@@ -1,9 +1,9 @@
 import type { IsoDate, PlayerId, TeamId } from './common'
 
-export const POSITIONS = ['GOL', 'LD', 'LE', 'ZAG', 'VOL', 'MC', 'MEI', 'PD', 'PE', 'ATA'] as const
+export const POSITIONS = ['GK', 'RB', 'LB', 'CB', 'DM', 'CM', 'AM', 'RW', 'LW', 'ST'] as const
 export type Position = (typeof POSITIONS)[number]
 
-export type Foot = 'direito' | 'esquerdo' | 'ambos'
+export type Foot = 'right' | 'left' | 'both'
 
 /** Atributos visíveis, escala de 1 a 20. */
 export const TECHNICAL_ATTRIBUTES = [

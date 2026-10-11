@@ -10,11 +10,11 @@ export interface Stadium {
 }
 
 export type FinanceCategory =
-  | 'bilheteria'
-  | 'patrocinio'
-  | 'venda-jogadores'
-  | 'salarios'
-  | 'compra-jogadores'
+  | 'ticket-sales'
+  | 'sponsorship'
+  | 'player-sales'
+  | 'salaries'
+  | 'player-purchases'
 
 export interface FinanceEntry {
   date: IsoDate

@@ -1,7 +1,7 @@
 import type { CompetitionId, IsoDate, MatchId, TeamId } from './common'
 
-/** MVP: só `liga`. Depois: `mata-mata` e `grupos+mata-mata`. */
-export type CompetitionType = 'liga'
+/** MVP: só `league`. Depois: `knockout` e `groups+knockout`. */
+export type CompetitionType = 'league'
 
 export interface Competition {
   id: CompetitionId
@@ -32,7 +32,7 @@ export interface StandingRow {
   redCards: number
 }
 
-export type SeasonPhase = 'pre-temporada' | 'em-andamento' | 'encerramento'
+export type SeasonPhase = 'pre-season' | 'in-season' | 'end-of-season'
 
 export interface Season {
   year: number

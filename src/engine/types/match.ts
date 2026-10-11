@@ -1,17 +1,17 @@
 import type { CompetitionId, IsoDate, MatchId, PlayerId, TeamId } from './common'
 
-export type MatchStatus = 'agendada' | 'finalizada'
+export type MatchStatus = 'scheduled' | 'finished'
 
 export type MatchEventType =
-  | 'gol'
-  | 'gol-contra'
-  | 'penalti-perdido'
-  | 'cartao-amarelo'
-  | 'cartao-vermelho'
-  | 'lesao'
-  | 'substituicao'
-  | 'escanteio'
-  | 'falta'
+  | 'goal'
+  | 'own-goal'
+  | 'missed-penalty'
+  | 'yellow-card'
+  | 'red-card'
+  | 'injury'
+  | 'substitution'
+  | 'corner'
+  | 'foul'
 
 export interface MatchEvent {
   minute: number
@@ -66,6 +66,6 @@ export interface Match {
   status: MatchStatus
   /** Semente usada na simulação (mesma semente = mesmo resultado). */
   seed: number
-  /** Preenchido apenas quando `status === 'finalizada'`. */
+  /** Preenchido apenas quando `status === 'finished'`. */
   result?: MatchResult
 }

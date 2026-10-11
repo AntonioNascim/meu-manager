@@ -1,12 +1,12 @@
 import type { PlayerId } from './common'
 import type { Position } from './player'
 
-export type PlayStyle = 'posse' | 'contra-ataque' | 'pressao-alta'
+export type PlayStyle = 'possession' | 'counter-attack' | 'high-press'
 
 /** De muito defensiva (-2) a muito ofensiva (+2). */
 export type Mentality = -2 | -1 | 0 | 1 | 2
 
-export type Sector = 'defesa' | 'meio' | 'ataque'
+export type Sector = 'defense' | 'midfield' | 'attack'
 
 export interface FormationSlot {
   position: Position

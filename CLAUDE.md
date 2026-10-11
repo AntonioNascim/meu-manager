@@ -4,6 +4,8 @@ Jogo de gerenciamento de futebol para navegador e celular, inspirado no Brasfoot
 
 Idioma do jogo e do código: textos da interface em português do Brasil. Nomes de variáveis, funções e tipos em inglês.
 
+**Valores de texto dos tipos também são em inglês** (ex.: `'possession'`, `'finished'`, `'counter-attack'`, posições `GK`, `CB`, `ST`). O português só existe na interface: todos os rótulos ficam em `src/ui/labels.ts` (`Record<Tipo, string>`, para o TypeScript acusar rótulo faltando). Nunca escrever texto em português dentro de `src/engine` ou `src/data`, exceto a narração das partidas. Ao criar um valor novo em um tipo, adicionar o rótulo em `labels.ts`.
+
 ---
 
 ## Stack
@@ -40,7 +42,7 @@ docs/       documentos de design
 
 ### Jogador
 - **Identidade:** id, nome, idade, nacionalidade, pé preferido (direito/esquerdo/ambos), posição principal e até 2 posições secundárias.
-- **Posições:** GOL, LD, LE, ZAG, VOL, MC, MEI, PD, PE, ATA.
+- **Posições:** GK, RB, LB, CB, DM, CM, AM, RW, LW, ST (na interface: GOL, LD, LE, ZAG, VOL, MC, MEI, PD, PE, ATA).
 - **Atributos visíveis (1 a 20):**
   - Técnicos: passe, finalização, drible, cruzamento, desarme, cabeceio, controle de bola
   - Físicos: velocidade, resistência, força
