@@ -50,6 +50,38 @@ export const FORMATIONS: Record<string, Formation> = {
       { position: 'ST', sector: 'attack' },
     ],
   },
+  '4-3-1-2': {
+    id: '4-3-1-2',
+    slots: [
+      { position: 'GK', sector: 'defense' },
+      { position: 'RB', sector: 'defense' },
+      { position: 'CB', sector: 'defense' },
+      { position: 'CB', sector: 'defense' },
+      { position: 'LB', sector: 'defense' },
+      { position: 'DM', sector: 'midfield' },
+      { position: 'CM', sector: 'midfield' },
+      { position: 'CM', sector: 'midfield' },
+      { position: 'AM', sector: 'midfield' },
+      { position: 'ST', sector: 'attack' },
+      { position: 'ST', sector: 'attack' },
+    ],
+  },
+  '4-1-4-1': {
+    id: '4-1-4-1',
+    slots: [
+      { position: 'GK', sector: 'defense' },
+      { position: 'RB', sector: 'defense' },
+      { position: 'CB', sector: 'defense' },
+      { position: 'CB', sector: 'defense' },
+      { position: 'LB', sector: 'defense' },
+      { position: 'DM', sector: 'midfield' },
+      { position: 'RW', sector: 'midfield' },
+      { position: 'CM', sector: 'midfield' },
+      { position: 'CM', sector: 'midfield' },
+      { position: 'LW', sector: 'midfield' },
+      { position: 'ST', sector: 'attack' },
+    ],
+  },
   '3-5-2': {
     id: '3-5-2',
     slots: [

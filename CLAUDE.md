@@ -43,15 +43,17 @@ docs/       documentos de design
 ### Jogador
 - **Identidade:** id, nome, idade, nacionalidade, pé preferido (direito/esquerdo/ambos), posição principal e até 2 posições secundárias.
 - **Posições:** GK, RB, LB, CB, DM, CM, AM, RW, LW, ST (na interface: GOL, LD, LE, ZAG, VOL, MC, MEI, PD, PE, ATA).
-- **Atributos visíveis (1 a 20):**
+- **Escala:** todos os atributos (visíveis e ocultos) e a força geral são **inteiros de 1 a 100** (limites em `ATTRIBUTE_MIN`/`ATTRIBUTE_MAX` no `config.ts`); a força geral calculada é decimal e só se arredonda para exibir. Só a **reputação dos times continua de 1 a 20**. Penalidades de posição são proporções (multiplicadores), então valem em qualquer escala.
+- **Atributos visíveis (1 a 100):**
   - Técnicos: passe, finalização, drible, cruzamento, desarme, cabeceio, controle de bola
   - Físicos: velocidade, resistência, força
   - Mentais: visão, posicionamento, decisão, determinação
   - Goleiro: reflexos, saída do gol (goleiro também usa posicionamento)
-- **Atributos ocultos:** potencial, consistência, propensão a lesão, profissionalismo.
+- **Atributos ocultos (1 a 100):** potencial (mesma escala da força geral), consistência, propensão a lesão, profissionalismo.
 - **Estado:** condição física (0–100), moral, forma (média das últimas notas), lesão (dias restantes), cartões e suspensão.
 - **Contrato:** salário, data de término, multa rescisória, clube de origem se emprestado.
 - **Força geral:** calculada a partir dos atributos com pesos por posição (ex.: zagueiro pesa desarme, cabeceio, posicionamento; atacante pesa finalização, velocidade, drible). Jogar fora da posição principal aplica penalidade; posição secundária tem penalidade menor.
+- **Faixas de força no mundo gerado:** titulares da Série A ~55 a 85; da Série B ~40 a 65. Craques (acima de ~85) são poucos no campeonato inteiro, só em times grandes da A; atributos acima de 90 são raros. A calibragem fica em `src/data/generationConfig.ts` e é coberta por testes.
 
 ### Time
 - **Identidade:** id, nome, abreviação de 3 letras, cidade, estado, 2 cores, estádio (nome e capacidade).
@@ -126,9 +128,11 @@ Criar testes de balanceamento que simulem temporadas inteiras e verifiquem esses
 ---
 
 ## Mundo inicial
-- **Série A e Série B**, 20 times cada, todos fictícios (sem nomes reais por questão de licença; no futuro um editor permitirá dados da comunidade).
+- **Série A e Série B**, 20 times cada, todos fictícios por padrão (sem nomes reais por questão de licença).
+- **Futuro:** times e jogadores reais serão carregados de um **arquivo de dados importado** (e o editor permitirá dados da comunidade). Por isso o mundo é sempre um `World` (`teams` + `players`) de dados puros: a geração fictícia em `src/data` é só uma das fontes, e o motor, o store e a UI nunca devem depender de como o mundo foi criado. Um importador futuro deve validar o arquivo (escala 1–100, elenco de 18 a 30, ids únicos) e montar o mesmo `World`.
 - Faixas de reputação na Série A: ~4 grandes, ~8 médios, ~8 pequenos. Série B com reputação menor.
-- Jogadores gerados com atributos coerentes com a posição e idades variadas (veteranos e promessas em todo time).
+- Jogadores gerados com atributos coerentes com a posição e idades variadas (veteranos e promessas em todo time). Elencos de 24 a 30 jogadores (times de maior reputação tendem a elencos maiores).
+- Escalação automática (IA e sugestão ao jogador): escolhe a formação que melhor encaixa os melhores jogadores, usando posições secundárias quando compensa; craques não ficam no banco.
 - 4 sobem da B e 4 caem da A.
 - A Série B é simulada pelo mesmo motor; no MVP a interface da B é só a classificação e resultados.
 

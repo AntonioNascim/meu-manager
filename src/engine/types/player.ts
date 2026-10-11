@@ -17,7 +17,7 @@ export const NATIONALITIES = [
 ] as const
 export type Nationality = (typeof NATIONALITIES)[number]
 
-/** Atributos visíveis, escala de 1 a 20. */
+/** Atributos visíveis, inteiros de 1 a 100 (ver ATTRIBUTE_MIN/MAX em config.ts). */
 export const TECHNICAL_ATTRIBUTES = [
   'passing',
   'finishing',
@@ -54,13 +54,13 @@ export type Attributes = Record<AttributeName, number>
 
 /** Atributos que o jogador não vê (apenas o motor e a IA usam). */
 export interface HiddenAttributes {
-  /** Teto de evolução (1 a 20). */
+  /** Teto de evolução (1 a 100, mesma escala da força geral). */
   potential: number
-  /** Regularidade de desempenho (1 a 20). */
+  /** Regularidade de desempenho (1 a 100). */
   consistency: number
-  /** Propensão a lesão (1 a 20; maior = mais lesões). */
+  /** Propensão a lesão (1 a 100; maior = mais lesões). */
   injuryProneness: number
-  /** Profissionalismo (1 a 20). */
+  /** Profissionalismo (1 a 100). */
   professionalism: number
 }
 

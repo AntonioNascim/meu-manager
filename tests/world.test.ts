@@ -2,8 +2,10 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { generateWorld } from '../src/data/generateWorld'
 import type { World } from '../src/data/generateWorld'
 import { TEAM_DEFINITIONS } from '../src/data/teamDefinitions'
-import { FORMATIONS } from '../src/engine/formations'
-import { playerOverall } from '../src/engine/overall'
+import { FORMATION_IDS, FORMATIONS, getFormation } from '../src/engine/formations'
+import { ATTRIBUTE_MAX, ATTRIBUTE_MIN, FORMATION_TIE_TOLERANCE } from '../src/engine/config'
+import { rankFormations } from '../src/engine/lineup'
+import { overallAt, playerOverall } from '../src/engine/overall'
 import { ATTRIBUTE_NAMES, NATIONALITIES, SQUAD_MAX, SQUAD_MIN } from '../src/engine/types'
 import type { Player, Team } from '../src/engine/types'
 
@@ -65,7 +67,12 @@ describe('robustez entre sementes', () => {
         const formation = FORMATIONS[t.tactic.formationId]
         const xi = t.tactic.startingXI.map((id) => byId.get(id) as Player)
         expect(new Set(t.tactic.startingXI).size).toBe(11)
-        expect(xi.filter((p, i) => p.position === formation?.slots[i]?.position).length).toBeGreaterThanOrEqual(9)
+        // Quem joga fora da posição principal deve ser exceção, e quase sempre numa posição secundária.
+        const slotOf = (i: number) => formation?.slots[i]?.position
+        expect(xi.filter((p, i) => p.position === slotOf(i)).length).toBeGreaterThanOrEqual(8)
+        expect(
+          xi.filter((p, i) => p.position === slotOf(i) || p.secondaryPositions.includes(slotOf(i) as Player['position'])).length,
+        ).toBeGreaterThanOrEqual(9)
         const ages = t.squad.map((id) => (byId.get(id) as Player).age)
         expect(ages.filter((a) => a >= 32).length).toBeGreaterThanOrEqual(2)
         expect(ages.filter((a) => a <= 20).length).toBeGreaterThanOrEqual(3)
@@ -137,7 +144,7 @@ describe('times', () => {
     const strengths = world.teams.map(startersStrength)
     expect(correlation(reps, strengths)).toBeGreaterThan(0.9)
     const avg = (tier: number) => mean(world.teams.filter((t) => t.tier === tier).map(startersStrength))
-    expect(avg(1)).toBeGreaterThan(avg(2) + 1.5)
+    expect(avg(1)).toBeGreaterThan(avg(2) + 8)
   })
 })
 
@@ -151,10 +158,21 @@ describe('elencos', () => {
     expect(world.players).toHaveLength(world.teams.reduce((n, t) => n + t.squad.length, 0))
   })
 
-  it('cada time tem ao menos 3 goleiros e cobertura de todas as posições', () => {
+  it('elencos têm entre 24 e 30 jogadores e os de maior reputação tendem a ser maiores', () => {
+    const sizes = world.teams.map((t) => t.squad.length)
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(24)
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(30)
+    expect(new Set(sizes).size).toBeGreaterThanOrEqual(5)
+    expect(correlation(world.teams.map((t) => t.reputation), sizes)).toBeGreaterThan(0.6)
+    const topFive = [...world.teams].sort((a, b) => b.reputation - a.reputation).slice(0, 5)
+    const bottomFive = [...world.teams].sort((a, b) => a.reputation - b.reputation).slice(0, 5)
+    expect(mean(topFive.map((t) => t.squad.length))).toBeGreaterThan(mean(bottomFive.map((t) => t.squad.length)) + 3)
+  })
+
+  it('cada time tem ao menos 2 goleiros e cobertura de todas as posições', () => {
     for (const t of world.teams) {
       const count = (pos: string) => squadOf(t).filter((p) => p.position === pos).length
-      expect(count('GK')).toBeGreaterThanOrEqual(3)
+      expect(count('GK')).toBeGreaterThanOrEqual(2)
       for (const pos of ['RB', 'LB', 'CB', 'DM', 'CM', 'AM', 'RW', 'LW', 'ST']) {
         expect(count(pos)).toBeGreaterThanOrEqual(2)
       }
@@ -178,17 +196,18 @@ describe('jogadores', () => {
     expect(new Set(world.players.map((p) => p.name)).size).toBe(world.players.length)
   })
 
-  it('atributos são inteiros de 1 a 20 e o potencial nunca fica abaixo do nível atual', () => {
+  it('atributos são inteiros de 1 a 100 e o potencial nunca fica abaixo do nível atual', () => {
     for (const p of world.players) {
       for (const name of ATTRIBUTE_NAMES) {
         const v = p.attributes[name]
         expect(Number.isInteger(v)).toBe(true)
-        expect(v).toBeGreaterThanOrEqual(1)
-        expect(v).toBeLessThanOrEqual(20)
+        expect(v).toBeGreaterThanOrEqual(ATTRIBUTE_MIN)
+        expect(v).toBeLessThanOrEqual(ATTRIBUTE_MAX)
       }
       for (const v of Object.values(p.hidden)) {
-        expect(v).toBeGreaterThanOrEqual(1)
-        expect(v).toBeLessThanOrEqual(20)
+        expect(Number.isInteger(v)).toBe(true)
+        expect(v).toBeGreaterThanOrEqual(ATTRIBUTE_MIN)
+        expect(v).toBeLessThanOrEqual(ATTRIBUTE_MAX)
       }
       expect(p.hidden.potential).toBeGreaterThanOrEqual(Math.round(playerOverall(p)))
     }
@@ -206,30 +225,30 @@ describe('jogadores', () => {
     const avgAttr = (pos: string, attr: (p: Player) => number) =>
       mean(world.players.filter((p) => p.position === pos).map(attr))
 
-    expect(avgAttr('ST', (p) => p.attributes.finishing)).toBeGreaterThan(avgAttr('CB', (p) => p.attributes.finishing) + 3)
-    expect(avgAttr('CB', (p) => p.attributes.tackling)).toBeGreaterThan(avgAttr('ST', (p) => p.attributes.tackling) + 3)
-    expect(avgAttr('CB', (p) => p.attributes.heading)).toBeGreaterThan(avgAttr('RW', (p) => p.attributes.heading) + 2)
-    expect(avgAttr('RW', (p) => p.attributes.crossing)).toBeGreaterThan(avgAttr('CB', (p) => p.attributes.crossing) + 3)
-    expect(avgAttr('CM', (p) => p.attributes.passing)).toBeGreaterThan(avgAttr('ST', (p) => p.attributes.passing) + 1)
-    expect(avgAttr('DM', (p) => p.attributes.tackling)).toBeGreaterThan(avgAttr('AM', (p) => p.attributes.tackling) + 2)
-    expect(avgAttr('ST', (p) => p.attributes.pace)).toBeGreaterThan(avgAttr('CB', (p) => p.attributes.pace) + 1)
+    expect(avgAttr('ST', (p) => p.attributes.finishing)).toBeGreaterThan(avgAttr('CB', (p) => p.attributes.finishing) + 15)
+    expect(avgAttr('CB', (p) => p.attributes.tackling)).toBeGreaterThan(avgAttr('ST', (p) => p.attributes.tackling) + 15)
+    expect(avgAttr('CB', (p) => p.attributes.heading)).toBeGreaterThan(avgAttr('RW', (p) => p.attributes.heading) + 10)
+    expect(avgAttr('RW', (p) => p.attributes.crossing)).toBeGreaterThan(avgAttr('CB', (p) => p.attributes.crossing) + 15)
+    expect(avgAttr('CM', (p) => p.attributes.passing)).toBeGreaterThan(avgAttr('ST', (p) => p.attributes.passing) + 5)
+    expect(avgAttr('DM', (p) => p.attributes.tackling)).toBeGreaterThan(avgAttr('AM', (p) => p.attributes.tackling) + 10)
+    expect(avgAttr('ST', (p) => p.attributes.pace)).toBeGreaterThan(avgAttr('CB', (p) => p.attributes.pace) + 5)
 
     const keepers = world.players.filter((p) => p.position === 'GK')
     const others = world.players.filter((p) => p.position !== 'GK')
-    expect(mean(keepers.map((p) => p.attributes.reflexes))).toBeGreaterThan(mean(others.map((p) => p.attributes.reflexes)) + 6)
-    expect(mean(keepers.map((p) => p.attributes.rushingOut))).toBeGreaterThan(mean(others.map((p) => p.attributes.rushingOut)) + 6)
+    expect(mean(keepers.map((p) => p.attributes.reflexes))).toBeGreaterThan(mean(others.map((p) => p.attributes.reflexes)) + 30)
+    expect(mean(keepers.map((p) => p.attributes.rushingOut))).toBeGreaterThan(mean(others.map((p) => p.attributes.rushingOut)) + 30)
     for (const p of others) {
-      expect(p.attributes.reflexes).toBeLessThanOrEqual(3)
-      expect(p.attributes.rushingOut).toBeLessThanOrEqual(3)
+      expect(p.attributes.reflexes).toBeLessThanOrEqual(15)
+      expect(p.attributes.rushingOut).toBeLessThanOrEqual(15)
     }
   })
 
   it('veteranos perdem velocidade e jovens ainda têm potencial para crescer', () => {
     const young = world.players.filter((p) => p.age <= 20)
     const old = world.players.filter((p) => p.age >= 34)
-    expect(mean(old.map((p) => p.attributes.pace))).toBeLessThan(mean(young.map((p) => p.attributes.pace)) + 1)
+    expect(mean(old.map((p) => p.attributes.pace))).toBeLessThan(mean(young.map((p) => p.attributes.pace)) + 5)
     const gap = (p: Player) => p.hidden.potential - playerOverall(p)
-    expect(mean(young.map(gap))).toBeGreaterThan(mean(old.map(gap)) + 1.5)
+    expect(mean(young.map(gap))).toBeGreaterThan(mean(old.map(gap)) + 7.5)
   })
 
   it('nomes têm cara brasileira, com apelidos e uns poucos sul-americanos', () => {
@@ -259,6 +278,98 @@ describe('jogadores', () => {
     const salaryOf = (tier: number) =>
       mean(world.players.filter((p) => world.teams.find((t) => t.id === p.teamId)?.tier === tier).map((p) => p.contract.salary))
     expect(salaryOf(1)).toBeGreaterThan(salaryOf(2))
+  })
+})
+
+const percentile = (xs: number[], p: number) => [...xs].sort((a, b) => a - b)[Math.floor(p * (xs.length - 1))] as number
+
+describe('escala de força de 1 a 100', () => {
+  const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8]
+  const worlds = SEEDS.map((seed) => generateWorld({ seed }))
+
+  /** Força de todos os titulares das equipes da série, juntando todos os mundos. */
+  const starters = (tier: number) =>
+    worlds.flatMap((w) => {
+      const byId = new Map(w.players.map((p) => [p.id, p]))
+      return w.teams
+        .filter((t) => t.tier === tier)
+        .flatMap((t) => t.tactic.startingXI.map((id) => playerOverall(byId.get(id) as Player)))
+    })
+
+  it('titulares da Série A ficam entre ~55 e ~85', () => {
+    const xs = starters(1)
+    expect(percentile(xs, 0.05)).toBeGreaterThanOrEqual(53)
+    expect(percentile(xs, 0.95)).toBeLessThanOrEqual(84)
+    expect(percentile(xs, 0.5)).toBeGreaterThan(62)
+    expect(percentile(xs, 0.5)).toBeLessThan(75)
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(45)
+    expect(Math.max(...xs)).toBeLessThanOrEqual(95)
+  })
+
+  it('titulares da Série B ficam entre ~40 e ~65', () => {
+    const xs = starters(2)
+    expect(percentile(xs, 0.05)).toBeGreaterThanOrEqual(40)
+    expect(percentile(xs, 0.95)).toBeLessThanOrEqual(65)
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(33)
+    expect(Math.max(...xs)).toBeLessThanOrEqual(76)
+  })
+
+  it('craques são poucos no campeonato inteiro e atributos acima de 90 são raros', () => {
+    for (const w of worlds) {
+      const overalls = w.players.map(playerOverall)
+      expect(overalls.filter((o) => o >= 85).length).toBeLessThanOrEqual(12)
+      expect(overalls.filter((o) => o >= 92).length).toBeLessThanOrEqual(2)
+
+      const values = w.players.flatMap((p) => ATTRIBUTE_NAMES.map((n) => p.attributes[n]))
+      expect(values.filter((v) => v > 90).length / values.length).toBeLessThan(0.005)
+      expect(values.filter((v) => v > 95).length / values.length).toBeLessThan(0.0005)
+    }
+  })
+
+  it('craques só aparecem na Série A', () => {
+    for (const w of worlds) {
+      const tierOf = new Map(w.teams.map((t) => [t.id, t.tier]))
+      for (const p of w.players) {
+        if (tierOf.get(p.teamId as string) === 2) expect(playerOverall(p)).toBeLessThan(80)
+      }
+    }
+  })
+
+  it('força mínima de um profissional é razoável', () => {
+    for (const w of worlds) expect(Math.min(...w.players.map(playerOverall))).toBeGreaterThanOrEqual(30)
+  })
+})
+
+describe('escalação automática prioriza os melhores', () => {
+  it('o melhor jogador de cada time joga, ou há alguém praticamente igual na vaga dele', () => {
+    for (const seed of [12345, 1, 2, 3, 4, 5, 6, 7]) {
+      const w = generateWorld({ seed })
+      for (const t of w.teams) {
+        const squad = w.players.filter((p) => p.teamId === t.id)
+        const top = [...squad].sort((a, b) => playerOverall(b) - playerOverall(a))[0] as Player
+        if (t.tactic.startingXI.includes(top.id)) continue
+
+        // Fora do XI só vale se, em toda vaga que ele cobriria, o titular rende quase o mesmo.
+        const formation = FORMATIONS[t.tactic.formationId]!
+        const xi = t.tactic.startingXI.map((id) => squad.find((p) => p.id === id) as Player)
+        const covers = formation.slots
+          .map((slot, i) => ({ slot, starter: xi[i] as Player }))
+          .filter(({ slot }) => slot.position === top.position || top.secondaryPositions.includes(slot.position))
+        for (const { slot, starter } of covers) {
+          expect(overallAt(starter, slot.position)).toBeGreaterThanOrEqual(overallAt(top, slot.position) - 3)
+        }
+      }
+    }
+  })
+
+  it('a formação escolhida está entre as que melhor encaixam o elenco', () => {
+    const squadOfTeam = (t: Team) => world.players.filter((p) => p.teamId === t.id)
+    for (const t of world.teams) {
+      const ranking = rankFormations(squadOfTeam(t), FORMATION_IDS.map(getFormation))
+      const best = ranking[0]!.score
+      const chosen = ranking.find((r) => r.formationId === t.tactic.formationId)!
+      expect(chosen.score).toBeGreaterThanOrEqual(best * (1 - FORMATION_TIE_TOLERANCE) - 1e-9)
+    }
   })
 })
 

@@ -1,22 +1,25 @@
-import { buildTactic } from '../engine/lineup'
-import { FORMATION_IDS } from '../engine/formations'
+import { FORMATION_TIE_TOLERANCE } from '../engine/config'
+import { buildTactic, rankFormations } from '../engine/lineup'
+import { FORMATION_IDS, getFormation } from '../engine/formations'
 import type { Rng } from '../engine/rng'
 import type { Mentality, Player, PlayStyle, Position, Team } from '../engine/types'
 import { createGenerationContext, generatePlayer, pickAge } from './generatePlayer'
 import type { GenerationContext } from './generatePlayer'
+import { GENERATION } from './generationConfig'
 import type { TeamDefinition } from './teamDefinitions'
 
 export { createGenerationContext }
 
 type Role = 'starter' | 'backup'
 
-/** 26 jogadores: cobre qualquer uma das formações com banco. */
-const SQUAD_TEMPLATE: readonly { position: Position; role: Role }[] = [
-  { position: 'GK', role: 'starter' }, { position: 'GK', role: 'backup' }, { position: 'GK', role: 'backup' },
+type SquadSlot = { position: Position; role: Role }
+
+/** 24 jogadores: o mínimo que cobre qualquer uma das formações com banco. */
+const CORE_TEMPLATE: readonly SquadSlot[] = [
+  { position: 'GK', role: 'starter' }, { position: 'GK', role: 'backup' },
   { position: 'RB', role: 'starter' }, { position: 'RB', role: 'backup' },
   { position: 'LB', role: 'starter' }, { position: 'LB', role: 'backup' },
-  { position: 'CB', role: 'starter' }, { position: 'CB', role: 'starter' },
-  { position: 'CB', role: 'backup' }, { position: 'CB', role: 'backup' },
+  { position: 'CB', role: 'starter' }, { position: 'CB', role: 'starter' }, { position: 'CB', role: 'backup' },
   { position: 'DM', role: 'starter' }, { position: 'DM', role: 'starter' }, { position: 'DM', role: 'backup' },
   { position: 'CM', role: 'starter' }, { position: 'CM', role: 'starter' }, { position: 'CM', role: 'backup' },
   { position: 'AM', role: 'starter' }, { position: 'AM', role: 'backup' },
@@ -25,20 +28,50 @@ const SQUAD_TEMPLATE: readonly { position: Position; role: Role }[] = [
   { position: 'ST', role: 'starter' }, { position: 'ST', role: 'starter' }, { position: 'ST', role: 'backup' },
 ]
 
+/** Reservas de profundidade, na ordem em que entram conforme o elenco cresce (até 30). */
+const DEPTH_TEMPLATE: readonly SquadSlot[] = [
+  { position: 'CB', role: 'backup' },
+  { position: 'GK', role: 'backup' },
+  { position: 'CM', role: 'backup' },
+  { position: 'ST', role: 'backup' },
+  { position: 'AM', role: 'backup' },
+  { position: 'RW', role: 'backup' },
+]
+
+const SQUAD_SIZE_MIN = CORE_TEMPLATE.length
+const SQUAD_SIZE_MAX = CORE_TEMPLATE.length + DEPTH_TEMPLATE.length
+
+/** Entre 24 e 30 jogadores; times de maior reputação tendem a ter elencos maiores. */
+export function squadSizeForReputation(rng: Rng, reputation: number): number {
+  const expected = SQUAD_SIZE_MIN + ((reputation - 3) / 16) * (SQUAD_SIZE_MAX - SQUAD_SIZE_MIN)
+  return Math.min(SQUAD_SIZE_MAX, Math.max(SQUAD_SIZE_MIN, Math.round(expected + rng.normal(0, 0.9))))
+}
+
 const MIN_VETERANS = 2
 const MIN_PROSPECTS = 3
 const VETERAN_AGE = 32
 const PROSPECT_MAX_AGE = 20
 
-/** Nível-base dos atributos a partir da reputação do time. */
-export function qualityForReputation(reputation: number): number {
-  return 5 + 0.58 * reputation
+/** Variação do nível entre times de mesma reputação (pontos de força). */
+const TEAM_LEVEL_SD = 1.75
+
+/** Força média esperada dos 11 titulares, a partir da série e da reputação (1 a 20) do time. */
+export function teamLevelFor(def: Pick<TeamDefinition, 'tier' | 'reputation'>): number {
+  const { base, referenceReputation, perReputation } = GENERATION.teamLevel[def.tier]
+  return base + (def.reputation - referenceReputation) * perReputation
+}
+
+/** Chance de cada titular ser um craque: zero fora da Série A, cresce com a reputação. */
+function starChance(def: Pick<TeamDefinition, 'tier' | 'reputation'>): number {
+  const { minReputation, maxChance } = GENERATION.star
+  if (def.tier !== 1 || def.reputation < minReputation) return 0
+  return (maxChance * (def.reputation - (minReputation - 1))) / (19 - (minReputation - 1))
 }
 
 /** Idades de todo o elenco, garantindo veteranos e promessas em todo time. */
-function assignAges(rng: Rng): number[] {
-  const ages = SQUAD_TEMPLATE.map(() => pickAge(rng))
-  const outfield = SQUAD_TEMPLATE.map((_, i) => i).filter((i) => SQUAD_TEMPLATE[i]?.position !== 'GK')
+function assignAges(rng: Rng, template: readonly SquadSlot[]): number[] {
+  const ages = template.map(() => pickAge(rng))
+  const outfield = template.map((_, i) => i).filter((i) => template[i]?.position !== 'GK')
 
   const isVeteran = (i: number) => (ages[i] ?? 0) >= VETERAN_AGE
   const isProspect = (i: number) => (ages[i] ?? 99) <= PROSPECT_MAX_AGE
@@ -80,22 +113,29 @@ export interface GeneratedTeam {
  */
 export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefinition, rank: number): GeneratedTeam {
   const id = `team-${def.abbreviation.toLowerCase()}`
-  const teamLevel = qualityForReputation(def.reputation) + rng.normal(0, 0.35)
-  const ages = assignAges(rng)
+  const teamLevel = teamLevelFor(def) + rng.normal(0, TEAM_LEVEL_SD)
+  const squadSize = squadSizeForReputation(rng, def.reputation)
+  const template = [...CORE_TEMPLATE, ...DEPTH_TEMPLATE].slice(0, squadSize)
+  const ages = assignAges(rng, template)
 
-  const players = SQUAD_TEMPLATE.map((slot, i) => {
-    const talent = rng.normal(0, 1.3)
-    const roleBonus = slot.role === 'starter' ? 0.8 : -0.9
-    return generatePlayer(rng, ctx, {
-      position: slot.position,
-      quality: teamLevel + talent + roleBonus,
-      age: ages[i] ?? 25,
-      teamId: id,
-    })
+  const players = template.map((slot, i) => {
+    const isStarter = slot.role === 'starter'
+    let quality = teamLevel + rng.normal(0, GENERATION.talentSd) - (isStarter ? 0 : GENERATION.backupPenalty)
+    // Craque raro: só entre os titulares de times grandes da Série A.
+    if (isStarter && rng.chance(starChance(def))) {
+      quality += rng.float(GENERATION.star.bonusMin, GENERATION.star.bonusMax)
+    }
+    return generatePlayer(rng, ctx, { position: slot.position, quality, age: ages[i] ?? 25, teamId: id })
   })
 
+  // A formação é a que melhor encaixa os melhores jogadores (sorteia entre as quase empatadas).
+  const ranking = rankFormations(players, FORMATION_IDS.map(getFormation))
+  const best = ranking[0]?.score ?? 0
+  const nearBest = ranking.filter((r) => r.score >= best * (1 - FORMATION_TIE_TOLERANCE))
+  const formationId = rng.pick(nearBest).formationId
+
   const tactic = buildTactic(players, {
-    formationId: rng.pick(FORMATION_IDS),
+    formationId,
     style: pickStyle(rng, def.reputation),
     mentality: pickMentality(rng, def.reputation),
   })

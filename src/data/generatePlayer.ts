@@ -1,3 +1,4 @@
+import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../engine/config'
 import { overallForPosition, POSITION_WEIGHTS } from '../engine/overall'
 import type { Rng } from '../engine/rng'
 import { ATTRIBUTE_NAMES } from '../engine/types'
@@ -20,6 +21,7 @@ import {
   SPANISH_FIRST_NAMES,
   SPANISH_SURNAMES,
 } from './names'
+import { GENERATION } from './generationConfig'
 
 /** Chance de o jogador ser estrangeiro (sul-americano). */
 const FOREIGN_CHANCE = 0.06
@@ -63,7 +65,7 @@ export function createGenerationContext(startYear: number): GenerationContext {
 
 export interface PlayerSpec {
   position: Position
-  /** Nível-base do jogador (escala dos atributos, antes de idade e ruído). */
+  /** Nível-base do jogador (força geral esperada, 1 a 100, antes de idade e ruído). */
   quality: number
   age: number
   teamId: TeamId
@@ -137,40 +139,81 @@ function pickSecondaryPositions(rng: Rng, position: Position): Position[] {
   return rng.shuffle(neighbors).slice(0, count)
 }
 
-/** Importância de cada atributo para a posição, vinda dos mesmos pesos da força geral. */
-function emphasis(position: Position, name: AttributeName): number {
+const offsetCache = new Map<Position, Record<AttributeName, number>>()
+
+/**
+ * Quanto cada atributo fica acima/abaixo do nível do jogador, conforme a importância
+ * dele na posição (mesmos pesos da força geral). Centralizado para que a força geral
+ * resultante fique em torno do nível-base: atributos-chave sobem, os irrelevantes caem.
+ */
+function attributeOffsets(position: Position): Record<AttributeName, number> {
+  const cached = offsetCache.get(position)
+  if (cached) return cached
+
   const weights = POSITION_WEIGHTS[position]
   const maxWeight = Math.max(...Object.values(weights))
-  const w = weights[name]
-  return w ? 0.45 + (0.75 * w) / maxWeight : 0.4
+  const raw = {} as Record<AttributeName, number>
+  let weightedSum = 0
+  let weightTotal = 0
+  for (const name of ATTRIBUTE_NAMES) {
+    const w = weights[name]
+    const importance = w ? 0.45 + (0.75 * w) / maxWeight : 0.4
+    const { above, below } = GENERATION.emphasis
+    raw[name] = importance >= 1 ? (importance - 1) * above : (importance - 1) * below
+    if (w) {
+      weightedSum += w * raw[name]
+      weightTotal += w
+    }
+  }
+  const center = weightedSum / weightTotal
+  const offsets = {} as Record<AttributeName, number>
+  for (const name of ATTRIBUTE_NAMES) offsets[name] = raw[name] - center
+  offsetCache.set(position, offsets)
+  return offsets
+}
+
+/** Comprime valores muito altos, para que atributos acima de 90 sejam raros. */
+function softCap(value: number): number {
+  const { softCap: cap, softCapFactor } = GENERATION
+  return value > cap ? cap + (value - cap) * softCapFactor : value
 }
 
 function generateAttributes(rng: Rng, position: Position, quality: number, age: number): Attributes {
+  const a = GENERATION.age
   // Jovens ainda não se desenvolveram; veteranos perdem físico mas ganham leitura de jogo.
-  const base = quality - Math.max(0, 22 - age) * 0.6
-  const physicalDecline = Math.max(0, age - 30) * 0.45
-  const mentalGain = clamp((age - 26) * 0.25, 0, 1.5)
+  const base = Math.max(
+    GENERATION.qualityFloor,
+    quality - Math.max(0, a.fullGrowthAge - age) * a.youthPenaltyPerYear,
+  )
+  const physicalDecline = Math.max(0, age - a.declineStartAge) * a.physicalDeclinePerYear
+  const mentalGain = clamp((age - a.mentalGainStartAge) * a.mentalGainPerYear, 0, a.mentalGainMax)
+  const offsets = attributeOffsets(position)
 
   const attributes = {} as Attributes
   for (const name of ATTRIBUTE_NAMES) {
     if ((name === 'reflexes' || name === 'rushingOut') && position !== 'GK') {
-      attributes[name] = rng.int(1, 3)
+      const [low, high] = GENERATION.outfieldGoalkeeperRange
+      attributes[name] = rng.int(low, high)
       continue
     }
-    let value = base * emphasis(position, name) + rng.normal(0, 1.2)
+    let value = base + offsets[name] + rng.normal(0, GENERATION.attributeNoiseSd)
     if (name === 'pace' || name === 'stamina') value -= physicalDecline
-    if (name === 'strength') value -= physicalDecline * 0.4
+    if (name === 'strength') value -= physicalDecline * a.strengthDeclineShare
     if (name === 'vision' || name === 'positioning' || name === 'decisions' || name === 'determination') {
       value += mentalGain
     }
-    attributes[name] = clamp(Math.round(value), 1, 20)
+    attributes[name] = clamp(Math.round(softCap(value)), ATTRIBUTE_MIN, ATTRIBUTE_MAX)
   }
   return attributes
 }
 
-/** Salário mensal em R$: cresce exponencialmente com a força geral. */
+function hiddenAttribute(rng: Rng, dist: { mean: number; sd: number }): number {
+  return clamp(Math.round(rng.normal(dist.mean, dist.sd)), ATTRIBUTE_MIN, ATTRIBUTE_MAX)
+}
+
+/** Salário mensal em R$: cresce exponencialmente com a força geral (de 1 a 100). */
 export function salaryForOverall(overall: number): number {
-  const raw = 8000 * Math.pow(1.33, overall - 5)
+  const raw = 8000 * Math.pow(1.33, overall / 5 - 5)
   return Math.max(5000, Math.round(raw / 500) * 500)
 }
 
@@ -185,8 +228,9 @@ export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpe
   const overall = overallForPosition(attributes, spec.position)
 
   // Jovens têm margem para crescer; quem já passou dos 28 está no teto.
-  const growth = Math.max(0, 26 - spec.age) * rng.float(0.2, 0.7) + rng.float(0, 0.8)
-  const potential = clamp(Math.round(overall + growth), Math.round(overall), 20)
+  const g = GENERATION.growth
+  const growth = Math.max(0, g.untilAge - spec.age) * rng.float(g.perYearMin, g.perYearMax) + rng.float(0, g.randomMax)
+  const potential = clamp(Math.round(overall + growth), Math.round(overall), ATTRIBUTE_MAX)
 
   const salary = salaryForOverall(overall)
   const contractYears = rng.weighted([0, 1, 2, 3, 4], (y) => [3, 4, 4, 3, 2][y] ?? 1)
@@ -202,9 +246,9 @@ export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpe
     attributes,
     hidden: {
       potential,
-      consistency: clamp(Math.round(rng.normal(12, 3)), 1, 20),
-      injuryProneness: clamp(Math.round(rng.normal(10, 4)), 1, 20),
-      professionalism: clamp(Math.round(rng.normal(12, 3.5)), 1, 20),
+      consistency: hiddenAttribute(rng, GENERATION.hidden.consistency),
+      injuryProneness: hiddenAttribute(rng, GENERATION.hidden.injuryProneness),
+      professionalism: hiddenAttribute(rng, GENERATION.hidden.professionalism),
     },
     condition: {
       fitness: 100,

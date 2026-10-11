@@ -12,19 +12,24 @@ const flat = (value: number): Attributes =>
 describe('força geral', () => {
   it('atributos todos iguais dão a mesma força em qualquer posição', () => {
     for (const pos of ['GK', 'CB', 'CM', 'ST'] as const) {
-      expect(overallForPosition(flat(10), pos)).toBeCloseTo(10)
+      expect(overallForPosition(flat(50), pos)).toBeCloseTo(50)
     }
   })
 
-  it('atacante pesa finalização; zagueiro pesa desarme, cabeceio e posicionamento', () => {
-    const base = flat(8)
-    const striker = overallForPosition({ ...base, finishing: 18 }, 'ST')
-    const defenderAsStriker = overallForPosition({ ...base, tackling: 18 }, 'ST')
-    expect(striker).toBeGreaterThan(defenderAsStriker + 1)
+  it('a força geral fica na mesma escala dos atributos (1 a 100)', () => {
+    expect(overallForPosition(flat(1), 'ST')).toBeCloseTo(1)
+    expect(overallForPosition(flat(100), 'GK')).toBeCloseTo(100)
+  })
 
-    const centreBack = overallForPosition({ ...base, tackling: 18, heading: 18, positioning: 18 }, 'CB')
-    const finisherAsCb = overallForPosition({ ...base, finishing: 18 }, 'CB')
-    expect(centreBack).toBeGreaterThan(finisherAsCb + 3)
+  it('atacante pesa finalização; zagueiro pesa desarme, cabeceio e posicionamento', () => {
+    const base = flat(40)
+    const striker = overallForPosition({ ...base, finishing: 90 }, 'ST')
+    const defenderAsStriker = overallForPosition({ ...base, tackling: 90 }, 'ST')
+    expect(striker).toBeGreaterThan(defenderAsStriker + 5)
+
+    const centreBack = overallForPosition({ ...base, tackling: 90, heading: 90, positioning: 90 }, 'CB')
+    const finisherAsCb = overallForPosition({ ...base, finishing: 90 }, 'CB')
+    expect(centreBack).toBeGreaterThan(finisherAsCb + 15)
   })
 
   it('jogar fora da posição tem penalidade, e a secundária penaliza menos', () => {
@@ -43,6 +48,13 @@ describe('formações', () => {
       expect(f.slots[0]?.position).toBe('GK')
       expect(f.slots.filter((s) => s.position === 'GK')).toHaveLength(1)
     }
+  })
+
+  it('penalidade de posição é proporcional (vale em qualquer escala)', () => {
+    const player: Pick<Player, 'position' | 'secondaryPositions'> = { position: 'ST', secondaryPositions: ['AM'] }
+    expect(positionFit(player, 'AM')).toBeCloseTo(0.93)
+    expect(positionFit(player, 'CB')).toBeCloseTo(0.75)
+    expect(positionFit(player, 'GK')).toBeCloseTo(0.3)
   })
 
   it('formação desconhecida dá erro', () => {

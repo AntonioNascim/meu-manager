@@ -45,7 +45,7 @@ export const POSITION_WEIGHTS: Record<Position, PositionWeights> = {
   },
 }
 
-/** Média ponderada dos atributos para a posição (escala 1 a 20). */
+/** Média ponderada dos atributos para a posição (escala 1 a 100; devolve decimal, arredondar só para exibir). */
 export function overallForPosition(attributes: Attributes, position: Position): number {
   const weights = POSITION_WEIGHTS[position]
   let sum = 0
