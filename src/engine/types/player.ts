@@ -5,6 +5,18 @@ export type Position = (typeof POSITIONS)[number]
 
 export type Foot = 'right' | 'left' | 'both'
 
+export const NATIONALITIES = [
+  'Brazil',
+  'Argentina',
+  'Uruguay',
+  'Paraguay',
+  'Chile',
+  'Colombia',
+  'Peru',
+  'Ecuador',
+] as const
+export type Nationality = (typeof NATIONALITIES)[number]
+
 /** Atributos visíveis, escala de 1 a 20. */
 export const TECHNICAL_ATTRIBUTES = [
   'passing',
@@ -90,9 +102,12 @@ export interface PlayerSeasonStats {
 
 export interface Player {
   id: PlayerId
+  /** Nome completo. */
   name: string
+  /** Apelido pelo qual o jogador é conhecido, quando tem um. */
+  nickname?: string
   age: number
-  nationality: string
+  nationality: Nationality
   foot: Foot
   position: Position
   /** Até 2 posições secundárias. */

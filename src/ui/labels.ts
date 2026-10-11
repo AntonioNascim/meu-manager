@@ -11,6 +11,7 @@ import type {
   Mentality,
   MatchEventType,
   MatchStatus,
+  Nationality,
   PlayStyle,
   Position,
   SeasonPhase,
@@ -42,6 +43,17 @@ export const POSITION_SHORT_LABELS: Record<Position, string> = {
   RW: 'PD',
   LW: 'PE',
   ST: 'ATA',
+}
+
+export const NATIONALITY_LABELS: Record<Nationality, string> = {
+  Brazil: 'Brasil',
+  Argentina: 'Argentina',
+  Uruguay: 'Uruguai',
+  Paraguay: 'Paraguai',
+  Chile: 'Chile',
+  Colombia: 'Colômbia',
+  Peru: 'Peru',
+  Ecuador: 'Equador',
 }
 
 export const FOOT_LABELS: Record<Foot, string> = {
