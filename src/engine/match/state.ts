@@ -86,7 +86,10 @@ export interface SideState {
   team: Team
   formation: Formation
   style: PlayStyle
-  mentality: Mentality
+  /** Mentalidade escolhida na tática. */
+  baseMentality: Mentality
+  /** Mentalidade em vigor no momento (a escolhida + ajuste conforme o placar). */
+  mentality: number
   /** Multiplicador de atributos deste lado (fator casa). */
   sideFactor: number
   /** Todos que entraram em campo (titulares e quem entrou depois). */
@@ -179,6 +182,7 @@ export function buildSide(input: MatchSideInput, sideFactor = 1): SideState {
     team,
     formation,
     style: team.tactic.style,
+    baseMentality: team.tactic.mentality,
     mentality: team.tactic.mentality,
     sideFactor,
     players,

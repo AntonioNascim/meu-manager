@@ -43,6 +43,7 @@ export function simulateMatch(input: MatchInput): MatchResult {
   for (let i = 0; i < MATCH.moments; i++) {
     ctx.minute = Math.min(MATCH_MINUTES, 1 + Math.floor((i * MATCH_MINUTES) / MATCH.moments))
     checkInjury(ctx)
+    updateGameState(ctx)
     applyFatigue(ctx.home)
     applyFatigue(ctx.away)
     substituteTired(ctx, ctx.home)
@@ -95,7 +96,7 @@ function controlScore(side: SideState): number {
     side.style === 'possession' ? MATCH.tactics.possession.control
     : side.style === 'counter-attack' ? MATCH.tactics.counter.control
     : 0
-  return base + style + midfieldNumbers(side)
+  return base + style + midfieldNumbers(side) + MATCH.tactics.mentality.control * side.mentality
 }
 
 /** Capacidade de tomar a bola: desarme, posicionamento, resistência (+ pressão alta e formação). */
@@ -130,6 +131,19 @@ function oneOnOneOffset(att: SideState, def: SideState, transition: boolean): nu
     (def.style === 'high-press' ? MATCH.tactics.highPress.spaceBehind : 0) +
     (transition ? MATCH.tactics.counter.transitionOneOnOne : 0)
   )
+}
+
+/** Reta final: quem vence recua para segurar o resultado e quem perde vai para o tudo ou nada. */
+function updateGameState(ctx: MatchContext): void {
+  const { fromMinute, shift } = MATCH.tactics.gameState
+  for (const [side, other] of [
+    [ctx.home, ctx.away],
+    [ctx.away, ctx.home],
+  ] as const) {
+    const diff = side.goals - other.goals
+    const adjust = ctx.minute < fromMinute || diff === 0 ? 0 : diff > 0 ? -shift : shift
+    side.mentality = Math.max(-2, Math.min(2, side.baseMentality + adjust))
+  }
 }
 
 /** Quem joga no contra-ataque, ao recuperar a bola, pode sair em transição rápida. */

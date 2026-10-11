@@ -39,11 +39,11 @@ export const MATCH = {
   moments: 96,
   /**
    * k da fórmula do duelo: chance = 1 / (1 + e^(−k × (ataque − defesa))).
-   * Calibrado para a escala 1–100: 10 pontos de vantagem ≈ 65% num duelo equilibrado.
+   * Calibrado para a escala 1–100: 10 pontos de vantagem ≈ 59%, 30 pontos ≈ 75%.
    */
-  duelK: 0.06,
+  duelK: 0.037,
   /** Chance de a posse chegar ao terço final e virar jogada (o resto é troca de passes sem perigo). */
-  attackRate: 0.56,
+  attackRate: 0.52,
   /** Substituições permitidas por time. */
   maxSubs: 5,
 
@@ -107,7 +107,7 @@ export const MATCH = {
   },
 
   /** xG base por tipo de finalização. */
-  xg: { longShot: 0.035, inBox: 0.12, header: 0.09, oneOnOne: 0.38, penalty: 0.76, freeKick: 0.06 } satisfies Record<ShotType, number>,
+  xg: { longShot: 0.035, inBox: 0.121, header: 0.09, oneOnOne: 0.38, penalty: 0.76, freeKick: 0.06 } satisfies Record<ShotType, number>,
   /** Chance de a finalização ser bloqueada antes de chegar ao goleiro. */
   blockChance: { longShot: 0.25, inBox: 0.2, header: 0.05, oneOnOne: 0, penalty: 0, freeKick: 0.3 } satisfies Record<ShotType, number>,
   /** Quando não é gol (nem bloqueio): chance de ir no alvo (defesa do goleiro). */
@@ -139,9 +139,9 @@ export const MATCH = {
   /** Fator casa: multiplica todos os atributos do mandante. Cresce com a lotação do estádio. */
   home: {
     /** Vantagem com estádio vazio. */
-    base: 0.02,
+    base: 0.025,
     /** Vantagem extra com estádio cheio (proporcional à ocupação). */
-    crowd: 0.04,
+    crowd: 0.055,
     /** Fração da torcida que vai ao jogo (estimativa de público até existir bilheteria). */
     fanTurnout: 0.012,
     minFill: 0.2,
@@ -170,26 +170,32 @@ export const MATCH = {
   tactics: {
     possession: {
       /** Mais controle no meio (pontos de atributo), menos cara a cara. */
-      control: 5,
+      control: 7,
       oneOnOne: -0.4,
       playType: { through: 1.2, longShot: 0.7 } as Partial<Record<PlayType, number>>,
     },
     counter: {
       /** Abre mão da bola... */
-      control: -5,
+      control: -7,
       /** ...mas, ao recuperá-la, sai em transição rápida. */
-      transitionChance: 0.35,
+      transitionChance: 0.5,
       transitionProgression: 0.5,
-      transitionOneOnOne: 0.6,
+      transitionOneOnOne: 0.9,
     },
     highPress: {
       /** Recupera a bola mais alto... */
-      press: 5,
+      press: 7,
       /** ...e deixa espaço nas costas (passe em profundidade e cara a cara do rival). */
       spaceBehind: 0.4,
     },
     /** Mentalidade (−2 a +2): muda a frequência de ataques e o espaço deixado atrás. */
-    mentality: { attackRate: 0.08, openness: 0.12 },
+    /** `control`: pontos de controle do meio por nível (quem recua cede a bola). */
+    mentality: { attackRate: 0.08, openness: 0.12, control: 2.5 },
+    /**
+     * Comportamento conforme o placar (IA): a partir de `fromMinute`, quem vence recua
+     * (`shift` níveis de mentalidade a menos) e quem perde se lança ao ataque.
+     */
+    gameState: { fromMinute: 65, shift: 2 },
   },
 
   /** Formação: número de jogadores por setor (referência: 4 no meio e na defesa, 2 no ataque). */

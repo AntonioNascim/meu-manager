@@ -38,11 +38,11 @@ describe('fórmula do duelo', () => {
     expect(duelChance(70, 60)).toBeCloseTo(1 - duelChance(60, 70))
   })
 
-  it('k está calibrado para a escala 1–100: 10 pontos ≈ 65%, 30 pontos ≈ 86%', () => {
-    expect(duelChance(70, 60)).toBeGreaterThan(0.6)
-    expect(duelChance(70, 60)).toBeLessThan(0.7)
-    expect(duelChance(90, 60)).toBeGreaterThan(0.8)
-    expect(duelChance(90, 60)).toBeLessThan(0.9)
+  it('k está calibrado para a escala 1–100: 10 pontos ≈ 59%, 30 pontos ≈ 75%', () => {
+    expect(duelChance(70, 60)).toBeGreaterThan(0.55)
+    expect(duelChance(70, 60)).toBeLessThan(0.65)
+    expect(duelChance(90, 60)).toBeGreaterThan(0.7)
+    expect(duelChance(90, 60)).toBeLessThan(0.8)
   })
 
   it('o deslocamento torna a etapa mais difícil para o ataque', () => {
@@ -115,8 +115,11 @@ describe('simulação de partida', () => {
         expect(injured?.injuryDays).toBeGreaterThan(0)
       }
       for (const e of r.events.filter((ev) => ev.type === 'red-card')) {
+        // Sai no minuto da expulsão (quem entrou depois do início joga menos que isso).
         const sentOff = r.playerResults.find((p) => p.playerId === e.playerId)
-        expect(sentOff?.minutesPlayed).toBe(e.minute)
+        expect(sentOff?.minutesPlayed).toBeLessThanOrEqual(e.minute)
+        // Expulso não pode ser substituído depois.
+        expect(r.events.some((ev) => ev.type === 'substitution' && ev.playerId === e.playerId && ev.minute > e.minute)).toBe(false)
       }
     }
   })

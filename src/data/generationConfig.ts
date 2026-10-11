@@ -8,7 +8,7 @@ export const GENERATION = {
    * `base` na reputação de referência, somando `perReputation` por ponto acima dela.
    */
   teamLevel: {
-    1: { base: 62, referenceReputation: 7, perReputation: 1.15 },
+    1: { base: 62, referenceReputation: 7, perReputation: 0.95 },
     2: { base: 47, referenceReputation: 3, perReputation: 2.2 },
   },
   /** Desvio padrão do talento individual em torno do nível do time. */
