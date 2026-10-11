@@ -1,0 +1,477 @@
+/**
+ * Motor de partida: ~96 momentos de posse, cada um decidido por duelos entre jogadores.
+ * Etapas de um momento (pode terminar em qualquer uma):
+ *   1. disputa do meio-campo (quem fica com a bola)
+ *   2. progressão: condutor × marcador (drible, passe em profundidade ou cruzamento)
+ *   3. criação da chance (tipo de finalização define o xG base)
+ *   4. finalização × goleiro
+ * Em paralelo: faltas, cartões, pênaltis, escanteios e lesões.
+ */
+import { MATCH } from '../config'
+import type { PlayType, ShotType } from '../config'
+import { overallAt } from '../overall'
+import { createRng } from '../rng'
+import type { MatchEvent, MatchResult, Player, PlayerMatchResult, TeamMatchStats } from '../types'
+import { duelChance } from './duel'
+import * as text from './narration'
+import { playerRating } from './ratings'
+import {
+  activePlayers,
+  attr,
+  buildSide,
+  createPitchPlayer,
+  displayName,
+  goalkeeperOf,
+  pickByPosition,
+} from './state'
+import type { MatchContext, MatchInput, PitchPlayer, SideState } from './state'
+
+const MATCH_MINUTES = 90
+
+export function simulateMatch(input: MatchInput): MatchResult {
+  const rng = createRng(input.seed)
+  const ctx: MatchContext = {
+    rng,
+    textRng: rng.fork('narration'),
+    home: buildSide(input.home),
+    away: buildSide(input.away),
+    minute: 0,
+    events: [],
+  }
+
+  for (let i = 0; i < MATCH.moments; i++) {
+    ctx.minute = Math.min(MATCH_MINUTES, 1 + Math.floor((i * MATCH_MINUTES) / MATCH.moments))
+    checkInjury(ctx)
+    const homeHasBall = rng.chance(homePossessionChance(ctx.home, ctx.away))
+    const [attacking, defending] = homeHasBall ? [ctx.home, ctx.away] : [ctx.away, ctx.home]
+    playMoment(ctx, attacking, defending)
+  }
+
+  return buildResult(ctx)
+}
+
+// ---------------------------------------------------------------------------
+// 1. Disputa do meio-campo
+// ---------------------------------------------------------------------------
+
+function midfielders(side: SideState): PitchPlayer[] {
+  const active = activePlayers(side)
+  const mids = active.filter((p) => p.sector === 'midfield')
+  return mids.length > 0 ? mids : active.filter((p) => p.slot !== 'GK')
+}
+
+const mean = (values: number[]) => (values.length === 0 ? 0 : values.reduce((a, b) => a + b, 0) / values.length)
+
+/** Capacidade de ficar com a bola: passe, visão, controle, posicionamento. */
+function controlScore(side: SideState): number {
+  return mean(
+    midfielders(side).map(
+      (p) => (attr(p, 'passing') + attr(p, 'vision') + attr(p, 'ballControl') + attr(p, 'positioning')) / 4,
+    ),
+  )
+}
+
+/** Capacidade de tomar a bola: desarme, posicionamento, resistência. */
+function pressScore(side: SideState): number {
+  return mean(midfielders(side).map((p) => (attr(p, 'tackling') + attr(p, 'positioning') + attr(p, 'stamina')) / 3))
+}
+
+export function homePossessionChance(home: SideState, away: SideState): number {
+  const homeKeeps = duelChance(controlScore(home), pressScore(away))
+  const awayKeeps = duelChance(controlScore(away), pressScore(home))
+  return 0.5 + (homeKeeps - awayKeeps) / 2
+}
+
+// ---------------------------------------------------------------------------
+// 2. Progressão
+// ---------------------------------------------------------------------------
+
+function playMoment(ctx: MatchContext, att: SideState, def: SideState): void {
+  const { rng } = ctx
+  att.tally.possession++
+
+  if (!rng.chance(MATCH.attackRate)) {
+    if (rng.chance(MATCH.foul.midfield)) {
+      const fouler = pickByPosition(rng, def, {}, 1)
+      const victim = pickByPosition(rng, att, {}, 1)
+      if (fouler && victim) commitFoul(ctx, def, att, fouler, victim, false)
+    }
+    return
+  }
+
+  const carrier = pickByPosition(rng, att, MATCH.carrierWeight)
+  if (!carrier) return
+  const typeWeights = MATCH.playTypeWeight[carrier.slot]
+  const type = rng.weighted(Object.keys(typeWeights) as PlayType[], (t) => typeWeights[t])
+
+  if (type === 'longShot') {
+    shoot(ctx, att, def, carrier, 'longShot')
+    return
+  }
+
+  const marker = pickByPosition(rng, def, MATCH.markerWeight[carrier.slot], MATCH.markerFallbackWeight)
+  if (!marker) {
+    shoot(ctx, att, def, carrier, 'oneOnOne')
+    return
+  }
+
+  if (type === 'dribble') dribble(ctx, att, def, carrier, marker)
+  else if (type === 'through') throughBall(ctx, att, def, carrier)
+  else cross(ctx, att, def, carrier, marker)
+}
+
+const isAttacker = (p: PitchPlayer) => p.sector === 'attack' || p.slot === 'AM' || p.slot === 'ST'
+
+function dribble(ctx: MatchContext, att: SideState, def: SideState, carrier: PitchPlayer, marker: PitchPlayer): void {
+  const { rng } = ctx
+  const attack = (2 * attr(carrier, 'dribbling') + attr(carrier, 'pace') + attr(carrier, 'ballControl')) / 4
+  const defense = (2 * attr(marker, 'tackling') + attr(marker, 'pace') + attr(marker, 'positioning')) / 4
+
+  if (rng.chance(duelChance(attack, defense, MATCH.offset.dribble))) {
+    carrier.tally.dribblesWon++
+    if (rng.chance(MATCH.foul.onBeaten)) {
+      commitFoul(ctx, def, att, marker, carrier, isAttacker(carrier))
+      return
+    }
+    const mix = isAttacker(carrier) ? MATCH.shotAfterDribble.attacker : MATCH.shotAfterDribble.other
+    const shotType = rng.weighted(Object.keys(mix) as (keyof typeof mix)[], (t) => mix[t])
+    shoot(ctx, att, def, carrier, shotType)
+    return
+  }
+
+  carrier.tally.dribblesLost++
+  if (rng.chance(MATCH.foul.onFailedDribble)) commitFoul(ctx, def, att, marker, carrier, isAttacker(carrier))
+  else marker.tally.tacklesWon++
+}
+
+function throughBall(ctx: MatchContext, att: SideState, def: SideState, passer: PitchPlayer): void {
+  const { rng } = ctx
+  const receiver = pickByPosition(rng, att, MATCH.throughReceiverWeight, 0, passer)
+  if (!receiver) {
+    shoot(ctx, att, def, passer, 'longShot')
+    return
+  }
+  const defenders = activePlayers(def).filter((p) => p.sector === 'defense' && p.slot !== 'GK')
+  const line = defenders.length > 0 ? defenders : activePlayers(def)
+  const lineReading = mean(line.map((p) => attr(p, 'positioning')))
+  const attack = (attr(passer, 'passing') + attr(passer, 'vision')) / 2
+
+  if (!rng.chance(duelChance(attack, lineReading, MATCH.offset.through))) {
+    // Passe interceptado pela defesa.
+    const interceptor = rng.pick(line)
+    interceptor.tally.tacklesWon++
+    return
+  }
+
+  passer.tally.keyPasses++
+  const runner = (attr(receiver, 'pace') + attr(receiver, 'decisions')) / 2
+  const cover = mean(line.map((p) => (attr(p, 'pace') + attr(p, 'positioning')) / 2))
+  const oneOnOne = rng.chance(duelChance(runner, cover, MATCH.offset.oneOnOne))
+  shoot(ctx, att, def, receiver, oneOnOne ? 'oneOnOne' : 'inBox', passer)
+}
+
+function cross(ctx: MatchContext, att: SideState, def: SideState, crosser: PitchPlayer, marker: PitchPlayer): void {
+  const { rng } = ctx
+  if (!rng.chance(duelChance(attr(crosser, 'crossing'), attr(marker, 'positioning'), MATCH.offset.cross))) {
+    // Cruzamento travado.
+    marker.tally.tacklesWon++
+    if (rng.chance(MATCH.corner.afterLostCross)) corner(ctx, att, def)
+    return
+  }
+  aerialDuel(ctx, att, def, crosser, MATCH.offset.header)
+}
+
+const aerialScore = (p: PitchPlayer) => (3 * attr(p, 'heading') + attr(p, 'strength') + attr(p, 'positioning')) / 5
+
+/** Bola alçada na área: cabeceio do atacante × cabeceio do zagueiro. */
+function aerialDuel(ctx: MatchContext, att: SideState, def: SideState, crosser: PitchPlayer, offset: number): void {
+  const { rng } = ctx
+  const target = pickByPosition(rng, att, MATCH.crossReceiverWeight, 0, crosser)
+  const defender = pickByPosition(rng, def, MATCH.aerialDefenderWeight, MATCH.markerFallbackWeight)
+  if (!target || !defender) return
+
+  if (rng.chance(duelChance(aerialScore(target), aerialScore(defender), offset))) {
+    target.tally.headersWon++
+    shoot(ctx, att, def, target, 'header', crosser)
+    return
+  }
+  defender.tally.headersWon++
+  if (rng.chance(MATCH.ownGoalOnLostHeader)) {
+    ownGoal(ctx, att, def, defender)
+    return
+  }
+  if (rng.chance(MATCH.corner.afterLostHeader)) corner(ctx, att, def)
+}
+
+function corner(ctx: MatchContext, att: SideState, def: SideState): void {
+  att.tally.corners++
+  const taker = setPieceTaker(att, att.team.tactic.freeKickTakerIds, 'crossing')
+  addEvent(ctx, att, 'corner', taker, text.cornerText(att.team.name))
+  if (taker) aerialDuel(ctx, att, def, taker, MATCH.offset.cornerHeader)
+}
+
+/** Primeiro cobrador da lista que está em campo; senão, o melhor no atributo. */
+function setPieceTaker(side: SideState, ids: readonly string[], fallbackAttr: 'crossing' | 'finishing'): PitchPlayer | undefined {
+  const active = activePlayers(side).filter((p) => p.slot !== 'GK')
+  for (const id of ids) {
+    const found = active.find((p) => p.player.id === id)
+    if (found) return found
+  }
+  return [...active].sort((a, b) => attr(b, fallbackAttr) - attr(a, fallbackAttr))[0]
+}
+
+// ---------------------------------------------------------------------------
+// 3 e 4. Criação da chance e finalização × goleiro
+// ---------------------------------------------------------------------------
+
+function shoot(
+  ctx: MatchContext,
+  att: SideState,
+  def: SideState,
+  shooter: PitchPlayer,
+  type: ShotType,
+  assister?: PitchPlayer,
+): void {
+  const { rng } = ctx
+  const base = MATCH.xg[type]
+  const block = MATCH.blockChance[type]
+  att.tally.shots++
+  att.tally.xg += base
+  shooter.tally.shots++
+
+  if (rng.chance(block)) {
+    if (rng.chance(MATCH.corner.afterBlock)) corner(ctx, att, def)
+    return
+  }
+
+  const keeper = goalkeeperOf(def)
+  const skill =
+    type === 'header'
+      ? 0.8 * attr(shooter, 'heading') + 0.2 * attr(shooter, 'strength')
+      : 0.8 * attr(shooter, 'finishing') + 0.2 * attr(shooter, 'decisions')
+  const keeping = !keeper
+    ? 0
+    : type === 'oneOnOne'
+      ? 0.4 * attr(keeper, 'reflexes') + 0.4 * attr(keeper, 'rushingOut') + 0.2 * attr(keeper, 'positioning')
+      : 0.6 * attr(keeper, 'reflexes') + 0.4 * attr(keeper, 'positioning')
+  // O xG base já desconta bloqueios; aqui é a chance de gol quando a bola chega ao goleiro.
+  const goalChance = Math.min(MATCH.maxGoalChance, (base / (1 - block)) * Math.exp(MATCH.shotK * (skill - keeping)))
+
+  if (rng.chance(goalChance)) {
+    att.tally.shotsOnTarget++
+    shooter.tally.shotsOnTarget++
+    scoreGoal(ctx, att, def, shooter, type, assister)
+    return
+  }
+
+  const onTarget = rng.chance(MATCH.onTargetIfMissed[type])
+  if (onTarget) {
+    att.tally.shotsOnTarget++
+    shooter.tally.shotsOnTarget++
+    if (keeper) keeper.tally.saves++
+  }
+  if (type === 'penalty') {
+    shooter.tally.penaltiesMissed++
+    addEvent(ctx, att, 'missed-penalty', shooter, text.missedPenaltyText(ctx.textRng, displayName(shooter), onTarget))
+    return
+  }
+  if (onTarget && rng.chance(MATCH.corner.afterSave)) corner(ctx, att, def)
+}
+
+function scoreGoal(
+  ctx: MatchContext,
+  att: SideState,
+  def: SideState,
+  scorer: PitchPlayer,
+  type: ShotType,
+  assister?: PitchPlayer,
+): void {
+  att.goals++
+  scorer.tally.goals++
+  if (assister) assister.tally.assists++
+  for (const p of activePlayers(def)) p.tally.goalsConceded++
+  addEvent(
+    ctx,
+    att,
+    'goal',
+    scorer,
+    text.goalText(ctx.textRng, att.team.name, displayName(scorer), type, assister && displayName(assister)),
+    assister,
+  )
+}
+
+/** Gol contra: conta para o time que atacava; o evento aponta o defensor. */
+function ownGoal(ctx: MatchContext, att: SideState, def: SideState, defender: PitchPlayer): void {
+  att.goals++
+  defender.tally.ownGoals++
+  for (const p of activePlayers(def)) p.tally.goalsConceded++
+  addEvent(ctx, att, 'own-goal', defender, text.ownGoalText(displayName(defender), att.team.name))
+}
+
+// ---------------------------------------------------------------------------
+// Eventos paralelos: faltas, cartões, pênaltis, lesões, substituições
+// ---------------------------------------------------------------------------
+
+function commitFoul(
+  ctx: MatchContext,
+  foulingSide: SideState,
+  fouledSide: SideState,
+  fouler: PitchPlayer,
+  victim: PitchPlayer,
+  dangerous: boolean,
+): void {
+  const { rng } = ctx
+  foulingSide.tally.fouls++
+  fouler.tally.fouls++
+  victim.tally.foulsWon++
+  addEvent(ctx, foulingSide, 'foul', fouler, text.foulText(displayName(fouler)))
+
+  if (rng.chance(MATCH.card.straightRedPerFoul)) {
+    sendOff(ctx, foulingSide, fouler, text.redCardText(displayName(fouler)))
+  } else if (rng.chance(MATCH.card.yellowPerFoul * (fouler.yellowCards > 0 ? MATCH.card.bookedCaution : 1))) {
+    fouler.yellowCards++
+    foulingSide.tally.yellowCards++
+    addEvent(ctx, foulingSide, 'yellow-card', fouler, text.yellowCardText(displayName(fouler), foulingSide.team.name))
+    if (fouler.yellowCards >= 2) sendOff(ctx, foulingSide, fouler, text.secondYellowText(displayName(fouler)))
+  }
+
+  if (!dangerous) return
+  if (rng.chance(MATCH.foul.penalty)) {
+    const taker = setPieceTaker(fouledSide, fouledSide.team.tactic.penaltyTakerIds, 'finishing')
+    if (taker) shoot(ctx, fouledSide, foulingSide, taker, 'penalty')
+  } else if (rng.chance(MATCH.foul.freeKickShot)) {
+    const taker = setPieceTaker(fouledSide, fouledSide.team.tactic.freeKickTakerIds, 'finishing')
+    if (taker) shoot(ctx, fouledSide, foulingSide, taker, 'freeKick')
+  }
+}
+
+function sendOff(ctx: MatchContext, side: SideState, player: PitchPlayer, message: string): void {
+  if (player.minuteOff !== null) return
+  player.sentOff = true
+  player.minuteOff = ctx.minute
+  side.tally.redCards++
+  addEvent(ctx, side, 'red-card', player, message)
+
+  // Goleiro expulso: entra o reserva no lugar de um jogador de linha, se der.
+  if (player.slot === 'GK') {
+    const keeper = side.bench.find((p) => p.position === 'GK')
+    if (keeper && side.subsLeft > 0) {
+      const outfield = activePlayers(side).filter((p) => p.slot !== 'GK')
+      const weakest = [...outfield].sort((a, b) => overallAt(a.player, a.slot) - overallAt(b.player, b.slot))[0]
+      if (weakest) substitute(ctx, side, weakest, keeper, 'GK')
+    }
+  }
+}
+
+function checkInjury(ctx: MatchContext): void {
+  const { rng } = ctx
+  const candidates = [...activePlayers(ctx.home), ...activePlayers(ctx.away)]
+  const risk = (p: PitchPlayer) =>
+    (p.player.hidden.injuryProneness / 50) * (p.fitness < MATCH.injuryLowFitness ? MATCH.injuryLowFitnessFactor : 1)
+  const totalRisk = candidates.reduce((sum, p) => sum + risk(p), 0)
+  if (!rng.chance(MATCH.injuryPerMoment * totalRisk)) return
+
+  const injured = rng.weighted(candidates, risk)
+  const side = ctx.home.players.includes(injured) ? ctx.home : ctx.away
+  const severity = rng.weighted(
+    [
+      { min: 3, max: 10, weight: 70 },
+      { min: 11, max: 30, weight: 25 },
+      { min: 31, max: 90, weight: 5 },
+    ],
+    (s) => s.weight,
+  )
+  injured.injuryDays = rng.int(severity.min, severity.max)
+  addEvent(ctx, side, 'injury', injured, text.injuryText(displayName(injured)))
+
+  const replacement = bestReplacement(side, injured)
+  if (replacement && side.subsLeft > 0) substitute(ctx, side, injured, replacement)
+  else injured.minuteOff = ctx.minute
+}
+
+function bestReplacement(side: SideState, outgoing: PitchPlayer): Player | undefined {
+  return [...side.bench].sort((a, b) => overallAt(b, outgoing.slot) - overallAt(a, outgoing.slot))[0]
+}
+
+function substitute(
+  ctx: MatchContext,
+  side: SideState,
+  outgoing: PitchPlayer,
+  incoming: Player,
+  slot = outgoing.slot,
+): void {
+  if (outgoing.minuteOff === null) outgoing.minuteOff = ctx.minute
+  side.bench = side.bench.filter((p) => p !== incoming)
+  side.subsLeft--
+  const sector = slot === 'GK' ? 'defense' : outgoing.sector
+  side.players.push(createPitchPlayer(incoming, slot, sector, ctx.minute))
+  addEvent(
+    ctx,
+    side,
+    'substitution',
+    outgoing,
+    text.substitutionText(side.team.name, displayName(outgoing), displayName(incoming)),
+    incoming,
+  )
+}
+
+function addEvent(
+  ctx: MatchContext,
+  side: SideState,
+  type: MatchEvent['type'],
+  player: PitchPlayer | undefined,
+  message: string,
+  related?: PitchPlayer | Player,
+): void {
+  if (!player) return
+  const event: MatchEvent = { minute: ctx.minute, type, teamId: side.team.id, playerId: player.player.id, text: message }
+  if (related) event.relatedPlayerId = 'player' in related ? related.player.id : related.id
+  ctx.events.push(event)
+}
+
+// ---------------------------------------------------------------------------
+// Resultado final
+// ---------------------------------------------------------------------------
+
+function teamStats(side: SideState, possessionShare: number): TeamMatchStats {
+  const t = side.tally
+  return {
+    possession: possessionShare,
+    shots: t.shots,
+    shotsOnTarget: t.shotsOnTarget,
+    corners: t.corners,
+    fouls: t.fouls,
+    yellowCards: t.yellowCards,
+    redCards: t.redCards,
+    xg: Math.round(t.xg * 100) / 100,
+  }
+}
+
+function playerResults(side: SideState, opponent: SideState): PlayerMatchResult[] {
+  return side.players.map((p) => {
+    const minutesPlayed = (p.minuteOff ?? MATCH_MINUTES) - p.minuteOn
+    const result: PlayerMatchResult = {
+      playerId: p.player.id,
+      teamId: side.team.id,
+      minutesPlayed,
+      rating: playerRating(p, minutesPlayed, side.goals, opponent.goals),
+      finalFitness: Math.round(p.fitness),
+    }
+    if (p.injuryDays > 0) result.injuryDays = p.injuryDays
+    return result
+  })
+}
+
+function buildResult(ctx: MatchContext): MatchResult {
+  const { home, away } = ctx
+  const totalPossession = home.tally.possession + away.tally.possession
+  const homeShare = totalPossession === 0 ? 50 : Math.round((100 * home.tally.possession) / totalPossession)
+  return {
+    homeGoals: home.goals,
+    awayGoals: away.goals,
+    events: ctx.events,
+    homeStats: teamStats(home, homeShare),
+    awayStats: teamStats(away, 100 - homeShare),
+    playerResults: [...playerResults(home, away), ...playerResults(away, home)],
+  }
+}

@@ -45,6 +45,8 @@ export interface PlayerMatchResult {
   rating: number
   /** Condição física ao fim da partida (0 a 100). */
   finalFitness: number
+  /** Dias de lesão sofrida na partida, se houver. */
+  injuryDays?: number
 }
 
 export interface MatchResult {
