@@ -1,5 +1,5 @@
 /** Constantes de balanceamento do motor. Mexer só aqui, nunca espalhado pelo código. */
-import type { Position } from './types'
+import type { PlayStyle, Position } from './types'
 
 /** Escala dos atributos visíveis, ocultos e da força geral (inteiros). A reputação dos times continua de 1 a 20. */
 export const ATTRIBUTE_MIN = 1
@@ -134,6 +134,77 @@ export const MATCH = {
     straightRedPerFoul: 0.004,
     /** Jogador já advertido se cuida: chance de novo amarelo multiplicada por isto. */
     bookedCaution: 0.35,
+  },
+
+  /** Fator casa: multiplica todos os atributos do mandante. Cresce com a lotação do estádio. */
+  home: {
+    /** Vantagem com estádio vazio. */
+    base: 0.02,
+    /** Vantagem extra com estádio cheio (proporcional à ocupação). */
+    crowd: 0.04,
+    /** Fração da torcida que vai ao jogo (estimativa de público até existir bilheteria). */
+    fanTurnout: 0.012,
+    minFill: 0.2,
+  },
+
+  /** Condição física: cai durante o jogo e reduz os atributos. */
+  fatigue: {
+    /** Queda por momento para resistência 50 (escala: (1,5 − resistência/100)). */
+    perMoment: 0.3,
+    style: { possession: 0.9, 'counter-attack': 1, 'high-press': 1.3 } satisfies Record<PlayStyle, number>,
+    /** Cada nível de mentalidade ofensiva cansa um pouco mais. */
+    perMentality: 0.05,
+    /** Com condição 0, atributos físicos caem até este fator; os demais até `otherFloor`. */
+    physicalFloor: 0.6,
+    otherFloor: 0.85,
+    /** IA troca jogadores cansados a partir deste minuto e abaixo desta condição. */
+    subFromMinute: 60,
+    subBelowFitness: 70,
+    /** Até este minuto a IA guarda uma troca para emergências (lesão). */
+    keepOneSubUntil: 80,
+  },
+
+  /** Posição improvisada: quanto da penalidade de posição (POSITION_FIT) vale nos duelos. */
+  improvisationWeight: 0.6,
+
+  tactics: {
+    possession: {
+      /** Mais controle no meio (pontos de atributo), menos cara a cara. */
+      control: 5,
+      oneOnOne: -0.4,
+      playType: { through: 1.2, longShot: 0.7 } as Partial<Record<PlayType, number>>,
+    },
+    counter: {
+      /** Abre mão da bola... */
+      control: -5,
+      /** ...mas, ao recuperá-la, sai em transição rápida. */
+      transitionChance: 0.35,
+      transitionProgression: 0.5,
+      transitionOneOnOne: 0.6,
+    },
+    highPress: {
+      /** Recupera a bola mais alto... */
+      press: 5,
+      /** ...e deixa espaço nas costas (passe em profundidade e cara a cara do rival). */
+      spaceBehind: 0.4,
+    },
+    /** Mentalidade (−2 a +2): muda a frequência de ataques e o espaço deixado atrás. */
+    mentality: { attackRate: 0.08, openness: 0.12 },
+  },
+
+  /** Formação: número de jogadores por setor (referência: 4 no meio e na defesa, 2 no ataque). */
+  formation: {
+    /** Pontos de controle/pressão por meio-campista acima/abaixo de 4. */
+    perMidfielder: 2.5,
+    /** Deslocamento contra a progressão rival por defensor acima/abaixo de 4. */
+    perDefender: 0.08,
+    /** Deslocamento a favor da progressão por atacante acima/abaixo de 2. */
+    perAttacker: 0.06,
+    /** Quantos meio-campistas (os melhores) definem a qualidade do meio; os demais contam pelo número. */
+    midfieldCore: 3,
+    referenceMidfielders: 4,
+    referenceDefenders: 4,
+    referenceAttackers: 2,
   },
 
   /** Chance de lesão por momento, por jogador com propensão 50 (escala com a propensão). */

@@ -22,6 +22,7 @@ import {
   createPitchPlayer,
   displayName,
   goalkeeperOf,
+  homeFactor,
   pickByPosition,
 } from './state'
 import type { MatchContext, MatchInput, PitchPlayer, SideState } from './state'
@@ -33,7 +34,7 @@ export function simulateMatch(input: MatchInput): MatchResult {
   const ctx: MatchContext = {
     rng,
     textRng: rng.fork('narration'),
-    home: buildSide(input.home),
+    home: buildSide(input.home, homeFactor(input.home.team, input.attendance)),
     away: buildSide(input.away),
     minute: 0,
     events: [],
@@ -42,6 +43,10 @@ export function simulateMatch(input: MatchInput): MatchResult {
   for (let i = 0; i < MATCH.moments; i++) {
     ctx.minute = Math.min(MATCH_MINUTES, 1 + Math.floor((i * MATCH_MINUTES) / MATCH.moments))
     checkInjury(ctx)
+    applyFatigue(ctx.home)
+    applyFatigue(ctx.away)
+    substituteTired(ctx, ctx.home)
+    substituteTired(ctx, ctx.away)
     const homeHasBall = rng.chance(homePossessionChance(ctx.home, ctx.away))
     const [attacking, defending] = homeHasBall ? [ctx.home, ctx.away] : [ctx.away, ctx.home]
     playMoment(ctx, attacking, defending)
@@ -62,18 +67,102 @@ function midfielders(side: SideState): PitchPlayer[] {
 
 const mean = (values: number[]) => (values.length === 0 ? 0 : values.reduce((a, b) => a + b, 0) / values.length)
 
-/** Capacidade de ficar com a bola: passe, visão, controle, posicionamento. */
+const sectorCount = (side: SideState, sector: PitchPlayer['sector']) =>
+  activePlayers(side).filter((p) => p.sector === sector && p.slot !== 'GK').length
+
+/** Bônus da formação no meio-campo: cada meio-campista acima/abaixo da referência vale pontos. */
+function midfieldNumbers(side: SideState): number {
+  const f = MATCH.formation
+  return f.perMidfielder * (sectorCount(side, 'midfield') - f.referenceMidfielders)
+}
+
+/**
+ * Qualidade do meio: média do núcleo (os melhores do setor). Quem passa do núcleo entra
+ * pelo bônus de números, então um meio-campista a mais nunca piora o meio.
+ */
+function sectorQuality(players: PitchPlayer[], value: (p: PitchPlayer) => number): number {
+  const values = players.map(value).sort((a, b) => b - a)
+  return mean(values.slice(0, MATCH.formation.midfieldCore))
+}
+
+/** Capacidade de ficar com a bola: passe, visão, controle, posicionamento (+ estilo e formação). */
 function controlScore(side: SideState): number {
-  return mean(
-    midfielders(side).map(
-      (p) => (attr(p, 'passing') + attr(p, 'vision') + attr(p, 'ballControl') + attr(p, 'positioning')) / 4,
-    ),
+  const base = sectorQuality(
+    midfielders(side),
+    (p) => (attr(p, 'passing') + attr(p, 'vision') + attr(p, 'ballControl') + attr(p, 'positioning')) / 4,
+  )
+  const style =
+    side.style === 'possession' ? MATCH.tactics.possession.control
+    : side.style === 'counter-attack' ? MATCH.tactics.counter.control
+    : 0
+  return base + style + midfieldNumbers(side)
+}
+
+/** Capacidade de tomar a bola: desarme, posicionamento, resistência (+ pressão alta e formação). */
+function pressScore(side: SideState): number {
+  const base = sectorQuality(
+    midfielders(side),
+    (p) => (attr(p, 'tackling') + attr(p, 'positioning') + attr(p, 'stamina')) / 3,
+  )
+  const style = side.style === 'high-press' ? MATCH.tactics.highPress.press : 0
+  return base + style + midfieldNumbers(side)
+}
+
+/**
+ * Deslocamento tático na progressão do ataque: defesa com mais gente fecha espaços,
+ * ataque com mais gente abre; mentalidade ofensiva de quem defende deixa espaço;
+ * transição de contra-ataque pega a defesa desarrumada.
+ */
+function progressionOffset(att: SideState, def: SideState, transition: boolean): number {
+  const f = MATCH.formation
+  return (
+    -f.perDefender * (sectorCount(def, 'defense') - f.referenceDefenders) +
+    f.perAttacker * (sectorCount(att, 'attack') - f.referenceAttackers) +
+    MATCH.tactics.mentality.openness * def.mentality +
+    (transition ? MATCH.tactics.counter.transitionProgression : 0)
   )
 }
 
-/** Capacidade de tomar a bola: desarme, posicionamento, resistência. */
-function pressScore(side: SideState): number {
-  return mean(midfielders(side).map((p) => (attr(p, 'tackling') + attr(p, 'positioning') + attr(p, 'stamina')) / 3))
+/** Chance de virar cara a cara: posse tem menos; pressão alta do rival e contra-ataque dão mais. */
+function oneOnOneOffset(att: SideState, def: SideState, transition: boolean): number {
+  return (
+    (att.style === 'possession' ? MATCH.tactics.possession.oneOnOne : 0) +
+    (def.style === 'high-press' ? MATCH.tactics.highPress.spaceBehind : 0) +
+    (transition ? MATCH.tactics.counter.transitionOneOnOne : 0)
+  )
+}
+
+/** Quem joga no contra-ataque, ao recuperar a bola, pode sair em transição rápida. */
+function maybeCounter(ctx: MatchContext, recovering: SideState, opponent: SideState, transition: boolean): void {
+  if (transition || recovering.style !== 'counter-attack') return
+  if (ctx.rng.chance(MATCH.tactics.counter.transitionChance)) playMoment(ctx, recovering, opponent, true)
+}
+
+// ---------------------------------------------------------------------------
+// Condição física e substituições por cansaço
+// ---------------------------------------------------------------------------
+
+function applyFatigue(side: SideState): void {
+  const f = MATCH.fatigue
+  const tactical = f.style[side.style] * (1 + f.perMentality * side.mentality)
+  for (const p of activePlayers(side)) {
+    const staminaFactor = 1.5 - p.player.attributes.stamina / 100
+    // Goleiro corre bem menos.
+    const role = p.slot === 'GK' ? 0.3 : 1
+    p.fitness = Math.max(0, p.fitness - f.perMoment * staminaFactor * tactical * role)
+  }
+}
+
+function substituteTired(ctx: MatchContext, side: SideState): void {
+  const f = MATCH.fatigue
+  if (ctx.minute < f.subFromMinute || side.subsLeft <= 0 || side.bench.length === 0) return
+  if (ctx.minute < f.keepOneSubUntil && side.subsLeft <= 1) return
+  const tired = activePlayers(side)
+    .filter((p) => p.slot !== 'GK' && p.fitness < f.subBelowFitness)
+    .sort((a, b) => a.fitness - b.fitness)[0]
+  if (!tired) return
+  const replacement = bestReplacement(side, tired)
+  if (replacement && replacement.position !== 'GK') substitute(ctx, side, tired, replacement)
 }
 
 export function homePossessionChance(home: SideState, away: SideState): number {
@@ -86,11 +175,13 @@ export function homePossessionChance(home: SideState, away: SideState): number {
 // 2. Progressão
 // ---------------------------------------------------------------------------
 
-function playMoment(ctx: MatchContext, att: SideState, def: SideState): void {
+function playMoment(ctx: MatchContext, att: SideState, def: SideState, transition = false): void {
   const { rng } = ctx
-  att.tally.possession++
+  // Transição de contra-ataque é um lance rápido: não conta como momento de posse.
+  if (!transition) att.tally.possession++
 
-  if (!rng.chance(MATCH.attackRate)) {
+  const attackRate = Math.min(0.95, MATCH.attackRate * (1 + MATCH.tactics.mentality.attackRate * att.mentality))
+  if (!transition && !rng.chance(attackRate)) {
     if (rng.chance(MATCH.foul.midfield)) {
       const fouler = pickByPosition(rng, def, {}, 1)
       const victim = pickByPosition(rng, att, {}, 1)
@@ -102,7 +193,10 @@ function playMoment(ctx: MatchContext, att: SideState, def: SideState): void {
   const carrier = pickByPosition(rng, att, MATCH.carrierWeight)
   if (!carrier) return
   const typeWeights = MATCH.playTypeWeight[carrier.slot]
-  const type = rng.weighted(Object.keys(typeWeights) as PlayType[], (t) => typeWeights[t])
+  const styleWeights: Partial<Record<PlayType, number>> = att.style === 'possession' ? MATCH.tactics.possession.playType : {}
+  // Em transição não há tempo para chutar de longe ou cruzar: é passe em profundidade ou drible.
+  const types = (Object.keys(typeWeights) as PlayType[]).filter((t) => !transition || t === 'through' || t === 'dribble')
+  const type = rng.weighted(types, (t) => typeWeights[t] * (styleWeights[t] ?? 1))
 
   if (type === 'longShot') {
     shoot(ctx, att, def, carrier, 'longShot')
@@ -115,36 +209,52 @@ function playMoment(ctx: MatchContext, att: SideState, def: SideState): void {
     return
   }
 
-  if (type === 'dribble') dribble(ctx, att, def, carrier, marker)
-  else if (type === 'through') throughBall(ctx, att, def, carrier)
-  else cross(ctx, att, def, carrier, marker)
+  if (type === 'dribble') dribble(ctx, att, def, carrier, marker, transition)
+  else if (type === 'through') throughBall(ctx, att, def, carrier, transition)
+  else cross(ctx, att, def, carrier, marker, transition)
 }
 
 const isAttacker = (p: PitchPlayer) => p.sector === 'attack' || p.slot === 'AM' || p.slot === 'ST'
 
-function dribble(ctx: MatchContext, att: SideState, def: SideState, carrier: PitchPlayer, marker: PitchPlayer): void {
+function dribble(
+  ctx: MatchContext,
+  att: SideState,
+  def: SideState,
+  carrier: PitchPlayer,
+  marker: PitchPlayer,
+  transition: boolean,
+): void {
   const { rng } = ctx
   const attack = (2 * attr(carrier, 'dribbling') + attr(carrier, 'pace') + attr(carrier, 'ballControl')) / 4
   const defense = (2 * attr(marker, 'tackling') + attr(marker, 'pace') + attr(marker, 'positioning')) / 4
+  const offset = MATCH.offset.dribble + progressionOffset(att, def, transition)
 
-  if (rng.chance(duelChance(attack, defense, MATCH.offset.dribble))) {
+  if (rng.chance(duelChance(attack, defense, offset))) {
     carrier.tally.dribblesWon++
     if (rng.chance(MATCH.foul.onBeaten)) {
       commitFoul(ctx, def, att, marker, carrier, isAttacker(carrier))
       return
     }
     const mix = isAttacker(carrier) ? MATCH.shotAfterDribble.attacker : MATCH.shotAfterDribble.other
-    const shotType = rng.weighted(Object.keys(mix) as (keyof typeof mix)[], (t) => mix[t])
+    // Cara a cara fica mais ou menos provável conforme a tática (mesmo deslocamento do passe em profundidade).
+    const oneOnOneWeight = mix.oneOnOne * Math.exp(oneOnOneOffset(att, def, transition))
+    const shotType = rng.weighted(Object.keys(mix) as (keyof typeof mix)[], (t) =>
+      t === 'oneOnOne' ? oneOnOneWeight : mix[t],
+    )
     shoot(ctx, att, def, carrier, shotType)
     return
   }
 
   carrier.tally.dribblesLost++
-  if (rng.chance(MATCH.foul.onFailedDribble)) commitFoul(ctx, def, att, marker, carrier, isAttacker(carrier))
-  else marker.tally.tacklesWon++
+  if (rng.chance(MATCH.foul.onFailedDribble)) {
+    commitFoul(ctx, def, att, marker, carrier, isAttacker(carrier))
+    return
+  }
+  marker.tally.tacklesWon++
+  maybeCounter(ctx, def, att, transition)
 }
 
-function throughBall(ctx: MatchContext, att: SideState, def: SideState, passer: PitchPlayer): void {
+function throughBall(ctx: MatchContext, att: SideState, def: SideState, passer: PitchPlayer, transition: boolean): void {
   const { rng } = ctx
   const receiver = pickByPosition(rng, att, MATCH.throughReceiverWeight, 0, passer)
   if (!receiver) {
@@ -156,26 +266,39 @@ function throughBall(ctx: MatchContext, att: SideState, def: SideState, passer: 
   const lineReading = mean(line.map((p) => attr(p, 'positioning')))
   const attack = (attr(passer, 'passing') + attr(passer, 'vision')) / 2
 
-  if (!rng.chance(duelChance(attack, lineReading, MATCH.offset.through))) {
+  // Pressão alta do rival deixa espaço nas costas também para o passe.
+  const spaceBehind = def.style === 'high-press' ? MATCH.tactics.highPress.spaceBehind / 2 : 0
+  const offset = MATCH.offset.through + progressionOffset(att, def, transition) + spaceBehind
+  if (!rng.chance(duelChance(attack, lineReading, offset))) {
     // Passe interceptado pela defesa.
     const interceptor = rng.pick(line)
     interceptor.tally.tacklesWon++
+    maybeCounter(ctx, def, att, transition)
     return
   }
 
   passer.tally.keyPasses++
   const runner = (attr(receiver, 'pace') + attr(receiver, 'decisions')) / 2
   const cover = mean(line.map((p) => (attr(p, 'pace') + attr(p, 'positioning')) / 2))
-  const oneOnOne = rng.chance(duelChance(runner, cover, MATCH.offset.oneOnOne))
+  const oneOnOne = rng.chance(duelChance(runner, cover, MATCH.offset.oneOnOne + oneOnOneOffset(att, def, transition)))
   shoot(ctx, att, def, receiver, oneOnOne ? 'oneOnOne' : 'inBox', passer)
 }
 
-function cross(ctx: MatchContext, att: SideState, def: SideState, crosser: PitchPlayer, marker: PitchPlayer): void {
+function cross(
+  ctx: MatchContext,
+  att: SideState,
+  def: SideState,
+  crosser: PitchPlayer,
+  marker: PitchPlayer,
+  transition: boolean,
+): void {
   const { rng } = ctx
-  if (!rng.chance(duelChance(attr(crosser, 'crossing'), attr(marker, 'positioning'), MATCH.offset.cross))) {
+  const offset = MATCH.offset.cross + progressionOffset(att, def, transition)
+  if (!rng.chance(duelChance(attr(crosser, 'crossing'), attr(marker, 'positioning'), offset))) {
     // Cruzamento travado.
     marker.tally.tacklesWon++
     if (rng.chance(MATCH.corner.afterLostCross)) corner(ctx, att, def)
+    else maybeCounter(ctx, def, att, transition)
     return
   }
   aerialDuel(ctx, att, def, crosser, MATCH.offset.header)
@@ -404,7 +527,7 @@ function substitute(
   side.bench = side.bench.filter((p) => p !== incoming)
   side.subsLeft--
   const sector = slot === 'GK' ? 'defense' : outgoing.sector
-  side.players.push(createPitchPlayer(incoming, slot, sector, ctx.minute))
+  side.players.push(createPitchPlayer(incoming, slot, sector, ctx.minute, side.sideFactor))
   addEvent(
     ctx,
     side,
