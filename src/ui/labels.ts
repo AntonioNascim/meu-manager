@@ -16,6 +16,7 @@ import type {
   Position,
   SeasonPhase,
   Sector,
+  TeamMatchStats,
 } from '../engine/types'
 
 export const POSITION_LABELS: Record<Position, string> = {
@@ -170,6 +171,18 @@ export const PLAY_STYLE_DESCRIPTIONS: Record<PlayStyle, string> = {
   possession: 'Fica mais com a bola e controla o meio, mas cria menos chances cara a cara.',
   'counter-attack': 'Cede a bola, mas ataca em transições rápidas de alta qualidade.',
   'high-press': 'Recupera a bola no campo do rival e sai em velocidade, mas cansa mais e deixa espaço nas costas.',
+}
+
+/** Estatísticas da partida (na ordem em que aparecem). */
+export const MATCH_STAT_LABELS: Record<keyof TeamMatchStats, string> = {
+  possession: 'Posse de bola (%)',
+  shots: 'Finalizações',
+  shotsOnTarget: 'No alvo',
+  corners: 'Escanteios',
+  fouls: 'Faltas',
+  yellowCards: 'Cartões amarelos',
+  redCards: 'Cartões vermelhos',
+  xg: 'Gols esperados (xG)',
 }
 
 export const SET_PIECE_LABELS: Record<'penalty' | 'free-kick', string> = {

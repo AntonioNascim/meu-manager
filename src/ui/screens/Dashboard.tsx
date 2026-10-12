@@ -4,7 +4,6 @@ import {
   lastUserMatch,
   nextEventOf,
   nextUserMatch,
-  playPendingAuto,
   standingsOf,
   teamById,
   teamStrength,
@@ -15,6 +14,7 @@ import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
 import { Button, Card, TeamBadge } from '../components/ui'
 import { formatDate, outcomeFor } from '../format'
+import type { ScreenId } from '../navigation'
 import { OUTCOME_LABELS, OUTCOME_SHORT_LABELS, SEASON_PHASE_LABELS } from '../labels'
 
 const OUTCOME_COLOR = { W: 'bg-emerald-500 text-slate-950', D: 'bg-slate-500 text-white', L: 'bg-rose-500 text-white' } as const
@@ -47,7 +47,7 @@ function MatchLine({ game, match }: { game: Game; match: Match }) {
 }
 
 /** Painel principal: próximo jogo, posição na tabela e o botão de avançar. */
-export function Dashboard({ game }: { game: Game }) {
+export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId) => void }) {
   const team = userTeam(game)
   const competition = userCompetition(game)
   const table = standingsOf(game, competition)
@@ -59,12 +59,15 @@ export function Dashboard({ game }: { game: Game }) {
   const opponent = next ? teamById(game, next.homeTeamId === team.id ? next.awayTeamId : next.homeTeamId) : undefined
   const lastOutcome = last ? outcomeFor(last, team.id) : undefined
 
-  const advance = () =>
-    updateGame((g) => {
-      // Por enquanto a partida do jogador é jogada na hora, sem intervenção (a tela de partida vem depois).
-      const moved = advanceGame(g)
-      return moved.pendingUserMatch ? playPendingAuto(moved) : moved
-    })
+  const pending = game.pendingUserMatch
+
+  // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
+  const advance = () => {
+    if (pending) return onNavigate('match')
+    const moved = advanceGame(game)
+    updateGame(() => moved)
+    if (moved.pendingUserMatch) onNavigate('match')
+  }
 
   return (
     <div className="space-y-3">
@@ -117,7 +120,7 @@ export function Dashboard({ game }: { game: Game }) {
 
       <div className="sticky bottom-20 pt-2">
         <Button className="w-full text-lg shadow-lg" onClick={advance} disabled={seasonOver}>
-          {seasonOver ? SEASON_PHASE_LABELS['end-of-season'] : 'Avançar'}
+          {seasonOver ? SEASON_PHASE_LABELS['end-of-season'] : pending ? 'Ir para a partida' : 'Avançar'}
         </Button>
       </div>
     </div>

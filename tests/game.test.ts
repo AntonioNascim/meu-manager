@@ -67,12 +67,12 @@ describe('telas (renderização)', () => {
   })
 
   it('o painel mostra próximo jogo, posição e o botão Avançar', () => {
-    const html = renderToStaticMarkup(createElement(Dashboard, { game: createGame(12, idA) }))
+    const html = renderToStaticMarkup(createElement(Dashboard, { game: createGame(12, idA), onNavigate: () => {} }))
     expect(html).toContain('Próximo jogo')
     expect(html).toContain('Classificação')
     expect(html).toContain('Avançar')
     expect(html).not.toContain('Último jogo')
     const played = playPendingAuto(advanceGame(createGame(12, idA)))
-    expect(renderToStaticMarkup(createElement(Dashboard, { game: played }))).toContain('Último jogo')
+    expect(renderToStaticMarkup(createElement(Dashboard, { game: played, onNavigate: () => {} }))).toContain('Último jogo')
   })
 })

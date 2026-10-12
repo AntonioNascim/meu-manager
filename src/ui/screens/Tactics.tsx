@@ -9,8 +9,9 @@ import { setUserTactic, squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
 import { bandFor, conditionBand } from '../colors'
+import { getLive } from '../../store/liveMatch'
 import { StatusTags } from '../components/PlayerDetail'
-import { Button, Card } from '../components/ui'
+import { Button, Card, Segmented } from '../components/ui'
 import { playerName } from '../format'
 import {
   MENTALITY_LABELS,
@@ -119,23 +120,6 @@ function ListRow({ player, selected, onTap, tag }: { player: Player; selected: b
   )
 }
 
-function Segmented<T extends string | number>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (id: T) => void }) {
-  return (
-    <div className="flex gap-1">
-      {options.map((o) => (
-        <button
-          key={String(o.id)}
-          type="button"
-          onClick={() => onChange(o.id)}
-          className={`min-h-11 flex-1 rounded-lg px-1 text-xs font-semibold leading-tight ${value === o.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-200'}`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function PlayerSelect({ label, value, xi, onChange }: { label: string; value: string | undefined; xi: Player[]; onChange: (id: string) => void }) {
   return (
     <label className="flex items-center gap-2 py-1 text-sm">
@@ -190,6 +174,16 @@ export function Tactics({ game }: { game: Game }) {
   const strength = xi.reduce((s, p, i) => s + overallAt(p, getFormation(tactic.formationId).slots[i]?.position ?? p.position), 0) / Math.max(1, xi.length)
   const unavailableStarters = xi.filter(unavailable)
   const selected = selectedId ? byId.get(selectedId) : undefined
+  const matchStarted = game.pendingUserMatch !== undefined && getLive(game.pendingUserMatch.id) !== null
+
+  if (matchStarted) {
+    return (
+      <Card>
+        <h1 className="text-lg font-bold">Tática</h1>
+        <p className="mt-2 text-sm text-slate-300">A partida já começou. Durante o jogo, a tática, a formação e as substituições são feitas na aba Partida.</p>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-3">

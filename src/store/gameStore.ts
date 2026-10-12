@@ -21,5 +21,5 @@ const subscribe = (listener: () => void) => {
 }
 
 export function useGame(): Game | null {
-  return useSyncExternalStore(subscribe, () => current)
+  return useSyncExternalStore(subscribe, () => current, () => current)
 }

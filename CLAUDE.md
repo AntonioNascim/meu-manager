@@ -118,7 +118,8 @@ Pontuação de cada lado = média ponderada dos atributos envolvidos × modifica
 
 ### Comportamento da IA durante a partida
 O motor hoje ajusta sozinho, para os dois times: trocas por cansaço (a partir dos 60'), postura conforme o placar na reta final (quem vence recua, quem perde ataca) e postura de azarão (time bem mais fraco que o rival entra mais defensivo).
-- **Etapa 6 (pendente):** o motor precisa de uma opção na entrada da partida para a IA **não alterar a tática do time controlado pelo jogador** (nem mentalidade, nem substituições por cansaço); esse time só muda quando o jogador mandar (intervalo, substituições). O mesmo vale para a escalação automática e o rodízio de `advanceToNextEvent` (`aiTactic`): o time do jogador precisa ficar de fora. Os testes de balanceamento continuam com IA nos dois lados.
+- **Time do jogador (etapa 6):** `MatchInput.userControlled` faz a IA do motor **não alterar a tática do time controlado pelo jogador** (nem recuo de azarão, nem postura pelo placar, nem substituições por cansaço); esse time só muda quando o jogador mandar (intervalo, substituições). Lesão ainda tira o jogador de campo (entra o melhor reserva). O mesmo vale para a escalação automática e o rodízio de `advanceToNextEvent` (`aiTactic`): o time do jogador fica de fora. Os testes de balanceamento continuam com IA nos dois lados.
+- **Partida ao vivo:** `startMatch(input)` devolve um `LiveMatch` (`playUntil(minuto)`, `snapshot`, `setStyle`, `setMentality`, `setFormation`, `substitute`, `result`); `simulateMatch` é `startMatch` jogado até o fim, com resultado idêntico, em quantos passos for jogada.
 
 ### Condição entre as partidas (`src/engine/season/condition.ts`)
 O estado da temporada (`SeasonState`) leva os times e jogadores, porque a condição muda a cada dia de jogos:
@@ -201,7 +202,8 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
 - Mobile-first: Tailwind, barra de navegação embaixo, botões grandes (altura mínima 48 px). Rótulos de valores de tipos sempre de `labels.ts`.
 - O estado do jogo é `Game` (`src/store/game.ts`, funções puras: `createGame`, `advanceGame`, `finishPendingMatch`, `setUserTactic`...), guardado em memória por `gameStore.ts` (`useGame`). Nada é salvo ainda. Consultas (classificação, próxima partida) são derivadas na hora.
 - `advanceToNextEvent(state, { userTeamId })` não simula a partida do jogador: devolve `pendingUserMatch` e a IA não mexe no time dele (`userMatchInput`, `MatchInput.userControlled`, `repairTactic`, `setTeamTactic`, `completeMatch`).
-- Atalho de desenvolvimento: `npm run dev` e abrir `/?time=imp&semente=7` já começa um jogo com o time (sigla de 3 letras).
+- Atalhos de desenvolvimento (só em `npm run dev`): `/?time=imp&semente=7` começa um jogo com o time (sigla de 3 letras); `&tela=squad|tactics|match` abre numa tela; `&jogo=1` avança até a partida do time; `&minuto=60` deixa a partida ao vivo parada nesse minuto.
+- A partida ao vivo mora em `src/store/liveMatch.ts` (o objeto do motor muda a cada passo e não faz parte do `Game`).
 
 ## Convenções
 - Componentes React pequenos e focados; lógica fica no `engine`, não nos componentes.

@@ -66,3 +66,20 @@ export function Tabs<T extends string>({ value, options, onChange }: { value: T;
     </div>
   )
 }
+
+export function Segmented<T extends string | number>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (id: T) => void }) {
+  return (
+    <div className="flex gap-1">
+      {options.map((o) => (
+        <button
+          key={String(o.id)}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={`min-h-11 flex-1 rounded-lg px-1 text-xs font-semibold leading-tight ${value === o.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-200'}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
