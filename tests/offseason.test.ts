@@ -102,7 +102,8 @@ describe('virada de temporada', () => {
       expect(t.finances.pastSeasons[t.finances.pastSeasons.length - 1]!.year).toBe(2026)
     }
     const champ = report.reputationChanges[report.champions[0]!]!
-    expect(champ.to).toBeGreaterThanOrEqual(champ.from)
+    // O campeão sobe de reputação, a menos que já esteja bem acima do patamar da divisão (a reputação volta devagar para ele, até 2 pontos).
+    expect(champ.to).toBeGreaterThanOrEqual(champ.from - 2)
   })
 
   it('é determinística', () => {
@@ -172,4 +173,52 @@ describe('virada de temporada no jogo', () => {
     const moved = advanceToMatchday(turned)
     expect(moved.lastReport).toBeUndefined()
   }, 200_000)
+})
+
+describe('potencial, craques e divisões', () => {
+  const cm = world.players.filter((x) => x.position === 'CM').sort((a, b) => playerOverall(a) - playerOverall(b))[0]!
+  const cohort = (age: number, gap: number, share: number, years: number, start = cm) => {
+    const rng = createRng(`cohort:${age}:${gap}:${share}`)
+    const base = { ...start, age }
+    const overall = playerOverall(base)
+    const finals: number[] = []
+    for (let i = 0; i < 80; i++) {
+      let p = { ...base, hidden: { ...base.hidden, potential: Math.round(overall) + gap } }
+      for (let y = 0; y < years; y++) p = evolvePlayer(rng, p, share)
+      finals.push(playerOverall(p))
+    }
+    return { overall, mean: finals.reduce((a, b) => a + b, 0) / finals.length }
+  }
+
+  const prospect = world.players.filter((x) => x.position === 'CM').sort((a, b) => Math.abs(playerOverall(a) - 55) - Math.abs(playerOverall(b) - 55))[0]!
+
+  it('jovem de potencial alto que joga regularmente chega perto do potencial; sem jogar, chega menos', () => {
+    const gap = 96 - Math.round(playerOverall(prospect))
+    const plays = cohort(18, gap, 1, 8, prospect)
+    expect(plays.mean).toBeGreaterThan(96 - 7)
+    // No caminho (5 anos) quem joga está à frente de quem fica no banco.
+    expect(cohort(18, gap, 1, 5, prospect).mean).toBeGreaterThan(cohort(18, gap, 0, 5, prospect).mean + 1)
+  })
+
+  it('jogador de potencial médio não infla: continua perto do que seria (sem bônus de potencial)', () => {
+    // 19 anos com o potencial médio da idade (12 + 2 × 3): ganha só a curva de juventude, sem bônus.
+    const average = cohort(19, 12 + 2 * 3, 0.8, 7)
+    expect(average.mean - average.overall).toBeLessThan(10)
+    expect(average.mean - average.overall).toBeGreaterThan(4)
+  })
+
+  it('a reputação volta para o patamar da divisão', () => {
+    const skewed = {
+      ...ended,
+      teams: ended.teams.map((t) => ({ ...t, reputation: t.tier === 1 ? 18 : 1 })),
+    }
+    const { state } = advanceSeason(skewed, { createYouth })
+    const tierMean = (tier: number) => {
+      const teams = state.teams.filter((t) => t.tier === tier)
+      return teams.reduce((s, t) => s + t.reputation, 0) / teams.length
+    }
+    // Promovidos e rebaixados mudam de série, mas a média da A cai do 18 e a da B sobe do 1.
+    expect(tierMean(1)).toBeLessThan(17.5)
+    expect(tierMean(2)).toBeGreaterThan(1.5)
+  })
 })

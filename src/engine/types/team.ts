@@ -12,6 +12,7 @@ export interface Stadium {
 export type FinanceCategory =
   | 'ticket-sales'
   | 'sponsorship'
+  | 'tv-rights'
   | 'player-sales'
   | 'salaries'
   | 'player-purchases'

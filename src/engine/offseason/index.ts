@@ -73,6 +73,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   }
   const reputationChanges: OffseasonReport['reputationChanges'] = {}
   const R = OFFSEASON.reputation
+  const reputationRng = rng.fork('reputation')
   let teams: Team[] = state.teams.map((t) => {
     const finalPosition = finalPositions[t.id]?.position ?? 10
     const expected = rankByReputation.get(t.id) ?? 10
@@ -80,9 +81,11 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (champions.includes(t.id)) delta += R.champion
     if (promoted.includes(t.id)) delta += R.promoted
     if (relegated.includes(t.id)) delta += R.relegated
-    const reputation = clamp(t.reputation + delta, 1, 20)
-    reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const tier = promoted.includes(t.id) ? 1 : relegated.includes(t.id) ? 2 : t.tier
+    // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
+    const pulled = t.reputation + delta + R.tierPull * ((R.tierMean[tier] ?? t.reputation) - t.reputation)
+    const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
+    reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId
     return {
       ...t,

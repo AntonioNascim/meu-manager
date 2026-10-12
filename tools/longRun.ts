@@ -23,8 +23,12 @@ export interface YearRow {
   /** Jogadores de até 21 anos com potencial ≥ 75, e o maior potencial entre os de até 21. */
   prospects: number
   topPotential: number
-  /** Jogadores com força geral ≥ 85 (craques). */
+  /** Jogadores com força geral ≥ 85 (craques), com potencial ≥ 85 e a maior força geral do mundo. */
   stars: number
+  highPotential: number
+  /** Craques com até 24 anos (a base está repondo os craques). */
+  youngStars: number
+  topOverall: number
   /** Menor e maior elenco; jogadores livres no mercado. */
   minSquad: number
   maxSquad: number
@@ -45,6 +49,12 @@ export interface YearRow {
   report?: OffseasonReport
 }
 
+/** Força geral a partir da qual o jogador é craque. */
+export const STAR_OVERALL = 85
+
+/** Potencial a partir do qual um jovem (até 21 anos) é promessa. */
+export const PROSPECT_POTENTIAL = 75
+
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1)
 
 function teamStrength(team: Team, byId: Map<string, Player>): number {
@@ -62,7 +72,7 @@ export function lowestBalance(team: Team): number {
   return lowest
 }
 
-export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB'> {
+export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'highPotential' | 'youngStars' | 'topOverall' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB'> {
   const byId = new Map(state.players.map((p) => [p.id, p]))
   const signed = state.players.filter((p) => p.teamId !== null)
   const squads = state.teams.map((t) => state.players.filter((p) => p.teamId === t.id).length)
@@ -73,9 +83,12 @@ export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'stren
     meanAge: mean(signed.map((p) => p.age)),
     under22: young.length / signed.length,
     over30: signed.filter((p) => p.age >= 31).length / signed.length,
-    prospects: young.filter((p) => p.hidden.potential >= 75).length,
+    prospects: young.filter((p) => p.hidden.potential >= PROSPECT_POTENTIAL).length,
     topPotential: Math.max(...young.map((p) => p.hidden.potential)),
-    stars: signed.filter((p) => playerOverall(p) >= 85).length,
+    stars: signed.filter((p) => playerOverall(p) >= STAR_OVERALL).length,
+    youngStars: signed.filter((p) => p.age <= 24 && playerOverall(p) >= STAR_OVERALL).length,
+    highPotential: signed.filter((p) => p.hidden.potential >= STAR_OVERALL).length,
+    topOverall: Math.max(...signed.map((p) => playerOverall(p))),
     minSquad: Math.min(...squads),
     maxSquad: Math.max(...squads),
     freeAgents: state.players.length - signed.length,
@@ -84,15 +97,15 @@ export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'stren
   }
 }
 
-export function simulateYears(world: World, years: number, seed: string | number = 'years'): YearRow[] {
+export function simulateYears(world: World, years: number, seed: string | number = 'years', options: { market?: boolean } = {}): YearRow[] {
   let state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players })
   const rows: YearRow[] = []
   for (let i = 0; i < years; i++) {
     const start = snapshot(state)
-    const ended = simulateToSeasonEnd(state, { market: true })
+    const ended = simulateToSeasonEnd(state, { market: options.market ?? true })
     const balances = ended.teams.map((t) => t.finances.balance)
     const lows = ended.teams.map(lowestBalance)
-    const revenue = (t: Team) => t.finances.ledger.filter((e) => e.amount > 0 && (e.category === 'ticket-sales' || e.category === 'sponsorship')).reduce((s, e) => s + e.amount, 0)
+    const revenue = (t: Team) => t.finances.ledger.filter((e) => e.amount > 0 && (e.category === 'ticket-sales' || e.category === 'sponsorship' || e.category === 'tv-rights')).reduce((s, e) => s + e.amount, 0)
     const row: YearRow = {
       year: ended.season.year,
       ...start,
@@ -119,7 +132,7 @@ const pct = (x: number) => `${(100 * x).toFixed(0)}%`
 /** Tabela ano a ano para o terminal. */
 export function formatYears(rows: YearRow[]): string {
   return [
-    'ano   forçaA forçaB  idade <22  >30  promessas potMax craques  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB',
+    'ano   forçaA forçaB  idade <22  >30  promessas potMax craques pot85 topFor  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB',
     ...rows.map((r) =>
       [
         String(r.year),
@@ -131,6 +144,8 @@ export function formatYears(rows: YearRow[]): string {
         String(r.prospects).padStart(9),
         String(r.topPotential).padStart(6),
         String(r.stars).padStart(7),
+        String(r.highPotential).padStart(6),
+        r.topOverall.toFixed(1).padStart(6),
         `${r.minSquad}-${r.maxSquad}`.padStart(8),
         String(r.freeAgents).padStart(8),
         m(r.minEndBalance).padStart(10),

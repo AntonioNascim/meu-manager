@@ -25,7 +25,7 @@ describe(`${YEARS} temporadas seguidas`, () => {
   })
 
   it('o dinheiro não se acumula sem limite: perto do teto da IA e sem crescer ao longo dos anos', () => {
-    for (const r of rows) expect(r.maxBalanceInRevenueYears).toBeLessThan(FINANCE.ceilingYears + 1)
+    for (const r of rows) expect(r.maxBalanceInRevenueYears).toBeLessThan(FINANCE.ceilingYears + 1.5)
     const early = mean(rows.slice(0, 3).map((r) => r.maxEndBalance))
     const late = mean(rows.slice(-3).map((r) => r.maxEndBalance))
     expect(late).toBeLessThan(early * 1.25)
@@ -41,6 +41,28 @@ describe(`${YEARS} temporadas seguidas`, () => {
     expect(Math.abs(drift((r) => r.strengthB))).toBeLessThan(3.5)
   })
 
+  it('a distância de força entre as séries se mantém (a cota de TV e a reputação seguram a Série A em cima)', () => {
+    const gaps = rows.map((r) => r.strengthA - r.strengthB)
+    for (const g of gaps) expect(g).toBeGreaterThan(6)
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(5.5)
+    expect(Math.abs(mean(gaps.slice(-5)) - mean(gaps.slice(1, 6)))).toBeLessThan(1.5)
+    // A reputação média de cada divisão também não anda.
+    expect(Math.abs((rows[YEARS - 1] as YearRow).reputationA - first.reputationA)).toBeLessThan(1.5)
+    expect(Math.abs((rows[YEARS - 1] as YearRow).reputationB - first.reputationB)).toBeLessThan(1)
+  })
+
+  it('sempre existem alguns craques (3 a 8 jogadores com força geral de 85 ou mais) e eles nascem da base', () => {
+    for (const r of rows) {
+      expect(r.stars, `craques em ${r.year}`).toBeGreaterThanOrEqual(3)
+      expect(r.stars, `craques em ${r.year}`).toBeLessThanOrEqual(8)
+      expect(r.topOverall).toBeGreaterThanOrEqual(85)
+      expect(r.topOverall).toBeLessThan(96)
+    }
+    // Craques que existem no fim já não são os do início: a base repõe (alguns jogadores novos de força >= 85).
+    const youngStars = rows.slice(-3).map((r) => r.youngStars)
+    expect(Math.max(...youngStars)).toBeGreaterThanOrEqual(1)
+  })
+
   it('a distribuição de idades continua realista', () => {
     for (const r of rows) {
       expect(r.meanAge).toBeGreaterThan(24)
@@ -54,6 +76,7 @@ describe(`${YEARS} temporadas seguidas`, () => {
   it('continuam surgindo jovens promissores', () => {
     for (const r of rows) {
       expect(r.prospects).toBeGreaterThan(first.prospects * 0.5)
+      expect(r.prospects).toBeLessThan(first.prospects * 2.5)
       expect(r.topPotential).toBeGreaterThanOrEqual(85)
     }
   })

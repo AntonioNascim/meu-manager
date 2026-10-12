@@ -14,8 +14,10 @@ export const createYouth: YouthFactory = (request, rng, taken) => {
   ctx.usedNames = new Set(taken)
   const level = teamLevelFor({ tier: request.tier as 1 | 2, reputation: request.reputation })
   return request.positions.map((position) => {
-    let quality = level - Y.qualityBelowTeam + rng.normal(0, GENERATION.talentSd)
-    if (rng.chance(Y.prospectChance)) quality += rng.float(Y.prospectBonus[0], Y.prospectBonus[1])
+    let quality = level - (Y.qualityBelowTeam[request.tier] ?? 7) + rng.normal(0, GENERATION.talentSd)
+    const wonderkid = rng.chance(Y.wonderkidChance)
+    if (wonderkid) quality = rng.normal(Y.wonderkidQuality, Y.wonderkidQualitySd)
+    else if (rng.chance(Y.prospectChance)) quality += rng.float(Y.prospectBonus[0], Y.prospectBonus[1])
     const player = generatePlayer(rng, ctx, { position, quality, age: rng.int(Y.ageRange[0], Y.ageRange[1]), teamId: request.teamId })
     const salary = player.contract.salary
     return { ...player, contract: { ...player.contract, endDate: `${request.year + rng.int(2, 4)}-12-31`, releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000 } }

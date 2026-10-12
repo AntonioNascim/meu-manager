@@ -31,6 +31,9 @@ export const matchTicketRevenue = (home: Team, away: Pick<Team, 'reputation'>, p
 export const annualSponsorship = (team: Pick<Team, 'reputation'>): number =>
   roundTo(FINANCE.sponsorship.base + FINANCE.sponsorship.perReputation * team.reputation ** FINANCE.sponsorship.power, 10_000)
 
+/** Cota de TV anual da divisão do clube. */
+export const annualTvRights = (team: Pick<Team, 'tier'>): number => FINANCE.tvRights[team.tier] ?? 0
+
 export const monthlyOperations = (team: Pick<Team, 'stadium'>): number => Math.round((team.stadium.capacity * FINANCE.operationsPerSeat) / 12)
 
 /** Folha mensal: salários de quem está no clube (o emprestado é pago por quem o recebeu). */
@@ -38,7 +41,7 @@ export const monthlyPayroll = (players: readonly Pick<Player, 'contract'>[]): nu
 
 /** Receita anual esperada sem contar vendas de jogadores (para o teto do saldo e as projeções). */
 export function expectedAnnualRevenue(team: Team, averageOpponentReputation = 10, homeGames = 19): number {
-  return annualSponsorship(team) + homeGames * matchTicketRevenue(team, { reputation: averageOpponentReputation })
+  return annualSponsorship(team) + annualTvRights(team) + homeGames * matchTicketRevenue(team, { reputation: averageOpponentReputation })
 }
 
 /** Folha mensal que o clube aguenta no longo prazo: receita esperada menos a operação, dividida em 12. */
@@ -63,11 +66,12 @@ export function collectGate(home: Team, away: Pick<Team, 'reputation'>, date: Is
 }
 
 /**
- * Fechamento do mês: patrocínio entra, salários e operação saem. Clubes da IA com saldo acima do teto
+ * Fechamento do mês: patrocínio e cota de TV entram, salários e operação saem. Clubes da IA com saldo acima do teto
  * reinvestem o excesso em estrutura (`ai`). O orçamento de transferências é refeito a partir do saldo.
  */
 export function settleMonth(team: Team, players: readonly Player[], date: IsoDate, ai: boolean): Team {
   let next = recordEntry(team, date, 'sponsorship', Math.round(annualSponsorship(team) / 12), 'Patrocínio')
+  next = recordEntry(next, date, 'tv-rights', Math.round(annualTvRights(team) / 12), 'Cota de TV')
   next = recordEntry(next, date, 'salaries', -monthlyPayroll(players), 'Folha salarial')
   next = recordEntry(next, date, 'operations', -monthlyOperations(team), 'Operação do clube')
   if (ai) {

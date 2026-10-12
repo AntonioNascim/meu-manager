@@ -24,9 +24,12 @@ function stochasticRound(rng: Rng, value: number): number {
 export function yearlyGain(age: number, overall: number, potential: number): number {
   if (age >= E.growthUntil) return 0
   const base = age < E.youthUntil ? E.youthGain : 0
-  const expectedExcess = (E.growthUntil - age) * E.expectedGrowthPerYear + E.expectedGrowthFixed
-  const bonus = (E.potentialPull * (potential - overall - expectedExcess)) / (E.growthUntil + 1 - age)
-  return base + bonus
+  // Quem tem mais potencial do que o jogador médio da idade cresce além da curva média; quem tem menos, fica abaixo.
+  const H = E.highPotential
+  const matureGap = E.maturePotentialGap * clamp((H.top - potential) / (H.top - H.from), H.minShare, 1)
+  const averageGap = matureGap + E.youthGain * Math.max(0, E.youthUntil - age)
+  const bonus = (E.potentialPull * (potential - overall - averageGap)) / (E.growthUntil + 1 - age)
+  return Math.max(0, base + bonus)
 }
 
 const PHYSICAL_PACE: readonly AttributeName[] = ['pace', 'stamina']

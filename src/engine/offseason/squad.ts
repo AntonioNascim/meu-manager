@@ -39,7 +39,8 @@ export function payrollCuts(squad: readonly Player[], sustainable: number, balan
     const candidate = remaining
       .filter((p) => {
         const role = squadRole(p, remaining)
-        return (role === 'rotation' || role === 'surplus') && (counts.get(p.position) ?? 0) > Math.max(MARKET.minByPosition[p.position] ?? 1, 2)
+        const cuttable = role === 'rotation' || role === 'surplus' || (role === 'starter' && monthlyPayroll(remaining) > sustainable * FINANCE.hardCutMargin)
+        return cuttable && (counts.get(p.position) ?? 0) > Math.max(MARKET.minByPosition[p.position] ?? 1, 2)
       })
       .sort((a, b) => b.contract.salary / (playerOverall(b) ** 2) - a.contract.salary / (playerOverall(a) ** 2))[0]
     if (!candidate) break

@@ -226,7 +226,7 @@ export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpe
   // Jovens têm margem para crescer; quem já passou dos 28 está no teto.
   const g = GENERATION.growth
   const growth = Math.max(0, g.untilAge - spec.age) * rng.float(g.perYearMin, g.perYearMax) + rng.float(0, g.randomMax)
-  const potential = clamp(Math.round(overall + growth), Math.round(overall), ATTRIBUTE_MAX)
+  const potential = clamp(Math.round(Math.max(overall, softCap(overall + growth))), Math.round(overall), ATTRIBUTE_MAX)
 
   const salary = salaryForOverall(overall)
   const contractYears = rng.weighted([0, 1, 2, 3, 4], (y) => [3, 4, 4, 3, 2][y] ?? 1)

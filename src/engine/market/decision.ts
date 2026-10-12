@@ -49,7 +49,7 @@ export function playerDecision(input: PlayerDecisionInput): PlayerDecision {
   const salaryPoints = clamp(Math.log(Math.max(1, salary) / reference) / Math.log(cfg.salaryStep), -cfg.salaryClamp, cfg.salaryClamp)
 
   const reputationShare = kind === 'loan' ? cfg.loanReputationShare : 1
-  const fromReputation = from?.reputation ?? cfg.freeAgentReputation
+  const fromReputation = from?.reputation ?? expectedClubReputation(player)
   const reputation = clamp((buyer.reputation - fromReputation) / cfg.reputationStep, -1.5, 1.5) * cfg.reputationWeight * reputationShare
 
   const now = playingTimeIn(player, buyerSquad, buyer)
@@ -65,6 +65,18 @@ export function playerDecision(input: PlayerDecisionInput): PlayerDecision {
   const worst = Math.min(salaryPoints * cfg.salaryWeight, reputation, playing)
   const reason: OfferReason = worst === playing ? 'playing-time' : worst === reputation ? 'club-reputation' : 'salary'
   return { accepted: false, reason, minimumSalary }
+}
+
+/**
+ * Reputação do clube que um jogador livre espera: quem é melhor quer um clube maior (curva inversa da
+ * força média dos times por reputação, na Série B ou na A, a que pedir mais).
+ */
+export function expectedClubReputation(player: Player): number {
+  const overall = playerOverall(player)
+  const g = MARKET.player.freeAgent
+  const b = g.b.referenceReputation + (overall - g.b.base) / g.b.perReputation
+  const a = g.a.referenceReputation + (overall - g.a.base) / g.a.perReputation
+  return clamp(Math.max(a, b), g.min, g.max)
 }
 
 /** Salário que zera a decisão: quanto falta em "pontos de salário" depois dos outros fatores. */

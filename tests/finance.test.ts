@@ -214,3 +214,15 @@ describe('tela de finanças', () => {
     expect(html).toContain('Nenhum lançamento ainda')
   })
 })
+
+describe('cota de TV por divisão', () => {
+  it('é bem maior na Série A, entra todo mês e conta na receita esperada', async () => {
+    const { annualTvRights, expectedAnnualRevenue } = await import('../src/engine/finance')
+    expect(annualTvRights(imp)).toBeGreaterThanOrEqual(4 * annualTvRights(tam))
+    expect(annualTvRights(tam)).toBeGreaterThan(0)
+    const month = settleMonth(imp, world.players.filter((p) => p.teamId === imp.id), '2026-02-01', false)
+    const tv = month.finances.ledger.find((e) => e.category === 'tv-rights')!
+    expect(tv.amount).toBe(Math.round(annualTvRights(imp) / 12))
+    expect(expectedAnnualRevenue(imp)).toBeGreaterThan(annualSponsorship(imp) + annualTvRights(imp))
+  })
+})

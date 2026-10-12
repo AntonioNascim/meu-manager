@@ -1,6 +1,7 @@
 import { FINANCE } from '../../engine/config'
 import {
   annualSponsorship,
+  annualTvRights,
   bestTicketPrice,
   matchAttendance,
   monthlyOperations,
@@ -15,7 +16,7 @@ import { Button, Card } from '../components/ui'
 import { formatDate, formatMoney } from '../format'
 import { FINANCE_CATEGORY_LABELS } from '../labels'
 
-const CATEGORY_ORDER: FinanceCategory[] = ['ticket-sales', 'sponsorship', 'player-sales', 'salaries', 'player-purchases', 'severance', 'operations']
+const CATEGORY_ORDER: FinanceCategory[] = ['ticket-sales', 'sponsorship', 'tv-rights', 'player-sales', 'salaries', 'player-purchases', 'severance', 'operations']
 
 const monthLabel = (month: string) =>
   new Date(`${month}-15T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' })
@@ -33,7 +34,7 @@ export function Finance({ game }: { game: Game }) {
   const fill = Math.round((100 * attendance) / team.stadium.capacity)
   const best = bestTicketPrice(team)
   const payroll = monthlyPayroll(squad)
-  const monthly = Math.round(annualSponsorship(team) / 12) - payroll - monthlyOperations(team)
+  const monthly = Math.round((annualSponsorship(team) + annualTvRights(team)) / 12) - payroll - monthlyOperations(team)
   const setPrice = (price: number) => {
     const bounded = Math.min(FINANCE.ticket.max, Math.max(FINANCE.ticket.min, price))
     updateGame((g) => setUserTicketPrice(g, bounded))
@@ -65,7 +66,7 @@ export function Finance({ game }: { game: Game }) {
           </div>
         </dl>
         <p className="mt-2 text-[11px] text-slate-500">
-          Fixo do mês = patrocínio − salários − operação. A bilheteria entra a cada jogo em casa.
+          Fixo do mês = patrocínio + cota de TV − salários − operação. A bilheteria entra a cada jogo em casa.
         </p>
       </Card>
 

@@ -112,6 +112,7 @@ export const SECTOR_LABELS: Record<Sector, string> = {
 export const FINANCE_CATEGORY_LABELS: Record<FinanceCategory, string> = {
   'ticket-sales': 'Bilheteria',
   sponsorship: 'Patrocínio',
+  'tv-rights': 'Cota de TV',
   'player-sales': 'Venda de jogadores',
   salaries: 'Salários',
   'player-purchases': 'Compra de jogadores',

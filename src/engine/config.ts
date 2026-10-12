@@ -369,6 +369,8 @@ export const FINANCE = {
   },
   /** Patrocínio por ano: base + perReputation × reputação^power. Pago por mês. */
   sponsorship: { base: 5_500_000, perReputation: 900_000, power: 1.2 },
+  /** Cota de TV por clube e por ano, conforme a divisão (paga por mês): bem maior na Série A. */
+  tvRights: { 1: 20_000_000, 2: 3_000_000 } as Record<number, number>,
   /** Custo anual de operação (estádio, estrutura, comissão): por lugar da capacidade. Pago por mês. */
   operationsPerSeat: 110,
   /** Parcela do saldo que fica disponível para transferências (recalculada todo mês). */
@@ -384,7 +386,9 @@ export const FINANCE = {
   /** A IA só corta salários quando a folha passa da sustentável por esta margem. */
   payrollCutMargin: 1.0,
   /** A IA só corta se o saldo aguenta menos que isto de anos de déficit (folha acima da sustentável). */
-  cutRunwayYears: 5,
+  cutRunwayYears: 2,
+  /** Se a folha passa da sustentável por mais que isto, a IA corta até titulares (peças-chave ficam). */
+  hardCutMargin: 1.15,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -437,12 +441,17 @@ export const MARKET = {
     /** Cada 1,5× no salário vale 1 ponto (limitado a ±salaryClamp pontos). */
     salaryStep: 1.5,
     salaryClamp: 2,
-    reputationWeight: 0.5,
+    reputationWeight: 0.8,
     /** Diferença de reputação (ponto) que vale 1 ponto de reputação, limitada a ±1,5. */
     reputationStep: 6,
     playingTimeWeight: 0.8,
     /** Reputação que o jogador livre considera como "clube de origem". */
-    freeAgentReputation: 8,
+    freeAgent: {
+      a: { base: 62, referenceReputation: 7, perReputation: 0.55 },
+      b: { base: 47, referenceReputation: 3, perReputation: 2.2 },
+      min: 3,
+      max: 19,
+    },
     /** Viés contra mudar de clube. */
     inertia: 0.2,
     /** Tempo de jogo pesa mais para quem é bom: 0,6 + ambition × força/100. */
@@ -515,6 +524,9 @@ export const OFFSEASON = {
     /** Pontos de reputação por (posição esperada − posição final) / step, limitados a ±max. */
     positionStep: 5,
     positionMax: 2,
+    /** Reputação média de cada divisão e quanto da distância até ela o clube recupera por ano: mantém a distância entre as séries. */
+    tierMean: { 1: 12, 2: 5.5 } as Record<number, number>,
+    tierPull: 0.3,
     champion: 0,
     promoted: 1,
     relegated: -1,
@@ -527,11 +539,12 @@ export const OFFSEASON = {
     youthUntil: 22,
     /** Quem ainda cresce (até esta idade) recebe um bônus/penalidade pela distância até o potencial. */
     growthUntil: 26,
-    /** Crescimento médio esperado até o potencial (por ano restante e fixo), igual à geração. */
-    expectedGrowthPerYear: 2.25,
-    expectedGrowthFixed: 2,
-    /** Parcela da diferença (potencial − esperado) que vira ganho a cada ano. */
-    potentialPull: 0.5,
+    /** Distância média entre potencial e força geral de quem já amadureceu (22 a 26 anos): o excesso acima disso vira ganho extra. */
+    maturePotentialGap: 12,
+    /** Potencial alto fica mais perto do teto: a distância de maturidade vai de 12 (potencial `from`) a `minShare` × 12 (potencial `top`). */
+    highPotential: { from: 90, top: 100, minShare: 0.35 },
+    /** Quanto do excesso de potencial (sobre a média da idade) vira ganho por ano restante até `growthUntil`. */
+    potentialPull: 3,
     /** Ruído do ganho do jogador e de cada atributo. */
     playerNoise: 0.8,
     attributeNoise: 1.2,
@@ -603,7 +616,11 @@ export const OFFSEASON = {
     /** Promessas: chance de um jovem vir bem acima do nível do time, e quanto (pontos de qualidade). */
     prospectChance: 0.08,
     prospectBonus: [5, 11] as readonly [number, number],
+    /** Fenômeno: raríssimo (cerca de 1 por ano no mundo todo); nasce já com qualidade de craque, em qualquer time. */
+    wonderkidChance: 0.006,
+    wonderkidQuality: 86,
+    wonderkidQualitySd: 2.5,
     /** Jovem de base é reserva: qualidade = nível do time − isto (±talento). */
-    qualityBelowTeam: 7,
+    qualityBelowTeam: { 1: 5, 2: 18 } as Record<number, number>,
   },
 } as const
