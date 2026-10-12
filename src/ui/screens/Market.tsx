@@ -1,18 +1,18 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { askingPrice, expectedSalary, isWindowOpen, loanFee, OfferError, pendingIncoming, transferWindows, windowAt } from '../../engine/market'
+import { askingPrice, buyerInterest, expectedSalary, isWindowOpen, loanFee, OfferError, pendingIncoming, releaseCost, transferWindows, windowAt } from '../../engine/market'
 import { playerOverall } from '../../engine/overall'
 import { makeDate } from '../../engine/season/dates'
 import { POSITIONS } from '../../engine/types'
 import type { OfferKind, Player, Position, TransferOffer } from '../../engine/types'
-import { makeUserOffer, respondToUserOffer, squadOf, teamById, userTeam } from '../../store/game'
+import { makeUserOffer, releaseUserSquadPlayer, respondToUserOffer, sellUserPlayer, squadOf, teamById, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
 import { Button, Card, Tabs } from '../components/ui'
 import { formatDate, formatMoney, playerName } from '../format'
 import { OFFER_KIND_LABELS, OFFER_REASON_LABELS, OFFER_STATUS_LABELS, POSITION_SHORT_LABELS, WINDOW_LABELS } from '../labels'
 
-type Tab = 'search' | 'incoming' | 'mine'
+type Tab = 'search' | 'incoming' | 'mine' | 'squad'
 
 const clubName = (game: Game, id: string | null) => (id ? teamById(game, id).name : 'Livre no mercado')
 
@@ -50,11 +50,13 @@ export function Market({ game }: { game: Game }) {
           { id: 'search', label: 'Buscar' },
           { id: 'incoming', label: `Recebidas${incoming.length ? ` (${incoming.length})` : ''}` },
           { id: 'mine', label: 'Minhas' },
+          { id: 'squad', label: 'Meu elenco' },
         ]}
       />
       {tab === 'search' && <Search game={game} open={open} />}
       {tab === 'incoming' && <Incoming game={game} open={open} />}
       {tab === 'mine' && <Mine game={game} />}
+      {tab === 'squad' && <MySquad game={game} open={open} />}
     </div>
   )
 }
@@ -253,6 +255,138 @@ function Mine({ game }: { game: Game }) {
         ))}
         {offers.length === 0 && <li className="p-4 text-sm text-slate-400">Você ainda não fez propostas.</li>}
       </ul>
+    </Card>
+  )
+}
+
+/** Vender, emprestar ou liberar jogadores do próprio time. */
+function MySquad({ game, open }: { game: Game; open: boolean }) {
+  const [pickedId, setPickedId] = useState<string | null>(null)
+  const squad = squadOf(game, game.userTeamId)
+    .filter((p) => !p.contract.loanedFrom)
+    .sort((a, b) => playerOverall(b) - playerOverall(a))
+  const picked = squad.find((p) => p.id === pickedId)
+  if (picked) return <SellForm game={game} player={picked} open={open} onClose={() => setPickedId(null)} />
+  return (
+    <Card flush>
+      <ul className="divide-y divide-slate-700">
+        {squad.map((p) => (
+          <li key={p.id}>
+            <button type="button" className="flex min-h-14 w-full items-center gap-2 px-3 text-left" onClick={() => setPickedId(p.id)}>
+              <span className="w-9 text-xs text-slate-400">{POSITION_SHORT_LABELS[p.position]}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{playerName(p)}</span>
+              <span className="text-xs text-slate-400">{p.age} anos</span>
+              <span className="w-9 text-right font-semibold">{Math.round(playerOverall(p))}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+function SellForm({ game, player, open, onClose }: { game: Game; player: Player; open: boolean; onClose: () => void }) {
+  const state = game.season
+  const year = state.season.year
+  const [kind, setKind] = useState<OfferKind>('purchase')
+  const [buyerId, setBuyerId] = useState<string | null>(null)
+  const [fee, setFee] = useState<number | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const buyers = useMemo(
+    () =>
+      state.teams
+        .filter((t) => t.id !== game.userTeamId)
+        .map((t) => ({ team: t, interest: buyerInterest(state, t.id, player, kind) }))
+        .filter((b) => b.interest.maxFee !== null && b.interest.maxFee > 0)
+        .sort((a, b) => (b.interest.maxFee ?? 0) - (a.interest.maxFee ?? 0)),
+    [state, game.userTeamId, player, kind],
+  )
+  const chosen = buyers.find((b) => b.team.id === buyerId)
+  const value = fee ?? chosen?.interest.maxFee ?? 0
+  const date = state.season.currentDate
+
+  const sell = () => {
+    if (!chosen) return
+    try {
+      const contractEnd = makeDate(kind === 'loan' ? year : year + 3, 12, 31)
+      const { game: next, result } = sellUserPlayer(game, { playerId: player.id, buyerId: chosen.team.id, kind, fee: value, contractEnd })
+      if (result.accepted) {
+        updateGame(() => next)
+        onClose()
+      } else {
+        const reason = result.reason ? OFFER_REASON_LABELS[result.reason] : 'Proposta recusada.'
+        setMessage(result.counter !== undefined ? `${reason} Máximo: ${formatMoney(result.counter)}.` : reason)
+      }
+    } catch (e) {
+      setMessage(e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível concluir.')
+    }
+  }
+
+  const release = () => {
+    if (!window.confirm(`Liberar ${playerName(player)}? Rescisão de ${formatMoney(releaseCost(player, date))}.`)) return
+    try {
+      updateGame((g) => releaseUserSquadPlayer(g, player.id))
+      onClose()
+    } catch (e) {
+      setMessage(e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível liberar.')
+    }
+  }
+
+  return (
+    <Card title="Negociar jogador">
+      <div className="mb-3">
+        <div className="font-semibold">{playerName(player)}</div>
+        <div className="text-xs text-slate-400">
+          {POSITION_SHORT_LABELS[player.position]} · {player.age} anos · força {Math.round(playerOverall(player))} · salário {formatMoney(player.contract.salary)}
+        </div>
+      </div>
+      <div className="mb-3 flex gap-2">
+        {(['purchase', 'loan'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => {
+              setKind(k)
+              setBuyerId(null)
+              setFee(null)
+            }}
+            className={`min-h-12 flex-1 rounded-xl text-sm font-semibold ${kind === k ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700'}`}
+          >
+            {k === 'purchase' ? 'Vender' : 'Emprestar'}
+          </button>
+        ))}
+      </div>
+      <label className="mb-3 block text-sm">
+        Clube interessado
+        <select
+          className="mt-1 min-h-12 w-full rounded-xl bg-slate-900 px-3"
+          value={buyerId ?? ''}
+          onChange={(e) => {
+            setBuyerId(e.target.value || null)
+            setFee(null)
+          }}
+        >
+          <option value="">{buyers.length ? 'Escolha um clube' : 'Nenhum clube interessado'}</option>
+          {buyers.map((b) => (
+            <option key={b.team.id} value={b.team.id}>
+              {b.team.name} · até {formatMoney(b.interest.maxFee as number)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {chosen && (
+        <label className="mb-3 block text-sm">
+          {kind === 'loan' ? 'Taxa do empréstimo' : 'Valor da venda'}
+          <input type="number" min={0} step={10_000} className="mt-1 min-h-12 w-full rounded-xl bg-slate-900 px-3" value={value} onChange={(e) => setFee(Number(e.target.value))} />
+        </label>
+      )}
+      {!open && <p className="mb-2 text-sm text-amber-300">Janela fechada: só é possível liberar o jogador.</p>}
+      {message && <p className="mb-2 text-sm text-rose-300">{message}</p>}
+      <div className="flex gap-2">
+        <Button className="flex-1" disabled={!open || !chosen} onClick={sell}>{kind === 'loan' ? 'Emprestar' : 'Vender'}</Button>
+        <Button variant="secondary" onClick={release}>Liberar</Button>
+        <Button variant="secondary" onClick={onClose}>Voltar</Button>
+      </div>
     </Card>
   )
 }

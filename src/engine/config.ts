@@ -444,6 +444,15 @@ export const MARKET = {
     loanReputationShare: 0.5,
   },
 
+  /** Venda, empréstimo e liberação de jogadores do time do jogador. */
+  userSale: {
+    /** Até quanto (× valor de mercado) um clube interessado paga numa compra / paga de taxa num empréstimo. */
+    purchaseWillingness: 1.15,
+    loanWillingness: 1.25,
+    /** Rescisão ao liberar: fração do salário dos meses de contrato que restam. */
+    releaseCostShare: 0.5,
+  },
+
   ai: {
     /** Elenco abaixo disto: o clube sai procurando reforço de profundidade. */
     wantsDepthBelow: 23,

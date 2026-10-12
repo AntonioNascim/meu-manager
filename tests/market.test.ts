@@ -141,3 +141,59 @@ describe('mercado no jogo', () => {
     expect(() => respondToUserOffer(g, 'nao-existe', true)).toThrowError('invalid')
   })
 })
+
+describe('venda, empréstimo e liberação pelo jogador', () => {
+  const loaded = async () => import('../src/engine/market')
+  const surplusOf = (s: ReturnType<typeof season>, teamId: string) => {
+    const squad = squadOf(s, teamId)
+    // jogador de posição com sobra de cobertura, para passar nas travas de elenco
+    return squad.find((p) => squad.filter((q) => q.position === p.position).length > 3)!
+  }
+  const rich = [...world.teams].sort((a, b) => b.squad.length - a.squad.length)[0]!
+
+  it('liberar deixa o jogador livre e cobra rescisão; respeita elenco mínimo e posição', async () => {
+    const { releaseUserPlayer, releaseCost } = await loaded()
+    const s = season()
+    const p = surplusOf(s, rich.id)
+    const out = releaseUserPlayer(s, rich.id, p.id)
+    expect(out.players.find((x) => x.id === p.id)!.teamId).toBeNull()
+    const before = s.teams.find((t) => t.id === rich.id)!.finances.balance
+    expect(out.teams.find((t) => t.id === rich.id)!.finances.balance).toBe(before - releaseCost(p, s.season.currentDate))
+    const gk = squadOf(s, rich.id).filter((x) => x.position === 'GK')
+    expect(() => releaseUserPlayer(s, rich.id, gk[0]!.id)).not.toThrow() // 3+ goleiros
+    const tight = squadOf(s, rich.id).filter((x) => x.position === 'GK').slice(0, gk.length - 2)
+    let t = s
+    for (const g of tight) t = releaseUserPlayer(t, rich.id, g.id)
+    expect(() => releaseUserPlayer(t, rich.id, squadOf(t, rich.id).find((x) => x.position === 'GK')!.id)).toThrowError('position-cover')
+  })
+
+  it('a venda é respondida na hora: acima do teto o clube recusa com o máximo; dentro do teto a venda acontece', async () => {
+    const { buyerInterest, sellPlayer } = await loaded()
+    const s = season()
+    const p = surplusOf(s, rich.id)
+    const interested = world.teams.filter((t) => t.id !== rich.id).map((t) => buyerInterest(s, t.id, p, 'purchase')).filter((i) => i.maxFee !== null && i.maxFee > 0)
+    expect(interested.length).toBeGreaterThan(0)
+    const target = interested[0]!
+    const base = { playerId: p.id, buyerId: target.teamId, kind: 'purchase' as const, contractEnd: '2030-12-31' }
+    const refused = sellPlayer(s, rich.id, { ...base, fee: target.maxFee! + 10_000_000 })
+    expect(refused.accepted).toBe(false)
+    expect(refused.reason).toBe('fee')
+    expect(refused.counter).toBe(target.maxFee)
+    const sold = sellPlayer(s, rich.id, { ...base, fee: target.maxFee! })
+    expect(sold.accepted).toBe(true)
+    {
+      expect(sold.state.players.find((x) => x.id === p.id)!.teamId).toBe(target.teamId)
+      expect(sold.state.teams.find((t) => t.id === rich.id)!.squad).not.toContain(p.id)
+    }
+  })
+
+  it('não vende jogador emprestado nem de outro time, nem com a janela fechada', async () => {
+    const { sellPlayer } = await loaded()
+    const s = season()
+    const other = world.teams.find((t) => t.id !== rich.id)!
+    const foreign = squadOf(s, other.id)[0]!
+    expect(() => sellPlayer(s, rich.id, { playerId: foreign.id, buyerId: other.id, kind: 'purchase', fee: 1, contractEnd: '2030-12-31' })).toThrowError('unavailable')
+    const closed = { ...s, season: { ...s.season, currentDate: s.matches.map((m) => m.date).sort()[0]! } }
+    expect(() => sellPlayer(closed, rich.id, { playerId: surplusOf(s, rich.id).id, buyerId: other.id, kind: 'purchase', fee: 1, contractEnd: '2030-12-31' })).toThrowError('window-closed')
+  })
+})

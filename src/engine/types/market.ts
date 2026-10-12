@@ -19,6 +19,7 @@ export type OfferReason =
   | 'own-player'
   | 'duplicate'
   | 'invalid'
+  | 'no-interest'
 
 export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired'
 

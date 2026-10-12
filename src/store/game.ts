@@ -4,8 +4,8 @@
  */
 import { generateWorld } from '../data/generateWorld'
 import { setTicketPrice } from '../engine/finance'
-import { makeOffer, respondToOffer } from '../engine/market'
-import type { OfferRequest } from '../engine/market'
+import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
+import type { OfferRequest, SaleResult } from '../engine/market'
 import { playerOverall } from '../engine/overall'
 import {
   advanceToNextEvent,
@@ -17,7 +17,7 @@ import {
   setTeamTactic,
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
-import type { Competition, MarketNotice, Match, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import type { Competition, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
 export interface Game {
   /** Semente do mundo e da temporada (mesma semente = mesmo jogo). */
@@ -101,6 +101,17 @@ export function makeUserOffer(game: Game, request: OfferRequest): Game {
 /** O jogador aceita ou recusa uma proposta recebida. */
 export function respondToUserOffer(game: Game, offerId: string, accept: boolean): Game {
   return { ...game, season: respondToOffer(game.season, offerId, accept) }
+}
+
+/** Vende ou empresta um jogador do time a um clube da IA, que responde na hora. */
+export function sellUserPlayer(game: Game, request: { playerId: string; buyerId: TeamId; kind: OfferKind; fee: number; contractEnd: IsoDate }): { game: Game; result: SaleResult } {
+  const result = sellPlayer(game.season, game.userTeamId, request)
+  return { game: result.accepted ? { ...game, season: result.state } : game, result }
+}
+
+/** Libera um jogador do time (paga a rescisão). */
+export function releaseUserSquadPlayer(game: Game, playerId: string): Game {
+  return { ...game, season: releaseUserPlayer(game.season, game.userTeamId, playerId) }
 }
 
 // ---------------------------------------------------------------------------

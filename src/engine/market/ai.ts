@@ -30,7 +30,7 @@ interface Need {
 }
 
 /** Posições em que o time pode melhorar, com a força do titular mais fraco de cada uma. */
-function needsOf(team: Team, squad: readonly Player[]): Need[] {
+export function needsOf(team: Team, squad: readonly Player[]): Need[] {
   const slots = new Map<Position, number>()
   for (const s of getFormation(team.tactic.formationId).slots) slots.set(s.position, (slots.get(s.position) ?? 0) + 1)
   const needs: Need[] = []

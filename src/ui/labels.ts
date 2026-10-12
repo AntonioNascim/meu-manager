@@ -220,6 +220,7 @@ export const OFFER_REASON_LABELS: Record<OfferReason, string> = {
   'own-player': 'O jogador já é do seu time',
   duplicate: 'Já existe uma proposta pendente por ele',
   invalid: 'Proposta inválida',
+  'no-interest': 'O clube não tem interesse no jogador',
 }
 
 export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
