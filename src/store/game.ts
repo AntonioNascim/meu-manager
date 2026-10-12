@@ -3,6 +3,7 @@
  * Nada daqui depende de React; o salvamento (Dexie) entra numa etapa futura.
  */
 import { generateWorld } from '../data/generateWorld'
+import { setTicketPrice } from '../engine/finance'
 import { playerOverall } from '../engine/overall'
 import {
   advanceToNextEvent,
@@ -61,6 +62,12 @@ export function playPendingAuto(game: Game): Game {
   if (!pending) return game
   const finished = playUserMatchAuto(game.season, pending, game.userTeamId)
   return finishPendingMatch(game, finished.result as MatchResult)
+}
+
+/** O jogador define o preço do ingresso (vale a partir do próximo jogo em casa). */
+export function setUserTicketPrice(game: Game, price: number): Game {
+  const team = setTicketPrice(userTeam(game), price)
+  return { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === team.id ? team : t)) } }
 }
 
 export function setUserTactic(game: Game, tactic: Tactic): Game {

@@ -108,6 +108,7 @@ export const FINANCE_CATEGORY_LABELS: Record<FinanceCategory, string> = {
   'player-sales': 'Venda de jogadores',
   salaries: 'Salários',
   'player-purchases': 'Compra de jogadores',
+  operations: 'Operação e estrutura',
 }
 
 export const COMPETITION_TYPE_LABELS: Record<CompetitionType, string> = {

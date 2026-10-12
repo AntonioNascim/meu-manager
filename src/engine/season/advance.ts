@@ -7,6 +7,7 @@
  * partidas do dia são simuladas e seus efeitos entram nos jogadores (condição, lesões,
  * suspensões, forma e moral).
  */
+import { collectGate, matchAttendance, monthStartsBetween, settleMonth } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
 import { getFormation } from '../formations'
 import { simulateMatch } from '../match'
@@ -48,8 +49,18 @@ export function aiTactic(team: Team, squad: readonly Player[]) {
 
 /** Simula uma partida agendada com a seed dela (mesma seed = mesmo resultado). */
 export function playMatch(match: Match, home: { team: Team; players: readonly Player[] }, away: { team: Team; players: readonly Player[] }): Match {
-  const result = simulateMatch({ home, away, seed: match.seed })
-  return { ...match, status: 'finished', result }
+  const attendance = matchAttendance(home.team, away.team)
+  const result = simulateMatch({ home, away, seed: match.seed, attendance })
+  return { ...match, status: 'finished', result, attendance }
+}
+
+/** Fechamento financeiro dos meses que começam no intervalo (de, até]; os clubes da IA reinvestem o excesso. */
+function settleMonths(teams: readonly Team[], squads: Map<TeamId, Player[]>, from: IsoDate, to: IsoDate, userTeamId?: TeamId): Team[] {
+  let current = [...teams]
+  for (const month of monthStartsBetween(from, to)) {
+    current = current.map((t) => settleMonth(t, squads.get(t.id) ?? [], month, t.id !== userTeamId))
+  }
+  return current
 }
 
 export interface AdvanceOptions {
@@ -84,9 +95,8 @@ export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions =
   const days = daysBetween(state.season.currentDate, event.date)
   const players = progressDays(state.players, days)
   const squads = groupByTeam(players)
-  const teams = new Map(state.teams.map((t) => [t.id, t]))
-
   const { userTeamId } = options
+  const teams = new Map(settleMonths(state.teams, squads, state.season.currentDate, event.date, userTeamId).map((t) => [t.id, t]))
   let pendingUserMatch: Match | undefined
   const played: Match[] = []
   const changed = new Map<PlayerId, Player>()
@@ -107,6 +117,7 @@ export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions =
       { team: { ...away, tactic: aiTactic(away, awaySquad) }, players: awaySquad },
     )
     for (const p of applyMatchToPlayers(new Map([[home.id, homeSquad], [away.id, awaySquad]]), finished)) changed.set(p.id, p)
+    teams.set(home.id, collectGate(home, away, m.date).team)
     played.push(finished)
     return finished
   })
@@ -114,7 +125,7 @@ export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions =
   const done = matches.every((m) => m.status === 'finished')
   const season = { ...state.season, currentDate: event.date, phase: done ? ('end-of-season' as const) : ('in-season' as const) }
   return {
-    state: { ...state, season, matches, players: players.map((p) => changed.get(p.id) ?? p) },
+    state: { ...state, season, matches, teams: state.teams.map((t) => teams.get(t.id) ?? t), players: players.map((p) => changed.get(p.id) ?? p) },
     event,
     played,
     ...(pendingUserMatch ? { pendingUserMatch } : {}),
@@ -145,6 +156,7 @@ export function userMatchInput(state: SeasonState, match: Match, userTeamId: Tea
     home: side(match.homeTeamId),
     away: side(match.awayTeamId),
     seed: match.seed,
+    attendance: matchAttendance(teamOf(match.homeTeamId), teamOf(match.awayTeamId)),
     userControlled: { home: match.homeTeamId === userTeamId, away: match.awayTeamId === userTeamId },
   }
 }
@@ -155,7 +167,11 @@ export function playUserMatchAuto(state: SeasonState, match: Match, userTeamId: 
 }
 
 /** Registra uma partida jogada fora de `advanceToNextEvent` (a do jogador): placar, jogadores e fase. */
-export function completeMatch(state: SeasonState, finished: Match): SeasonState {
+export function completeMatch(state: SeasonState, played: Match): SeasonState {
+  const home_ = state.teams.find((t) => t.id === played.homeTeamId) as Team
+  const away_ = state.teams.find((t) => t.id === played.awayTeamId) as Team
+  const gate = collectGate(home_, away_, played.date)
+  const finished: Match = { ...played, attendance: gate.attendance }
   const squads = groupByTeam(state.players)
   const home = squads.get(finished.homeTeamId) ?? []
   const away = squads.get(finished.awayTeamId) ?? []
@@ -165,6 +181,7 @@ export function completeMatch(state: SeasonState, finished: Match): SeasonState 
   return {
     ...state,
     matches,
+    teams: state.teams.map((t) => (t.id === home_.id ? gate.team : t)),
     players: state.players.map((p) => changed.get(p.id) ?? p),
     season: { ...state.season, phase: done ? 'end-of-season' : 'in-season' },
   }

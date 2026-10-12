@@ -15,6 +15,7 @@ export type FinanceCategory =
   | 'player-sales'
   | 'salaries'
   | 'player-purchases'
+  | 'operations'
 
 export interface FinanceEntry {
   date: IsoDate
@@ -30,6 +31,15 @@ export interface Finances {
   transferBudget: number
   /** Lançamentos da temporada corrente. */
   ledger: FinanceEntry[]
+  /** Fechamento das temporadas anteriores. */
+  pastSeasons: SeasonFinance[]
+}
+
+export interface SeasonFinance {
+  year: number
+  income: number
+  expenses: number
+  endBalance: number
 }
 
 export interface BoardObjective {

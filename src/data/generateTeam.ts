@@ -1,4 +1,5 @@
 import { FORMATION_TIE_TOLERANCE } from '../engine/config'
+import { defaultTicketPrice } from '../engine/finance'
 import { buildTactic, rankFormations } from '../engine/lineup'
 import { FORMATION_IDS, getFormation } from '../engine/formations'
 import type { Rng } from '../engine/rng'
@@ -160,9 +161,10 @@ export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefiniti
       salaryBudget: Math.round((monthlyPayroll * 1.1) / 1_000) * 1_000,
       transferBudget: Math.round((balance * 0.25) / 10_000) * 10_000,
       ledger: [],
+      pastSeasons: [],
     },
     fanBase: Math.round((def.reputation ** 2.5 * 12_000 * rng.float(0.85, 1.15)) / 1_000) * 1_000,
-    ticketPrice: Math.round(20 + def.reputation * 3),
+    ticketPrice: defaultTicketPrice(def.reputation),
     objective: { targetPosition: target, sackingPosition: Math.min(20, target + 6) },
     history: [],
     tier: def.tier,

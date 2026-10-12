@@ -344,3 +344,37 @@ export const LINEUP = {
   /** Multiplica o cansaço percebido na escolha (>1 = poupa jogadores mais cedo que o necessário). */
   restBias: 3,
 } as const
+
+// ---------------------------------------------------------------------------
+// Finanças
+// ---------------------------------------------------------------------------
+
+export const FINANCE = {
+  ticket: {
+    /** Preço padrão do ingresso: base + perReputation × reputação do time. */
+    base: 8,
+    perReputation: 1.6,
+    min: 5,
+    max: 300,
+    /**
+     * Elasticidade da procura: público = procura base × (preço padrão / preço)^elasticidade. Acima de 1,
+     * subir o preço só compensa quando o estádio está cheio; abaixo do ponto em que a procura iguala a
+     * capacidade, cada real a mais reduz a receita.
+     */
+    elasticity: 1.2,
+    /** Rival maior atrai mais gente: cada ponto de reputação do visitante acima/abaixo de 10. */
+    opponentPerReputation: 0.02,
+    opponentFactorMin: 0.8,
+    opponentFactorMax: 1.2,
+  },
+  /** Patrocínio por ano: base + perReputation × reputação^power. Pago por mês. */
+  sponsorship: { base: 4_000_000, perReputation: 900_000, power: 1.2 },
+  /** Custo anual de operação (estádio, estrutura, comissão): por lugar da capacidade. Pago por mês. */
+  operationsPerSeat: 110,
+  /** Parcela do saldo que fica disponível para transferências (recalculada todo mês). */
+  transferShare: 0.4,
+  /** Saldo acima de (receita anual × isto) é reinvestido em estrutura (clubes da IA): evita acumular sem limite. */
+  ceilingYears: 1.5,
+  /** Parcela do excesso acima do teto investida por mês. */
+  ceilingSpendPerMonth: 0.3,
+} as const

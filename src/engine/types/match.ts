@@ -68,6 +68,8 @@ export interface Match {
   status: MatchStatus
   /** Semente usada na simulação (mesma semente = mesmo resultado). */
   seed: number
+  /** Público presente (preenchido quando a partida é jogada). */
+  attendance?: number
   /** Preenchido apenas quando `status === 'finished'`. */
   result?: MatchResult
 }
