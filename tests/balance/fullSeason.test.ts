@@ -1,7 +1,6 @@
 /**
  * Temporada inteira das duas séries pelo calendário (760 partidas, alguns segundos).
- * Fica no projeto de balanceamento para manter o 
-pm test rápido.
+ * Fica no projeto de balanceamento para manter o npm test rápido.
  */
 import { describe, expect, it } from 'vitest'
 import { generateWorld } from '../../src/data/generateWorld'
@@ -10,17 +9,16 @@ import {
   advanceToNextEvent,
   computeStandings,
   createSeason,
-  createSimulationContext,
-  defaultCompetitions,
+  daysBetween,
   nextEvent,
+  progressDays,
   simulateToSeasonEnd,
 } from '../../src/engine/season'
 describe('temporada inteira pelo calendário (Série A e Série B)', () => {
   const world = generateWorld({ seed: 31 })
-  const context = createSimulationContext(world.teams, world.players)
-  const start = createSeason({ year: 2026, seed: 'full', competitions: defaultCompetitions(world.teams) })
+  const start = createSeason({ year: 2026, seed: 'full', teams: world.teams, players: world.players })
   const t0 = performance.now()
-  const end = simulateToSeasonEnd(start, context)
+  const end = simulateToSeasonEnd(start)
   const seconds = (performance.now() - t0) / 1000
 
   // Classificação final no terminal (aparece em npm run test:balance).
@@ -46,7 +44,7 @@ describe('temporada inteira pelo calendário (Série A e Série B)', () => {
     expect(end.matches.every((m) => m.status === 'finished' && m.result)).toBe(true)
     expect(end.season.phase).toBe('end-of-season')
     expect(nextEvent(end).type).toBe('season-end')
-    expect(advanceToNextEvent(end, context).played).toHaveLength(0)
+    expect(advanceToNextEvent(end).played).toHaveLength(0)
     expect(seconds).toBeLessThan(30)
   })
 
@@ -106,7 +104,75 @@ describe('temporada inteira pelo calendário (Série A e Série B)', () => {
 
   it('a temporada simulada passo a passo dá o mesmo resultado que a direta', () => {
     let state = start
-    for (let i = 0; i < 400 && nextEvent(state).type === 'matchday'; i++) state = advanceToNextEvent(state, context).state
+    for (let i = 0; i < 400 && nextEvent(state).type === 'matchday'; i++) state = advanceToNextEvent(state).state
     expect(state.matches.map((m) => m.result?.homeGoals)).toEqual(end.matches.map((m) => m.result?.homeGoals))
+  })
+})
+
+describe('condição dos jogadores durante a temporada inteira', () => {
+  const world = generateWorld({ seed: 32 })
+  let state = createSeason({ year: 2026, seed: 'cond-full', teams: world.teams, players: world.players })
+
+  let unavailablePlayed = 0
+  let matchSides = 0
+  let rotatedOut = 0
+  let suspensionsServed = 0
+  let injuriesStarted = 0
+  const teamById = new Map(world.teams.map((t) => [t.id, t]))
+  const fitnessAtKickoff: number[] = []
+
+  while (nextEvent(state).type === 'matchday') {
+    // Estado do dia do jogo: já com os dias passados (recuperação e fim das lesões) e antes da partida.
+    const event = nextEvent(state)
+    const days = event.type === 'matchday' ? daysBetween(state.season.currentDate, event.date) : 0
+    const before = new Map(progressDays(state.players, days).map((p) => [p.id, p]))
+    const step = advanceToNextEvent(state)
+    for (const m of step.played) {
+      for (const teamId of [m.homeTeamId, m.awayTeamId]) {
+        const results = (m.result?.playerResults ?? []).filter((r) => r.teamId === teamId && r.minutesPlayed > 0)
+        matchSides++
+        for (const r of results) {
+          const p = before.get(r.playerId)
+          if (p && (p.condition.suspensionGames > 0 || p.condition.injuryDaysLeft > 0)) unavailablePlayed++
+        }
+        const base = teamById.get(teamId)?.tactic.startingXI ?? []
+        rotatedOut += base.filter((id) => !results.some((r) => r.playerId === id)).length
+        for (const r of results.filter((x) => x.minutesPlayed >= 60)) fitnessAtKickoff.push(before.get(r.playerId)?.condition.fitness ?? 100)
+      }
+      for (const r of m.result?.playerResults ?? []) if (r.injuryDays) injuriesStarted++
+    }
+    for (const p of step.state.players) {
+      const was = before.get(p.id)
+      if (was && was.condition.suspensionGames > 0 && p.condition.suspensionGames < was.condition.suspensionGames) suspensionsServed++
+    }
+    state = step.state
+  }
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
+  console.log(
+    `condição na temporada (mundo 32): condição média dos titulares ao entrar ${mean(fitnessAtKickoff).toFixed(1)} | titulares oficiais fora do jogo ${(rotatedOut / matchSides).toFixed(2)} por jogo por time | lesões ${(injuriesStarted / 40).toFixed(1)} por time | suspensões cumpridas ${suspensionsServed}`,
+  )
+
+  it('ninguém joga lesionado ou suspenso', () => {
+    expect(unavailablePlayed).toBe(0)
+  })
+
+  it('há lesões e suspensões ao longo do ano, em quantidade realista', () => {
+    expect(injuriesStarted / 40).toBeGreaterThan(2)
+    expect(injuriesStarted / 40).toBeLessThan(14)
+    expect(suspensionsServed).toBeGreaterThan(20)
+  })
+
+  it('o elenco é rodado: os titulares oficiais nem sempre jogam, mas quase sempre', () => {
+    expect(rotatedOut / matchSides).toBeGreaterThan(0.2)
+    expect(rotatedOut / matchSides).toBeLessThan(2.5)
+  })
+
+  it('os titulares entram cansados às vezes, mas em geral com boa condição', () => {
+    expect(mean(fitnessAtKickoff)).toBeGreaterThan(75)
+    expect(mean(fitnessAtKickoff)).toBeLessThan(99)
+  })
+
+  it('terminada a temporada, todos os 760 jogos foram jogados', () => {
+    expect(state.matches.every((m) => m.status === 'finished')).toBe(true)
   })
 })

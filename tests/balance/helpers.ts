@@ -4,9 +4,10 @@
  */
 import type { World } from '../../src/data/generateWorld'
 import { simulateMatch } from '../../src/engine/match'
+import { computeStandings, createSeason, simulateToSeasonEnd } from '../../src/engine/season'
 import { playerOverall } from '../../src/engine/overall'
 import { createRng } from '../../src/engine/rng'
-import type { MatchResult, Player, Team } from '../../src/engine/types'
+import type { Competition, MatchResult, Player, Team } from '../../src/engine/types'
 
 export interface BalanceSummary {
   matches: number
@@ -90,70 +91,35 @@ export function simulateRandomMatches(world: World, n: number, seed: string | nu
 }
 
 /**
- * Temporada completa de uma série: todos contra todos, turno e returno (380 jogos com 20 times).
- * A ordem dos jogos não importa aqui, então não usa o calendário real (etapa 5).
+ * Temporada completa pelo calendário real (as duas séries, turno e returno, 380 jogos cada), com
+ * recuperação física, rodízio da IA, lesões, suspensões, forma e moral entre as rodadas.
  */
-export function simulateSeason(world: World, tier: number, seed: string | number = 'season'): SeasonSummary {
-  const rng = createRng(seed)
-  const bySquad = squads(world)
-  const teams = world.teams.filter((t) => t.tier === tier)
+export function simulateSeasons(world: World, seed: string | number = 'season'): Record<1 | 2, SeasonSummary> {
   const byId = new Map(world.players.map((p) => [p.id, p]))
-  const rows = new Map<string, SeasonRow>(
-    teams.map((team) => [
-      team.id,
-      {
-        team,
-        strength: team.tactic.startingXI.reduce((s, id) => s + playerOverall(byId.get(id) as Player), 0) / 11,
-        points: 0,
-        wins: 0,
-        draws: 0,
-        losses: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-      },
-    ]),
-  )
-
-  const results: MatchResult[] = []
+  const start = createSeason({ year: 2026, seed, teams: world.teams, players: world.players })
   const t0 = performance.now()
-  for (const home of teams) {
-    for (const away of teams) {
-      if (home === away) continue
-      const r = simulateMatch({
-        home: { team: home, players: bySquad.get(home.id) ?? [] },
-        away: { team: away, players: bySquad.get(away.id) ?? [] },
-        seed: rng.int(0, 2 ** 31 - 1),
-      })
-      results.push(r)
-      const h = rows.get(home.id) as SeasonRow
-      const a = rows.get(away.id) as SeasonRow
-      h.goalsFor += r.homeGoals
-      h.goalsAgainst += r.awayGoals
-      a.goalsFor += r.awayGoals
-      a.goalsAgainst += r.homeGoals
-      if (r.homeGoals > r.awayGoals) {
-        h.wins++
-        h.points += 3
-        a.losses++
-      } else if (r.homeGoals < r.awayGoals) {
-        a.wins++
-        a.points += 3
-        h.losses++
-      } else {
-        h.draws++
-        a.draws++
-        h.points++
-        a.points++
-      }
-    }
+  const end = simulateToSeasonEnd(start)
+  const ms = performance.now() - t0
+
+  const summaryFor = (tier: 1 | 2): SeasonSummary => {
+    const competition = end.season.competitions.find((c) => c.tier === tier) as Competition
+    const matches = end.matches.filter((m) => m.competitionId === competition.id)
+    const table = computeStandings(competition.teamIds, matches).map((row) => {
+      const team = world.teams.find((t) => t.id === row.teamId) as Team
+      return {
+        team,
+        strength: team.tactic.startingXI.reduce((sum, id) => sum + playerOverall(byId.get(id) as Player), 0) / 11,
+        points: row.points,
+        wins: row.wins,
+        draws: row.draws,
+        losses: row.losses,
+        goalsFor: row.goalsFor,
+        goalsAgainst: row.goalsAgainst,
+      } satisfies SeasonRow
+    })
+    return { ...summarize(matches.map((m) => m.result as MatchResult), ms / 2), table }
   }
-  const table = [...rows.values()].sort(
-    (x, y) =>
-      y.points - x.points ||
-      y.goalsFor - y.goalsAgainst - (x.goalsFor - x.goalsAgainst) ||
-      y.goalsFor - x.goalsFor,
-  )
-  return { ...summarize(results, performance.now() - t0), table }
+  return { 1: summaryFor(1), 2: summaryFor(2) }
 }
 
 /** Linha da tabela de metas para exibir no terminal. */

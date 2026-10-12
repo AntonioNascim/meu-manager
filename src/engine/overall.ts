@@ -45,18 +45,20 @@ export const POSITION_WEIGHTS: Record<Position, PositionWeights> = {
   },
 }
 
+/** Pesos de cada posição já em lista (na ordem de ATTRIBUTE_NAMES) e com o total somado, para não refazer a conta a cada jogador. */
+const WEIGHT_TABLE = Object.fromEntries(
+  (Object.keys(POSITION_WEIGHTS) as Position[]).map((position) => {
+    const weights = POSITION_WEIGHTS[position]
+    const entries = ATTRIBUTE_NAMES.flatMap((name) => (weights[name] ? [[name, weights[name]] as const] : []))
+    return [position, { entries, total: entries.reduce((sum, [, w]) => sum + w, 0) }]
+  }),
+) as Record<Position, { entries: (readonly [AttributeName, number])[]; total: number }>
+
 /** Média ponderada dos atributos para a posição (escala 1 a 100; devolve decimal, arredondar só para exibir). */
 export function overallForPosition(attributes: Attributes, position: Position): number {
-  const weights = POSITION_WEIGHTS[position]
+  const { entries, total } = WEIGHT_TABLE[position]
   let sum = 0
-  let total = 0
-  for (const name of ATTRIBUTE_NAMES) {
-    const w = weights[name]
-    if (w) {
-      sum += w * attributes[name]
-      total += w
-    }
-  }
+  for (const [name, w] of entries) sum += w * attributes[name]
   return sum / total
 }
 

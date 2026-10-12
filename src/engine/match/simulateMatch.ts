@@ -77,7 +77,7 @@ const sectorCount = (side: SideState, sector: PitchPlayer['sector']) =>
 /** Bônus da formação no meio-campo: cada meio-campista acima/abaixo da referência vale pontos. */
 function midfieldNumbers(side: SideState): number {
   const f = MATCH.formation
-  return f.perMidfielder * (sectorCount(side, 'midfield') - f.referenceMidfielders)
+  return f.perMidfielder * (sectorCount(side, 'midfield') - f.referenceMidfielders) + (f.profile[side.formation.id]?.control ?? 0)
 }
 
 /**
@@ -85,8 +85,20 @@ function midfieldNumbers(side: SideState): number {
  * pelo bônus de números, então um meio-campista a mais nunca piora o meio.
  */
 function sectorQuality(players: PitchPlayer[], value: (p: PitchPlayer) => number): number {
-  const values = players.map(value).sort((a, b) => b - a)
-  return mean(values.slice(0, MATCH.formation.midfieldCore))
+  // Só os melhores do núcleo, em ordem decrescente (evita ordenar a lista inteira a cada momento).
+  const core = MATCH.formation.midfieldCore
+  const best: number[] = []
+  for (const p of players) {
+    const v = value(p)
+    if (best.length === core && v <= (best[core - 1] as number)) continue
+    let i = best.length === core ? core - 1 : best.length
+    while (i > 0 && (best[i - 1] as number) < v) {
+      best[i] = best[i - 1] as number
+      i--
+    }
+    best[i] = v
+  }
+  return mean(best)
 }
 
 /** Capacidade de ficar com a bola: passe, visão, controle, posicionamento (+ estilo e formação). */
@@ -122,6 +134,7 @@ function progressionOffset(att: SideState, def: SideState, transition: boolean):
   return (
     -f.perDefender * (sectorCount(def, 'defense') - f.referenceDefenders) +
     f.perAttacker * (sectorCount(att, 'attack') - f.referenceAttackers) +
+    (f.profile[att.formation.id]?.attack ?? 0) +
     MATCH.tactics.mentality.openness * def.mentality +
     (transition ? MATCH.tactics.counter.transitionProgression : 0)
   )
@@ -165,10 +178,14 @@ function applyUnderdogPosture(side: SideState, opponent: SideState): void {
   side.underdogShift = underdogShiftFor(side, opponent)
 }
 
-/** Quem joga no contra-ataque, ao recuperar a bola, pode sair em transição rápida. */
+/** Quem joga no contra-ataque (e, em menor grau, na pressão alta), ao recuperar a bola, pode sair em transição rápida. */
 function maybeCounter(ctx: MatchContext, recovering: SideState, opponent: SideState, transition: boolean): void {
-  if (transition || recovering.style !== 'counter-attack') return
-  if (ctx.rng.chance(MATCH.tactics.counter.transitionChance)) playMoment(ctx, recovering, opponent, true)
+  if (transition) return
+  const chance =
+    recovering.style === 'counter-attack' ? MATCH.tactics.counter.transitionChance
+    : recovering.style === 'high-press' ? MATCH.tactics.highPress.transitionChance
+    : 0
+  if (chance > 0 && ctx.rng.chance(chance)) playMoment(ctx, recovering, opponent, true)
 }
 
 // ---------------------------------------------------------------------------

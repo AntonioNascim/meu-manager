@@ -8,8 +8,6 @@ import {
   circleRounds,
   computeStandings,
   createSeason,
-  createSimulationContext,
-  defaultCompetitions,
   isMidweekRound,
   nextEvent,
   roundSlots,
@@ -86,6 +84,16 @@ describe('tabela da liga (turno e returno)', () => {
     })
   }
 
+  it('nenhuma seed falha: 300 tabelas, todas sem sequência longa de mando, rápidas', () => {
+    const t0 = performance.now()
+    for (let seed = 1; seed <= 300; seed++) {
+      const rounds = buildLeagueRounds(ids(20), createRng(`robusto-${seed}`))
+      expect(rounds).toHaveLength(38)
+      expect(venueViolations(rounds)).toBe(0)
+    }
+    expect((performance.now() - t0) / 300).toBeLessThan(50)
+  })
+
   it('mesma seed, mesma tabela; seed diferente, tabela diferente', () => {
     const a = buildLeagueRounds(ids(20), createRng(7))
     expect(buildLeagueRounds(ids(20), createRng(7))).toEqual(a)
@@ -95,7 +103,7 @@ describe('tabela da liga (turno e returno)', () => {
 
 describe('calendário', () => {
   const world = generateWorld({ seed: 11 })
-  const state = createSeason({ year: 2026, seed: 'cal', competitions: defaultCompetitions(world.teams) })
+  const state = createSeason({ year: 2026, seed: 'cal', teams: world.teams, players: world.players })
 
   it('Série A e Série B na mesma temporada: 380 jogos cada', () => {
     expect(state.season.competitions.map((c) => c.id)).toEqual(['serie-a', 'serie-b'])
@@ -151,7 +159,7 @@ describe('calendário', () => {
   it('começa por jogar, é determinístico e as partidas têm seeds distintas', () => {
     expect(state.season.phase).toBe('pre-season')
     expect(state.matches.every((m) => m.status === 'scheduled' && m.result === undefined)).toBe(true)
-    expect(createSeason({ year: 2026, seed: 'cal', competitions: defaultCompetitions(world.teams) })).toEqual(state)
+    expect(createSeason({ year: 2026, seed: 'cal', teams: world.teams, players: world.players })).toEqual(state)
     expect(new Set(state.matches.map((m) => m.seed)).size).toBeGreaterThan(755)
   })
 })
@@ -250,13 +258,12 @@ describe('classificação', () => {
 
 describe('avançar até o próximo evento', () => {
   const world = generateWorld({ seed: 21 })
-  const context = createSimulationContext(world.teams, world.players)
-  const start = createSeason({ year: 2026, seed: 'adv', competitions: defaultCompetitions(world.teams) })
+  const start = createSeason({ year: 2026, seed: 'adv', teams: world.teams, players: world.players })
 
   it('vai ao próximo dia de jogos, simula só aquele dia e não altera o estado anterior', () => {
     const first = nextEvent(start)
     expect(first.type).toBe('matchday')
-    const step = advanceToNextEvent(start, context)
+    const step = advanceToNextEvent(start)
     const date = first.type === 'matchday' ? first.date : ''
     expect(step.state.season.currentDate).toBe(date)
     expect(step.state.season.phase).toBe('in-season')
@@ -275,15 +282,15 @@ describe('avançar até o próximo evento', () => {
     for (let event = nextEvent(state); event.type === 'matchday' && steps < 3; event = nextEvent(state)) {
       expect(event.date > last).toBe(true)
       last = event.date
-      state = advanceToNextEvent(state, context).state
+      state = advanceToNextEvent(state).state
       steps++
     }
     expect(steps).toBe(3)
   })
 
   it('mesma temporada e mesmos elencos geram os mesmos resultados', () => {
-    const a = advanceToNextEvent(start, context).played.map((m) => [m.id, m.result?.homeGoals, m.result?.awayGoals])
-    const b = advanceToNextEvent(start, context).played.map((m) => [m.id, m.result?.homeGoals, m.result?.awayGoals])
+    const a = advanceToNextEvent(start).played.map((m) => [m.id, m.result?.homeGoals, m.result?.awayGoals])
+    const b = advanceToNextEvent(start).played.map((m) => [m.id, m.result?.homeGoals, m.result?.awayGoals])
     expect(a).toEqual(b)
   })
 })

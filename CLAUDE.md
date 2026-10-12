@@ -113,12 +113,19 @@ Pontuação de cada lado = média ponderada dos atributos envolvidos × modifica
 ### Tática
 - **Estilos:** posse (ganha meio, menos chances cara a cara), contra-ataque (menos posse, transições de alta qualidade), pressão alta (recupera bola alta, cansa mais, deixa espaço nas costas).
 - **Mentalidade:** de muito defensiva a muito ofensiva; desloca peso entre atacar e defender.
-- **Formação:** define quantos jogadores entram em cada setor/duelo.
-- Toda opção tática precisa ter um custo.
+- **Formação:** define quantos jogadores entram em cada setor/duelo. Cada formação tem um perfil (`MATCH.formation.profile`: controle do meio e criação de chances) **calibrado por medição** para que, com elencos de mesma força, nenhuma seja melhor que as outras na média; elas mudam o jeito de jogar (posse, chances), não o nível. Formação nova precisa de perfil calibrado (`tests/balance/formations.test.ts`).
+- Toda opção tática precisa ter um custo. **Nenhum estilo pode ser claramente pior** (`tests/balance/styles.test.ts`).
 
 ### Comportamento da IA durante a partida
 O motor hoje ajusta sozinho, para os dois times: trocas por cansaço (a partir dos 60'), postura conforme o placar na reta final (quem vence recua, quem perde ataca) e postura de azarão (time bem mais fraco que o rival entra mais defensivo).
-- **Etapa 6 (pendente):** o motor precisa de uma opção na entrada da partida para a IA **não alterar a tática do time controlado pelo jogador** (nem mentalidade, nem substituições por cansaço); esse time só muda quando o jogador mandar (intervalo, substituições). Os testes de balanceamento continuam com IA nos dois lados.
+- **Etapa 6 (pendente):** o motor precisa de uma opção na entrada da partida para a IA **não alterar a tática do time controlado pelo jogador** (nem mentalidade, nem substituições por cansaço); esse time só muda quando o jogador mandar (intervalo, substituições). O mesmo vale para a escalação automática e o rodízio de `advanceToNextEvent` (`aiTactic`): o time do jogador precisa ficar de fora. Os testes de balanceamento continuam com IA nos dois lados.
+
+### Condição entre as partidas (`src/engine/season/condition.ts`)
+O estado da temporada (`SeasonState`) leva os times e jogadores, porque a condição muda a cada dia de jogos:
+- **Por dia:** condição física recupera `CONDITION.fitnessPerDay` (mais rápido com resistência alta), os dias de lesão caem e a moral volta ao neutro (70).
+- **Depois de cada partida:** condição final do jogo; lesão sofrida vira dias de lesão; **forma** = média das notas das últimas 5 partidas (só conta quem jogou 20 min ou mais); **moral** sobe/desce com o resultado (todo o elenco) e com a nota de quem jogou; estatísticas da temporada (jogos, minutos, gols, assistências, cartões).
+- **Suspensões:** vermelho = 1 jogo; 3 amarelos acumulados = 1 jogo (e o contador zera). Expulsão por segundo amarelo vale como um vermelho só. Quem está suspenso ou lesionado não entra na escalação e a suspensão é cumprida no jogo seguinte do time.
+- **Rodízio da IA:** `aiTactic` mantém formação, estilo e mentalidade do time, escala só quem está disponível e valoriza a condição física (`LINEUP`): titular muito cansado dá lugar a um reserva descansado.
 
 ### Nota do jogador
 Parte de 6,0 e soma/subtrai por ações (gols, assistências, desarmes, erros, defesas, cartões).
@@ -131,6 +138,8 @@ Parte de 6,0 e soma/subtrai por ações (gols, assistências, desarmes, erros, d
 Metas por temporada da Série A (temporada média; cada temporada isolada varia por sorte):
 - campeão com ~70 a 82 pontos
 - empates entre 24% e 30%
+- elencos mais fortes terminam em cima e os mais fracos embaixo, com espaço para zebras: o top 4 de força termina em média por volta do 4º–5º lugar, o elenco mais forte por volta do 3º, e há títulos e vagas no G4 fora do top 4 de força
+- estilos de jogo e formações rendem parecido com elencos equivalentes
 
 Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e temporadas inteiras e verificam esses intervalos. Não reduzir o `k` do duelo para atingir as metas: os atributos precisam continuar pesando.
 
@@ -192,7 +201,7 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
 - Componentes React pequenos e focados; lógica fica no `engine`, não nos componentes.
 - Constantes de balanceamento centralizadas em `src/engine/config.ts`.
 - Rodar os testes depois de qualquer mudança no motor:
-  - `npm test`: testes rápidos (regras, geração, consistência do motor), poucos segundos.
-  - `npm run test:balance`: balanceamento e experimentos estatísticos (milhares de partidas, temporadas inteiras; ~30 s). Obrigatório depois de mexer em `config.ts`, no motor de partida ou na geração.
+  - `npm test`: testes rápidos (regras, geração, consistência do motor), de ~5 s a ~20 s conforme a carga da máquina.
+  - `npm run test:balance`: balanceamento e experimentos estatísticos (milhares de partidas, 20 temporadas inteiras, estilos e formações; de ~1,5 a ~5 min). Obrigatório depois de mexer em `config.ts`, no motor de partida ou na geração.
   - `npm run test:all`: os dois.
 - Interface pensada primeiro para celular.

@@ -107,7 +107,7 @@ export const MATCH = {
   },
 
   /** xG base por tipo de finalização. */
-  xg: { longShot: 0.035, inBox: 0.141, header: 0.096, oneOnOne: 0.41, penalty: 0.76, freeKick: 0.06 } satisfies Record<ShotType, number>,
+  xg: { longShot: 0.031, inBox: 0.124, header: 0.084, oneOnOne: 0.36, penalty: 0.76, freeKick: 0.06 } satisfies Record<ShotType, number>,
   /** Chance de a finalização ser bloqueada antes de chegar ao goleiro. */
   blockChance: { longShot: 0.25, inBox: 0.2, header: 0.05, oneOnOne: 0, penalty: 0, freeKick: 0.3 } satisfies Record<ShotType, number>,
   /** Quando não é gol (nem bloqueio): chance de ir no alvo (defesa do goleiro). */
@@ -170,7 +170,7 @@ export const MATCH = {
   tactics: {
     possession: {
       /** Mais controle no meio (pontos de atributo), menos cara a cara. */
-      control: 7,
+      control: 6,
       oneOnOne: -0.4,
       playType: { through: 1.2, longShot: 0.7 } as Partial<Record<PlayType, number>>,
     },
@@ -178,7 +178,7 @@ export const MATCH = {
       /** Abre mão da bola... */
       control: -5,
       /** ...mas, ao recuperá-la, sai em transição rápida. */
-      transitionChance: 0.3,
+      transitionChance: 0.33,
       transitionProgression: 0.3,
       transitionOneOnOne: 0.7,
     },
@@ -186,7 +186,9 @@ export const MATCH = {
       /** Recupera a bola mais alto... */
       press: 9,
       /** ...e deixa espaço nas costas (passe em profundidade e cara a cara do rival). */
-      spaceBehind: 0.4,
+      spaceBehind: 0.25,
+      /** Bola roubada no campo do rival: chance de sair em transição (como no contra-ataque, menos frequente). */
+      transitionChance: 0.2,
     },
     /**
      * Mentalidade (−2 a +2): muda a frequência de ataques, o espaço deixado atrás e
@@ -228,6 +230,19 @@ export const MATCH = {
     referenceMidfielders: 4,
     referenceDefenders: 4,
     referenceAttackers: 2,
+    /**
+     * Perfil de cada formação, calibrado por medição (npm run test:balance) para que, com elencos de mesma
+     * força, nenhuma formação seja melhor que as outras na média: cada uma muda o jeito de jogar, não o nível.
+     * `control`: pontos de controle e pressão no meio (posse); `attack`: deslocamento a favor da própria progressão.
+     */
+    profile: {
+      '4-4-2': { control: 5.7, attack: 0.4 },
+      '4-3-3': { control: 2.7, attack: 0.1 },
+      '4-2-3-1': { control: 2, attack: 0.5 },
+      '4-3-1-2': { control: 0.4, attack: 0.02 },
+      '4-1-4-1': { control: -1.3, attack: 0.45 },
+      '3-5-2': { control: -3, attack: -0.1 },
+    } as Record<string, { control: number; attack: number }>,
   },
 
   /** Chance de lesão por momento, por jogador com propensão 50 (escala com a propensão). */
@@ -281,8 +296,40 @@ export const SEASON = {
   midweekEvery: 5,
   /** A última rodada tem todos os jogos juntos, no domingo. */
   finalRoundSameDay: true,
-  /** Tentativas máximas de ajustar os mandos para não haver sequências longas. */
-  homeAwayMaxAttempts: 20_000,
   /** Maior sequência permitida de jogos seguidos em casa ou fora. */
   maxVenueStreak: 2,
+} as const
+
+// ---------------------------------------------------------------------------
+// Condição dos jogadores entre as partidas
+// ---------------------------------------------------------------------------
+
+export const CONDITION = {
+  /** Condição física recuperada por dia (pontos de 0 a 100) por um jogador de resistência média. */
+  fitnessPerDay: 4,
+  /** Quanto a resistência acelera a recuperação: a cada +40 de resistência acima de 60, +este valor × 100%. */
+  staminaEffect: 0.2,
+  /** Moral volta para o neutro: fração da distância percorrida por dia. */
+  moraleDriftPerDay: 0.03,
+  /** Moral de todo o elenco conforme o resultado do time. */
+  morale: { win: 4, draw: 0, loss: -4 },
+  /** Moral individual: pontos por nota acima (ou abaixo) de 6,5, para quem jogou. */
+  moralePerRating: 1.5,
+  moraleNeutralRating: 6.5,
+  /** Minutos mínimos para a nota entrar na forma e mexer na moral individual. */
+  minMinutesForForm: 20,
+  /** A forma é a média das notas das últimas partidas (quantas guardar). */
+  formMatches: 5,
+  /** Suspensão por cartão vermelho (jogos). */
+  redCardGames: 1,
+  /** A cada tantos amarelos acumulados, um jogo de suspensão (e o contador volta a zero). */
+  yellowsPerSuspension: 3,
+} as const
+
+/** Escalação automática com o elenco cansado: a IA troca titulares desgastados por descansados. */
+export const LINEUP = {
+  /** Parcela da força que é física (usa o piso físico de MATCH.fatigue); o resto usa o piso dos demais atributos. */
+  physicalShare: 0.4,
+  /** Multiplica o cansaço percebido na escolha (>1 = poupa jogadores mais cedo que o necessário). */
+  restBias: 3,
 } as const

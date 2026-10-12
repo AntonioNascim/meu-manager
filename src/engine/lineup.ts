@@ -1,7 +1,7 @@
-import { ATTRIBUTE_MAX, BENCH_SIZE } from './config'
+import { ATTRIBUTE_MAX, BENCH_SIZE, LINEUP, MATCH } from './config'
 import { getFormation } from './formations'
 import { overallAt, playerOverall } from './overall'
-import type { Formation, Mentality, Player, PlayerId, PlayStyle, Tactic } from './types'
+import type { Formation, Mentality, Player, PlayerId, PlayStyle, Position, Tactic } from './types'
 
 export function isAvailable(player: Player): boolean {
   return player.condition.injuryDaysLeft === 0 && player.condition.suspensionGames === 0
@@ -20,10 +20,35 @@ export interface LineupEvaluation {
 
 const EPSILON = 1e-9
 
+/** Valores de encaixe já calculados nesta avaliação (o mesmo jogador aparece em todas as formações). */
+export type FitCache = Map<Player, Partial<Record<Position, number>>>
+
+/** Opções da escolha da escalação. */
+export interface LineupOptions {
+  /** Considera a condição física: o cansado vale menos, e a IA roda o elenco. */
+  rested?: boolean
+  /** Valores de encaixe já calculados (usado ao comparar formações do mesmo elenco). */
+  cache?: FitCache
+}
+
+/**
+ * Fração da força que o jogador entrega com a condição física atual, no mesmo molde do motor
+ * (piso físico e piso dos demais atributos), mas poupando antes do necessário (LINEUP.restBias).
+ */
+export function restedFactor(fitness: number): number {
+  const rested = 1 - Math.min(1, Math.max(0, ((100 - fitness) * LINEUP.restBias) / 100))
+  const { physicalFloor, otherFloor } = MATCH.fatigue
+  return LINEUP.physicalShare * (physicalFloor + (1 - physicalFloor) * rested) + (1 - LINEUP.physicalShare) * (otherFloor + (1 - otherFloor) * rested)
+}
+
 /** Valor de encaixe de um jogador numa posição: convexo, para priorizar os melhores jogadores. */
-function fitValue(player: Player, position: Player['position']): number {
-  const strength = overallAt(player, position)
-  return (strength * strength) / ATTRIBUTE_MAX
+function fitValue(player: Player, position: Position, options: LineupOptions): number {
+  const cached = options.cache?.get(player)?.[position]
+  if (cached !== undefined) return cached
+  const strength = overallAt(player, position) * (options.rested ? restedFactor(player.condition.fitness) : 1)
+  const value = (strength * strength) / ATTRIBUTE_MAX
+  options.cache?.set(player, { ...options.cache.get(player), [position]: value })
+  return value
 }
 
 /**
@@ -31,14 +56,14 @@ function fitValue(player: Player, position: Player['position']): number {
  * e depois melhora por trocas e substituições até a soma da força efetiva não subir mais.
  * Assim os melhores jogadores jogam, na posição natural ou em uma secundária que encaixe.
  */
-export function evaluateFormation(players: readonly Player[], formation: Formation): LineupEvaluation {
+export function evaluateFormation(players: readonly Player[], formation: Formation, options: LineupOptions = {}): LineupEvaluation {
   const available = players.filter(isAvailable)
   const pool = available.length >= formation.slots.length ? available : [...players]
   const slotCount = formation.slots.length
   if (pool.length < slotCount) throw new Error('evaluateFormation: jogadores insuficientes')
 
   // matriz de encaixe: score[jogador][vaga]
-  const score = pool.map((player) => formation.slots.map((slot) => fitValue(player, slot.position)))
+  const score = pool.map((player) => formation.slots.map((slot) => fitValue(player, slot.position, options)))
 
   // 1) atribuição gulosa pelos melhores pares (ordenação estável: empates seguem a ordem do elenco)
   const pairs: { p: number; s: number; value: number }[] = []
@@ -93,12 +118,13 @@ export function evaluateFormation(players: readonly Player[], formation: Formati
 
 /** Formações ordenadas da que melhor encaixa o elenco para a que pior encaixa. */
 export function rankFormations(players: readonly Player[], formations: readonly Formation[]): LineupEvaluation[] {
-  return formations.map((f) => evaluateFormation(players, f)).sort((a, b) => b.score - a.score)
+  const cache: FitCache = new Map()
+  return formations.map((f) => evaluateFormation(players, f, { cache })).sort((a, b) => b.score - a.score)
 }
 
 /** Escolhe os 11 titulares para a formação (ids na ordem das vagas). */
-export function pickStartingXI(players: readonly Player[], formation: Formation): PlayerId[] {
-  return evaluateFormation(players, formation).startingXI
+export function pickStartingXI(players: readonly Player[], formation: Formation, options: LineupOptions = {}): PlayerId[] {
+  return evaluateFormation(players, formation, options).startingXI
 }
 
 /** Banco: um goleiro reserva e os melhores jogadores restantes. */
@@ -125,9 +151,10 @@ function topBy(players: readonly Player[], score: (p: Player) => number, count: 
 export function buildTactic(
   players: readonly Player[],
   options: { formationId: string; style: PlayStyle; mentality: Mentality },
+  lineup: LineupOptions = {},
 ): Tactic {
   const formation = getFormation(options.formationId)
-  const startingXI = pickStartingXI(players, formation)
+  const startingXI = pickStartingXI(players, formation, lineup)
   const xi = startingXI.map((id) => players.find((p) => p.id === id) as Player)
   const outfield = xi.filter((p) => p.position !== 'GK')
 

@@ -8,11 +8,13 @@ export const GENERATION = {
    * `base` na reputação de referência, somando `perReputation` por ponto acima dela.
    */
   teamLevel: {
-    1: { base: 62, referenceReputation: 7, perReputation: 0.4 },
+    1: { base: 62, referenceReputation: 7, perReputation: 0.55 },
     2: { base: 47, referenceReputation: 3, perReputation: 2.2 },
   },
+  /** Desvio padrão do nível entre times de mesma reputação (pontos de força dos titulares). */
+  teamLevelSd: 0.4,
   /** Desvio padrão do talento individual em torno do nível do time. */
-  talentSd: 4,
+  talentSd: 2.5,
   /** Quanto o reserva é mais fraco que o titular do time. */
   backupPenalty: 9,
   /** Nenhum jogador profissional nasce com nível-base abaixo disto (já descontada a idade). */

@@ -53,30 +53,28 @@ function mirror(firstHalf: readonly (readonly Fixture[])[]): Fixture[][] {
 }
 
 /**
- * Liga em turno e returno: `2 × (n − 1)` rodadas. A ordem dos times é sorteada pela seed (tabelas
- * diferentes a cada temporada) e os mandos são ajustados até ninguém ter mais de
- * `SEASON.maxVenueStreak` jogos seguidos em casa ou fora, contando a virada do turno para o returno.
+ * Liga em turno e returno: 2 × (n − 1) rodadas. A ordem dos times é sorteada pela seed (tabelas
+ * diferentes a cada temporada). Os mandos seguem a construção canônica do método do círculo (cada time
+ * troca de mando a cada rodada, com no máximo uma repetição no turno); depois a ordem das rodadas é
+ * girada para que a virada do turno para o returno também não crie sequência longa. Sempre há giro que serve.
  */
 export function buildLeagueRounds(teamIds: readonly TeamId[], rng: Rng): Fixture[][] {
-  const order = rng.shuffle(teamIds)
-  const pairs = circleRounds(order)
+  const pairs = circleRounds(rng.shuffle(teamIds))
+  const flip = rng.chance(0.5)
 
-  // Mando inicial alternado; depois um ajuste aleatório (com a seed) corrige o que sobrar.
-  const firstHalf: Fixture[][] = pairs.map((round, r) =>
-    round.map(([a, b], i) => ((i + r) % 2 === 0 ? { homeTeamId: a, awayTeamId: b } : { homeTeamId: b, awayTeamId: a })),
+  const canonical: Fixture[][] = pairs.map((round, r) =>
+    round.map(([a, b], i) => {
+      // O primeiro par é o time fixo; nos demais, alterna pela posição no círculo.
+      const aHome = i === 0 ? r % 2 === 0 : i % 2 === 1
+      return aHome !== flip ? { homeTeamId: a, awayTeamId: b } : { homeTeamId: b, awayTeamId: a }
+    }),
   )
 
-  let violations = venueViolations(mirror(firstHalf))
-  for (let attempt = 0; violations > 0 && attempt < SEASON.homeAwayMaxAttempts; attempt++) {
-    const r = rng.int(0, firstHalf.length - 1)
-    const round = firstHalf[r] as Fixture[]
-    const i = rng.int(0, round.length - 1)
-    const f = round[i] as Fixture
-    round[i] = { homeTeamId: f.awayTeamId, awayTeamId: f.homeTeamId }
-    const after = venueViolations(mirror(firstHalf))
-    if (after <= violations) violations = after
-    else round[i] = f
+  const candidates: Fixture[][][] = []
+  for (let shift = 0; shift < canonical.length; shift++) {
+    const full = mirror([...canonical.slice(shift), ...canonical.slice(0, shift)])
+    if (venueViolations(full) === 0) candidates.push(full)
   }
-  if (violations > 0) throw new Error('Não foi possível ajustar os mandos da tabela')
-  return mirror(firstHalf)
+  if (candidates.length === 0) throw new Error('Não foi possível ajustar os mandos da tabela')
+  return rng.pick(candidates)
 }

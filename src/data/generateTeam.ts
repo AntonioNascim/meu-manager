@@ -52,9 +52,6 @@ const MIN_PROSPECTS = 3
 const VETERAN_AGE = 32
 const PROSPECT_MAX_AGE = 20
 
-/** Variação do nível entre times de mesma reputação (pontos de força). */
-const TEAM_LEVEL_SD = 1
-
 /** Força média esperada dos 11 titulares, a partir da série e da reputação (1 a 20) do time. */
 export function teamLevelFor(def: Pick<TeamDefinition, 'tier' | 'reputation'>): number {
   const { base, referenceReputation, perReputation } = GENERATION.teamLevel[def.tier]
@@ -113,7 +110,7 @@ export interface GeneratedTeam {
  */
 export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefinition, rank: number): GeneratedTeam {
   const id = `team-${def.abbreviation.toLowerCase()}`
-  const teamLevel = teamLevelFor(def) + rng.normal(0, TEAM_LEVEL_SD)
+  const teamLevel = teamLevelFor(def) + rng.normal(0, GENERATION.teamLevelSd)
   const squadSize = squadSizeForReputation(rng, def.reputation)
   const template = [...CORE_TEMPLATE, ...DEPTH_TEMPLATE].slice(0, squadSize)
   const ages = assignAges(rng, template)

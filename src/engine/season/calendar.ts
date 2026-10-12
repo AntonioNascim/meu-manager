@@ -4,14 +4,20 @@
  */
 import { SEASON } from '../config'
 import { createRng, hashSeed } from '../rng'
-import type { Competition, CompetitionId, IsoDate, Match, Season, Team } from '../types'
+import type { Competition, CompetitionId, IsoDate, Match, Player, Season, Team } from '../types'
 import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
 import { buildLeagueRounds } from './schedule'
 
-/** A temporada inteira: dados puros, guardados e salvos como estão. A classificação é sempre derivada. */
+/**
+ * A temporada inteira: dados puros, guardados e salvos como estão. A classificação é sempre derivada.
+ * Os times e jogadores vão junto porque a condição dos jogadores (físico, lesão, suspensão, forma, moral)
+ * muda a cada dia de jogos.
+ */
 export interface SeasonState {
   season: Season
   matches: Match[]
+  teams: Team[]
+  players: Player[]
 }
 
 export interface RoundSlot {
@@ -62,7 +68,10 @@ export interface SeasonOptions {
   year: number
   /** Mesma seed = mesmo calendário e mesmas seeds de partida. */
   seed: number | string
-  competitions: readonly CompetitionSetup[]
+  teams: readonly Team[]
+  players: readonly Player[]
+  /** Padrão: Série A e Série B com os times de cada `tier`. */
+  competitions?: readonly CompetitionSetup[]
 }
 
 /** Cria a temporada: todas as partidas (com data e seed) de todas as ligas, ainda por jogar. */
@@ -71,7 +80,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
   const matches: Match[] = []
   const competitions: Competition[] = []
 
-  for (const setup of options.competitions) {
+  for (const setup of options.competitions ?? defaultCompetitions(options.teams)) {
     const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id))
     const slots = roundSlots(options.year, rounds.length)
     rounds.forEach((fixtures, roundIndex) => {
@@ -112,5 +121,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
       matchIds: matches.map((m) => m.id),
     },
     matches,
+    teams: [...options.teams],
+    players: [...options.players],
   }
 }
