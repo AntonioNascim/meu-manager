@@ -100,6 +100,9 @@ export interface PlayerSeasonStats {
   assists: number
   yellowCards: number
   redCards: number
+  /** Soma das notas das partidas em que jogou o mínimo de minutos (a nota média é `ratingSum / ratedGames`). */
+  ratingSum: number
+  ratedGames: number
 }
 
 export interface Player {

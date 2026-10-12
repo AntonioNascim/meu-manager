@@ -262,3 +262,33 @@ export const DISMISSAL_REASON_LABELS: Record<DismissalReason, string> = {
   results: 'Os resultados ficaram muito abaixo do que a diretoria esperava.',
   finances: 'O clube mergulhou em dívidas.',
 }
+
+import type { NumbersKey, PositionGroup, SquadSortKey } from './squadSort'
+
+export const POSITION_GROUP_LABELS: Record<PositionGroup, string> = {
+  all: 'Todos',
+  GK: 'GOL',
+  DEF: 'DEF',
+  MID: 'MEI',
+  FWD: 'ATA',
+}
+
+export const SQUAD_SORT_LABELS: Record<SquadSortKey, string> = {
+  position: 'Posição',
+  name: 'Nome',
+  age: 'Idade',
+  overall: 'Força',
+  fitness: 'Condição',
+  form: 'Forma',
+  morale: 'Moral',
+}
+
+export const NUMBERS_LABELS: Record<NumbersKey, string> = {
+  name: 'Jogador',
+  games: 'J',
+  goals: 'G',
+  assists: 'A',
+  yellow: 'Amarelos',
+  red: 'Vermelhos',
+  rating: 'Nota',
+}

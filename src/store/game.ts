@@ -7,6 +7,7 @@ import { generateWorld } from '../data/generateWorld'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
 import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
+import { applySavedLineup } from '../engine/tacticEdit'
 import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
 import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
 import type { OfferRequest, SaleResult } from '../engine/market'
@@ -21,7 +22,7 @@ import {
   setTeamTactic,
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
-import type { BoardEvaluation, Competition, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import type { BoardEvaluation, Competition, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
 /** Linha resumida da classificação final: time, jogos, vitórias, empates, derrotas, gols pró, gols contra, pontos. */
 export type ArchivedRow = [teamId: string, played: number, wins: number, draws: number, losses: number, goalsFor: number, goalsAgainst: number, points: number]
@@ -57,6 +58,8 @@ export interface Game {
   archive: SeasonArchive[]
   /** O que a última virada de temporada fez; some quando o jogador avança na temporada nova. */
   lastReport?: OffseasonReport
+  /** Até 3 escalações guardadas pelo jogador (posição = espaço; vazio = nada guardado). */
+  savedLineups?: (SavedLineup | null)[]
 }
 
 export function createGame(seed: number, userTeamId: TeamId): Game {
@@ -146,6 +149,30 @@ export function setUserTicketPrice(game: Game, price: number): Game {
 
 export function setUserTactic(game: Game, tactic: Tactic): Game {
   return { ...game, season: setTeamTactic(game.season, game.userTeamId, tactic) }
+}
+
+export const LINEUP_SLOTS = 3
+
+/** Guarda a escalação atual do time no espaço `slot` (0 a 2), com o nome dado. */
+export function saveUserLineup(game: Game, slot: number, name: string): Game {
+  if (!Number.isInteger(slot) || slot < 0 || slot >= LINEUP_SLOTS) throw new Error('Espaço de escalação inválido')
+  const tactic = userTeam(game).tactic
+  const slots: (SavedLineup | null)[] = Array.from({ length: LINEUP_SLOTS }, (_, i) => game.savedLineups?.[i] ?? null)
+  slots[slot] = { name: name.trim() || `Escalação ${slot + 1}`, formationId: tactic.formationId, style: tactic.style, startingXI: [...tactic.startingXI] }
+  return { ...game, savedLineups: slots }
+}
+
+/** Apaga a escalação guardada no espaço `slot`. */
+export function deleteUserLineup(game: Game, slot: number): Game {
+  const slots = Array.from({ length: LINEUP_SLOTS }, (_, i) => (i === slot ? null : (game.savedLineups?.[i] ?? null)))
+  return { ...game, savedLineups: slots }
+}
+
+/** Carrega a escalação guardada no espaço `slot` como tática do time (a mesma da tela de Tática). */
+export function loadUserLineup(game: Game, slot: number): Game {
+  const saved = game.savedLineups?.[slot]
+  if (!saved) throw new Error('Não há escalação guardada neste espaço')
+  return setUserTactic(game, applySavedLineup(userTeam(game).tactic, squadOf(game, game.userTeamId), saved))
 }
 
 /** O jogador faz uma proposta (lança `OfferError` se for inválida). */

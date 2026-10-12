@@ -43,9 +43,9 @@ describe('ordenação do elenco', () => {
 
 describe('cores por faixa', () => {
   it('atributos: vermelho até 39, laranja, amarelo, verde e azul a partir de 85', () => {
-    expect([30, 45, 60, 75, 90].map((v) => bandFor(v).bg)).toEqual(['bg-rose-500', 'bg-amber-500', 'bg-lime-400', 'bg-emerald-500', 'bg-cyan-400'])
+    expect([30, 45, 60, 75, 90].map((v) => bandFor(v).bg)).toEqual(['bg-rose-500', 'bg-amber-500', 'bg-lime-400', 'bg-green-500', 'bg-cyan-400'])
     expect(bandFor(85).bg).toBe('bg-cyan-400')
-    expect(bandFor(84.9).bg).toBe('bg-emerald-500')
+    expect(bandFor(84.9).bg).toBe('bg-green-500')
   })
   it('condição e forma pioram com valores menores', () => {
     expect(conditionBand(95).bg).not.toBe(conditionBand(40).bg)
@@ -58,7 +58,9 @@ describe('telas de elenco', () => {
     const html = renderToStaticMarkup(createElement(Squad, { game }))
     expect(html.match(/<li/g)).toHaveLength(squad.length)
     expect(html).toContain('GOL')
-    expect(html).toContain('Elenco')
+    for (const tab of ['Jogadores', 'Escalação', 'Números']) expect(html).toContain(tab)
+    expect(html).not.toContain('Base')
+    expect(html).not.toContain('Treino')
   })
 
   const detail = (p: Player) => renderToStaticMarkup(createElement(PlayerDetail, { player: p, onClose: () => {} }))

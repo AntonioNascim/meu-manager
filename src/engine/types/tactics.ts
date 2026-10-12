@@ -32,3 +32,11 @@ export interface Tactic {
   penaltyTakerIds: PlayerId[]
   freeKickTakerIds: PlayerId[]
 }
+
+/** Escalação guardada pelo jogador: nome, formação, estilo e os 11 titulares (na ordem das vagas). */
+export interface SavedLineup {
+  name: string
+  formationId: string
+  style: PlayStyle
+  startingXI: PlayerId[]
+}

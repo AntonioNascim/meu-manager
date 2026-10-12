@@ -4,8 +4,10 @@
  * (11 titulares únicos, banco sem repetidos, funções só para titulares).
  */
 import { getFormation } from './formations'
+import { BENCH_SIZE } from './config'
 import { evaluateFormation } from './lineup'
-import type { Player, PlayerId, Tactic } from './types'
+import { overallAt, playerOverall } from './overall'
+import type { Player, PlayerId, SavedLineup, Tactic } from './types'
 
 export type SetPieceKind = 'penalty' | 'free-kick'
 
@@ -88,4 +90,41 @@ export function setTaker(tactic: Tactic, kind: SetPieceKind, rank: number, id: P
     else list.splice(previous, 1)
   }
   return { ...tactic, [key]: list.filter((x, i) => x !== undefined && list.indexOf(x) === i) }
+}
+
+/**
+ * Carrega uma escalação guardada na tática atual: formação, estilo e titulares vêm do que foi guardado
+ * (mentalidade, banco, capitão e cobradores são mantidos quando ainda servem). Quem saiu do elenco desde
+ * então é trocado pelo melhor jogador que sobrou para a vaga. Lesionados e suspensos continuam como foram
+ * guardados: o jogador vê e decide.
+ */
+export function applySavedLineup(tactic: Tactic, squad: readonly Player[], saved: SavedLineup): Tactic {
+  const formation = getFormation(saved.formationId)
+  if (saved.startingXI.length !== formation.slots.length) throw new Error('Escalação guardada inválida')
+  const byId = new Map(squad.map((p) => [p.id, p]))
+  const taken = new Set(saved.startingXI.filter((id) => byId.has(id)))
+  const startingXI = saved.startingXI.map((id, i) => {
+    if (byId.has(id)) return id
+    const position = formation.slots[i]?.position as Player['position']
+    const best = squad.filter((p) => !taken.has(p.id)).sort((a, b) => overallAt(b, position) - overallAt(a, position))[0]
+    if (!best) throw new Error('Elenco pequeno demais para esta escalação')
+    taken.add(best.id)
+    return best.id
+  })
+  const inXI = new Set(startingXI)
+  const bench = tactic.bench.filter((id) => byId.has(id) && !inXI.has(id))
+  const filler = squad.filter((p) => !inXI.has(p.id) && !bench.includes(p.id)).sort((a, b) => playerOverall(b) - playerOverall(a))
+  for (const p of filler) if (bench.length < Math.max(tactic.bench.length, BENCH_SIZE)) bench.push(p.id)
+  const captainId = inXI.has(tactic.captainId) ? tactic.captainId : ((startingXI.find((id) => byId.get(id)?.position !== 'GK') ?? startingXI[0]) as PlayerId)
+  const keepTakers = (ids: PlayerId[]) => (ids.filter((id) => inXI.has(id)).length > 0 ? ids.filter((id) => inXI.has(id)) : [captainId])
+  return {
+    ...tactic,
+    formationId: saved.formationId,
+    style: saved.style,
+    startingXI,
+    bench,
+    captainId,
+    penaltyTakerIds: keepTakers(tactic.penaltyTakerIds),
+    freeKickTakerIds: keepTakers(tactic.freeKickTakerIds),
+  }
 }

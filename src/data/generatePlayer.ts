@@ -262,7 +262,7 @@ export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpe
       releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000,
     },
     teamId: spec.teamId,
-    seasonStats: { appearances: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0 },
+    seasonStats: { appearances: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedGames: 0 },
   }
   if (nickname) player.nickname = nickname
   return player

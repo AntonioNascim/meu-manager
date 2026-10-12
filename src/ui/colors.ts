@@ -8,7 +8,7 @@ export interface Band {
 
 export const VALUE_BANDS: readonly Band[] = [
   { min: 85, text: 'text-cyan-300', bg: 'bg-cyan-400' },
-  { min: 70, text: 'text-emerald-400', bg: 'bg-emerald-500' },
+  { min: 70, text: 'text-green-400', bg: 'bg-green-500' },
   { min: 55, text: 'text-lime-300', bg: 'bg-lime-400' },
   { min: 40, text: 'text-amber-400', bg: 'bg-amber-500' },
   { min: 0, text: 'text-rose-400', bg: 'bg-rose-500' },
@@ -25,3 +25,8 @@ export function conditionBand(value: number): Band {
 export function formBand(form: number): Band {
   return form >= 7.2 ? VALUE_BANDS[0]! : form >= 6.6 ? VALUE_BANDS[1]! : form >= 6.0 ? VALUE_BANDS[2]! : form >= 5.4 ? VALUE_BANDS[3]! : VALUE_BANDS[4]!
 }
+
+export type Mood = 'happy' | 'neutral' | 'sad'
+
+/** Faixa da moral (0 a 100): feliz a partir de 70 (o nível neutro do jogo), neutro de 50 a 69, triste abaixo. */
+export const moodBand = (morale: number): Mood => (morale >= 70 ? 'happy' : morale >= 50 ? 'neutral' : 'sad')

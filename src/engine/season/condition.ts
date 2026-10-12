@@ -78,6 +78,8 @@ export function applyMatchToPlayers(squads: ReadonlyMap<TeamId, readonly Player[
         if (r.minutesPlayed >= CONDITION.minMinutesForForm) {
           c.recentRatings = [r.rating, ...c.recentRatings].slice(0, CONDITION.formMatches)
           c.form = c.recentRatings.reduce((a, b) => a + b, 0) / c.recentRatings.length
+          stats.ratingSum += r.rating
+          stats.ratedGames++
           morale += (r.rating - CONDITION.moraleNeutralRating) * CONDITION.moralePerRating
         }
         if (r.injuryDays) c.injuryDaysLeft = Math.max(c.injuryDaysLeft, r.injuryDays)

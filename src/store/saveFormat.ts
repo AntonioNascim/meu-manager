@@ -10,7 +10,7 @@ import type { MatchResult } from '../engine/types'
 import { userTeam } from './game'
 import type { Game } from './game'
 
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 /** O que vai para o disco (e para o arquivo de backup). */
 export interface SaveEnvelope {
@@ -43,9 +43,22 @@ export type Migration = (envelope: { version: number; savedAt: string; game: unk
 
 /**
  * Migrações por versão de origem: `MIGRATIONS[1]` leva a versão 1 para a 2, e assim por diante.
- * Ainda vazio: a versão 1 é a primeira.
+ * 1 → 2: as estatísticas da temporada ganharam `ratingSum` e `ratedGames` (nota média); os saves antigos partem das
+ * notas das últimas partidas (`recentRatings`), a única informação que eles guardavam.
  */
-export const MIGRATIONS: Record<number, Migration> = {}
+export const MIGRATIONS: Record<number, Migration> = {
+  1: (envelope) => {
+    const game = envelope.game as { season?: { players?: { seasonStats?: Record<string, number>; condition?: { recentRatings?: number[] } }[] } }
+    for (const p of game.season?.players ?? []) {
+      const ratings = p.condition?.recentRatings ?? []
+      if (p.seasonStats) {
+        p.seasonStats.ratingSum ??= ratings.reduce((a, b) => a + b, 0)
+        p.seasonStats.ratedGames ??= ratings.length
+      }
+    }
+    return { ...envelope, version: 2 }
+  },
+}
 
 export class SaveError extends Error {
   constructor(
