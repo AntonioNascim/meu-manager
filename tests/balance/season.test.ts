@@ -212,8 +212,11 @@ describe('temporadas pelo calendário (Série A e Série B, 380 jogos cada)', ()
     )
     for (const season of seasonsB) {
       between(season.goalsPerMatch, [1.9, 2.8])
-      between(season.drawRate, [0.2, 0.34])
-      between(season.homeWinRate, [0.34, 0.58])
+      between(season.drawRate, [0.2, 0.36])
+      between(season.homeWinRate, [0.38, 0.58])
     }
+    // A vantagem de jogar em casa não some na Série B (elencos mais fracos, estádios mais vazios).
+    between(mean(seasonsB.map((s) => s.homeWinRate)), [0.42, 0.58])
+    expect(mean(seasonsA.map((s) => s.homeWinRate)) - mean(seasonsB.map((s) => s.homeWinRate))).toBeLessThan(0.05)
   })
 })

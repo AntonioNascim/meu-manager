@@ -145,6 +145,13 @@ export const MATCH = {
     /** Fração da torcida que vai ao jogo (estimativa de público até existir bilheteria). */
     fanTurnout: 0.012,
     minFill: 0.2,
+    /**
+     * Nível dos titulares (força geral média) em que a vantagem vale o configurado acima. Os atributos
+     * são multiplicados pelo fator casa, então o mesmo percentual rende menos pontos de atributo num
+     * elenco mais fraco; a vantagem é escalada por referência/nível para valer igual em qualquer série.
+     * Fica na média dos titulares da Série A gerada.
+     */
+    referenceLevel: 65,
   },
 
   /** Condição física: cai durante o jogo e reduz os atributos. */

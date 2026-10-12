@@ -47,6 +47,21 @@ describe('fator casa', () => {
     expect(homeWins).toBeGreaterThan(awayWins + 0.08)
   })
 
+  it('a vantagem vale o mesmo em pontos de atributo em elencos de níveis diferentes', () => {
+    const level = MATCH.home.referenceLevel
+    const gain = (l: number) => (homeFactor(A, 0, l) - 1) * l
+    expect(gain(level * 0.8)).toBeCloseTo(gain(level))
+    expect(homeFactor(A, 0, level * 0.8)).toBeGreaterThan(homeFactor(A, 0, level))
+  })
+
+  it('depende da ocupação (percentual), não do público absoluto', () => {
+    const small = { ...A, stadium: { ...A.stadium, capacity: 10_000 } }
+    const big = { ...A, stadium: { ...A.stadium, capacity: 80_000 } }
+    expect(homeFactor(small, 5_000)).toBeCloseTo(homeFactor(big, 40_000))
+    expect(homeFactor(small, 10_000)).toBeGreaterThan(homeFactor(small, 2_000))
+    expect(homeFactor(big, 10_000)).toBeLessThan(homeFactor(small, 10_000))
+  })
+
   it('estádio cheio ajuda mais que estádio vazio', () => {
     expect(homeFactor(A, A.stadium.capacity)).toBeGreaterThan(homeFactor(A, 0))
     expect(crowdFill(A, A.stadium.capacity / 2)).toBeCloseTo(0.5)

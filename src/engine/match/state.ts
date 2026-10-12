@@ -165,8 +165,14 @@ export function crowdFill(team: Team, attendance?: number): number {
   return Math.min(1, Math.max(attendance === undefined ? MATCH.home.minFill : 0, expected / capacity))
 }
 
-export function homeFactor(team: Team, attendance?: number): number {
-  return 1 + MATCH.home.base + MATCH.home.crowd * crowdFill(team, attendance)
+/**
+ * Multiplicador de atributos do mandante: vantagem fixa + parte proporcional à ocupação do estádio
+ * (percentual, não público absoluto). `level` é a força média dos titulares do mandante: elenco mais
+ * fraco recebe percentual maior, para a vantagem em pontos de atributo ser a mesma em qualquer série.
+ */
+export function homeFactor(team: Team, attendance?: number, level: number = MATCH.home.referenceLevel): number {
+  const advantage = MATCH.home.base + MATCH.home.crowd * crowdFill(team, attendance)
+  return 1 + (advantage * MATCH.home.referenceLevel) / Math.max(1, level)
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))

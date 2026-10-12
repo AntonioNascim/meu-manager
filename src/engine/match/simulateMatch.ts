@@ -9,7 +9,7 @@
  */
 import { MATCH } from '../config'
 import type { PlayType, ShotType } from '../config'
-import { overallAt } from '../overall'
+import { overallAt, playerOverall } from '../overall'
 import { createRng } from '../rng'
 import type { MatchEvent, MatchResult, Player, PlayerMatchResult, TeamMatchStats } from '../types'
 import { duelChance } from './duel'
@@ -30,12 +30,22 @@ import type { MatchContext, MatchInput, PitchPlayer, SideState } from './state'
 
 const MATCH_MINUTES = 90
 
+/** Força geral média dos titulares (referência do fator casa). */
+function startersLevel({ team, players }: MatchInput['home']): number {
+  const byId = new Map(players.map((p) => [p.id, p]))
+  const xi = team.tactic.startingXI.flatMap((id) => {
+    const p = byId.get(id)
+    return p ? [playerOverall(p)] : []
+  })
+  return xi.length ? mean(xi) : MATCH.home.referenceLevel
+}
+
 export function simulateMatch(input: MatchInput): MatchResult {
   const rng = createRng(input.seed)
   const ctx: MatchContext = {
     rng,
     textRng: rng.fork('narration'),
-    home: buildSide(input.home, homeFactor(input.home.team, input.attendance), rng),
+    home: buildSide(input.home, homeFactor(input.home.team, input.attendance, startersLevel(input.home)), rng),
     away: buildSide(input.away, 1, rng),
     minute: 0,
     events: [],

@@ -107,7 +107,7 @@ Pontuação de cada lado = média ponderada dos atributos envolvidos × modifica
 - Condição física (cai durante o jogo conforme resistência e estilo)
 - Moral e forma (efeito pequeno)
 - Consistência (variação de desempenho)
-- Fator casa (pequeno; maior com estádio cheio)
+- Fator casa (pequeno; maior com estádio cheio). Depende da **ocupação** (percentual do estádio, não o público absoluto) e é escalado pelo nível dos titulares do mandante (`MATCH.home.referenceLevel`): como os atributos são multiplicados, o mesmo percentual valeria menos pontos de atributo na Série B e o mandante venceria menos lá
 - Posição improvisada
 
 ### Tática
@@ -204,4 +204,5 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
   - `npm test`: testes rápidos (regras, geração, consistência do motor), de ~5 s a ~20 s conforme a carga da máquina.
   - `npm run test:balance`: balanceamento e experimentos estatísticos (milhares de partidas, 20 temporadas inteiras, estilos e formações; de ~1,5 a ~5 min). Obrigatório depois de mexer em `config.ts`, no motor de partida ou na geração.
   - `npm run test:all`: os dois.
+  - `npm run analyze`: ferramenta de análise (`tools/analyze.ts`, fora do jogo e dos testes) que imprime posição e pontos por faixa de força nas duas séries (`bands`), estilos com elencos equivalentes (`styles`) e vantagem do mandante por série e ocupação (`home`). Ex.: `npm run analyze -- bands --seasons 40`, `npm run analyze -- home --matches 6000`. Use depois de mexer em `config.ts`, no motor ou na geração.
 - Interface pensada primeiro para celular.
