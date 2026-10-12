@@ -164,3 +164,15 @@ export const ATTRIBUTE_GROUP_LABELS: Record<AttributeGroup, string> = {
   mental: 'Mentais',
   goalkeeper: 'Goleiro',
 }
+
+/** Resumo de cada estilo (o que ganha e o que custa) mostrado na tela de tática. */
+export const PLAY_STYLE_DESCRIPTIONS: Record<PlayStyle, string> = {
+  possession: 'Fica mais com a bola e controla o meio, mas cria menos chances cara a cara.',
+  'counter-attack': 'Cede a bola, mas ataca em transições rápidas de alta qualidade.',
+  'high-press': 'Recupera a bola no campo do rival e sai em velocidade, mas cansa mais e deixa espaço nas costas.',
+}
+
+export const SET_PIECE_LABELS: Record<'penalty' | 'free-kick', string> = {
+  penalty: 'Pênaltis',
+  'free-kick': 'Faltas',
+}

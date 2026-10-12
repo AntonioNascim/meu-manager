@@ -14,10 +14,10 @@ export function TeamBadge({ team, size = 'md' }: { team: Pick<Team, 'abbreviatio
   )
 }
 
-export function Card({ title, children, className = '' }: { title?: string; children: ReactNode; className?: string }) {
+export function Card({ title, children, className = '', flush = false }: { title?: string; children: ReactNode; className?: string; flush?: boolean }) {
   return (
-    <section className={`rounded-xl bg-slate-800 p-4 shadow ${className}`}>
-      {title && <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</h2>}
+    <section className={`overflow-hidden rounded-xl bg-slate-800 shadow ${flush ? '' : 'p-4'} ${className}`}>
+      {title && <h2 className={`text-xs font-semibold uppercase tracking-wide text-slate-400 ${flush ? 'px-3 py-2' : 'mb-2'}`}>{title}</h2>}
       {children}
     </section>
   )
