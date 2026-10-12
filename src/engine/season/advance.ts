@@ -7,9 +7,11 @@
  * partidas do dia são simuladas e seus efeitos entram nos jogadores (condição, lesões,
  * suspensões, forma e moral).
  */
-import { buildTactic } from '../lineup'
+import { buildTactic, repairTactic } from '../lineup'
+import { getFormation } from '../formations'
 import { simulateMatch } from '../match'
-import type { IsoDate, Match, Player, PlayerId, Team, TeamId } from '../types'
+import type { MatchInput } from '../match'
+import type { IsoDate, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
 import type { SeasonState } from './calendar'
 import { applyMatchToPlayers, progressDays } from './condition'
 import { daysBetween } from './dates'
@@ -50,18 +52,29 @@ export function playMatch(match: Match, home: { team: Team; players: readonly Pl
   return { ...match, status: 'finished', result }
 }
 
+export interface AdvanceOptions {
+  /**
+   * Time do jogador. A IA não mexe nele: a escalação é a que o jogador deixou (só quem ficou
+   * indisponível é trocado) e a partida dele não é simulada aqui, fica em `pendingUserMatch`
+   * para ser jogada (ao vivo ou por `playUserMatchAuto`) e depois registrada com `completeMatch`.
+   */
+  userTeamId?: TeamId
+}
+
 export interface AdvanceResult {
   state: SeasonState
   event: SeasonEvent
   /** Partidas simuladas neste avanço (vazio no fim da temporada). */
   played: Match[]
+  /** Partida do time do jogador neste dia, ainda por jogar. */
+  pendingUserMatch?: Match
 }
 
 /**
  * Avança até o próximo evento: passa os dias até a data dos jogos, escala os times, simula todas as
  * partidas do dia e atualiza os jogadores. Depois da última partida a fase passa para `end-of-season`.
  */
-export function advanceToNextEvent(state: SeasonState): AdvanceResult {
+export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions = {}): AdvanceResult {
   const event = nextEvent(state)
   if (event.type === 'season-end') {
     const season = { ...state.season, phase: 'end-of-season' as const }
@@ -73,6 +86,8 @@ export function advanceToNextEvent(state: SeasonState): AdvanceResult {
   const squads = groupByTeam(players)
   const teams = new Map(state.teams.map((t) => [t.id, t]))
 
+  const { userTeamId } = options
+  let pendingUserMatch: Match | undefined
   const played: Match[] = []
   const changed = new Map<PlayerId, Player>()
   const matches = state.matches.map((m) => {
@@ -82,6 +97,10 @@ export function advanceToNextEvent(state: SeasonState): AdvanceResult {
     if (!home || !away) throw new Error(`Time não encontrado na partida ${m.id}`)
     const homeSquad = squads.get(home.id) ?? []
     const awaySquad = squads.get(away.id) ?? []
+    if (userTeamId !== undefined && (m.homeTeamId === userTeamId || m.awayTeamId === userTeamId)) {
+      pendingUserMatch = m
+      return m
+    }
     const finished = playMatch(
       m,
       { team: { ...home, tactic: aiTactic(home, homeSquad) }, players: homeSquad },
@@ -98,6 +117,7 @@ export function advanceToNextEvent(state: SeasonState): AdvanceResult {
     state: { ...state, season, matches, players: players.map((p) => changed.get(p.id) ?? p) },
     event,
     played,
+    ...(pendingUserMatch ? { pendingUserMatch } : {}),
   }
 }
 
@@ -106,4 +126,58 @@ export function simulateToSeasonEnd(state: SeasonState): SeasonState {
   let current = state
   while (nextEvent(current).type === 'matchday') current = advanceToNextEvent(current).state
   return advanceToNextEvent(current).state
+}
+
+/**
+ * Entrada de motor da partida do jogador: a escalação dele é a que ele deixou (só quem ficou
+ * indisponível é trocado), o adversário usa a escalação da IA e a IA do motor não mexe no time do jogador.
+ */
+export function userMatchInput(state: SeasonState, match: Match, userTeamId: TeamId): MatchInput {
+  const squads = groupByTeam(state.players)
+  const teamOf = (id: TeamId) => state.teams.find((t) => t.id === id) as Team
+  const side = (id: TeamId) => {
+    const team = teamOf(id)
+    const squad = squads.get(id) ?? []
+    const tactic = id === userTeamId ? repairTactic(team.tactic, squad) : aiTactic(team, squad)
+    return { team: { ...team, tactic }, players: squad }
+  }
+  return {
+    home: side(match.homeTeamId),
+    away: side(match.awayTeamId),
+    seed: match.seed,
+    userControlled: { home: match.homeTeamId === userTeamId, away: match.awayTeamId === userTeamId },
+  }
+}
+
+/** Joga a partida do jogador sem intervenção (ele não muda nada durante o jogo). */
+export function playUserMatchAuto(state: SeasonState, match: Match, userTeamId: TeamId): Match {
+  return { ...match, status: 'finished', result: simulateMatch(userMatchInput(state, match, userTeamId)) }
+}
+
+/** Registra uma partida jogada fora de `advanceToNextEvent` (a do jogador): placar, jogadores e fase. */
+export function completeMatch(state: SeasonState, finished: Match): SeasonState {
+  const squads = groupByTeam(state.players)
+  const home = squads.get(finished.homeTeamId) ?? []
+  const away = squads.get(finished.awayTeamId) ?? []
+  const changed = new Map(applyMatchToPlayers(new Map([[finished.homeTeamId, home], [finished.awayTeamId, away]]), finished).map((p) => [p.id, p]))
+  const matches = state.matches.map((m) => (m.id === finished.id ? finished : m))
+  const done = matches.every((m) => m.status === 'finished')
+  return {
+    ...state,
+    matches,
+    players: state.players.map((p) => changed.get(p.id) ?? p),
+    season: { ...state.season, phase: done ? 'end-of-season' : 'in-season' },
+  }
+}
+
+/** Troca a tática do time (o jogador edita a dele entre os jogos). Valida a escalação. */
+export function setTeamTactic(state: SeasonState, teamId: TeamId, tactic: Tactic): SeasonState {
+  const squad = state.players.filter((p) => p.teamId === teamId)
+  const formation = getFormation(tactic.formationId)
+  const ids = new Set(squad.map((p) => p.id))
+  if (tactic.startingXI.length !== formation.slots.length || new Set(tactic.startingXI).size !== tactic.startingXI.length || tactic.startingXI.some((id) => !ids.has(id))) {
+    throw new Error('Escalação inválida')
+  }
+  if (tactic.bench.some((id) => !ids.has(id) || tactic.startingXI.includes(id))) throw new Error('Banco inválido')
+  return { ...state, teams: state.teams.map((t) => (t.id === teamId ? { ...t, tactic } : t)) }
 }

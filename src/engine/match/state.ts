@@ -31,6 +31,12 @@ export interface MatchInput {
   seed: number
   /** Público presente. Sem ele, é estimado pela torcida e capacidade do estádio do mandante. */
   attendance?: number
+  /**
+   * Times controlados pelo jogador: a IA do motor não mexe neles (nem recuo de azarão, nem postura
+   * pelo placar, nem substituição por cansaço). Só mudam quando o jogador mandar. Lesão ainda tira o
+   * jogador de campo (entra o melhor reserva).
+   */
+  userControlled?: { home?: boolean; away?: boolean }
 }
 
 /** Contagem de ações de um jogador na partida (base da nota). */
@@ -88,6 +94,8 @@ export interface SideState {
   team: Team
   formation: Formation
   style: PlayStyle
+  /** Time do jogador: a IA do motor não altera a tática. */
+  userControlled: boolean
   /** Mentalidade escolhida na tática. */
   baseMentality: Mentality
   /** Níveis de mentalidade a menos por ser bem mais fraco que o rival (IA). */
@@ -200,7 +208,7 @@ export function dayFactorFor(rng: Rng, player: Player): number {
   return moraleFactor(player.condition.morale) * formFactor(player.condition.form) * day
 }
 
-export function buildSide(input: MatchSideInput, sideFactor: number, rng: Rng): SideState {
+export function buildSide(input: MatchSideInput, sideFactor: number, rng: Rng, userControlled = false): SideState {
   const { team } = input
   const byId = new Map(input.players.map((p) => [p.id, p]))
   const formation = getFormation(team.tactic.formationId)
@@ -218,6 +226,7 @@ export function buildSide(input: MatchSideInput, sideFactor: number, rng: Rng): 
   return {
     team,
     formation,
+    userControlled,
     style: team.tactic.style,
     baseMentality: team.tactic.mentality,
     underdogShift: 0,

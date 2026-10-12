@@ -172,3 +172,39 @@ export function buildTactic(
     freeKickTakerIds: topBy(outfield, (p) => p.attributes.passing + p.attributes.crossing + p.attributes.finishing, 2),
   }
 }
+
+/**
+ * Tática do jogador pronta para o jogo: quem ficou indisponível (lesão ou suspensão) é trocado pelo
+ * melhor reserva disponível para a vaga, sem mexer no resto (formação, estilo e quem está bem).
+ * Devolve a própria tática quando nada precisa mudar.
+ */
+export function repairTactic(tactic: Tactic, squad: readonly Player[]): Tactic {
+  const byId = new Map(squad.map((p) => [p.id, p]))
+  const formation = getFormation(tactic.formationId)
+  const ok = (id: PlayerId) => {
+    const p = byId.get(id)
+    return p !== undefined && isAvailable(p)
+  }
+  if (tactic.startingXI.every(ok) && tactic.bench.every(ok) && ok(tactic.captainId)) return tactic
+
+  const taken = new Set(tactic.startingXI.filter(ok))
+  const startingXI = tactic.startingXI.map((id, i) => {
+    if (ok(id)) return id
+    const slot = formation.slots[i]?.position as Position
+    const pool = squad.filter((p) => isAvailable(p) && !taken.has(p.id))
+    const best = [...(pool.length > 0 ? pool : squad.filter((p) => !taken.has(p.id)))].sort((a, b) => overallAt(b, slot) - overallAt(a, slot))[0] as Player
+    taken.add(best.id)
+    return best.id
+  })
+  const kept = tactic.bench.filter((id) => ok(id) && !startingXI.includes(id))
+  const rest = pickBench(squad, [...startingXI, ...kept], BENCH_SIZE - kept.length)
+  const xi = startingXI.map((id) => byId.get(id) as Player)
+  return {
+    ...tactic,
+    startingXI,
+    bench: [...kept, ...rest].slice(0, BENCH_SIZE),
+    captainId: startingXI.includes(tactic.captainId) && ok(tactic.captainId) ? tactic.captainId : (xi.find((p) => p.position !== 'GK')?.id ?? startingXI[0]) as PlayerId,
+    penaltyTakerIds: tactic.penaltyTakerIds.filter((id) => startingXI.includes(id)),
+    freeKickTakerIds: tactic.freeKickTakerIds.filter((id) => startingXI.includes(id)),
+  }
+}

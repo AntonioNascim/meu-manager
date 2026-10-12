@@ -135,3 +135,23 @@ export const MATCH_EVENT_LABELS: Record<MatchEventType, string> = {
   corner: 'Escanteio',
   foul: 'Falta',
 }
+
+/** Nome da série (divisão) pelo nível na pirâmide. */
+export const TIER_LABELS: Record<1 | 2, string> = {
+  1: 'Série A',
+  2: 'Série B',
+}
+
+/** Resultado de uma partida do ponto de vista de um time. */
+export const OUTCOME_LABELS: Record<'W' | 'D' | 'L', string> = {
+  W: 'Vitória',
+  D: 'Empate',
+  L: 'Derrota',
+}
+
+/** Letra curta do resultado (V, E, D) nas sequências de forma. */
+export const OUTCOME_SHORT_LABELS: Record<'W' | 'D' | 'L', string> = {
+  W: 'V',
+  D: 'E',
+  L: 'D',
+}

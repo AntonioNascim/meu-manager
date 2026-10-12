@@ -45,8 +45,8 @@ export function simulateMatch(input: MatchInput): MatchResult {
   const ctx: MatchContext = {
     rng,
     textRng: rng.fork('narration'),
-    home: buildSide(input.home, homeFactor(input.home.team, input.attendance, startersLevel(input.home)), rng),
-    away: buildSide(input.away, 1, rng),
+    home: buildSide(input.home, homeFactor(input.home.team, input.attendance, startersLevel(input.home)), rng, input.userControlled?.home),
+    away: buildSide(input.away, 1, rng, input.userControlled?.away),
     minute: 0,
     events: [],
   }
@@ -166,6 +166,10 @@ function updateGameState(ctx: MatchContext): void {
     [ctx.home, ctx.away],
     [ctx.away, ctx.home],
   ] as const) {
+    if (side.userControlled) {
+      side.mentality = side.baseMentality
+      continue
+    }
     const diff = side.goals - other.goals
     const adjust = ctx.minute < fromMinute || diff === 0 ? 0 : diff > 0 ? -shift : shift
     side.mentality = Math.max(-2, Math.min(2, side.baseMentality - side.underdogShift + adjust))
@@ -185,6 +189,7 @@ export function underdogShiftFor(side: SideState, opponent: SideState): number {
 }
 
 function applyUnderdogPosture(side: SideState, opponent: SideState): void {
+  if (side.userControlled) return
   side.underdogShift = underdogShiftFor(side, opponent)
 }
 
@@ -214,6 +219,7 @@ function applyFatigue(side: SideState): void {
 }
 
 function substituteTired(ctx: MatchContext, side: SideState): void {
+  if (side.userControlled) return
   const f = MATCH.fatigue
   if (ctx.minute < f.subFromMinute || side.subsLeft <= 0 || side.bench.length === 0) return
   if (ctx.minute < f.keepOneSubUntil && side.subsLeft <= 1) return

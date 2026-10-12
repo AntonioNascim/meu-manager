@@ -197,6 +197,12 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
 8. Virada de temporada
 9. Salvamento (Dexie) e PWA
 
+## Interface (etapa 6)
+- Mobile-first: Tailwind, barra de navegação embaixo, botões grandes (altura mínima 48 px). Rótulos de valores de tipos sempre de `labels.ts`.
+- O estado do jogo é `Game` (`src/store/game.ts`, funções puras: `createGame`, `advanceGame`, `finishPendingMatch`, `setUserTactic`...), guardado em memória por `gameStore.ts` (`useGame`). Nada é salvo ainda. Consultas (classificação, próxima partida) são derivadas na hora.
+- `advanceToNextEvent(state, { userTeamId })` não simula a partida do jogador: devolve `pendingUserMatch` e a IA não mexe no time dele (`userMatchInput`, `MatchInput.userControlled`, `repairTactic`, `setTeamTactic`, `completeMatch`).
+- Atalho de desenvolvimento: `npm run dev` e abrir `/?time=imp&semente=7` já começa um jogo com o time (sigla de 3 letras).
+
 ## Convenções
 - Componentes React pequenos e focados; lógica fica no `engine`, não nos componentes.
 - Constantes de balanceamento centralizadas em `src/engine/config.ts`.
