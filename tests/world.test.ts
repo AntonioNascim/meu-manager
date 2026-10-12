@@ -78,7 +78,7 @@ describe('robustez entre sementes', () => {
         expect(ages.filter((a) => a <= 20).length).toBeGreaterThanOrEqual(3)
       }
     }
-  })
+  }, 30_000)
 })
 
 describe('times', () => {

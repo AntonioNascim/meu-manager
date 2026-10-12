@@ -268,3 +268,21 @@ export const RATING = {
   min: 1,
   max: 10,
 } as const
+
+// ---------------------------------------------------------------------------
+// Calendário
+// ---------------------------------------------------------------------------
+
+export const SEASON = {
+  /** A primeira rodada é no primeiro sábado em ou depois desta data (mês 1–12). */
+  startMonth: 4,
+  startDay: 11,
+  /** Toda rodada múltipla deste número é no meio de semana (quarta); as demais, no fim de semana. */
+  midweekEvery: 5,
+  /** A última rodada tem todos os jogos juntos, no domingo. */
+  finalRoundSameDay: true,
+  /** Tentativas máximas de ajustar os mandos para não haver sequências longas. */
+  homeAwayMaxAttempts: 20_000,
+  /** Maior sequência permitida de jogos seguidos em casa ou fora. */
+  maxVenueStreak: 2,
+} as const

@@ -68,6 +68,7 @@ docs/       documentos de design
 ### Temporada e calendário
 - Guarda ano, data atual, competições e fase (pré-temporada, em andamento, encerramento).
 - **O jogo avança por dias.** O botão "avançar" pula até o próximo evento relevante (jogo, proposta, fim de janela).
+- **Implementado em `src/engine/season/`:** `createSeason` monta a temporada das duas séries (partidas com data e seed própria); `nextEvent` / `advanceToNextEvent` pulam até o próximo dia de jogos e o simulam (hoje o único evento; propostas e janela entram com o mercado); `computeStandings` e `StandingsCache` calculam a classificação a partir das partidas finalizadas. Rodadas no sábado/domingo (a última, toda no domingo) e uma a cada 5 na quarta; constantes em `SEASON` no `config.ts`. O estado da temporada (`SeasonState`) é só dado: a classificação nunca é guardada.
 
 ### Competição
 - Campo `tipo` (no MVP só `liga`; depois `mata-mata` e `grupos+mata-mata`).

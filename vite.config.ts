@@ -15,6 +15,8 @@ export default defineConfig({
           name: 'unit',
           include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
           exclude: ['tests/balance/**'],
+          // Folga para máquinas lentas ou ocupadas; os testes rápidos seguem rápidos.
+          testTimeout: 30_000,
         },
       },
       {

@@ -1,0 +1,116 @@
+/**
+ * Calendário da temporada: datas das rodadas e partidas de todas as séries.
+ * Rodadas aos fins de semana (jogos no sábado e no domingo) e algumas na quarta-feira.
+ */
+import { SEASON } from '../config'
+import { createRng, hashSeed } from '../rng'
+import type { Competition, CompetitionId, IsoDate, Match, Season, Team } from '../types'
+import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
+import { buildLeagueRounds } from './schedule'
+
+/** A temporada inteira: dados puros, guardados e salvos como estão. A classificação é sempre derivada. */
+export interface SeasonState {
+  season: Season
+  matches: Match[]
+}
+
+export interface RoundSlot {
+  round: number
+  kind: 'weekend' | 'midweek'
+  /** Dias possíveis dos jogos da rodada (fim de semana: sábado e domingo; meio de semana: quarta). */
+  days: IsoDate[]
+}
+
+export const isMidweekRound = (round: number) => round % SEASON.midweekEvery === 0
+
+/** Datas de cada rodada. Rodadas de meio de semana não avançam o fim de semana seguinte. */
+export function roundSlots(year: number, roundCount: number): RoundSlot[] {
+  let saturday = onOrAfterWeekday(makeDate(year, SEASON.startMonth, SEASON.startDay), SATURDAY)
+  let lastSaturday = saturday
+  const slots: RoundSlot[] = []
+  for (let round = 1; round <= roundCount; round++) {
+    if (isMidweekRound(round) && round < roundCount) {
+      // Quarta-feira depois do último fim de semana jogado.
+      slots.push({ round, kind: 'midweek', days: [addDays(lastSaturday, 4)] })
+      continue
+    }
+    const sunday = addDays(saturday, 1)
+    const days = SEASON.finalRoundSameDay && round === roundCount ? [sunday] : [saturday, sunday]
+    slots.push({ round, kind: 'weekend', days })
+    lastSaturday = saturday
+    saturday = addDays(saturday, 7)
+  }
+  return slots
+}
+
+export interface CompetitionSetup {
+  id: CompetitionId
+  name: string
+  tier: number
+  teams: readonly Team[]
+}
+
+/** Séries padrão do mundo: todos os times de cada `tier`. */
+export function defaultCompetitions(teams: readonly Team[]): CompetitionSetup[] {
+  return [
+    { id: 'serie-a', name: 'Série A', tier: 1, teams: teams.filter((t) => t.tier === 1) },
+    { id: 'serie-b', name: 'Série B', tier: 2, teams: teams.filter((t) => t.tier === 2) },
+  ]
+}
+
+export interface SeasonOptions {
+  year: number
+  /** Mesma seed = mesmo calendário e mesmas seeds de partida. */
+  seed: number | string
+  competitions: readonly CompetitionSetup[]
+}
+
+/** Cria a temporada: todas as partidas (com data e seed) de todas as ligas, ainda por jogar. */
+export function createSeason(options: SeasonOptions): SeasonState {
+  const rng = createRng(`${options.seed}:${options.year}:calendar`)
+  const matches: Match[] = []
+  const competitions: Competition[] = []
+
+  for (const setup of options.competitions) {
+    const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id))
+    const slots = roundSlots(options.year, rounds.length)
+    rounds.forEach((fixtures, roundIndex) => {
+      const slot = slots[roundIndex] as RoundSlot
+      fixtures.forEach((fixture, i) => {
+        const id = `${setup.id}-r${String(slot.round).padStart(2, '0')}-${i + 1}`
+        matches.push({
+          id,
+          competitionId: setup.id,
+          round: slot.round,
+          date: slot.days[i % slot.days.length] as IsoDate,
+          homeTeamId: fixture.homeTeamId,
+          awayTeamId: fixture.awayTeamId,
+          status: 'scheduled',
+          seed: hashSeed(`${options.seed}:${options.year}:${id}`),
+        })
+      })
+    })
+    competitions.push({
+      id: setup.id,
+      name: setup.name,
+      type: 'league',
+      tier: setup.tier,
+      teamIds: setup.teams.map((t) => t.id),
+      roundCount: rounds.length,
+      promotionSlots: setup.tier === 1 ? 0 : 4,
+      relegationSlots: setup.tier === 1 ? 4 : 0,
+    })
+  }
+
+  matches.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+  return {
+    season: {
+      year: options.year,
+      currentDate: makeDate(options.year, 1, 1),
+      phase: 'pre-season',
+      competitions,
+      matchIds: matches.map((m) => m.id),
+    },
+    matches,
+  }
+}
