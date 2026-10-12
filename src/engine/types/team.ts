@@ -15,6 +15,7 @@ export type FinanceCategory =
   | 'player-sales'
   | 'salaries'
   | 'player-purchases'
+  | 'severance'
   | 'operations'
 
 export interface FinanceEntry {

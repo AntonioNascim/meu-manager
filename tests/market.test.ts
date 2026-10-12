@@ -197,3 +197,23 @@ describe('venda, empréstimo e liberação pelo jogador', () => {
     expect(() => sellPlayer(closed, rich.id, { playerId: surplusOf(s, rich.id).id, buyerId: other.id, kind: 'purchase', fee: 1, contractEnd: '2030-12-31' })).toThrowError('window-closed')
   })
 })
+
+describe('rescisão na tela de finanças', () => {
+  it('liberar um jogador lança a rescisão numa categoria própria e a tela de finanças mostra', async () => {
+    const { createGame, releaseUserSquadPlayer, squadOf: squad } = await import('../src/store/game')
+    const { Finance } = await import('../src/ui/screens/Finance')
+    const { createElement } = await import('react')
+    const { renderToStaticMarkup } = await import('react-dom/server')
+    const { releaseCost } = await import('../src/engine/market')
+    const big = [...world.teams].sort((a, b) => b.squad.length - a.squad.length)[0]!
+    let g = createGame(5, big.id)
+    const p = squad(g, big.id).find((x) => squad(g, big.id).filter((q) => q.position === x.position).length > 3)!
+    const cost = releaseCost(p, g.season.season.currentDate)
+    g = releaseUserSquadPlayer(g, p.id)
+    const entry = g.season.teams.find((t) => t.id === big.id)!.finances.ledger.find((e) => e.category === 'severance')!
+    expect(entry.amount).toBe(-cost)
+    const html = renderToStaticMarkup(createElement(Finance, { game: g }))
+    expect(html).toContain('Rescisões de contrato')
+    expect(html).toContain('Rescisão:')
+  })
+})

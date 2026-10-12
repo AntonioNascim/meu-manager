@@ -8,8 +8,10 @@
  *   npm run analyze -- home --matches 6000
  *
  * Seções: bands (posição e pontos por faixa de força), styles (estilos com elencos equivalentes),
- * home (vantagem de jogar em casa por série e por ocupação do estádio).
- * Opções: --seasons N (bands), --worlds N (styles e home), --matches N (home), --seed N (primeira semente).
+ * home (vantagem de jogar em casa por série e por ocupação do estádio), years (várias temporadas seguidas
+ * com virada de temporada: força das séries, idades, promessas, finanças e elencos, ano a ano).
+ * Opções: --seasons N (bands), --worlds N (styles e home), --matches N (home), --years N e --longworlds N (years;
+ * cada mundo leva ~10 s por temporada), --seed N (primeira semente).
  */
 import { generateWorld } from '../src/data/generateWorld'
 import type { World } from '../src/data/generateWorld'
@@ -18,15 +20,16 @@ import { simulateMatch } from '../src/engine/match'
 import { crowdFill } from '../src/engine/match/state'
 import { createRng } from '../src/engine/rng'
 import type { Player, PlayStyle, Team } from '../src/engine/types'
+import { formatYears, simulateYears } from './longRun'
 import { simulateSeasons } from './seasons'
 import type { SeasonSummary } from '../tests/balance/helpers'
 
-const SECTIONS = ['bands', 'styles', 'home'] as const
+const SECTIONS = ['bands', 'styles', 'home', 'years'] as const
 type Section = (typeof SECTIONS)[number]
 
 function parseArgs(argv: string[]) {
   const sections: Section[] = []
-  const options: Record<string, number> = { seasons: 20, worlds: 5, matches: 4000, seed: 1 }
+  const options: Record<string, number> = { seasons: 20, worlds: 5, matches: 4000, seed: 1, years: 10, longworlds: 1 }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] as string
     if (arg.startsWith('--')) {
@@ -191,11 +194,26 @@ function runHome(worlds: number, matches: number, firstSeed: number) {
   }
 }
 
+/** Temporadas encadeadas: uma tabela ano a ano por mundo, mais a variação entre o primeiro e o último ano. */
+function runYears(years: number, worlds: number, firstSeed: number) {
+  for (let w = 0; w < worlds; w++) {
+    const seed = firstSeed + w
+    const rows = simulateYears(generateWorld({ seed }), years, `years-${seed}`)
+    const first = rows[0]!
+    const last = rows[rows.length - 1]!
+    console.log(`
+Temporadas seguidas (mundo ${seed}, ${years} anos; força = média dos 11 titulares; saldos em R$)
+${formatYears(rows)}`)
+    console.log(`variação ${first.year}-${last.year}: Série A ${f(last.strengthA - first.strengthA)} | Série B ${f(last.strengthB - first.strengthB)} | idade média ${f(last.meanAge - first.meanAge)} | promessas ${last.prospects - first.prospects}`)
+  }
+}
+
 const { sections, options } = parseArgs(process.argv.slice(2))
 const t0 = performance.now()
 for (const section of sections) {
   if (section === 'bands') runBands(options.seasons as number, options.seed as number)
   if (section === 'styles') runStyles(options.worlds as number, options.seed as number)
   if (section === 'home') runHome(options.worlds as number, options.matches as number, options.seed as number)
+  if (section === 'years') runYears(options.years as number, options.longworlds as number, options.seed as number)
 }
 console.log(`\n(${f((performance.now() - t0) / 1000)} s)`)

@@ -88,6 +88,6 @@ export function releaseUserPlayer(state: SeasonState, userTeamId: TeamId, player
   const player = assertCanLose(state, userTeamId, playerId, false)
   const cost = releaseCost(player, date)
   const released = releasePlayer(state, playerId, date)
-  const teams = released.teams.map((t) => (t.id === userTeamId ? recordEntry(t, date, 'salaries', -cost, `Rescisão: ${player.nickname ?? player.name}`) : t))
+  const teams = released.teams.map((t) => (t.id === userTeamId ? recordEntry(t, date, 'severance', -cost, `Rescisão: ${player.nickname ?? player.name}`) : t))
   return { ...released, teams }
 }

@@ -115,6 +115,7 @@ export const FINANCE_CATEGORY_LABELS: Record<FinanceCategory, string> = {
   'player-sales': 'Venda de jogadores',
   salaries: 'Salários',
   'player-purchases': 'Compra de jogadores',
+  severance: 'Rescisões de contrato',
   operations: 'Operação e estrutura',
 }
 

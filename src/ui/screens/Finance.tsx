@@ -15,7 +15,7 @@ import { Button, Card } from '../components/ui'
 import { formatDate, formatMoney } from '../format'
 import { FINANCE_CATEGORY_LABELS } from '../labels'
 
-const CATEGORY_ORDER: FinanceCategory[] = ['ticket-sales', 'sponsorship', 'player-sales', 'salaries', 'player-purchases', 'operations']
+const CATEGORY_ORDER: FinanceCategory[] = ['ticket-sales', 'sponsorship', 'player-sales', 'salaries', 'player-purchases', 'severance', 'operations']
 
 const monthLabel = (month: string) =>
   new Date(`${month}-15T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' })

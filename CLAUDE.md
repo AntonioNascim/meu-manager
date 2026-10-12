@@ -142,6 +142,8 @@ Metas por temporada da Série A (temporada média; cada temporada isolada varia 
 - elencos mais fortes terminam em cima e os mais fracos embaixo, com espaço para zebras: o top 4 de força termina em média por volta do 4º–5º lugar, o elenco mais forte por volta do 3º, e há títulos e vagas no G4 fora do top 4 de força
 - estilos de jogo e formações rendem parecido com elencos equivalentes
 
+Metas de longo prazo (10 temporadas seguidas, `tests/balance/longRun.test.ts`, `npm run analyze -- years`): nenhum clube da IA no vermelho em nenhum momento nem acumulando caixa além do teto (`FINANCE.ceilingYears`); força média dos titulares da Série A (±3) e da B (±4,5) estável; idade média entre 24 e 28, menos de 40% com até 21 anos e entre 12% e 32% com mais de 30; promessas (até 21 anos, potencial ≥ 75) em número parecido com o início; elencos entre 18 e 30; campeões variados. A IA mantém a folha dentro da receita (`sustainablePayroll`, `payrollCuts`), renova contratos por elenco desejado e a base repõe só as posições descobertas.
+
 Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e temporadas inteiras e verificam esses intervalos. Não reduzir o `k` do duelo para atingir as metas: os atributos precisam continuar pesando.
 
 ---
@@ -215,5 +217,5 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
   - `npm test`: testes rápidos (regras, geração, consistência do motor), de ~5 s a ~20 s conforme a carga da máquina.
   - `npm run test:balance`: balanceamento e experimentos estatísticos (milhares de partidas, 20 temporadas inteiras, estilos e formações; de ~1,5 a ~5 min). Obrigatório depois de mexer em `config.ts`, no motor de partida ou na geração.
   - `npm run test:all`: os dois.
-  - `npm run analyze`: ferramenta de análise (`tools/analyze.ts`, fora do jogo e dos testes) que imprime posição e pontos por faixa de força nas duas séries (`bands`), estilos com elencos equivalentes (`styles`) e vantagem do mandante por série e ocupação (`home`). Ex.: `npm run analyze -- bands --seasons 40`, `npm run analyze -- home --matches 6000`. Use depois de mexer em `config.ts`, no motor ou na geração.
+  - `npm run analyze`: ferramenta de análise (`tools/analyze.ts`, fora do jogo e dos testes) que imprime posição e pontos por faixa de força nas duas séries (`bands`), estilos com elencos equivalentes (`styles`) e vantagem do mandante por série e ocupação (`home`) e a tabela ano a ano de várias temporadas seguidas com virada (`years`). Ex.: `npm run analyze -- bands --seasons 40`, `npm run analyze -- years --years 10 --seed 41`, `npm run analyze -- home --matches 6000`. Use depois de mexer em `config.ts`, no motor ou na geração.
 - Interface pensada primeiro para celular.

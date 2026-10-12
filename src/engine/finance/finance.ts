@@ -41,6 +41,10 @@ export function expectedAnnualRevenue(team: Team, averageOpponentReputation = 10
   return annualSponsorship(team) + homeGames * matchTicketRevenue(team, { reputation: averageOpponentReputation })
 }
 
+/** Folha mensal que o clube aguenta no longo prazo: receita esperada menos a operação, dividida em 12. */
+export const sustainablePayroll = (team: Team): number =>
+  Math.max(0, Math.round(((expectedAnnualRevenue(team) - monthlyOperations(team) * 12) * FINANCE.payrollShareOfNet) / 12))
+
 /** Lança uma receita (positiva) ou despesa (negativa), atualizando o saldo. */
 export function addEntry(finances: Finances, entry: FinanceEntry): Finances {
   return { ...finances, balance: finances.balance + entry.amount, ledger: [...finances.ledger, entry] }

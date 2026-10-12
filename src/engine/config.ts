@@ -368,7 +368,7 @@ export const FINANCE = {
     opponentFactorMax: 1.2,
   },
   /** Patrocínio por ano: base + perReputation × reputação^power. Pago por mês. */
-  sponsorship: { base: 4_000_000, perReputation: 900_000, power: 1.2 },
+  sponsorship: { base: 5_500_000, perReputation: 900_000, power: 1.2 },
   /** Custo anual de operação (estádio, estrutura, comissão): por lugar da capacidade. Pago por mês. */
   operationsPerSeat: 110,
   /** Parcela do saldo que fica disponível para transferências (recalculada todo mês). */
@@ -379,6 +379,12 @@ export const FINANCE = {
   ceilingSpendPerMonth: 0.3,
   /** Orçamento de salários do jogador depois da virada: folha × isto (o da IA é folha × 1,1). */
   salaryBudgetMargin: 1.1,
+  /** Folha sustentável da IA: (receita esperada − operação) × isto, por ano. Acima disso a IA não aumenta a folha e corta. */
+  payrollShareOfNet: 0.95,
+  /** A IA só corta salários quando a folha passa da sustentável por esta margem. */
+  payrollCutMargin: 1.0,
+  /** A IA só corta se o saldo aguenta menos que isto de anos de déficit (folha acima da sustentável). */
+  cutRunwayYears: 5,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -509,7 +515,7 @@ export const OFFSEASON = {
     /** Pontos de reputação por (posição esperada − posição final) / step, limitados a ±max. */
     positionStep: 5,
     positionMax: 2,
-    champion: 1,
+    champion: 0,
     promoted: 1,
     relegated: -1,
   },
@@ -550,6 +556,8 @@ export const OFFSEASON = {
     years: [[22, [3, 5]], [28, [2, 4]], [31, [1, 3]], [99, [1, 1]]] as readonly (readonly [number, readonly [number, number]])[],
     /** A IA só renova quem tem esta importância no elenco ou melhor, ou quem é jovem com potencial. */
     aiMaxAge: 35,
+    /** Reserva (sobra) só é renovada até esta idade, enquanto o elenco não chega ao tamanho desejado. */
+    reserveMaxAge: 33,
   },
 
   renewal: {
@@ -575,7 +583,7 @@ export const OFFSEASON = {
   retirement: {
     /** Chance anual = (idade − from) × perYear, limitada a 1; aposentadoria obrigatória em `forcedAge`. */
     from: 33,
-    perYear: 0.2,
+    perYear: 0.17,
     forcedAge: 40,
     /** Quem ainda é muito forte joga mais: a chance cai pela metade acima desta força. */
     strongOverall: 70,
@@ -586,14 +594,16 @@ export const OFFSEASON = {
     ageRange: [16, 19] as readonly [number, number],
     /** Elenco que a IA tenta ter depois da virada: 24 + (reputação − 3)/16 × 6, arredondado. */
     minPerTeam: 1,
+    /** Além de repor as posições descobertas, a base preenche no máximo isto para chegar ao elenco desejado. */
+    maxFill: 1,
     /** A IA corta o excesso (reservas de menor valor) até este tamanho. */
-    aiMaxSquad: 28,
+    aiMaxSquad: 30,
     /** O elenco do jogador sobe ao menos até aqui com jovens (nunca fica abaixo do mínimo do jogo). */
     userMinSquad: 22,
     /** Promessas: chance de um jovem vir bem acima do nível do time, e quanto (pontos de qualidade). */
     prospectChance: 0.08,
     prospectBonus: [5, 11] as readonly [number, number],
     /** Jovem de base é reserva: qualidade = nível do time − isto (±talento). */
-    qualityBelowTeam: 5,
+    qualityBelowTeam: 7,
   },
 } as const

@@ -4,7 +4,7 @@
  * Funções puras: recebem a temporada encerrada e devolvem a nova, mais um relatório do que aconteceu.
  */
 import { FINANCE, MARKET, OFFSEASON } from '../config'
-import { defaultTicketPrice, monthlyPayroll, summarizeLedger } from '../finance'
+import { defaultTicketPrice, monthlyPayroll, summarizeLedger, sustainablePayroll } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
@@ -13,14 +13,16 @@ import { createSeason } from '../season/calendar'
 import type { SeasonState } from '../season/calendar'
 import { makeDate } from '../season/dates'
 import { computeStandings } from '../season/standings'
-import { POSITIONS, SQUAD_MAX, SQUAD_MIN } from '../types'
+import { SQUAD_MAX, SQUAD_MIN } from '../types'
 import type { DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
 import { expireContracts } from './contracts'
+import { desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { evolvePlayer, retires } from './evolution'
 
 export * from './contracts'
 export * from './evolution'
 export * from './renewal'
+export * from './squad'
 
 /** Quem gera os jovens (fica em `src/data`: o motor não cria jogadores). `taken` = nomes já usados. */
 export type YouthFactory = (request: YouthRequest, rng: Rng, taken: ReadonlySet<string>) => Player[]
@@ -31,25 +33,10 @@ export interface OffseasonOptions {
   userTeamId?: TeamId
 }
 
-/** Elenco mínimo por posição que a base repõe (os 24 do núcleo do gerador de times). */
-const CORE_COUNTS: Record<Position, number> = { GK: 2, RB: 2, LB: 2, CB: 3, DM: 3, CM: 3, AM: 2, RW: 2, LW: 2, ST: 3 }
 const EXTRA_POSITIONS: readonly Position[] = ['CB', 'CM', 'ST', 'AM', 'RW', 'LW', 'DM', 'RB', 'LB']
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 const departed = (p: Player, teamId: TeamId | null = p.teamId): DepartedPlayer => ({ playerId: p.id, name: p.nickname ?? p.name, age: p.age, teamId })
-
-/** Elenco que a IA quer ter, pela reputação (24 a 30). */
-export const desiredSquadSize = (reputation: number): number => clamp(Math.round(24 + ((reputation - 3) / 16) * 6), 24, SQUAD_MAX)
-
-/** Posições em que o elenco tem menos jogadores que o núcleo mínimo. */
-export function positionDeficits(squad: readonly Pick<Player, 'position'>[]): Position[] {
-  const deficits: Position[] = []
-  for (const position of POSITIONS) {
-    const have = squad.filter((p) => p.position === position).length
-    for (let i = have; i < CORE_COUNTS[position]; i++) deficits.push(position)
-  }
-  return deficits
-}
 
 /** Meta da diretoria pela posição do time na série (por reputação), como na geração do mundo. */
 function objectiveFor(rank: number) {
@@ -136,7 +123,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     const isUser = team.id === options.userTeamId
     const deficits = positionDeficits(squad)
     const target = isUser ? Math.max(OFFSEASON.youth.userMinSquad, desiredSquadSize(team.reputation)) : desiredSquadSize(team.reputation)
-    let count = Math.max(deficits.length, target - squad.length, OFFSEASON.youth.minPerTeam)
+    let count = Math.max(deficits.length, Math.min(target - squad.length, isUser ? SQUAD_MAX : OFFSEASON.youth.maxFill), OFFSEASON.youth.minPerTeam)
     count = Math.min(count, SQUAD_MAX - squad.length)
     if (count <= 0) continue
     const positions = deficits.slice(0, count)
@@ -153,6 +140,8 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (team.id === options.userTeamId) continue
     const squad = players.filter((p) => p.teamId === team.id)
     for (const p of trimExcess(squad)) trimmed.add(p.id)
+    const rest = squad.filter((p) => !trimmed.has(p.id))
+    for (const p of payrollCuts(rest, sustainablePayroll(team), team.finances.balance)) trimmed.add(p.id)
   }
   if (trimmed.size > 0) {
     players = players.map((p) => (trimmed.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: makeDate(year, 12, 31) } } : p))
@@ -182,7 +171,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
         ...t.finances,
         ledger: [],
         pastSeasons: [...t.finances.pastSeasons, { year, income: summary.income, expenses: summary.expenses, endBalance: t.finances.balance }],
-        salaryBudget: Math.round((payroll * (isUser ? FINANCE.salaryBudgetMargin : 1.1)) / 1_000) * 1_000,
+        salaryBudget: Math.round((isUser ? payroll * FINANCE.salaryBudgetMargin : Math.max(payroll, Math.min(payroll * 1.1, sustainablePayroll(t)))) / 1_000) * 1_000,
       },
     }
   })

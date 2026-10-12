@@ -7,6 +7,7 @@ import { squadRole } from '../market/value'
 import { playerOverall } from '../overall'
 import type { Rng } from '../rng'
 import { makeDate } from '../season/dates'
+import { CORE_COUNTS, desiredSquadSize } from './squad'
 import { renewalDecision, renewalDemand } from './renewal'
 import type { DepartedPlayer, Player, PlayerId, Team, TeamId } from '../types'
 
@@ -23,8 +24,9 @@ export const expiresBy = (player: Pick<Player, 'contract'>, year: number): boole
 export function aiWantsToKeep(player: Player, squad: readonly Player[]): boolean {
   if (player.age > OFFSEASON.contracts.aiMaxAge) return false
   const role = squadRole(player, squad)
-  if (role === 'key' || role === 'starter') return true
-  if (role === 'rotation') return player.age <= 33
+  if (role !== 'surplus') return true
+  // Sobra só fica se o elenco precisa dela para cobrir a posição ou se é jovem com potencial.
+  if (squad.filter((p) => p.position === player.position).length <= (CORE_COUNTS[player.position] ?? 2)) return true
   return player.age <= 21 && player.hidden.potential - playerOverall(player) >= 8
 }
 
@@ -70,18 +72,39 @@ export function expireContracts(input: ExpireInput): ExpireResult {
 
   const freed = new Set<PlayerId>()
   const renewals = new Map<PlayerId, Player['contract']>()
-  for (const p of players) {
-    if (!p.teamId || !expiresBy(p, year)) continue
-    const team = teams.find((t) => t.id === p.teamId)
-    const squad = squads.get(p.teamId) ?? []
+  const free = (p: Player) => {
+    freed.add(p.id)
+    released.push({ playerId: p.id, name: p.nickname ?? p.name, age: p.age, teamId: p.teamId })
+  }
+  const renew = (p: Player, salary: number) => {
+    renewals.set(p.id, renewedContract(rng, p, year, salary))
+    renewed++
+  }
+  for (const team of teams) {
+    const squad = squads.get(team.id) ?? []
+    const expiring = squad.filter((p) => expiresBy(p, year))
+    if (expiring.length === 0) continue
+    if (team.id === userTeamId) {
+      for (const p of expiring) free(p)
+      continue
+    }
     // A IA oferece o salário que o jogador pede (que pode ser menor que o atual, se ele caiu de nível).
-    const salary = team ? renewalDemand(p, team) : 0
-    if (team && p.teamId !== userTeamId && aiWantsToKeep(p, squad) && renewalDecision({ player: p, team, squad, salary }).accepted) {
-      renewals.set(p.id, renewedContract(rng, p, year, salary))
-      renewed++
-    } else {
-      freed.add(p.id)
-      released.push({ playerId: p.id, name: p.nickname ?? p.name, age: p.age, teamId: p.teamId })
+    const accepts = (p: Player) => renewalDecision({ player: p, team, squad, salary: renewalDemand(p, team) }).accepted
+    const wanted = expiring.filter((p) => aiWantsToKeep(p, squad)).sort((a, b) => playerOverall(b) - playerOverall(a))
+    const others = expiring.filter((p) => !wanted.includes(p)).sort((a, b) => playerOverall(b) - playerOverall(a))
+    let size = squad.length - expiring.length
+    for (const p of wanted) {
+      if (accepts(p)) {
+        renew(p, renewalDemand(p, team))
+        size++
+      } else free(p)
+    }
+    // Reservas: ficam enquanto o elenco não chega ao tamanho que o clube quer (menos uma vaga para a base).
+    for (const p of others) {
+      if (size < desiredSquadSize(team.reputation) - 1 && p.age <= OFFSEASON.contracts.reserveMaxAge && accepts(p)) {
+        renew(p, renewalDemand(p, team))
+        size++
+      } else free(p)
     }
   }
   players = players.map((p) => {
