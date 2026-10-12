@@ -16,7 +16,7 @@ import {
   ticketDemand,
 } from '../src/engine/finance'
 import { advanceToNextEvent, completeMatch, createSeason, playUserMatchAuto, simulateToSeasonEnd, userMatchInput } from '../src/engine/season'
-import { advanceGame, createGame, playPendingAuto, setUserTicketPrice, userTeam } from '../src/store/game'
+import { advanceToMatchday, createGame, playPendingAuto, setUserTicketPrice, userTeam } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { Finance } from '../src/ui/screens/Finance'
 
@@ -141,7 +141,7 @@ describe('finanças ao longo da temporada', () => {
 function playUntilHome(game: Game, teamId: string): Game {
   let g = game
   for (let i = 0; i < 80; i++) {
-    g = advanceGame(g)
+    g = advanceToMatchday(g)
     if (g.pendingUserMatch?.homeTeamId === teamId) return g
     g = playPendingAuto(g)
   }
@@ -164,7 +164,7 @@ describe('time do jogador', () => {
   it('jogo fora de casa não rende bilheteria ao time do jogador', () => {
     let game = createGame(5, 'team-imp')
     for (let i = 0; i < 80; i++) {
-      game = advanceGame(game)
+      game = advanceToMatchday(game)
       if (game.pendingUserMatch?.awayTeamId === 'team-imp') break
       game = playPendingAuto(game)
     }
@@ -200,7 +200,7 @@ describe('time do jogador', () => {
 describe('tela de finanças', () => {
   it('mostra saldo, preço do ingresso, categorias e lançamentos', () => {
     let game = createGame(5, 'team-imp')
-    for (let i = 0; i < 4; i++) game = playPendingAuto(advanceGame(game))
+    for (let i = 0; i < 4; i++) game = playPendingAuto(advanceToMatchday(game))
     const html = renderToStaticMarkup(createElement(Finance, { game }))
     expect(html).toContain('Saldo')
     expect(html).toContain('Preço do ingresso')

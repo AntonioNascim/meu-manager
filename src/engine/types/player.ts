@@ -89,6 +89,8 @@ export interface Contract {
   releaseClause: number
   /** Clube de origem, se emprestado. */
   loanedFrom?: TeamId
+  /** Contrato com o clube de origem, guardado enquanto o jogador está emprestado. */
+  loanOriginal?: Omit<Contract, 'loanedFrom' | 'loanOriginal'>
 }
 
 export interface PlayerSeasonStats {

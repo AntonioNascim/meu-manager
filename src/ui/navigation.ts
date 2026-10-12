@@ -1,4 +1,4 @@
-export type ScreenId = 'home' | 'squad' | 'tactics' | 'match' | 'standings' | 'finance'
+export type ScreenId = 'home' | 'squad' | 'tactics' | 'match' | 'standings' | 'finance' | 'market'
 
 export const SCREEN_LABELS: Record<ScreenId, string> = {
   home: 'Painel',
@@ -7,4 +7,5 @@ export const SCREEN_LABELS: Record<ScreenId, string> = {
   match: 'Partida',
   standings: 'Tabela',
   finance: 'Finanças',
+  market: 'Mercado',
 }

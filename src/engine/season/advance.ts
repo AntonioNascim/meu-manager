@@ -1,6 +1,6 @@
 /**
  * O jogo avança por dias: "avançar" pula até o próximo evento relevante.
- * Hoje o único evento é o dia de jogos; propostas e fim de janela entram nas etapas de mercado.
+ * Eventos: dia de jogos e, com o mercado ligado, abertura/fim de janela e propostas.
  *
  * A cada avanço: passam os dias (recuperação física, lesões, moral), a IA escolhe a escalação de
  * cada time com o elenco que tem (rodando o elenco quando os titulares estão cansados), as
@@ -9,15 +9,17 @@
  */
 import { collectGate, matchAttendance, monthStartsBetween, settleMonth } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
+import { expireOffers, nextMarketEvent, resolveDueOffers, runMarketTick } from '../market'
+import type { MarketEvent } from '../market'
 import { getFormation } from '../formations'
 import { simulateMatch } from '../match'
 import type { MatchInput } from '../match'
-import type { IsoDate, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
+import type { IsoDate, MarketNotice, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
 import type { SeasonState } from './calendar'
 import { applyMatchToPlayers, progressDays } from './condition'
 import { daysBetween } from './dates'
 
-export type SeasonEvent = { type: 'matchday'; date: IsoDate } | { type: 'season-end' }
+export type SeasonEvent = { type: 'matchday'; date: IsoDate } | { type: 'market'; date: IsoDate } | { type: 'season-end' }
 
 /** Próximo evento a partir de `currentDate` (inclusive): o primeiro dia com jogos por disputar. */
 export function nextEvent(state: SeasonState): SeasonEvent {
@@ -70,6 +72,8 @@ export interface AdvanceOptions {
    * para ser jogada (ao vivo ou por `playUserMatchAuto`) e depois registrada com `completeMatch`.
    */
   userTeamId?: TeamId
+  /** Liga o mercado: janelas, negociações da IA e propostas viram eventos do avanço. */
+  market?: boolean
 }
 
 export interface AdvanceResult {
@@ -79,29 +83,79 @@ export interface AdvanceResult {
   played: Match[]
   /** Partida do time do jogador neste dia, ainda por jogar. */
   pendingUserMatch?: Match
+  /** Avisos do mercado (janela, propostas recebidas e respondidas). */
+  notices: MarketNotice[]
+}
+
+/** Passa os dias até `date`: recuperação, fechamento dos meses e, se for dia de negociação, o mercado. */
+function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, marketEvent: MarketEvent | undefined): { state: SeasonState; notices: MarketNotice[] } {
+  const days = daysBetween(state.season.currentDate, date)
+  const players = progressDays(state.players, days)
+  const squads = groupByTeam(players)
+  const teams = settleMonths(state.teams, squads, state.season.currentDate, date, options.userTeamId)
+  let current: SeasonState = { ...state, players, teams, season: { ...state.season, currentDate: date } }
+  const notices: MarketNotice[] = []
+  if (!options.market) return { state: current, notices }
+
+  current = expireOffers(current, date)
+  if (marketEvent) {
+    for (const w of marketEvent.opens) notices.push({ type: 'window-opened', window: w })
+    for (const w of marketEvent.closes) notices.push({ type: 'window-last-day', window: w })
+    const answered = resolveDueOffers(current, date)
+    current = answered.state
+    for (const o of answered.decided) notices.push({ type: 'offer-answered', offerId: o.id })
+    if (marketEvent.tick) {
+      const tick = runMarketTick(current, date, options.userTeamId)
+      current = tick.state
+      for (const o of tick.incoming) notices.push({ type: 'offer-received', offerId: o.id })
+    }
+    current = { ...current, market: { ...current.market, handled: date } }
+  }
+  return { state: current, notices }
 }
 
 /**
- * Avança até o próximo evento: passa os dias até a data dos jogos, escala os times, simula todas as
- * partidas do dia e atualiza os jogadores. Depois da última partida a fase passa para `end-of-season`.
+ * Avança até o próximo evento: passa os dias, escala os times, simula as partidas do dia e atualiza
+ * os jogadores. Com `market`, o mercado também gera eventos (abertura e último dia da janela, propostas
+ * recebidas e respondidas); dias de negociação sem novidade para o jogador são atravessados em silêncio.
+ * Depois da última partida a fase passa para `end-of-season`.
  */
 export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions = {}): AdvanceResult {
-  const event = nextEvent(state)
-  if (event.type === 'season-end') {
-    const season = { ...state.season, phase: 'end-of-season' as const }
-    return { state: { ...state, season }, event, played: [] }
-  }
+  let current = state
+  const notices: MarketNotice[] = []
+  for (;;) {
+    const matchEvent = nextEvent(current)
+    if (matchEvent.type === 'season-end') {
+      const season = { ...current.season, phase: 'end-of-season' as const }
+      return { state: { ...current, season }, event: matchEvent, played: [], notices }
+    }
+    const marketEvent = options.market ? nextMarketEvent(current) : undefined
+    const date = marketEvent && marketEvent.date < matchEvent.date ? marketEvent.date : matchEvent.date
+    const todayMarket = marketEvent && marketEvent.date === date ? marketEvent : undefined
 
-  const days = daysBetween(state.season.currentDate, event.date)
-  const players = progressDays(state.players, days)
-  const squads = groupByTeam(players)
+    const passed = passDays(current, date, options, todayMarket)
+    notices.push(...passed.notices)
+    current = passed.state
+    if (date < matchEvent.date) {
+      // Dia só de mercado: para se há novidade para o jogador, senão segue para o próximo evento.
+      if (notices.length > 0) return { state: current, event: { type: 'market', date }, played: [], notices }
+      continue
+    }
+    return playMatchday(current, date, options, notices)
+  }
+}
+
+/** Simula as partidas do dia (menos a do jogador, que fica pendente) e atualiza os jogadores. */
+function playMatchday(state: SeasonState, date: IsoDate, options: AdvanceOptions, notices: MarketNotice[]): AdvanceResult {
+  const squads = groupByTeam(state.players)
+  const teams = new Map(state.teams.map((t) => [t.id, t]))
+
   const { userTeamId } = options
-  const teams = new Map(settleMonths(state.teams, squads, state.season.currentDate, event.date, userTeamId).map((t) => [t.id, t]))
   let pendingUserMatch: Match | undefined
   const played: Match[] = []
   const changed = new Map<PlayerId, Player>()
   const matches = state.matches.map((m) => {
-    if (m.status !== 'scheduled' || m.date !== event.date) return m
+    if (m.status !== 'scheduled' || m.date !== date) return m
     const home = teams.get(m.homeTeamId)
     const away = teams.get(m.awayTeamId)
     if (!home || !away) throw new Error(`Time não encontrado na partida ${m.id}`)
@@ -123,20 +177,21 @@ export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions =
   })
 
   const done = matches.every((m) => m.status === 'finished')
-  const season = { ...state.season, currentDate: event.date, phase: done ? ('end-of-season' as const) : ('in-season' as const) }
+  const season = { ...state.season, phase: done ? ('end-of-season' as const) : ('in-season' as const) }
   return {
-    state: { ...state, season, matches, teams: state.teams.map((t) => teams.get(t.id) ?? t), players: players.map((p) => changed.get(p.id) ?? p) },
-    event,
+    state: { ...state, season, matches, teams: state.teams.map((t) => teams.get(t.id) ?? t), players: state.players.map((p) => changed.get(p.id) ?? p) },
+    event: { type: 'matchday', date },
     played,
+    notices,
     ...(pendingUserMatch ? { pendingUserMatch } : {}),
   }
 }
 
 /** Joga a temporada inteira (usado em testes e na simulação rápida). */
-export function simulateToSeasonEnd(state: SeasonState): SeasonState {
+export function simulateToSeasonEnd(state: SeasonState, options: AdvanceOptions = {}): SeasonState {
   let current = state
-  while (nextEvent(current).type === 'matchday') current = advanceToNextEvent(current).state
-  return advanceToNextEvent(current).state
+  while (nextEvent(current).type === 'matchday') current = advanceToNextEvent(current, options).state
+  return advanceToNextEvent(current, options).state
 }
 
 /**

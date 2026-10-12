@@ -4,6 +4,8 @@
  */
 import { generateWorld } from '../data/generateWorld'
 import { setTicketPrice } from '../engine/finance'
+import { makeOffer, respondToOffer } from '../engine/market'
+import type { OfferRequest } from '../engine/market'
 import { playerOverall } from '../engine/overall'
 import {
   advanceToNextEvent,
@@ -15,7 +17,7 @@ import {
   setTeamTactic,
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
-import type { Competition, Match, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import type { Competition, MarketNotice, Match, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
 export interface Game {
   /** Semente do mundo e da temporada (mesma semente = mesmo jogo). */
@@ -26,25 +28,42 @@ export interface Game {
   pendingUserMatch?: Match
   /** Última rodada de partidas simuladas por um avanço (a do jogador entra quando é registrada). */
   lastDay: Match[]
+  /** Avisos do mercado do último avanço (janela, propostas recebidas e respondidas). */
+  notices: MarketNotice[]
 }
 
 export function createGame(seed: number, userTeamId: TeamId): Game {
   const world = generateWorld({ seed })
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
   const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players })
-  return { seed, userTeamId, season, lastDay: [] }
+  return { seed, userTeamId, season, lastDay: [], notices: [] }
 }
 
 /** Avança até o próximo dia de jogos. A partida do jogador fica pendente em `pendingUserMatch`. */
 export function advanceGame(game: Game): Game {
   if (game.pendingUserMatch) return game
-  const step = advanceToNextEvent(game.season, { userTeamId: game.userTeamId })
+  const step = advanceToNextEvent(game.season, { userTeamId: game.userTeamId, market: true })
   return {
     ...game,
     season: step.state,
     lastDay: step.played,
+    notices: step.notices,
     ...(step.pendingUserMatch ? { pendingUserMatch: step.pendingUserMatch } : {}),
   }
+}
+
+/** Avança (parando só para a partida do jogador) até o próximo dia de jogos, passando direto pelos dias de mercado. */
+export function advanceToMatchday(game: Game): Game {
+  if (game.pendingUserMatch) return game
+  let current = game
+  const notices: MarketNotice[] = []
+  for (;;) {
+    const before = current.season.season.currentDate
+    current = advanceGame(current)
+    notices.push(...current.notices)
+    if (current.pendingUserMatch || current.lastDay.length > 0 || nextEventOf(current).type === 'season-end' || current.season.season.currentDate === before) break
+  }
+  return { ...current, notices }
 }
 
 /** Registra o resultado da partida pendente (jogada ao vivo ou automaticamente). */
@@ -72,6 +91,16 @@ export function setUserTicketPrice(game: Game, price: number): Game {
 
 export function setUserTactic(game: Game, tactic: Tactic): Game {
   return { ...game, season: setTeamTactic(game.season, game.userTeamId, tactic) }
+}
+
+/** O jogador faz uma proposta (lança `OfferError` se for inválida). */
+export function makeUserOffer(game: Game, request: OfferRequest): Game {
+  return { ...game, season: makeOffer(game.season, game.userTeamId, request) }
+}
+
+/** O jogador aceita ou recusa uma proposta recebida. */
+export function respondToUserOffer(game: Game, offerId: string, accept: boolean): Game {
+  return { ...game, season: respondToOffer(game.season, offerId, accept) }
 }
 
 // ---------------------------------------------------------------------------

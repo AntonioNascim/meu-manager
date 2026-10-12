@@ -4,7 +4,7 @@
  */
 import { SEASON } from '../config'
 import { createRng, hashSeed } from '../rng'
-import type { Competition, CompetitionId, IsoDate, Match, Player, Season, Team } from '../types'
+import type { Competition, CompetitionId, IsoDate, MarketState, Match, Player, Season, Team } from '../types'
 import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
 import { buildLeagueRounds } from './schedule'
 
@@ -18,6 +18,8 @@ export interface SeasonState {
   matches: Match[]
   teams: Team[]
   players: Player[]
+  /** Propostas, histórico de transferências e controle dos eventos do mercado. */
+  market: MarketState
 }
 
 export interface RoundSlot {
@@ -123,5 +125,6 @@ export function createSeason(options: SeasonOptions): SeasonState {
     matches,
     teams: [...options.teams],
     players: [...options.players],
+    market: { seed: options.seed, offers: [], history: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }
 }

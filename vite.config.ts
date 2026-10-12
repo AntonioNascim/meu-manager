@@ -7,6 +7,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   test: {
     environment: 'node',
+    // PC com pouca memória (6 GB): no máximo 2 workers em paralelo.
+    maxWorkers: 2,
     projects: [
       {
         // npm test: testes rápidos (regras, geração, consistência do motor)

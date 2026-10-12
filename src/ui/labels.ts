@@ -11,13 +11,18 @@ import type {
   Mentality,
   MatchEventType,
   MatchStatus,
+  OfferKind,
+  OfferReason,
+  OfferStatus,
   Nationality,
   PlayStyle,
   Position,
   SeasonPhase,
   Sector,
   TeamMatchStats,
+  WindowName,
 } from '../engine/types'
+import type { SquadRole } from '../engine/market'
 
 export const POSITION_LABELS: Record<Position, string> = {
   GK: 'Goleiro',
@@ -197,4 +202,47 @@ export const ZONE_LABELS: Record<Zone, string> = {
 export const SET_PIECE_LABELS: Record<'penalty' | 'free-kick', string> = {
   penalty: 'Pênaltis',
   'free-kick': 'Faltas',
+}
+
+export const OFFER_REASON_LABELS: Record<OfferReason, string> = {
+  fee: 'Valor abaixo do que o clube pede',
+  'squad-size': 'O clube não pode ficar com elenco tão curto',
+  'position-cover': 'O clube não tem reposição para a posição',
+  'key-player': 'Jogador importante demais para o clube vender',
+  salary: 'Salário abaixo do que o jogador quer',
+  'club-reputation': 'O jogador não quer o clube',
+  'playing-time': 'O jogador não terá espaço no time',
+  unavailable: 'Jogador não está mais disponível',
+  budget: 'Orçamento de transferências insuficiente',
+  'salary-budget': 'Orçamento de salários insuficiente',
+  'squad-full': 'Elenco cheio',
+  'window-closed': 'Janela de transferências fechada',
+  'own-player': 'O jogador já é do seu time',
+  duplicate: 'Já existe uma proposta pendente por ele',
+  invalid: 'Proposta inválida',
+}
+
+export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
+  pending: 'Aguardando',
+  accepted: 'Aceita',
+  rejected: 'Recusada',
+  withdrawn: 'Cancelada',
+  expired: 'Vencida',
+}
+
+export const OFFER_KIND_LABELS: Record<OfferKind, string> = {
+  purchase: 'Compra',
+  loan: 'Empréstimo',
+}
+
+export const WINDOW_LABELS: Record<WindowName, string> = {
+  'pre-season': 'Pré-temporada',
+  'mid-year': 'Meio do ano',
+}
+
+export const SQUAD_ROLE_LABELS: Record<SquadRole, string> = {
+  key: 'Essencial',
+  starter: 'Titular',
+  rotation: 'Rodízio',
+  surplus: 'Sobra',
 }

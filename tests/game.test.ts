@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { generateWorld } from '../src/data/generateWorld'
 import {
-  advanceGame,
+  advanceToMatchday,
   createGame,
   lastUserMatch,
   nextUserMatch,
@@ -39,10 +39,10 @@ describe('avançar', () => {
   const g0 = createGame(12, idA)
 
   it('a partida do jogador fica pendente até ser jogada', () => {
-    const g1 = advanceGame(g0)
+    const g1 = advanceToMatchday(g0)
     expect(g1.pendingUserMatch).toBeDefined()
     expect(g1.lastDay.length).toBeGreaterThan(0)
-    expect(advanceGame(g1)).toBe(g1)
+    expect(advanceToMatchday(g1)).toBe(g1)
     const g2 = playPendingAuto(g1)
     expect(g2.pendingUserMatch).toBeUndefined()
     expect(lastUserMatch(g2)?.id).toBe(g1.pendingUserMatch?.id)
@@ -52,7 +52,7 @@ describe('avançar', () => {
   it('a classificação do jogador muda depois de jogar', () => {
     let g = g0
     // Alguns avanços caem em dias sem jogo do time (o outro dia do fim de semana).
-    for (let i = 0; i < 30 && (standingsOf(g, userCompetition(g)).find((r) => r.teamId === idA)?.played ?? 0) < 3; i++) g = playPendingAuto(advanceGame(g))
+    for (let i = 0; i < 30 && (standingsOf(g, userCompetition(g)).find((r) => r.teamId === idA)?.played ?? 0) < 3; i++) g = playPendingAuto(advanceToMatchday(g))
     const table = standingsOf(g, userCompetition(g))
     expect(table.find((r) => r.teamId === idA)?.played).toBe(3)
   })
@@ -72,7 +72,7 @@ describe('telas (renderização)', () => {
     expect(html).toContain('Classificação')
     expect(html).toContain('Avançar')
     expect(html).not.toContain('Último jogo')
-    const played = playPendingAuto(advanceGame(createGame(12, idA)))
+    const played = playPendingAuto(advanceToMatchday(createGame(12, idA)))
     expect(renderToStaticMarkup(createElement(Dashboard, { game: played, onNavigate: () => {} }))).toContain('Último jogo')
   })
 })

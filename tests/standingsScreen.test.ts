@@ -2,13 +2,13 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { generateWorld } from '../src/data/generateWorld'
-import { advanceGame, createGame, playPendingAuto, standingsOf, userCompetition } from '../src/store/game'
+import { advanceToMatchday, createGame, playPendingAuto, standingsOf, userCompetition } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { Standings, latestPlayedRound, zoneOf } from '../src/ui/screens/Standings'
 
 function playDays(game: Game, days: number): Game {
   let g = game
-  for (let i = 0; i < days; i++) g = playPendingAuto(advanceGame(g))
+  for (let i = 0; i < days; i++) g = playPendingAuto(advanceToMatchday(g))
   return g
 }
 

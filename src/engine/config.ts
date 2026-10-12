@@ -378,3 +378,93 @@ export const FINANCE = {
   /** Parcela do excesso acima do teto investida por mês. */
   ceilingSpendPerMonth: 0.3,
 } as const
+
+// ---------------------------------------------------------------------------
+// Mercado de transferências
+// ---------------------------------------------------------------------------
+
+export const MARKET = {
+  /** Valor de mercado: base × e^(perPoint × (força efetiva − referência)), vezes idade e contrato. */
+  value: {
+    base: 300_000,
+    perPoint: 0.115,
+    referenceOverall: 40,
+    minimum: 20_000,
+    /** Peso da distância até o potencial (só para jovens). */
+    potentialWeight: 0.6,
+    /** Até esta idade o potencial vale por inteiro; some em `youthSpan` anos. */
+    youthUntil: 21,
+    youthSpan: 6,
+    /** Multiplicador por idade: o primeiro par cuja idade máxima cobre o jogador. */
+    ageFactors: [[19, 1.15], [23, 1.1], [28, 1], [29, 0.85], [30, 0.7], [31, 0.55], [32, 0.4], [33, 0.3], [34, 0.2]] as readonly (readonly [number, number])[],
+    olderFactor: 0.12,
+    /** Contrato curto vale menos: de `shortestFactor` (sem contrato) a 1 com `fullYears` anos ou mais. */
+    contract: { shortestFactor: 0.6, fullYears: 3 },
+  },
+  /** Quanto o clube pede em relação ao valor de mercado, conforme a importância do jogador para ele. */
+  ask: { key: 1.5, starter: 1.25, rotation: 1, surplus: 0.85 },
+  /** Taxa de empréstimo (por temporada) em fração do valor. */
+  loanFeeShare: 0.12,
+  /** Mínimo de jogadores por posição que o clube mantém depois de vender/emprestar/liberar. */
+  minByPosition: { GK: 2, RB: 1, LB: 1, CB: 2, DM: 2, CM: 2, AM: 1, RW: 1, LW: 1, ST: 2 } as Record<string, number>,
+  /** Elenco mínimo depois de uma saída (o limite do jogo é SQUAD_MIN). */
+  minSquadAfterSale: 19,
+  /** Máximo antes de contratar (o limite do jogo é SQUAD_MAX). */
+  maxSquadBeforeSigning: 29,
+
+  windows: {
+    /** Janela do meio do ano: mês/dia de abertura e de fechamento. */
+    midYear: { start: [7, 1], end: [7, 31] } as { start: [number, number]; end: [number, number] },
+    /** A IA negocia a cada tantos dias dentro da janela. */
+    tickDays: 7,
+    /** Dias até a resposta a uma proposta do jogador. */
+    responseDays: 2,
+    /** Dias de validade de uma proposta recebida. */
+    offerValidDays: 7,
+  },
+
+  /** Decisão do jogador: soma ponderada de salário, reputação do clube e tempo de jogo; aceita se ≥ 0. */
+  player: {
+    salaryWeight: 1,
+    /** Cada 1,5× no salário vale 1 ponto (limitado a ±salaryClamp pontos). */
+    salaryStep: 1.5,
+    salaryClamp: 2,
+    reputationWeight: 0.5,
+    /** Diferença de reputação (ponto) que vale 1 ponto de reputação, limitada a ±1,5. */
+    reputationStep: 6,
+    playingTimeWeight: 0.8,
+    /** Reputação que o jogador livre considera como "clube de origem". */
+    freeAgentReputation: 8,
+    /** Viés contra mudar de clube. */
+    inertia: 0.2,
+    /** Tempo de jogo pesa mais para quem é bom: 0,6 + ambition × força/100. */
+    ambitionBase: 0.6,
+    ambition: 0.6,
+    /** No empréstimo, a reputação do novo clube pesa menos. */
+    loanReputationShare: 0.5,
+  },
+
+  ai: {
+    /** Elenco abaixo disto: o clube sai procurando reforço de profundidade. */
+    wantsDepthBelow: 23,
+    /** Ganho mínimo de força (pontos) sobre o titular da posição para valer a contratação. */
+    minUpgrade: 4,
+    /** Idade máxima de quem a IA contrata. */
+    maxAge: 33,
+    /** Reserva de caixa: meses de folha + operação que o clube não gasta em transferências. */
+    reserveMonths: 3,
+    /** Clubes que olham o elenco do jogador a cada rodada de negociações, e chance de a proposta sair. */
+    userOfferChance: 0.12,
+    maxPendingIncoming: 4,
+    /** Quanto acima/abaixo do pedido a IA oferece ao jogador (propostas recebidas). */
+    userOfferFee: [0.9, 1.25] as readonly [number, number],
+    /** Parcela das propostas recebidas que é de empréstimo. */
+    userLoanShare: 0.25,
+    /** Máximo de contratações por clube por janela. */
+    maxSigningsPerWindow: 5,
+    /** Elenco acima disto: o clube libera o pior reserva depois de contratar. */
+    releaseAbove: 27,
+    /** Anos de contrato novo (mín., máx.). */
+    contractYears: [1, 4] as readonly [number, number],
+  },
+} as const

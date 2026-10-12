@@ -1,4 +1,5 @@
 import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../engine/config'
+import { salaryForOverall } from '../engine/market/value'
 import { overallForPosition, POSITION_WEIGHTS } from '../engine/overall'
 import type { Rng } from '../engine/rng'
 import { ATTRIBUTE_NAMES } from '../engine/types'
@@ -68,7 +69,8 @@ export interface PlayerSpec {
   /** Nível-base do jogador (força geral esperada, 1 a 100, antes de idade e ruído). */
   quality: number
   age: number
-  teamId: TeamId
+  /** `null` = jogador livre no mercado. */
+  teamId: TeamId | null
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
@@ -209,12 +211,6 @@ function generateAttributes(rng: Rng, position: Position, quality: number, age: 
 
 function hiddenAttribute(rng: Rng, dist: { mean: number; sd: number }): number {
   return clamp(Math.round(rng.normal(dist.mean, dist.sd)), ATTRIBUTE_MIN, ATTRIBUTE_MAX)
-}
-
-/** Salário mensal em R$: cresce exponencialmente com a força geral (de 1 a 100). */
-export function salaryForOverall(overall: number): number {
-  const raw = 8000 * Math.pow(1.33, overall / 5 - 5)
-  return Math.max(5000, Math.round(raw / 500) * 500)
 }
 
 export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpec): Player {

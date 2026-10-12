@@ -1,4 +1,4 @@
-import type { Match } from '../../engine/types'
+import type { MarketNotice, Match } from '../../engine/types'
 import {
   advanceGame,
   lastUserMatch,
@@ -15,7 +15,7 @@ import { updateGame } from '../../store/gameStore'
 import { Button, Card, TeamBadge } from '../components/ui'
 import { formatDate, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { OUTCOME_LABELS, OUTCOME_SHORT_LABELS, SEASON_PHASE_LABELS } from '../labels'
+import { OUTCOME_LABELS, OUTCOME_SHORT_LABELS, SEASON_PHASE_LABELS, WINDOW_LABELS } from '../labels'
 
 const OUTCOME_COLOR = { W: 'bg-emerald-500 text-slate-950', D: 'bg-slate-500 text-white', L: 'bg-rose-500 text-white' } as const
 
@@ -47,6 +47,15 @@ function MatchLine({ game, match }: { game: Game; match: Match }) {
 }
 
 /** Painel principal: próximo jogo, posição na tabela e o botão de avançar. */
+function noticeText(n: MarketNotice): string {
+  switch (n.type) {
+    case 'window-opened': return `Janela de transferências aberta: ${WINDOW_LABELS[n.window]}.`
+    case 'window-last-day': return `Último dia da janela: ${WINDOW_LABELS[n.window]}.`
+    case 'offer-answered': return 'Uma proposta sua foi respondida.'
+    case 'offer-received': return 'Você recebeu uma proposta por um jogador.'
+  }
+}
+
 export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId) => void }) {
   const team = userTeam(game)
   const competition = userCompetition(game)
@@ -71,6 +80,19 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   return (
     <div className="space-y-3">
+      {game.notices.length > 0 && (
+        <Card title="Mercado">
+          <ul className="space-y-1 text-sm">
+            {game.notices.map((n, i) => (
+              <li key={i}>{noticeText(n)}</li>
+            ))}
+          </ul>
+          <button type="button" className="mt-2 min-h-12 text-sm font-semibold text-emerald-400" onClick={() => onNavigate('market')}>
+            Abrir o mercado
+          </button>
+        </Card>
+      )}
+
       <Card title={`Próximo jogo${next ? ` · ${competition.name}, rodada ${next.round}` : ''}`}>
         {next && opponent ? (
           <>

@@ -208,6 +208,7 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
 ## Convenções
 - Componentes React pequenos e focados; lógica fica no `engine`, não nos componentes.
 - Constantes de balanceamento centralizadas em `src/engine/config.ts`.
+- O Vitest usa no máximo 2 workers (`maxWorkers` em `vite.config.ts`; o PC tem 6 GB). Durante o trabalho rode só os testes do que mudou (`npx vitest run --project unit tests/arquivo.test.ts`) e deixe `npm run test:balance` para o fim de cada parte.
 - Rodar os testes depois de qualquer mudança no motor:
   - `npm test`: testes rápidos (regras, geração, consistência do motor), de ~5 s a ~20 s conforme a carga da máquina.
   - `npm run test:balance`: balanceamento e experimentos estatísticos (milhares de partidas, 20 temporadas inteiras, estilos e formações; de ~1,5 a ~5 min). Obrigatório depois de mexer em `config.ts`, no motor de partida ou na geração.

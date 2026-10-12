@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it } from 'vitest'
-import { advanceGame, createGame, finishPendingMatch, lastUserMatch, nextUserMatch } from '../src/store/game'
+import { advanceToMatchday, createGame, finishPendingMatch, lastUserMatch, nextUserMatch } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { beginLive, clearLive, getLive } from '../src/store/liveMatch'
 import { App } from '../src/ui/App'
@@ -14,7 +14,7 @@ const USER = 'team-imp'
 /** Avança até o dia da partida do time. */
 function toMatchDay(seed = 3): Game {
   let game = createGame(seed, USER)
-  while (!game.pendingUserMatch) game = advanceGame(game)
+  while (!game.pendingUserMatch) game = advanceToMatchday(game)
   return game
 }
 
@@ -26,7 +26,7 @@ describe('partida do jogador: do avanço ao registro do resultado', () => {
     expect(game.pendingUserMatch?.status).toBe('scheduled')
     expect(nextUserMatch(game)?.id).toBe(game.pendingUserMatch?.id)
     expect(lastUserMatch(game)).toBeUndefined()
-    expect(advanceGame(game)).toBe(game)
+    expect(advanceToMatchday(game)).toBe(game)
   })
 
   it('jogada ao vivo e registrada, a partida entra na tabela e libera o próximo avanço', () => {
@@ -39,7 +39,7 @@ describe('partida do jogador: do avanço ao registro do resultado', () => {
     game = finishPendingMatch(game, result)
     expect(game.pendingUserMatch).toBeUndefined()
     expect(lastUserMatch(game)?.result).toEqual(result)
-    const next = advanceGame(game)
+    const next = advanceToMatchday(game)
     expect(next.season.season.currentDate > game.season.season.currentDate).toBe(true)
   })
 

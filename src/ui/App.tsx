@@ -6,6 +6,7 @@ import { TeamBadge } from './components/ui'
 import { formatDate } from './format'
 import { SCREEN_LABELS } from './navigation'
 import type { ScreenId } from './navigation'
+import { Market } from './screens/Market'
 import { Finance } from './screens/Finance'
 import { Dashboard } from './screens/Dashboard'
 import { MatchScreen } from './screens/Match'
@@ -28,7 +29,7 @@ export function App() {
   const team = userTeam(game)
   // A aba da partida só existe enquanto o time do jogador tem um jogo por jogar.
   const hasMatch = game.pendingUserMatch !== undefined
-  const tabs: ScreenId[] = hasMatch ? ['home', 'match', 'squad', 'tactics', 'standings', 'finance'] : ['home', 'squad', 'tactics', 'standings', 'finance']
+  const tabs: ScreenId[] = hasMatch ? ['home', 'match', 'squad', 'tactics', 'standings', 'market', 'finance'] : ['home', 'squad', 'tactics', 'standings', 'market', 'finance']
   const current: ScreenId = screen === 'match' && !hasMatch ? 'home' : screen
 
   return (
@@ -59,6 +60,7 @@ export function App() {
         {current === 'squad' && <Squad game={game} />}
         {current === 'tactics' && <Tactics game={game} />}
         {current === 'standings' && <Standings game={game} />}
+        {current === 'market' && <Market game={game} />}
         {current === 'finance' && <Finance game={game} />}
       </main>
 
