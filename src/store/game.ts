@@ -2,7 +2,9 @@
  * Estado do jogo em andamento e suas transições (funções puras: recebem o jogo e devolvem outro).
  * Nada daqui depende de React; o salvamento (Dexie) entra numa etapa futura.
  */
+import { createYouth } from '../data/generateYouth'
 import { generateWorld } from '../data/generateWorld'
+import { advanceSeason } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
 import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
 import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
@@ -18,7 +20,7 @@ import {
   setTeamTactic,
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
-import type { BoardEvaluation, Competition, Dismissal, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import type { BoardEvaluation, Competition, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
 export interface Game {
   /** Semente do mundo e da temporada (mesma semente = mesmo jogo). */
@@ -33,18 +35,24 @@ export interface Game {
   notices: MarketNotice[]
   /** Preenchido quando a diretoria demitiu o técnico: o jogo não avança mais. */
   dismissal?: Dismissal
+  /** Resumo de cada temporada já encerrada (campeões, acesso, rebaixamento e a campanha do jogador). */
+  seasonLog: SeasonSummary[]
+  /** O que a última virada de temporada fez; some quando o jogador avança na temporada nova. */
+  lastReport?: OffseasonReport
 }
 
 export function createGame(seed: number, userTeamId: TeamId): Game {
   const world = generateWorld({ seed })
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
   const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players })
-  return { seed, userTeamId, season, lastDay: [], notices: [] }
+  return { seed, userTeamId, season, lastDay: [], notices: [], seasonLog: [] }
 }
 
 /** Avança até o próximo dia de jogos. A partida do jogador fica pendente em `pendingUserMatch`. */
 export function advanceGame(game: Game): Game {
   if (game.pendingUserMatch || game.dismissal) return game
+  const { lastReport: _seen, ...kept } = game
+  game = kept
   const step = advanceToNextEvent(game.season, { userTeamId: game.userTeamId, market: true })
   return checkDismissal({
     ...game,
@@ -67,6 +75,15 @@ export function advanceToMatchday(game: Game): Game {
     if (current.pendingUserMatch || current.lastDay.length > 0 || nextEventOf(current).type === 'season-end' || current.season.season.currentDate === before) break
   }
   return { ...current, notices }
+}
+
+/** A temporada acabou e o técnico segue no cargo: vira o ano (acesso, evolução, contratos, base, tabela nova). */
+export function startNextSeason(game: Game): Game {
+  if (game.season.season.phase !== 'end-of-season' || game.dismissal || game.pendingUserMatch) return game
+  const { state, report } = advanceSeason(game.season, { createYouth, userTeamId: game.userTeamId })
+  const mine = report.finalPositions[game.userTeamId] as { tier: number; position: number }
+  const summary: SeasonSummary = { year: report.year, champions: report.champions, promoted: report.promoted, relegated: report.relegated, userTeamId: game.userTeamId, userTier: mine.tier, userPosition: mine.position }
+  return { ...game, season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], lastReport: report }
 }
 
 /** Registra o resultado da partida pendente (jogada ao vivo ou automaticamente). */

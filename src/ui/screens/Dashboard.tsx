@@ -1,10 +1,11 @@
-import type { MarketNotice, Match } from '../../engine/types'
+import type { DepartedPlayer, MarketNotice, Match, OffseasonReport } from '../../engine/types'
 import {
   advanceGame,
   boardOf,
   lastUserMatch,
   nextEventOf,
   nextUserMatch,
+  startNextSeason,
   standingsOf,
   teamById,
   teamStrength,
@@ -16,7 +17,7 @@ import { updateGame } from '../../store/gameStore'
 import { Button, Card, TeamBadge } from '../components/ui'
 import { formatDate, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { BOARD_STATUS_LABELS, OUTCOME_LABELS, OUTCOME_SHORT_LABELS, SEASON_PHASE_LABELS, WINDOW_LABELS } from '../labels'
+import { BOARD_STATUS_LABELS, OUTCOME_LABELS, OUTCOME_SHORT_LABELS, WINDOW_LABELS } from '../labels'
 
 const BOARD_TONE = { safe: 'text-emerald-300', warning: 'text-amber-300', danger: 'text-rose-300' } as const
 const BOARD_BAR = { safe: 'bg-emerald-500', warning: 'bg-amber-400', danger: 'bg-rose-500' } as const
@@ -59,6 +60,29 @@ function noticeText(n: MarketNotice): string {
   }
 }
 
+function SeasonReport({ game, report }: { game: Game; report: OffseasonReport }) {
+  const name = (id: string) => teamById(game, id).name
+  const mine = report.finalPositions[game.userTeamId]
+  const gone = (list: DepartedPlayer[]) => list.filter((d) => d.teamId === game.userTeamId)
+  const youth = report.youth[game.userTeamId] ?? 0
+  const reputation = report.reputationChanges[game.userTeamId]
+  return (
+    <Card title={`Temporada ${report.year} encerrada`}>
+      <ul className="space-y-1 text-sm">
+        <li>Campeão da Série A: <b>{name(report.champions[0] as string)}</b></li>
+        <li>Campeão da Série B: <b>{name(report.champions[1] as string)}</b></li>
+        <li className="text-emerald-300">Subiram: {report.promoted.map(name).join(', ')}</li>
+        <li className="text-rose-300">Caíram: {report.relegated.map(name).join(', ')}</li>
+        {mine && <li>Seu time terminou em {mine.position}º na Série {mine.tier === 1 ? 'A' : 'B'}.</li>}
+        {reputation && reputation.to !== reputation.from && <li>Reputação do clube: {reputation.from} → {reputation.to}.</li>}
+        {gone(report.retired).length > 0 && <li>Aposentaram-se: {gone(report.retired).map((d) => `${d.name} (${d.age})`).join(', ')}.</li>}
+        {gone(report.released).length > 0 && <li>Contratos vencidos: {gone(report.released).map((d) => d.name).join(', ')}.</li>}
+        {youth > 0 && <li>{youth} {youth === 1 ? 'jovem subiu' : 'jovens subiram'} da base.</li>}
+      </ul>
+    </Card>
+  )
+}
+
 export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId) => void }) {
   const team = userTeam(game)
   const competition = userCompetition(game)
@@ -76,6 +100,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
   const advance = () => {
+    if (seasonOver) return updateGame(startNextSeason)
     if (pending) return onNavigate('match')
     const moved = advanceGame(game)
     updateGame(() => moved)
@@ -84,6 +109,8 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   return (
     <div className="space-y-3">
+      {game.lastReport && <SeasonReport game={game} report={game.lastReport} />}
+
       {game.notices.length > 0 && (
         <Card title="Mercado">
           <ul className="space-y-1 text-sm">
@@ -158,8 +185,8 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
       )}
 
       <div className="sticky bottom-20 pt-2">
-        <Button className="w-full text-lg shadow-lg" onClick={advance} disabled={seasonOver}>
-          {seasonOver ? SEASON_PHASE_LABELS['end-of-season'] : pending ? 'Ir para a partida' : 'Avançar'}
+        <Button className="w-full text-lg shadow-lg" onClick={advance}>
+          {seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
         </Button>
       </div>
     </div>

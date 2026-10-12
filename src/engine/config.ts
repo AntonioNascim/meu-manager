@@ -377,6 +377,8 @@ export const FINANCE = {
   ceilingYears: 1.5,
   /** Parcela do excesso acima do teto investida por mês. */
   ceilingSpendPerMonth: 0.3,
+  /** Orçamento de salários do jogador depois da virada: folha × isto (o da IA é folha × 1,1). */
+  salaryBudgetMargin: 1.1,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -496,4 +498,82 @@ export const BOARD = {
   /** Dívida: saldo abaixo de (− meses × custo mensal) demite; saldo negativo já tira confiança. */
   debtMonths: 3,
   debtPenaltyMax: 25,
+} as const
+
+// ---------------------------------------------------------------------------
+// Virada de temporada
+// ---------------------------------------------------------------------------
+
+export const OFFSEASON = {
+  reputation: {
+    /** Pontos de reputação por (posição esperada − posição final) / step, limitados a ±max. */
+    positionStep: 5,
+    positionMax: 2,
+    champion: 1,
+    promoted: 1,
+    relegated: -1,
+  },
+
+  /** Evolução anual dos atributos (pontos por ano, sobre todos os atributos do jogador). */
+  evolution: {
+    /** Ganho médio por ano abaixo de `youthUntil` anos (igual ao `youthPenaltyPerYear` da geração). */
+    youthGain: 2,
+    youthUntil: 22,
+    /** Quem ainda cresce (até esta idade) recebe um bônus/penalidade pela distância até o potencial. */
+    growthUntil: 26,
+    /** Crescimento médio esperado até o potencial (por ano restante e fixo), igual à geração. */
+    expectedGrowthPerYear: 2.25,
+    expectedGrowthFixed: 2,
+    /** Parcela da diferença (potencial − esperado) que vira ganho a cada ano. */
+    potentialPull: 0.5,
+    /** Ruído do ganho do jogador e de cada atributo. */
+    playerNoise: 0.8,
+    attributeNoise: 1.2,
+    /** Desenvolvimento: 0,8 + 0,4 × fração dos minutos jogados; profissionalismo ajusta ±10%. */
+    minutesBase: 0.8,
+    minutesWeight: 0.4,
+    professionalismWeight: 0.2,
+    /** Declínio físico (pontos/ano) depois de `declineStartAge`, e leitura de jogo até `mentalGainUntil`. */
+    declineStartAge: 30,
+    paceStaminaDecline: 2.25,
+    strengthDecline: 0.9,
+    mentalGainFrom: 26,
+    mentalGainUntil: 32,
+    mentalGainPerYear: 1.25,
+    /** Depois desta idade a técnica também cai. */
+    technicalDeclineFrom: 33,
+    technicalDecline: 0.8,
+  },
+
+  contracts: {
+    /** Anos de contrato novo por idade: o primeiro par cuja idade máxima cobre o jogador [mín., máx.]. */
+    years: [[22, [3, 5]], [28, [2, 4]], [31, [1, 3]], [99, [1, 1]]] as readonly (readonly [number, readonly [number, number]])[],
+    /** A IA só renova quem tem esta importância no elenco ou melhor, ou quem é jovem com potencial. */
+    aiMaxAge: 35,
+  },
+
+  retirement: {
+    /** Chance anual = (idade − from) × perYear, limitada a 1; aposentadoria obrigatória em `forcedAge`. */
+    from: 33,
+    perYear: 0.2,
+    forcedAge: 40,
+    /** Quem ainda é muito forte joga mais: a chance cai pela metade acima desta força. */
+    strongOverall: 70,
+  },
+
+  youth: {
+    /** Idade dos jovens que sobem da base (mín., máx.). */
+    ageRange: [16, 19] as readonly [number, number],
+    /** Elenco que a IA tenta ter depois da virada: 24 + (reputação − 3)/16 × 6, arredondado. */
+    minPerTeam: 1,
+    /** A IA corta o excesso (reservas de menor valor) até este tamanho. */
+    aiMaxSquad: 28,
+    /** O elenco do jogador sobe ao menos até aqui com jovens (nunca fica abaixo do mínimo do jogo). */
+    userMinSquad: 22,
+    /** Promessas: chance de um jovem vir bem acima do nível do time, e quanto (pontos de qualidade). */
+    prospectChance: 0.08,
+    prospectBonus: [5, 11] as readonly [number, number],
+    /** Jovem de base é reserva: qualidade = nível do time − isto (±talento). */
+    qualityBelowTeam: 5,
+  },
 } as const

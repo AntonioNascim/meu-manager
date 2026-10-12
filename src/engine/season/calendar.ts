@@ -20,6 +20,8 @@ export interface SeasonState {
   players: Player[]
   /** Propostas, histórico de transferências e controle dos eventos do mercado. */
   market: MarketState
+  /** Último número usado nos ids dos jogadores (`player-N`): jovens novos continuam daqui. */
+  playerCounter: number
 }
 
 export interface RoundSlot {
@@ -125,6 +127,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
     matches,
     teams: [...options.teams],
     players: [...options.players],
+    playerCounter: options.players.reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
     market: { seed: options.seed, offers: [], history: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }
 }
