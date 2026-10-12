@@ -2,6 +2,7 @@ import type { DepartedPlayer, MarketNotice, Match, OffseasonReport } from '../..
 import {
   advanceGame,
   boardOf,
+  lastYearContracts,
   lastUserMatch,
   nextEventOf,
   nextUserMatch,
@@ -97,10 +98,14 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   const pending = game.pendingUserMatch
   const board = boardOf(game)
+  const expiring = lastYearContracts(game)
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
   const advance = () => {
-    if (seasonOver) return updateGame(startNextSeason)
+    if (seasonOver) {
+      if (expiring.length > 0 && !window.confirm(`${expiring.length} contrato(s) vencem agora e esses jogadores vão embora. Encerrar a temporada mesmo assim?`)) return
+      return updateGame(startNextSeason)
+    }
     if (pending) return onNavigate('match')
     const moved = advanceGame(game)
     updateGame(() => moved)
@@ -110,6 +115,18 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   return (
     <div className="space-y-3">
       {game.lastReport && <SeasonReport game={game} report={game.lastReport} />}
+
+      {expiring.length > 0 && (
+        <Card title="Contratos no último ano">
+          <p className="text-sm">
+            {expiring.length} {expiring.length === 1 ? 'jogador termina' : 'jogadores terminam'} o contrato neste ano:{' '}
+            {expiring.slice(0, 4).map((p) => p.nickname ?? p.name).join(', ')}{expiring.length > 4 ? ` e mais ${expiring.length - 4}` : ''}.
+          </p>
+          <button type="button" className="mt-2 min-h-12 text-sm font-semibold text-emerald-400" onClick={() => onNavigate('market')}>
+            Renovar no Mercado, aba Contratos
+          </button>
+        </Card>
+      )}
 
       {game.notices.length > 0 && (
         <Card title="Mercado">

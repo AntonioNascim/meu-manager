@@ -8,11 +8,12 @@ import type { OfferKind, Player, Position, TransferOffer } from '../../engine/ty
 import { makeUserOffer, releaseUserSquadPlayer, respondToUserOffer, sellUserPlayer, squadOf, teamById, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
+import { Contracts } from './Contracts'
 import { Button, Card, Tabs } from '../components/ui'
 import { formatDate, formatMoney, playerName } from '../format'
 import { OFFER_KIND_LABELS, OFFER_REASON_LABELS, OFFER_STATUS_LABELS, POSITION_SHORT_LABELS, WINDOW_LABELS } from '../labels'
 
-type Tab = 'search' | 'incoming' | 'mine' | 'squad'
+type Tab = 'search' | 'incoming' | 'mine' | 'squad' | 'contracts'
 
 const clubName = (game: Game, id: string | null) => (id ? teamById(game, id).name : 'Livre no mercado')
 
@@ -51,12 +52,14 @@ export function Market({ game }: { game: Game }) {
           { id: 'incoming', label: `Recebidas${incoming.length ? ` (${incoming.length})` : ''}` },
           { id: 'mine', label: 'Minhas' },
           { id: 'squad', label: 'Meu elenco' },
+          { id: 'contracts', label: 'Contratos' },
         ]}
       />
       {tab === 'search' && <Search game={game} open={open} />}
       {tab === 'incoming' && <Incoming game={game} open={open} />}
       {tab === 'mine' && <Mine game={game} />}
       {tab === 'squad' && <MySquad game={game} open={open} />}
+      {tab === 'contracts' && <Contracts game={game} />}
     </div>
   )
 }

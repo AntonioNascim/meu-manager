@@ -3,10 +3,11 @@
  * no fim do ano são renovados pela IA (quando o jogador ainda serve ao time) ou viram jogador livre.
  */
 import { OFFSEASON } from '../config'
-import { expectedSalary, squadRole } from '../market/value'
+import { squadRole } from '../market/value'
 import { playerOverall } from '../overall'
 import type { Rng } from '../rng'
 import { makeDate } from '../season/dates'
+import { renewalDecision, renewalDemand } from './renewal'
 import type { DepartedPlayer, Player, PlayerId, Team, TeamId } from '../types'
 
 /** Anos de um contrato novo, sorteados pela idade. */
@@ -27,8 +28,8 @@ export function aiWantsToKeep(player: Player, squad: readonly Player[]): boolean
   return player.age <= 21 && player.hidden.potential - playerOverall(player) >= 8
 }
 
-/** Contrato novo do jogador pelo salário de mercado (a IA nunca baixa o salário de quem renova). */
-export function renewedContract(rng: Rng, player: Player, year: number, salary: number = Math.max(player.contract.salary, expectedSalary(player))): Player['contract'] {
+/** Contrato novo do jogador com o salário combinado e a duração sorteada pela idade. */
+export function renewedContract(rng: Rng, player: Player, year: number, salary: number): Player['contract'] {
   return {
     salary,
     endDate: makeDate(year + contractYearsFor(rng, player.age), 12, 31),
@@ -71,8 +72,12 @@ export function expireContracts(input: ExpireInput): ExpireResult {
   const renewals = new Map<PlayerId, Player['contract']>()
   for (const p of players) {
     if (!p.teamId || !expiresBy(p, year)) continue
-    if (p.teamId !== userTeamId && aiWantsToKeep(p, squads.get(p.teamId) ?? [])) {
-      renewals.set(p.id, renewedContract(rng, p, year))
+    const team = teams.find((t) => t.id === p.teamId)
+    const squad = squads.get(p.teamId) ?? []
+    // A IA oferece o salário que o jogador pede (que pode ser menor que o atual, se ele caiu de nível).
+    const salary = team ? renewalDemand(p, team) : 0
+    if (team && p.teamId !== userTeamId && aiWantsToKeep(p, squad) && renewalDecision({ player: p, team, squad, salary }).accepted) {
+      renewals.set(p.id, renewedContract(rng, p, year, salary))
       renewed++
     } else {
       freed.add(p.id)

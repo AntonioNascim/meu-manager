@@ -552,6 +552,26 @@ export const OFFSEASON = {
     aiMaxAge: 35,
   },
 
+  renewal: {
+    /** Pedido salarial: salário de mercado × reputação do clube (cada ponto acima/abaixo da referência desconta/acrescenta isto, entre min e max). */
+    referenceReputation: 10,
+    reputationDiscount: 0.015,
+    reputationMin: 0.85,
+    reputationMax: 1.2,
+    /** Jovem com potencial pede mais: até +prospectPremium quando faltam `prospectGap` pontos até o potencial. */
+    prospectAge: 24,
+    prospectPremium: 0.3,
+    prospectGap: 20,
+    /** Veterano pede menos: −veteranDiscount por ano a partir de `veteranAge`. */
+    veteranAge: 32,
+    veteranDiscount: 0.06,
+    minimumSalary: 5_000,
+    /** Aceita até este tanto abaixo do pedido. */
+    tolerance: 0.97,
+    /** Sem espaço no time, só fica por esta proporção do pedido. */
+    benchPremium: 1.35,
+  },
+
   retirement: {
     /** Chance anual = (idade − from) × perYear, limitada a 1; aposentadoria obrigatória em `forcedAge`. */
     from: 33,

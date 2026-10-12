@@ -20,6 +20,7 @@ import { evolvePlayer, retires } from './evolution'
 
 export * from './contracts'
 export * from './evolution'
+export * from './renewal'
 
 /** Quem gera os jovens (fica em `src/data`: o motor não cria jogadores). `taken` = nomes já usados. */
 export type YouthFactory = (request: YouthRequest, rng: Rng, taken: ReadonlySet<string>) => Player[]

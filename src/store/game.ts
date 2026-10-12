@@ -4,7 +4,8 @@
  */
 import { createYouth } from '../data/generateYouth'
 import { generateWorld } from '../data/generateWorld'
-import { advanceSeason } from '../engine/offseason'
+import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
+import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
 import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
 import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
@@ -128,6 +129,15 @@ export function sellUserPlayer(game: Game, request: { playerId: string; buyerId:
   const result = sellPlayer(game.season, game.userTeamId, request)
   return { game: result.accepted ? { ...game, season: result.state } : game, result }
 }
+
+/** Renova o contrato de um jogador do time (ele pode recusar). */
+export function renewUserPlayer(game: Game, request: { playerId: string; salary: number; years: number }): { game: Game; result: RenewalResult } {
+  const result = renewUserContract(game.season, game.userTeamId, request)
+  return { game: result.accepted ? { ...game, season: result.state } : game, result }
+}
+
+/** Jogadores do time com contrato no último ano (vencem no fim desta temporada). */
+export const lastYearContracts = (game: Game): Player[] => expiringContracts(game.season, game.userTeamId, game.season.season.year)
 
 /** Libera um jogador do time (paga a rescisão). */
 export function releaseUserSquadPlayer(game: Game, playerId: string): Game {
