@@ -155,3 +155,12 @@ export const OUTCOME_SHORT_LABELS: Record<'W' | 'D' | 'L', string> = {
   D: 'E',
   L: 'D',
 }
+
+export type AttributeGroup = 'technical' | 'physical' | 'mental' | 'goalkeeper'
+
+export const ATTRIBUTE_GROUP_LABELS: Record<AttributeGroup, string> = {
+  technical: 'Técnicos',
+  physical: 'Físicos',
+  mental: 'Mentais',
+  goalkeeper: 'Goleiro',
+}

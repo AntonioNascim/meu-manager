@@ -5,14 +5,24 @@ import { TeamBadge } from './components/ui'
 import { formatDate } from './format'
 import { Dashboard } from './screens/Dashboard'
 import { NewGame } from './screens/NewGame'
+import { Squad } from './screens/Squad'
 
-type ScreenId = 'home'
+type ScreenId = 'home' | 'squad'
 
-const SCREENS: { id: ScreenId; label: string }[] = [{ id: 'home', label: 'Painel' }]
+const SCREENS: { id: ScreenId; label: string }[] = [
+  { id: 'home', label: 'Painel' },
+  { id: 'squad', label: 'Elenco' },
+]
+
+/** Em desenvolvimento, /?tela=squad abre direto numa tela (junto com ?time=). */
+function initialScreen(): ScreenId {
+  const wanted = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('tela') : null
+  return SCREENS.find((s) => s.id === wanted)?.id ?? 'home'
+}
 
 export function App() {
   const game = useGame()
-  const [screen, setScreen] = useState<ScreenId>('home')
+  const [screen, setScreen] = useState<ScreenId>(initialScreen)
   if (!game) return <NewGame />
 
   const team = userTeam(game)
@@ -33,7 +43,10 @@ export function App() {
         </button>
       </header>
 
-      <main className="flex-1 px-4 pb-28 pt-4">{screen === 'home' && <Dashboard game={game} />}</main>
+      <main className="flex-1 px-4 pb-28 pt-4">
+        {screen === 'home' && <Dashboard game={game} />}
+        {screen === 'squad' && <Squad game={game} />}
+      </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-800 bg-slate-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
         <div className="mx-auto flex max-w-xl">
