@@ -18,7 +18,7 @@ import { simulateMatch } from '../src/engine/match'
 import { crowdFill } from '../src/engine/match/state'
 import { createRng } from '../src/engine/rng'
 import type { Player, PlayStyle, Team } from '../src/engine/types'
-import { simulateSeasons } from '../tests/balance/helpers'
+import { simulateSeasons } from './seasons'
 import type { SeasonSummary } from '../tests/balance/helpers'
 
 const SECTIONS = ['bands', 'styles', 'home'] as const
