@@ -192,3 +192,42 @@ describe('salvamento automático', () => {
     }
   })
 })
+
+describe('backup em arquivo', () => {
+  it('exporta um espaço e importa em outro com o mesmo jogo, mesmo depois de apagar o original', async () => {
+    const { exportSlot, importSave, parseSaveFile } = await import('../src/store/saveFile')
+    const game = played()
+    await saveToSlot(1, game, new Date('2026-05-01T10:00:00Z'))
+    const file = await exportSlot(1)
+    expect(file.filename).toMatch(/^meu-manager-[a-z0-9-]+-2026\.json$/)
+    expect(JSON.parse(file.json)).toMatchObject({ app: 'meu-manager', version: SAVE_VERSION })
+
+    await deleteSlot(1)
+    const summary = await importSave(file.json, 3, new Date('2026-06-01T10:00:00Z'))
+    expect(summary).toMatchObject({ slot: 3, teamName: userTeam(game).name, year: 2026 })
+    expect(await loadSlot(3)).toEqual(compactGame(game))
+    expect((await latestSlot())?.slot).toBe(3)
+    expect(parseSaveFile(file.json).game.userTeamId).toBe(game.userTeamId)
+  })
+
+  it('recusa arquivo que não é JSON, não é do jogo, é de versão mais nova ou está corrompido', async () => {
+    const { exportSlot, parseSaveFile } = await import('../src/store/saveFile')
+    await saveToSlot(1, played())
+    const file = JSON.parse((await exportSlot(1)).json)
+    expect(() => parseSaveFile('isto nao e json')).toThrowError(expect.objectContaining({ code: 'invalid' }))
+    expect(() => parseSaveFile(JSON.stringify({ qualquer: 'coisa' }))).toThrowError(expect.objectContaining({ code: 'invalid' }))
+    expect(() => parseSaveFile(JSON.stringify({ ...file, version: SAVE_VERSION + 5 }))).toThrowError(expect.objectContaining({ code: 'newer-version' }))
+    expect(() => parseSaveFile(JSON.stringify({ ...file, game: { ...file.game, season: null } }))).toThrowError(expect.objectContaining({ code: 'invalid' }))
+    await expect(deleteSlot(2)).resolves.toBeUndefined()
+    expect((await listSlots())[1]).toBeNull()
+  })
+
+  it('arquivo de versão antiga passa pelas migrações na importação', async () => {
+    const { parseSaveFile } = await import('../src/store/saveFile')
+    const { seasonLog: _drop, ...oldGame } = played()
+    const text = JSON.stringify({ app: 'meu-manager', version: 1, savedAt: 'x', game: oldGame })
+    const migrations = { 1: (e: { version: number; savedAt: string; game: unknown }) => ({ ...e, version: 2, game: { ...(e.game as object), seasonLog: [] } }) }
+    expect(parseSaveFile(text, migrations, 2).game.seasonLog).toEqual([])
+    expect(() => parseSaveFile(text, {}, 2)).toThrowError(expect.objectContaining({ code: 'missing-migration' }))
+  })
+})

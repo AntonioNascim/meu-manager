@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SLOT_COUNT } from '../../store/saveFormat'
 import type { SaveSummary } from '../../store/saveFormat'
 import { markSaved } from '../../store/autosave'
 import { openGame } from '../../store/gameStore'
+import { exportSlot, importSave, parseSaveFile } from '../../store/saveFile'
 import { deleteSlot, latestSlot, listSlots, loadSlot } from '../../store/saves'
 import { SlotInfo } from '../components/SlotInfo'
+import { SlotPicker } from '../components/SlotPicker'
 import { Button, Card } from '../components/ui'
+import { downloadText } from '../download'
 import { NewGame } from './NewGame'
 
 type View = 'menu' | 'new' | 'load'
@@ -17,6 +20,10 @@ export function Start() {
   const [latest, setLatest] = useState<SaveSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  /** Texto do arquivo importado, esperando a escolha do espaço. */
+  const [imported, setImported] = useState<string | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -50,6 +57,44 @@ export function Start() {
     await refresh()
   }
 
+  const pickFile = async (file: File | undefined) => {
+    if (!file) return
+    setError(null)
+    setMessage(null)
+    try {
+      const text = await file.text()
+      parseSaveFile(text)
+      setImported(text)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível ler o arquivo.')
+    } finally {
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
+
+  const finishImport = async (slot: number) => {
+    if (imported === null) return
+    try {
+      const summary = await importSave(imported, slot)
+      setMessage(`Save de ${summary.teamName} (temporada ${summary.year}) importado para o espaço ${slot}.`)
+      setImported(null)
+      await refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível importar o save.')
+      setImported(null)
+    }
+  }
+
+  const exportFile = async (slot: number) => {
+    setError(null)
+    try {
+      const file = await exportSlot(slot)
+      downloadText(file.filename, file.json)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível exportar o save.')
+    }
+  }
+
   if (view === 'new') return <NewGame slots={slots} onBack={() => { setView('menu'); void refresh() }} />
 
   return (
@@ -77,6 +122,9 @@ export function Start() {
           <Button className="w-full" variant="secondary" disabled={!latest} onClick={() => setView('load')}>
             Carregar
           </Button>
+          <Button className="w-full" variant="secondary" onClick={() => fileInput.current?.click()}>
+            Importar save de um arquivo
+          </Button>
         </div>
       )}
 
@@ -93,6 +141,9 @@ export function Start() {
                       <Button className="flex-1" disabled={busy} onClick={() => void open(summary.slot)}>
                         Carregar
                       </Button>
+                      <Button variant="secondary" onClick={() => void exportFile(summary.slot)}>
+                        Exportar
+                      </Button>
                       <Button variant="secondary" onClick={() => void remove(summary)}>
                         Excluir
                       </Button>
@@ -104,13 +155,19 @@ export function Start() {
               </Card>
             )
           })}
+          <Button className="w-full" variant="secondary" onClick={() => fileInput.current?.click()}>
+            Importar save de um arquivo
+          </Button>
           <Button className="w-full" variant="secondary" onClick={() => setView('menu')}>
             Voltar
           </Button>
         </div>
       )}
 
+      <input ref={fileInput} type="file" accept=".json,application/json" className="hidden" onChange={(e) => void pickFile(e.target.files?.[0])} />
+      {message && <p className="text-center text-sm text-emerald-300">{message}</p>}
       {error && <p className="text-center text-sm text-rose-300">{error}</p>}
+      {imported !== null && <SlotPicker title="Em qual espaço guardar o save importado?" slots={slots} onCancel={() => setImported(null)} onPick={(slot) => void finishImport(slot)} />}
     </div>
   )
 }

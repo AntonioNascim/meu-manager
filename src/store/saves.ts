@@ -89,3 +89,11 @@ export async function firstEmptySlot(): Promise<number | null> {
   const index = (await listSlots()).findIndex((s) => s === null)
   return index === -1 ? null : index + 1
 }
+
+/** O envelope como está gravado (sem migrar): é o que vai para o arquivo de backup. */
+export async function loadEnvelope(slot: number): Promise<SaveEnvelope> {
+  checkSlot(slot)
+  const row = await db().games.get(slot)
+  if (!row) throw new SaveError('not-found', 'Este espaço está vazio.')
+  return row.envelope
+}

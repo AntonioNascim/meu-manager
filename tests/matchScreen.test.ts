@@ -124,5 +124,6 @@ describe('telas da partida (renderização)', () => {
     const html = renderToStaticMarkup(createElement(App))
     expect(html).toContain('Novo jogo')
     expect(html).toContain('Carregar')
+    expect(html).toContain('Importar save de um arquivo')
   })
 })
