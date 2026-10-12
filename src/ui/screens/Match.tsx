@@ -222,8 +222,9 @@ function SubsPanel({ game, live, side, canEdit, refresh }: { game: Game; live: L
     <div className={`space-y-3 ${canEdit ? '' : 'pointer-events-none opacity-60'}`}>
       {!canEdit && <p className="pointer-events-auto rounded-lg bg-slate-800 p-2 text-xs text-slate-300">Pause o jogo para fazer substituições.</p>}
       <p className="text-sm">
-        Substituições restantes: <b>{side.subsLeft}</b>
+        Substituições restantes: <b>{side.subsLeft}</b> · Paradas além do intervalo: <b>{side.stopsLeft}</b>
       </p>
+      <p className="text-[11px] text-slate-500">Máximo de 5 trocas em até 3 paradas além do intervalo. Várias trocas na mesma parada contam uma só.</p>
       <Card title="Em campo (toque em quem sai)" flush>
         <ul className="divide-y divide-slate-700">
           {side.onPitch.map((p) => {

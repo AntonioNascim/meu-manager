@@ -46,6 +46,10 @@ export const MATCH = {
   attackRate: 0.55,
   /** Substituições permitidas por time. */
   maxSubs: 5,
+  /** Paradas para substituir (momentos distintos) além do intervalo, como no futebol. Várias trocas na mesma parada contam uma só. */
+  maxSubStops: 3,
+  /** Minuto do intervalo: trocas feitas nele não gastam parada. */
+  halftimeMinute: 45,
 
   /** Deslocamento da curva do duelo por etapa (negativo = mais difícil para o ataque). */
   offset: {

@@ -63,6 +63,8 @@ export interface SideSnapshot {
   /** Reservas que ainda podem entrar. */
   bench: string[]
   subsLeft: number
+  /** Paradas para substituir que ainda restam (o intervalo não conta). */
+  stopsLeft: number
 }
 
 export interface MatchSnapshot {
@@ -140,6 +142,7 @@ export function startMatch(input: MatchInput): LiveMatch {
     onPitch: activePlayers(side).map((p) => ({ playerId: p.player.id, slot: p.slot, fitness: Math.round(p.fitness), yellowCards: p.yellowCards })),
     bench: side.bench.map((p) => p.id),
     subsLeft: side.subsLeft,
+    stopsLeft: MATCH.maxSubStops - side.subStops.length,
   })
 
   return {
@@ -197,6 +200,7 @@ export function startMatch(input: MatchInput): LiveMatch {
       if (!outgoing) throw new Error('O jogador não está em campo')
       if (!incoming) throw new Error('O reserva não está no banco')
       if (s.subsLeft <= 0) throw new Error('Sem substituições disponíveis')
+      if (!canSubstituteAt(s, ctx.minute)) throw new Error('Sem paradas disponíveis: no máximo 3 paradas além do intervalo')
       substitute(ctx, s, outgoing, incoming)
     },
     result() {
@@ -360,6 +364,7 @@ function substituteTired(ctx: MatchContext, side: SideState): void {
   const f = MATCH.fatigue
   if (ctx.minute < f.subFromMinute || side.subsLeft <= 0 || side.bench.length === 0) return
   if (ctx.minute < f.keepOneSubUntil && side.subsLeft <= 1) return
+  if (!canSubstituteAt(side, ctx.minute)) return
   const tired = activePlayers(side)
     .filter((p) => p.slot !== 'GK' && p.fitness < f.subBelowFitness)
     .sort((a, b) => a.fitness - b.fitness)[0]
@@ -715,6 +720,11 @@ function checkInjury(ctx: MatchContext): void {
   else injured.minuteOff = ctx.minute
 }
 
+/** Substituição voluntária: no intervalo, numa parada já aberta neste minuto ou abrindo uma nova (até o limite). */
+function canSubstituteAt(side: SideState, minute: number): boolean {
+  return side.subsLeft > 0 && (minute === MATCH.halftimeMinute || side.subStops.includes(minute) || side.subStops.length < MATCH.maxSubStops)
+}
+
 function bestReplacement(side: SideState, outgoing: PitchPlayer): Player | undefined {
   return [...side.bench].sort((a, b) => overallAt(b, outgoing.slot) - overallAt(a, outgoing.slot))[0]
 }
@@ -729,6 +739,7 @@ function substitute(
   if (outgoing.minuteOff === null) outgoing.minuteOff = ctx.minute
   side.bench = side.bench.filter((p) => p !== incoming)
   side.subsLeft--
+  if (ctx.minute !== MATCH.halftimeMinute && !side.subStops.includes(ctx.minute)) side.subStops.push(ctx.minute)
   const sector = slot === 'GK' ? 'defense' : outgoing.sector
   side.players.push(
     createPitchPlayer(incoming, slot, sector, ctx.minute, side.sideFactor, dayFactorFor(ctx.rng, incoming)),

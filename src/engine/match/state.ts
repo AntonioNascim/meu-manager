@@ -109,6 +109,8 @@ export interface SideState {
   /** Reservas ainda disponíveis. */
   bench: Player[]
   subsLeft: number
+  /** Minutos (fora o intervalo) em que houve substituição: cada um é uma parada. */
+  subStops: number[]
   goals: number
   tally: TeamTally
 }
@@ -235,6 +237,7 @@ export function buildSide(input: MatchSideInput, sideFactor: number, rng: Rng, u
     players,
     bench,
     subsLeft: Math.min(MATCH.maxSubs, bench.length),
+    subStops: [],
     goals: 0,
     tally: { possession: 0, shots: 0, shotsOnTarget: 0, corners: 0, fouls: 0, yellowCards: 0, redCards: 0, xg: 0 },
   }

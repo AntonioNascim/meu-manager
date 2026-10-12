@@ -131,6 +131,63 @@ describe('substituições ao vivo', () => {
     expect(() => live.substitute('home', s.home.onPitch[9]?.playerId as string, s.home.bench[0] as string)).toThrow()
   })
 
+  it('limita as trocas a 3 paradas além do intervalo; várias trocas na mesma parada contam uma só', () => {
+    const live = startMatch(input(3, true))
+    const swap = (i: number) => {
+      const s = live.snapshot()
+      live.substitute('home', s.home.onPitch[1 + i]?.playerId as string, s.home.bench[0] as string)
+    }
+    live.playUntil(30)
+    swap(0)
+    swap(1) // mesma parada
+    expect(live.snapshot().home.stopsLeft).toBe(2)
+    live.playUntil(60)
+    swap(2)
+    live.playUntil(75)
+    swap(3)
+    expect(live.snapshot().home.stopsLeft).toBe(0)
+    live.playUntil(80)
+    expect(() => swap(4)).toThrow(/paradas/)
+    expect(live.snapshot().home.subsLeft).toBe(1)
+  })
+
+  it('o intervalo não gasta parada', () => {
+    const live = startMatch(input(3, true))
+    live.playUntil(20)
+    const s = live.snapshot()
+    live.substitute('home', s.home.onPitch[1]?.playerId as string, s.home.bench[0] as string)
+    live.playUntil(35)
+    const t = live.snapshot()
+    live.substitute('home', t.home.onPitch[2]?.playerId as string, t.home.bench[0] as string)
+    live.playUntil(50)
+    const u = live.snapshot()
+    live.substitute('home', u.home.onPitch[3]?.playerId as string, u.home.bench[0] as string)
+    expect(live.snapshot().home.stopsLeft).toBe(0)
+    // no intervalo ainda dá para trocar (mas sem parada nova, aqui já gasta)
+    const fresh = startMatch(input(3, true))
+    fresh.playUntil(45)
+    for (let i = 0; i < 3; i++) {
+      const f = fresh.snapshot()
+      fresh.substitute('home', f.home.onPitch[1 + i]?.playerId as string, f.home.bench[0] as string)
+    }
+    expect(fresh.snapshot().home.stopsLeft).toBe(3)
+  })
+
+  it('a IA do rival também respeita as 3 paradas e as 5 trocas', () => {
+    for (let seed = 1; seed <= 25; seed++) {
+      const live = startMatch(input(seed, false))
+      live.playUntil(90)
+      for (const side of ['home', 'away'] as const) {
+        const subs = live.snapshot().events.filter((e) => e.type === 'substitution' && e.teamId === live.snapshot()[side].teamId)
+        expect(subs.length).toBeLessThanOrEqual(5)
+        const minutes = new Set(subs.map((e) => e.minute).filter((m) => m !== 45))
+        // Lesão força a troca e pode abrir uma parada a mais; fora isso, só 3.
+        const injuries = live.snapshot().events.filter((e) => e.type === 'injury' && e.teamId === live.snapshot()[side].teamId).length
+        expect(minutes.size).toBeLessThanOrEqual(3 + injuries)
+      }
+    }
+  })
+
   it('sem a IA, o time do jogador só troca quando manda (a IA do rival continua trocando)', () => {
     let mine = 0
     let theirs = 0
