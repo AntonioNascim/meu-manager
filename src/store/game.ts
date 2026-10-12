@@ -23,6 +23,21 @@ import {
 import type { SeasonEvent, SeasonState } from '../engine/season'
 import type { BoardEvaluation, Competition, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
+/** Linha resumida da classificação final: time, jogos, vitórias, empates, derrotas, gols pró, gols contra, pontos. */
+export type ArchivedRow = [teamId: string, played: number, wins: number, draws: number, losses: number, goalsFor: number, goalsAgainst: number, points: number]
+
+/** Jogo do time do jogador resumido: rodada, adversário, 1 se foi em casa, gols pró, gols contra. */
+export type ArchivedMatch = [round: number, opponentId: string, home: 0 | 1, goalsFor: number, goalsAgainst: number]
+
+/** O que se guarda de uma temporada encerrada (os jogos completos, com lances e notas, não ficam). */
+export interface SeasonArchive {
+  year: number
+  /** Classificação final de cada série (índice = série − 1). */
+  tables: ArchivedRow[][]
+  /** Todos os jogos do time do jogador na temporada, resumidos. */
+  userMatches: ArchivedMatch[]
+}
+
 export interface Game {
   /** Semente do mundo e da temporada (mesma semente = mesmo jogo). */
   seed: number
@@ -38,6 +53,8 @@ export interface Game {
   dismissal?: Dismissal
   /** Resumo de cada temporada já encerrada (campeões, acesso, rebaixamento e a campanha do jogador). */
   seasonLog: SeasonSummary[]
+  /** Temporadas passadas em forma resumida (classificações finais e jogos do time do jogador). */
+  archive: SeasonArchive[]
   /** O que a última virada de temporada fez; some quando o jogador avança na temporada nova. */
   lastReport?: OffseasonReport
 }
@@ -46,7 +63,7 @@ export function createGame(seed: number, userTeamId: TeamId): Game {
   const world = generateWorld({ seed })
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
   const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players })
-  return { seed, userTeamId, season, lastDay: [], notices: [], seasonLog: [] }
+  return { seed, userTeamId, season, lastDay: [], notices: [], seasonLog: [], archive: [] }
 }
 
 /** Avança até o próximo dia de jogos. A partida do jogador fica pendente em `pendingUserMatch`. */
@@ -84,7 +101,24 @@ export function startNextSeason(game: Game): Game {
   const { state, report } = advanceSeason(game.season, { createYouth, userTeamId: game.userTeamId })
   const mine = report.finalPositions[game.userTeamId] as { tier: number; position: number }
   const summary: SeasonSummary = { year: report.year, champions: report.champions, promoted: report.promoted, relegated: report.relegated, userTeamId: game.userTeamId, userTier: mine.tier, userPosition: mine.position }
-  return { ...game, season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], lastReport: report }
+  return { ...game, season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], archive: [...game.archive, archiveSeason(game)], lastReport: report }
+}
+
+/** Resume a temporada que acabou: classificação final das séries e os jogos do time do jogador. */
+export function archiveSeason(game: Game): SeasonArchive {
+  const { season } = game.season
+  const tables = [...season.competitions]
+    .sort((a, b) => a.tier - b.tier)
+    .map((c) => standingsOf(game, c).map((r): ArchivedRow => [r.teamId, r.played, r.wins, r.draws, r.losses, r.goalsFor, r.goalsAgainst, r.points]))
+  const userMatches = game.season.matches
+    .filter((m) => m.status === 'finished' && m.result && (m.homeTeamId === game.userTeamId || m.awayTeamId === game.userTeamId))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((m): ArchivedMatch => {
+      const home = m.homeTeamId === game.userTeamId
+      const r = m.result as MatchResult
+      return [m.round, home ? m.awayTeamId : m.homeTeamId, home ? 1 : 0, home ? r.homeGoals : r.awayGoals, home ? r.awayGoals : r.homeGoals]
+    })
+  return { year: season.year, tables, userMatches }
 }
 
 /** Registra o resultado da partida pendente (jogada ao vivo ou automaticamente). */

@@ -10,6 +10,7 @@
  * Seções: bands (posição e pontos por faixa de força), styles (estilos com elencos equivalentes),
  * home (vantagem de jogar em casa por série e por ocupação do estádio), years (várias temporadas seguidas
  * com virada de temporada: força das séries, idades, promessas, finanças e elencos, ano a ano).
+ * save (tamanho do save em KB depois de cada uma de `--years` temporadas jogadas pelo store).
  * Opções: --seasons N (bands), --worlds N (styles e home), --matches N (home), --years N e --longworlds N (years;
  * cada mundo leva ~10 s por temporada), --seed N (primeira semente).
  */
@@ -21,10 +22,11 @@ import { crowdFill } from '../src/engine/match/state'
 import { createRng } from '../src/engine/rng'
 import type { Player, PlayStyle, Team } from '../src/engine/types'
 import { formatYears, simulateYears } from './longRun'
+import { formatSizes, measureSaveSizes } from './saveSize'
 import { simulateSeasons } from './seasons'
 import type { SeasonSummary } from '../tests/balance/helpers'
 
-const SECTIONS = ['bands', 'styles', 'home', 'years'] as const
+const SECTIONS = ['bands', 'styles', 'home', 'years', 'save'] as const
 type Section = (typeof SECTIONS)[number]
 
 function parseArgs(argv: string[]) {
@@ -214,6 +216,9 @@ for (const section of sections) {
   if (section === 'bands') runBands(options.seasons as number, options.seed as number)
   if (section === 'styles') runStyles(options.worlds as number, options.seed as number)
   if (section === 'home') runHome(options.worlds as number, options.matches as number, options.seed as number)
+  if (section === 'save') console.log(`
+Tamanho do save (${options.years} temporadas, time jogado no automático)
+${formatSizes(measureSaveSizes(options.years as number, options.seed as number))}`)
   if (section === 'years') runYears(options.years as number, options.longworlds as number, options.seed as number)
 }
 console.log(`\n(${f((performance.now() - t0) / 1000)} s)`)

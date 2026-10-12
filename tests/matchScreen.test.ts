@@ -120,7 +120,9 @@ describe('telas da partida (renderização)', () => {
     expect(renderToStaticMarkup(createElement(Tactics, { game }))).toContain('A partida já começou')
   })
 
-  it('o aplicativo começa na escolha de time', () => {
-    expect(renderToStaticMarkup(createElement(App))).toContain('Escolha o time')
+  it('o aplicativo começa no menu inicial, com Novo jogo e Carregar', () => {
+    const html = renderToStaticMarkup(createElement(App))
+    expect(html).toContain('Novo jogo')
+    expect(html).toContain('Carregar')
   })
 })
