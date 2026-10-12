@@ -4,6 +4,8 @@
  * Os `Record` abaixo fazem o TypeScript acusar rótulo faltando quando um valor novo é criado.
  */
 import type {
+  BoardStatus,
+  DismissalReason,
   AttributeName,
   CompetitionType,
   FinanceCategory,
@@ -246,4 +248,15 @@ export const SQUAD_ROLE_LABELS: Record<SquadRole, string> = {
   starter: 'Titular',
   rotation: 'Rodízio',
   surplus: 'Sobra',
+}
+
+export const BOARD_STATUS_LABELS: Record<BoardStatus, string> = {
+  safe: 'Diretoria satisfeita',
+  warning: 'Diretoria preocupada',
+  danger: 'Seu cargo está ameaçado',
+}
+
+export const DISMISSAL_REASON_LABELS: Record<DismissalReason, string> = {
+  results: 'Os resultados ficaram muito abaixo do que a diretoria esperava.',
+  finances: 'O clube mergulhou em dívidas.',
 }

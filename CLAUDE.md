@@ -203,6 +203,7 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
 - O estado do jogo é `Game` (`src/store/game.ts`, funções puras: `createGame`, `advanceGame`, `finishPendingMatch`, `setUserTactic`...), guardado em memória por `gameStore.ts` (`useGame`). Nada é salvo ainda. Consultas (classificação, próxima partida) são derivadas na hora.
 - `advanceToNextEvent(state, { userTeamId })` não simula a partida do jogador: devolve `pendingUserMatch` e a IA não mexe no time dele (`userMatchInput`, `MatchInput.userControlled`, `repairTactic`, `setTeamTactic`, `completeMatch`).
 - Atalhos de desenvolvimento (só em `npm run dev`): `/?time=imp&semente=7` começa um jogo com o time (sigla de 3 letras); `&tela=squad|tactics|match` abre numa tela; `&dias=10` joga 10 dias de jogos antes; `&jogo=1` avança até a partida do time; `&minuto=60` deixa a partida ao vivo parada nesse minuto.
+- Mercado: `advanceGame` liga o mercado (`market: true`) e também para em dias só de mercado; `advanceToMatchday` atravessa esses dias. Vender/emprestar/liberar os próprios jogadores: `src/engine/market/sell.ts`. Diretoria: `src/engine/board` (`evaluateBoard`, confiança derivada da classificação, meta e finanças; `BOARD` no `config.ts`); a demissão fica em `Game.dismissal` e para o jogo.
 - A partida ao vivo mora em `src/store/liveMatch.ts` (o objeto do motor muda a cada passo e não faz parte do `Game`).
 
 ## Convenções

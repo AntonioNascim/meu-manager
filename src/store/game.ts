@@ -3,7 +3,8 @@
  * Nada daqui depende de React; o salvamento (Dexie) entra numa etapa futura.
  */
 import { generateWorld } from '../data/generateWorld'
-import { setTicketPrice } from '../engine/finance'
+import { evaluateBoard } from '../engine/board'
+import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
 import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
 import type { OfferRequest, SaleResult } from '../engine/market'
 import { playerOverall } from '../engine/overall'
@@ -17,7 +18,7 @@ import {
   setTeamTactic,
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
-import type { Competition, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import type { BoardEvaluation, Competition, Dismissal, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
 export interface Game {
   /** Semente do mundo e da temporada (mesma semente = mesmo jogo). */
@@ -30,6 +31,8 @@ export interface Game {
   lastDay: Match[]
   /** Avisos do mercado do último avanço (janela, propostas recebidas e respondidas). */
   notices: MarketNotice[]
+  /** Preenchido quando a diretoria demitiu o técnico: o jogo não avança mais. */
+  dismissal?: Dismissal
 }
 
 export function createGame(seed: number, userTeamId: TeamId): Game {
@@ -41,20 +44,20 @@ export function createGame(seed: number, userTeamId: TeamId): Game {
 
 /** Avança até o próximo dia de jogos. A partida do jogador fica pendente em `pendingUserMatch`. */
 export function advanceGame(game: Game): Game {
-  if (game.pendingUserMatch) return game
+  if (game.pendingUserMatch || game.dismissal) return game
   const step = advanceToNextEvent(game.season, { userTeamId: game.userTeamId, market: true })
-  return {
+  return checkDismissal({
     ...game,
     season: step.state,
     lastDay: step.played,
     notices: step.notices,
     ...(step.pendingUserMatch ? { pendingUserMatch: step.pendingUserMatch } : {}),
-  }
+  })
 }
 
 /** Avança (parando só para a partida do jogador) até o próximo dia de jogos, passando direto pelos dias de mercado. */
 export function advanceToMatchday(game: Game): Game {
-  if (game.pendingUserMatch) return game
+  if (game.pendingUserMatch || game.dismissal) return game
   let current = game
   const notices: MarketNotice[] = []
   for (;;) {
@@ -72,7 +75,7 @@ export function finishPendingMatch(game: Game, result: MatchResult): Game {
   if (!pending) return game
   const finished: Match = { ...pending, status: 'finished', result }
   const { pendingUserMatch: _done, ...rest } = game
-  return { ...rest, season: completeMatch(game.season, finished), lastDay: [...game.lastDay, finished] }
+  return checkDismissal({ ...rest, season: completeMatch(game.season, finished), lastDay: [...game.lastDay, finished] })
 }
 
 /** Joga a partida pendente sem intervenção do jogador. */
@@ -112,6 +115,15 @@ export function sellUserPlayer(game: Game, request: { playerId: string; buyerId:
 /** Libera um jogador do time (paga a rescisão). */
 export function releaseUserSquadPlayer(game: Game, playerId: string): Game {
   return { ...game, season: releaseUserPlayer(game.season, game.userTeamId, playerId) }
+}
+
+/** Se a diretoria acabou de perder a paciência, registra a demissão (a partida pendente, se houver, continua). */
+function checkDismissal(game: Game): Game {
+  if (game.dismissal || game.pendingUserMatch) return game
+  const board = boardOf(game)
+  if (!board.dismissal) return game
+  const position = standingsOf(game, userCompetition(game)).findIndex((r) => r.teamId === game.userTeamId) + 1
+  return { ...game, dismissal: { date: game.season.season.currentDate, reason: board.dismissal, confidence: board.confidence, position } }
 }
 
 // ---------------------------------------------------------------------------
@@ -155,4 +167,21 @@ export function teamStrength(game: Game, team: Team): number {
   const byId = new Map(squadOf(game, team.id).map((p) => [p.id, p]))
   const xi = team.tactic.startingXI.map((id) => byId.get(id)).filter((p): p is Player => p !== undefined)
   return xi.reduce((sum, p) => sum + playerOverall(p), 0) / Math.max(1, xi.length)
+}
+
+/** Avaliação da diretoria hoje (derivada da classificação, da meta e das finanças). */
+export function boardOf(game: Game): BoardEvaluation {
+  const team = userTeam(game)
+  const competition = userCompetition(game)
+  const table = standingsOf(game, competition)
+  const index = table.findIndex((r) => r.teamId === team.id)
+  return evaluateBoard({
+    objective: team.objective,
+    row: table[index],
+    position: index + 1,
+    teamCount: table.length,
+    totalGames: (table.length - 1) * 2,
+    balance: team.finances.balance,
+    monthlyCost: monthlyPayroll(squadOf(game, team.id)) + monthlyOperations(team),
+  })
 }

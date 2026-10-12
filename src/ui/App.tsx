@@ -6,6 +6,7 @@ import { TeamBadge } from './components/ui'
 import { formatDate } from './format'
 import { SCREEN_LABELS } from './navigation'
 import type { ScreenId } from './navigation'
+import { Dismissed } from './screens/Dismissed'
 import { Market } from './screens/Market'
 import { Finance } from './screens/Finance'
 import { Dashboard } from './screens/Dashboard'
@@ -25,6 +26,8 @@ export function App() {
   const game = useGame()
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
   if (!game) return <NewGame />
+
+  if (game.dismissal) return <Dismissed game={game} />
 
   const team = userTeam(game)
   // A aba da partida só existe enquanto o time do jogador tem um jogo por jogar.

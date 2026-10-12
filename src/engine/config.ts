@@ -477,3 +477,23 @@ export const MARKET = {
     contractYears: [1, 4] as readonly [number, number],
   },
 } as const
+
+/** Diretoria: a confiança vem dos pontos por jogo comparados à meta e ao limite de demissão. */
+export const BOARD = {
+  /** Pontos por jogo esperados para quem termina em 1º e em último (interpolação linear entre eles). */
+  pointsPerGame: { first: 2.1, last: 0.8 },
+  /** Confiança de quem está exatamente na meta. */
+  atTarget: 70,
+  /** Confiança no limite de demissão (posição de `sackingPosition`). */
+  atSacking: 0,
+  /** Jogos até a diretoria julgar por inteiro: antes disso a confiança fica perto do neutro. */
+  judgeAfterGames: 10,
+  /** Abaixo desta confiança (depois do período de graça) o técnico é demitido. */
+  dismissBelow: 8,
+  /** Abaixo disto o aviso vira alerta; abaixo de `dangerBelow`, perigo. */
+  warningBelow: 55,
+  dangerBelow: 30,
+  /** Dívida: saldo abaixo de (− meses × custo mensal) demite; saldo negativo já tira confiança. */
+  debtMonths: 3,
+  debtPenaltyMax: 25,
+} as const

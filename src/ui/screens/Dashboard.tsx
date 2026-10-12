@@ -1,6 +1,7 @@
 import type { MarketNotice, Match } from '../../engine/types'
 import {
   advanceGame,
+  boardOf,
   lastUserMatch,
   nextEventOf,
   nextUserMatch,
@@ -15,8 +16,10 @@ import { updateGame } from '../../store/gameStore'
 import { Button, Card, TeamBadge } from '../components/ui'
 import { formatDate, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { OUTCOME_LABELS, OUTCOME_SHORT_LABELS, SEASON_PHASE_LABELS, WINDOW_LABELS } from '../labels'
+import { BOARD_STATUS_LABELS, OUTCOME_LABELS, OUTCOME_SHORT_LABELS, SEASON_PHASE_LABELS, WINDOW_LABELS } from '../labels'
 
+const BOARD_TONE = { safe: 'text-emerald-300', warning: 'text-amber-300', danger: 'text-rose-300' } as const
+const BOARD_BAR = { safe: 'bg-emerald-500', warning: 'bg-amber-400', danger: 'bg-rose-500' } as const
 const OUTCOME_COLOR = { W: 'bg-emerald-500 text-slate-950', D: 'bg-slate-500 text-white', L: 'bg-rose-500 text-white' } as const
 
 function MatchLine({ game, match }: { game: Game; match: Match }) {
@@ -69,6 +72,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const lastOutcome = last ? outcomeFor(last, team.id) : undefined
 
   const pending = game.pendingUserMatch
+  const board = boardOf(game)
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
   const advance = () => {
@@ -124,6 +128,19 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
           </div>
         </div>
         <p className="mt-2 text-xs text-slate-400">Meta da diretoria: {team.objective.targetPosition}º lugar</p>
+      </Card>
+
+      <Card title="Diretoria">
+        <div className="flex items-baseline justify-between">
+          <span className={`text-sm font-semibold ${BOARD_TONE[board.status]}`}>{BOARD_STATUS_LABELS[board.status]}</span>
+          <span className="text-sm tabular-nums text-slate-300">{Math.round(board.confidence)}/100</span>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
+          <div className={`h-full ${BOARD_BAR[board.status]}`} style={{ width: `${board.confidence}%` }} />
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Você faz {board.pointsPerGame.toFixed(2)} pontos por jogo; a meta pede {board.targetPointsPerGame.toFixed(2)}. Abaixo do {team.objective.sackingPosition}º lugar você é demitido.
+        </p>
       </Card>
 
       {last && (
