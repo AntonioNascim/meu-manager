@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
 import { advanceGame, createGame, playPendingAuto } from '../store/game'
+import { initPwa } from '../pwa/pwa'
 import { startAutosave } from '../store/autosave'
 import { setGame } from '../store/gameStore'
 import { beginLive } from '../store/liveMatch'
@@ -29,6 +30,7 @@ if (import.meta.env.DEV) {
 }
 
 startAutosave()
+initPwa()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

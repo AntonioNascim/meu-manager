@@ -2,9 +2,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { pwaPlugin } from './tools/pwaPlugin.ts'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  // Caminhos relativos: o app funciona em qualquer pasta/endereço (e o service worker usa o escopo de onde está).
+  base: './',
+  plugins: [react(), tailwindcss(), pwaPlugin()],
   test: {
     environment: 'node',
     // PC com pouca memória (6 GB): no máximo 2 workers em paralelo.

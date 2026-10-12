@@ -12,6 +12,7 @@ import { Market } from './screens/Market'
 import { Finance } from './screens/Finance'
 import { Dashboard } from './screens/Dashboard'
 import { MatchScreen } from './screens/Match'
+import { PwaBanner } from './components/PwaBanner'
 import { Start } from './screens/Start'
 import { Squad } from './screens/Squad'
 import { Standings } from './screens/Standings'
@@ -27,7 +28,14 @@ export function App() {
   const game = useGame()
   const saveStatus = useSaveStatus()
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
-  if (!game) return <Start />
+  if (!game) {
+    return (
+      <>
+        <PwaBanner />
+        <Start />
+      </>
+    )
+  }
 
   if (game.dismissal) return <Dismissed game={game} />
 
