@@ -1,23 +1,16 @@
 import type { ReactNode } from 'react'
 import type { Team } from '../../engine/types'
+import { Crest } from '../theme'
 
-/** Escudo simples com as cores e a sigla do time. */
+/** Escudo do time (as cores e a sigla). Mantém o nome antigo; o desenho está em theme/Crest. */
 export function TeamBadge({ team, size = 'md' }: { team: Pick<Team, 'abbreviation' | 'colors'>; size?: 'sm' | 'md' | 'lg' }) {
-  const box = size === 'lg' ? 'h-16 w-16 text-lg' : size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-10 w-10 text-xs'
-  return (
-    <span
-      className={`${box} inline-flex shrink-0 items-center justify-center rounded-full border-2 font-bold`}
-      style={{ background: team.colors[0], color: team.colors[1], borderColor: team.colors[1] }}
-    >
-      {team.abbreviation}
-    </span>
-  )
+  return <Crest team={team} size={size} />
 }
 
 export function Card({ title, children, className = '', flush = false }: { title?: string; children: ReactNode; className?: string; flush?: boolean }) {
   return (
-    <section className={`overflow-hidden rounded-xl bg-slate-800 shadow ${flush ? '' : 'p-4'} ${className}`}>
-      {title && <h2 className={`text-xs font-semibold uppercase tracking-wide text-slate-400 ${flush ? 'px-3 py-2' : 'mb-2'}`}>{title}</h2>}
+    <section className={`overflow-hidden rounded-2xl border border-line bg-surface ${flush ? '' : 'p-4'} ${className}`}>
+      {title && <h2 className={`text-[11px] font-bold uppercase tracking-[0.14em] text-muted ${flush ? 'px-3 py-2' : 'mb-2'}`}>{title}</h2>}
       {children}
     </section>
   )
@@ -36,13 +29,13 @@ export function Button({
   variant?: 'primary' | 'secondary'
   className?: string
 }) {
-  const color = variant === 'primary' ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400' : 'bg-slate-700 text-slate-100 hover:bg-slate-600'
+  const color = variant === 'primary' ? 'bg-accent text-accent-ink hover:brightness-110' : 'bg-surface-2 text-slate-100 ring-1 ring-line hover:bg-slate-700'
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`min-h-12 rounded-xl px-5 font-semibold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${color} ${className}`}
+      className={`min-h-12 rounded-xl px-5 font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${color} ${className}`}
     >
       {children}
     </button>

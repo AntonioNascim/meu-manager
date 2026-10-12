@@ -98,10 +98,11 @@ export function Start() {
   if (view === 'new') return <NewGame slots={slots} onBack={() => { setView('menu'); void refresh() }} />
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-slate-900 px-4 py-8 text-slate-100">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-emerald-400">Meu Manager</h1>
-        <p className="text-sm text-slate-400">Jogo de técnico de futebol</p>
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-bg px-4 py-8 text-slate-100">
+      <div className="flex flex-col items-center gap-3 pb-3 text-center">
+        <img src="icons/icon-192.png" alt="" width={72} height={72} className="rounded-2xl" />
+        <h1 className="title text-6xl">Meu Manager</h1>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted">Jogo de técnico de futebol</p>
       </div>
 
       {view === 'menu' && (
@@ -165,8 +166,8 @@ export function Start() {
       )}
 
       <input ref={fileInput} type="file" accept=".json,application/json" className="hidden" onChange={(e) => void pickFile(e.target.files?.[0])} />
-      {message && <p className="text-center text-sm text-emerald-300">{message}</p>}
-      {error && <p className="text-center text-sm text-rose-300">{error}</p>}
+      {message && <p className="text-center text-sm text-win">{message}</p>}
+      {error && <p className="text-center text-sm text-loss">{error}</p>}
       {imported !== null && <SlotPicker title="Em qual espaço guardar o save importado?" slots={slots} onCancel={() => setImported(null)} onPick={(slot) => void finishImport(slot)} />}
     </div>
   )

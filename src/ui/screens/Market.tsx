@@ -13,13 +13,13 @@ import { Button, Card, Tabs } from '../components/ui'
 import { formatDate, formatMoney, playerName } from '../format'
 import { OFFER_KIND_LABELS, OFFER_REASON_LABELS, OFFER_STATUS_LABELS, POSITION_SHORT_LABELS, WINDOW_LABELS } from '../labels'
 
-type Tab = 'search' | 'incoming' | 'mine' | 'squad' | 'contracts'
+export type MarketTab = 'search' | 'incoming' | 'mine' | 'squad' | 'contracts'
 
 const clubName = (game: Game, id: string | null) => (id ? teamById(game, id).name : 'Livre no mercado')
 
 /** Tela de mercado: busca de jogadores, propostas feitas e propostas recebidas. */
-export function Market({ game }: { game: Game }) {
-  const [tab, setTab] = useState<Tab>('search')
+export function Market({ game, initialTab = 'search' }: { game: Game; initialTab?: MarketTab }) {
+  const [tab, setTab] = useState<MarketTab>(initialTab)
   const state = game.season
   const open = isWindowOpen(state)
   const window = windowAt(state.season, state.matches, state.season.currentDate)

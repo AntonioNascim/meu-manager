@@ -212,6 +212,8 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
 - Virada de temporada: `src/engine/offseason` (`advanceSeason`: acesso/rebaixamento, reputação, evolução, aposentadoria, contratos, base via `YouthFactory`, meta, tabela nova); a base é gerada por `src/data/generateYouth.ts`. No jogo: `startNextSeason` (botão "Encerrar a temporada"), `Game.seasonLog` e `Game.lastReport`.
 - A partida ao vivo mora em `src/store/liveMatch.ts` (o objeto do motor muda a cada passo e não faz parte do `Game`).
 
+- **Tema e painel (redesenho):** o tema fica em `src/ui/theme` (`theme.css` com as cores e fontes em `@theme`, componentes `Panel`, `Eyebrow`, `Crest`, `ResultDot`, `SegmentedBar`, `ProgressBar`, `ShortcutTile`, `BottomNav`, `Icon`). Fundo quase preto azulado, cartões mais claros, **verde-limão (`accent`) só para a ação principal e para progresso**; vitória/empate/derrota são `win`/`draw`/`loss`. Títulos em caixa alta com a fonte Barlow Condensed (classe `title`) e texto em Inter, ambas por `@fontsource` (entram no bundle e no cache offline do PWA). `theme.css` também remapeia a paleta antiga (`slate-*`, `emerald-400/500`) para as cores do tema, então as telas ainda não redesenhadas já combinam; ao redesenhar uma tela, use os tokens (`bg-surface`, `text-muted`, `border-line`) e os componentes do tema. A barra de baixo tem Clube, Elenco, Mercado, Tabela e Finanças (`NAV_TAB_OF` diz qual aba acende em Tática, Partida e Contratos). Não crie botão para função que não existe.
+
 ## Convenções
 - Componentes React pequenos e focados; lógica fica no `engine`, não nos componentes.
 - Constantes de balanceamento centralizadas em `src/engine/config.ts`.

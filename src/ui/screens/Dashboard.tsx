@@ -1,4 +1,6 @@
 import type { DepartedPlayer, MarketNotice, Match, OffseasonReport } from '../../engine/types'
+import { monthlyPayroll } from '../../engine/finance'
+import { pendingIncoming, windowAt } from '../../engine/market'
 import {
   advanceGame,
   boardOf,
@@ -6,6 +8,7 @@ import {
   lastUserMatch,
   nextEventOf,
   nextUserMatch,
+  squadOf,
   startNextSeason,
   standingsOf,
   teamById,
@@ -15,49 +18,21 @@ import {
 } from '../../store/game'
 import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
-import { Button, Card, TeamBadge } from '../components/ui'
-import { formatDate, outcomeFor } from '../format'
+import { Card } from '../components/ui'
+import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { BOARD_STATUS_LABELS, OUTCOME_LABELS, OUTCOME_SHORT_LABELS, WINDOW_LABELS } from '../labels'
+import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TIER_LABELS, WINDOW_LABELS } from '../labels'
+import { Crest, Eyebrow, Icon, Panel, ProgressBar, ResultDot, SegmentedBar, ShortcutTile } from '../theme'
 
-const BOARD_TONE = { safe: 'text-emerald-300', warning: 'text-amber-300', danger: 'text-rose-300' } as const
-const BOARD_BAR = { safe: 'bg-emerald-500', warning: 'bg-amber-400', danger: 'bg-rose-500' } as const
-const OUTCOME_COLOR = { W: 'bg-emerald-500 text-slate-950', D: 'bg-slate-500 text-white', L: 'bg-rose-500 text-white' } as const
+const BOARD_CHIP = { safe: 'border-win/40 bg-win/10 text-win', warning: 'border-amber-300/40 bg-amber-300/10 text-amber-300', danger: 'border-loss/40 bg-loss/10 text-loss' } as const
+const BAR_TONE = { safe: 'accent', warning: 'warning', danger: 'danger' } as const
 
-function MatchLine({ game, match }: { game: Game; match: Match }) {
-  const home = teamById(game, match.homeTeamId)
-  const away = teamById(game, match.awayTeamId)
-  const result = match.result
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
-        <TeamBadge team={home} size="lg" />
-        <span className="w-full truncate text-sm font-semibold">{home.name}</span>
-      </div>
-      <div className="text-center">
-        {result ? (
-          <span className="text-3xl font-bold tabular-nums">
-            {result.homeGoals} x {result.awayGoals}
-          </span>
-        ) : (
-          <span className="text-xl font-bold text-slate-400">x</span>
-        )}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
-        <TeamBadge team={away} size="lg" />
-        <span className="w-full truncate text-sm font-semibold">{away.name}</span>
-      </div>
-    </div>
-  )
-}
-
-/** Painel principal: próximo jogo, posição na tabela e o botão de avançar. */
-function noticeText(n: MarketNotice): string {
+/** Avisos de propostas (a janela de transferências tem aviso próprio, calculado pela data). */
+function noticeText(n: MarketNotice): string | null {
   switch (n.type) {
-    case 'window-opened': return `Janela de transferências aberta: ${WINDOW_LABELS[n.window]}.`
-    case 'window-last-day': return `Último dia da janela: ${WINDOW_LABELS[n.window]}.`
     case 'offer-answered': return 'Uma proposta sua foi respondida.'
     case 'offer-received': return 'Você recebeu uma proposta por um jogador.'
+    default: return null
   }
 }
 
@@ -72,8 +47,8 @@ function SeasonReport({ game, report }: { game: Game; report: OffseasonReport })
       <ul className="space-y-1 text-sm">
         <li>Campeão da Série A: <b>{name(report.champions[0] as string)}</b></li>
         <li>Campeão da Série B: <b>{name(report.champions[1] as string)}</b></li>
-        <li className="text-emerald-300">Subiram: {report.promoted.map(name).join(', ')}</li>
-        <li className="text-rose-300">Caíram: {report.relegated.map(name).join(', ')}</li>
+        <li className="text-win">Subiram: {report.promoted.map(name).join(', ')}</li>
+        <li className="text-loss">Caíram: {report.relegated.map(name).join(', ')}</li>
         {mine && <li>Seu time terminou em {mine.position}º na Série {mine.tier === 1 ? 'A' : 'B'}.</li>}
         {reputation && reputation.to !== reputation.from && <li>Reputação do clube: {reputation.from} → {reputation.to}.</li>}
         {gone(report.retired).length > 0 && <li>Aposentaram-se: {gone(report.retired).map((d) => `${d.name} (${d.age})`).join(', ')}.</li>}
@@ -84,6 +59,53 @@ function SeasonReport({ game, report }: { game: Game; report: OffseasonReport })
   )
 }
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+const inDays = (n: number) => (n <= 0 ? 'hoje' : n === 1 ? 'amanhã' : `em ${n} dias`)
+
+/** Bolinha de resultado do último jogo e placar com as siglas, no ponto de vista do mandante. */
+function LastMatchCard({ game, match }: { game: Game; match: Match }) {
+  const team = userTeam(game)
+  const home = teamById(game, match.homeTeamId)
+  const away = teamById(game, match.awayTeamId)
+  const opponent = home.id === team.id ? away : home
+  const outcome = outcomeFor(match, team.id)
+  const result = match.result
+  const competition = userCompetition(game)
+  const capacity = home.stadium.capacity
+  const income = home.id === team.id ? team.finances.ledger.find((e) => e.category === 'ticket-sales' && e.date === match.date)?.amount : undefined
+  return (
+    <Panel className="p-4">
+      <Eyebrow>Último jogo</Eyebrow>
+      <div className="mt-3 flex items-center gap-3">
+        {outcome && <ResultDot outcome={outcome} size="lg" />}
+        <div className="min-w-0 flex-1">
+          <div className="title flex items-center gap-2 text-3xl tabular-nums">
+            <span>{home.abbreviation}</span>
+            <span>{result?.homeGoals} – {result?.awayGoals}</span>
+            <span>{away.abbreviation}</span>
+          </div>
+          <div className="truncate text-sm text-muted">
+            {competition.name} · {home.id === team.id ? 'em casa' : 'fora'} contra {opponent.name}
+            {outcome && <span className="sr-only"> ({OUTCOME_LABELS[outcome]})</span>}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2 text-sm text-muted">
+        <Icon name="stadium" size={18} />
+        {match.attendance !== undefined ? (
+          <span>
+            {match.attendance.toLocaleString('pt-BR')} ({Math.round((100 * match.attendance) / capacity)}%)
+            {income !== undefined && <> · renda {formatMoney(income)}</>}
+          </span>
+        ) : (
+          <span>{formatDate(match.date)}</span>
+        )}
+      </div>
+    </Panel>
+  )
+}
+
+/** Painel principal (aba Clube): situação do time, próximo jogo e o botão de avançar, atalhos, diretoria e orçamento. */
 export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId) => void }) {
   const team = userTeam(game)
   const competition = userCompetition(game)
@@ -92,13 +114,32 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const row = table[position - 1]
   const next = nextUserMatch(game)
   const last = lastUserMatch(game)
+  const state = game.season
+  const today = state.season.currentDate
   const seasonOver = nextEventOf(game).type === 'season-end'
   const opponent = next ? teamById(game, next.homeTeamId === team.id ? next.awayTeamId : next.homeTeamId) : undefined
-  const lastOutcome = last ? outcomeFor(last, team.id) : undefined
 
   const pending = game.pendingUserMatch
   const board = boardOf(game)
   const expiring = lastYearContracts(game)
+  const incoming = pendingIncoming(state)
+  const transferWindow = windowAt(state.season, state.matches, today)
+  const offerNotices = game.notices.map(noticeText).filter((t): t is string => t !== null)
+
+  const squad = squadOf(game, team.id)
+  const byId = new Map(squad.map((p) => [p.id, p]))
+  const starters = team.tactic.startingXI.map((id) => byId.get(id)).filter((p) => p !== undefined)
+  const condition = starters.length ? Math.round(starters.reduce((sum, p) => sum + p.condition.fitness, 0) / starters.length) : 0
+
+  const finishedMine = state.matches
+    .filter((m) => m.status === 'finished' && (m.homeTeamId === team.id || m.awayTeamId === team.id))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.round - b.round)
+  const form = finishedMine.slice(-5).map((m) => outcomeFor(m, team.id)).filter((o) => o !== undefined)
+  const totalRounds = (table.length - 1) * 2
+
+  const payroll = monthlyPayroll(squad)
+  const salaryBudget = team.finances.salaryBudget
+  const when = dateParts(today)
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
   const advance = () => {
@@ -114,98 +155,185 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   return (
     <div className="space-y-3">
+      <header className="flex items-center gap-4">
+        <Crest team={team} size="xl" />
+        <div className="min-w-0 flex-1">
+          <h1 className="title line-clamp-2 text-4xl sm:text-5xl">{team.name}</h1>
+          <p className="text-sm text-muted">{TIER_LABELS[team.tier as 1 | 2] ?? competition.name} · {team.stadium.name}</p>
+        </div>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
+        <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3">
+          <Icon name="trophy" size={16} className="text-muted" />
+          {row && row.played > 0 ? `${position}º` : '–'}
+        </span>
+        <span className="inline-flex min-h-9 items-center rounded-full border border-line bg-surface px-3">{row?.points ?? 0} pts</span>
+        <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3">
+          <Icon name="calendar" size={16} className="text-muted" />
+          {row?.played ?? 0}/{totalRounds}
+        </span>
+        <span className="flex items-center gap-1" aria-label="Últimos 5 resultados">
+          {form.map((o, i) => (
+            <ResultDot key={i} outcome={o} />
+          ))}
+        </span>
+        <span className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 tabular-nums" title="Saldo em caixa">
+          <Icon name="finance" size={16} className="text-muted" />
+          {formatCompactMoney(team.finances.balance)}
+        </span>
+      </div>
+
       {game.lastReport && <SeasonReport game={game} report={game.lastReport} />}
 
+      <Panel striped cut className="p-5">
+        <div className="flex items-end gap-3">
+          <span className="title text-7xl tabular-nums">{when.day}</span>
+          <div className="pb-1.5 leading-tight">
+            <div className="title text-2xl">
+              {when.month} <span className="text-muted">{when.weekday}</span>
+            </div>
+            <div className="text-sm font-bold text-muted">{when.year}</div>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <Eyebrow>Próximo jogo</Eyebrow>
+          {next && opponent ? (
+            <>
+              <div className="mt-2 flex items-center gap-3">
+                <Crest team={opponent} size="md" />
+                <div className="min-w-0">
+                  <div className="title line-clamp-2 text-3xl">{opponent.name}</div>
+                  <div className="text-sm text-muted">
+                    {competition.name} · rodada {next.round} · {next.homeTeamId === team.id ? 'em casa' : 'fora'} · {inDays(daysBetween(today, next.date))}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-muted">
+                Força dos titulares: {teamStrength(game, team).toFixed(0)} (você) x {teamStrength(game, opponent).toFixed(0)} ({opponent.abbreviation})
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-lg font-bold">{seasonOver ? 'A temporada terminou.' : 'Sem jogos agendados.'}</p>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 text-sm text-slate-200">
+          <Icon name="heart" size={18} className="text-muted" />
+          Condição média dos titulares: <b className="tabular-nums">{condition}</b>
+        </div>
+
+        <button
+          type="button"
+          onClick={advance}
+          className="mt-5 flex min-h-14 w-full items-center justify-center rounded-xl bg-accent font-display text-2xl font-extrabold uppercase tracking-wide text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
+        >
+          {seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
+        </button>
+      </Panel>
+
+      <div className="grid grid-cols-3 gap-2">
+        <ShortcutTile icon="squad" label="Elenco" tone="sky" onClick={() => onNavigate('squad')} />
+        <ShortcutTile icon="tactics" label="Tática" tone="amber" onClick={() => onNavigate('tactics')} />
+        <ShortcutTile icon="market" label="Mercado" tone="rose" alert={incoming.length > 0} onClick={() => onNavigate('market')} />
+        <ShortcutTile icon="finance" label="Finanças" tone="teal" onClick={() => onNavigate('finance')} />
+        <ShortcutTile icon="table" label="Classificação" tone="violet" onClick={() => onNavigate('standings')} />
+        <ShortcutTile icon="contract" label="Contratos" tone="slate" alert={expiring.length > 0} onClick={() => onNavigate('contracts')} />
+      </div>
+
+      {transferWindow && (
+        <Panel glow className="p-4">
+          <div className="flex items-center gap-3">
+            <Icon name="swap" size={24} className="text-accent" />
+            <div className="min-w-0 flex-1">
+              <div className="font-bold">Janela de transferências aberta</div>
+              <div className="text-sm text-muted">
+                {WINDOW_LABELS[transferWindow.name]} · {transferWindow.end === today ? 'fecha hoje' : `fecha ${inDays(daysBetween(today, transferWindow.end))}`} ({formatDate(transferWindow.end)})
+              </div>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {(incoming.length > 0 || offerNotices.length > 0) && (
+        <Panel glow className="p-4">
+          <div className="font-bold">Mercado</div>
+          <ul className="mt-1 space-y-1 text-sm">
+            {incoming.length > 0 && <li>Você tem {plural(incoming.length, 'proposta recebida', 'propostas recebidas')} para responder.</li>}
+            {offerNotices.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+          <button type="button" className="mt-2 min-h-12 text-sm font-bold text-accent" onClick={() => onNavigate('market')}>
+            Abrir o mercado
+          </button>
+        </Panel>
+      )}
+
       {expiring.length > 0 && (
-        <Card title="Contratos no último ano">
-          <p className="text-sm">
+        <Panel glow className="p-4">
+          <div className="font-bold">Contratos no último ano</div>
+          <p className="mt-1 text-sm">
             {expiring.length} {expiring.length === 1 ? 'jogador termina' : 'jogadores terminam'} o contrato neste ano:{' '}
             {expiring.slice(0, 4).map((p) => p.nickname ?? p.name).join(', ')}{expiring.length > 4 ? ` e mais ${expiring.length - 4}` : ''}.
           </p>
-          <button type="button" className="mt-2 min-h-12 text-sm font-semibold text-emerald-400" onClick={() => onNavigate('market')}>
-            Renovar no Mercado, aba Contratos
+          <button type="button" className="mt-2 min-h-12 text-sm font-bold text-accent" onClick={() => onNavigate('contracts')}>
+            Renovar na aba Contratos
           </button>
-        </Card>
+        </Panel>
       )}
 
-      {game.notices.length > 0 && (
-        <Card title="Mercado">
-          <ul className="space-y-1 text-sm">
-            {game.notices.map((n, i) => (
-              <li key={i}>{noticeText(n)}</li>
-            ))}
-          </ul>
-          <button type="button" className="mt-2 min-h-12 text-sm font-semibold text-emerald-400" onClick={() => onNavigate('market')}>
-            Abrir o mercado
-          </button>
-        </Card>
-      )}
+      {last && <LastMatchCard game={game} match={last} />}
 
-      <Card title={`Próximo jogo${next ? ` · ${competition.name}, rodada ${next.round}` : ''}`}>
-        {next && opponent ? (
-          <>
-            <MatchLine game={game} match={next} />
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-              <span>{formatDate(next.date)}</span>
-              <span>{next.homeTeamId === team.id ? `Em casa · ${team.stadium.name}` : `Fora · ${opponent.stadium.name}`}</span>
-            </div>
-            <div className="mt-2 text-xs text-slate-400">
-              Força dos titulares: {teamStrength(game, team).toFixed(0)} (você) x {teamStrength(game, opponent).toFixed(0)} ({opponent.abbreviation})
-            </div>
-          </>
-        ) : (
-          <p className="text-slate-300">{seasonOver ? 'A temporada terminou.' : 'Sem jogos agendados.'}</p>
-        )}
-      </Card>
-
-      <Card title={`Classificação · ${competition.name}`}>
-        <div className="flex items-end justify-between">
-          <div>
-            <span className="text-4xl font-bold tabular-nums">{row && row.played > 0 ? `${position}º` : "–"}</span>
-            <span className="ml-1 text-slate-400">de {table.length}</span>
-          </div>
-          <div className="text-right text-sm text-slate-300">
-            <div className="text-2xl font-bold tabular-nums">{row?.points ?? 0} pts</div>
-            <div className="text-xs text-slate-400">
-              {row?.played ?? 0} J · {row?.wins ?? 0} V · {row?.draws ?? 0} E · {row?.losses ?? 0} D · SG {row?.goalDifference ?? 0}
-            </div>
-          </div>
+      <Panel className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <Eyebrow>Diretoria</Eyebrow>
+          <span className={`rounded-full border px-3 py-1 text-xs font-bold ${BOARD_CHIP[board.status]}`}>{BOARD_STATUS_LABELS[board.status]}</span>
         </div>
-        <p className="mt-2 text-xs text-slate-400">Meta da diretoria: {team.objective.targetPosition}º lugar</p>
-      </Card>
-
-      <Card title="Diretoria">
-        <div className="flex items-baseline justify-between">
-          <span className={`text-sm font-semibold ${BOARD_TONE[board.status]}`}>{BOARD_STATUS_LABELS[board.status]}</span>
-          <span className="text-sm tabular-nums text-slate-300">{Math.round(board.confidence)}/100</span>
+        <div className="title mt-2 text-4xl">Meta: {team.objective.targetPosition}º lugar</div>
+        <p className="text-sm text-muted">Abaixo do {team.objective.sackingPosition}º lugar você é demitido.</p>
+        <div className="mt-3 flex items-center justify-between text-sm font-bold">
+          <span className="text-accent">Hoje {row && row.played > 0 ? `${position}º` : '–'}</span>
+          <span>meta ≤ {team.objective.targetPosition}º</span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700">
-          <div className={`h-full ${BOARD_BAR[board.status]}`} style={{ width: `${board.confidence}%` }} />
+        <div className="mt-1.5">
+          <SegmentedBar
+            total={table.length}
+            lit={team.objective.targetPosition}
+            current={row && row.played > 0 ? position : undefined}
+            marker={team.objective.targetPosition}
+            label={`Posição ${position} de ${table.length}, meta ${team.objective.targetPosition}`}
+          />
         </div>
-        <p className="mt-2 text-xs text-slate-400">
-          Você faz {board.pointsPerGame.toFixed(2)} pontos por jogo; a meta pede {board.targetPointsPerGame.toFixed(2)}. Abaixo do {team.objective.sackingPosition}º lugar você é demitido.
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span className="text-muted">Confiança da diretoria</span>
+          <span className="font-bold tabular-nums">{Math.round(board.confidence)}/100</span>
+        </div>
+        <div className="mt-1.5">
+          <ProgressBar value={board.confidence} tone={BAR_TONE[board.status]} label="Confiança da diretoria" />
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Você faz {board.pointsPerGame.toFixed(2)} pontos por jogo; a meta pede {board.targetPointsPerGame.toFixed(2)}.
         </p>
-      </Card>
+      </Panel>
 
-      {last && (
-        <Card title="Último jogo">
-          <MatchLine game={game} match={last} />
-          <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-            <span>{formatDate(last.date)}</span>
-            {lastOutcome && (
-              <span className={`rounded-full px-2 py-0.5 font-bold ${OUTCOME_COLOR[lastOutcome]}`}>
-                {OUTCOME_SHORT_LABELS[lastOutcome]} · {OUTCOME_LABELS[lastOutcome]}
-              </span>
-            )}
+      <Panel className="p-4">
+        <Eyebrow>Orçamento</Eyebrow>
+        <div className="mt-3">
+          <ProgressBar value={salaryBudget > 0 ? (100 * payroll) / salaryBudget : 100} tone="striped" height="h-4" label="Folha salarial no orçamento" />
+        </div>
+        <div className="mt-2 flex items-start justify-between gap-3 text-sm">
+          <div>
+            <div className="whitespace-nowrap font-bold text-pink-300">Folha {formatCompactMoney(payroll)}</div>
+            <div className="text-xs text-muted">por mês, de {formatCompactMoney(salaryBudget)}<br />folga {formatCompactMoney(salaryBudget - payroll)}</div>
           </div>
-        </Card>
-      )}
-
-      <div className="sticky bottom-20 pt-2">
-        <Button className="w-full text-lg shadow-lg" onClick={advance}>
-          {seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
-        </Button>
-      </div>
+          <div className="text-right">
+            <div className="whitespace-nowrap font-bold text-accent">Compras {formatCompactMoney(team.finances.transferBudget)}</div>
+            <div className="text-xs text-muted">para transferências</div>
+          </div>
+        </div>
+      </Panel>
     </div>
   )
 }

@@ -1,0 +1,84 @@
+/*
+ * Tema central do jogo: fundo quase preto azulado, cartões um pouco mais claros e uma única cor neon
+ * (verde-limão) reservada para a ação principal e para progresso. Fontes por pacote (@fontsource),
+ * então funcionam offline no PWA.
+ */
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-600.css";
+@import "@fontsource/inter/latin-700.css";
+@import "@fontsource/barlow-condensed/latin-600.css";
+@import "@fontsource/barlow-condensed/latin-700.css";
+@import "@fontsource/barlow-condensed/latin-800.css";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+
+  --color-bg: #080b14;
+  --color-surface: #121828;
+  --color-surface-2: #1a2136;
+  --color-line: #262e47;
+  --color-muted: #8b94b0;
+
+  --color-accent: #d4ff2e;
+  --color-accent-ink: #11160a;
+
+  --color-win: #9cf27a;
+  --color-draw: #b4b9cc;
+  --color-loss: #f5766b;
+
+  /* Paleta antiga das telas ainda não redesenhadas: os mesmos nomes, agora nas cores do tema. */
+  --color-slate-950: #05070d;
+  --color-slate-900: #080b14;
+  --color-slate-800: #121828;
+  --color-slate-700: #202842;
+  --color-slate-600: #2f3857;
+  --color-emerald-400: #d4ff2e;
+  --color-emerald-500: #d4ff2e;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Canto superior direito cortado. */
+@utility cut-corner {
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+}
+
+/* Fundo listrado na diagonal, para os cartões de destaque. */
+@utility stripes {
+  background-color: var(--color-surface-2);
+  background-image: repeating-linear-gradient(
+    115deg,
+    transparent 0 34px,
+    rgb(255 255 255 / 0.045) 34px 68px
+  );
+}
+
+/* Listras para barras (folha salarial). */
+@utility stripes-fine {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.28) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+@utility title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+@utility cut-corner-sm {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}

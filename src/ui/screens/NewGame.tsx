@@ -40,7 +40,7 @@ export function NewGame({ slots, onBack }: { slots: (SaveSummary | null)[] | nul
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col bg-slate-900 text-slate-100">
       <header className="px-4 pb-3 pt-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-emerald-400">Meu Manager</h1>
+          <h1 className="title text-4xl">Meu Manager</h1>
           <button type="button" className="min-h-12 rounded-lg px-3 text-sm text-slate-400 hover:bg-slate-800" onClick={onBack}>
             Voltar
           </button>
@@ -67,7 +67,7 @@ export function NewGame({ slots, onBack }: { slots: (SaveSummary | null)[] | nul
             <button
               type="button"
               onClick={() => setSelected(team.id)}
-              className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${selected === team.id ? 'bg-emerald-600/30 ring-2 ring-emerald-400' : 'bg-slate-800 hover:bg-slate-700'}`}
+              className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${selected === team.id ? 'bg-accent/10 ring-2 ring-accent' : 'bg-slate-800 hover:bg-slate-700'}`}
             >
               <TeamBadge team={team} />
               <span className="min-w-0 flex-1">
@@ -85,7 +85,7 @@ export function NewGame({ slots, onBack }: { slots: (SaveSummary | null)[] | nul
         ))}
       </ul>
 
-      <footer className="fixed inset-x-0 bottom-0 border-t border-slate-700 bg-slate-900/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <footer className="fixed inset-x-0 bottom-0 border-t border-line bg-bg/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="mx-auto flex max-w-xl items-center gap-3">
           {chosen ? (
             <>
