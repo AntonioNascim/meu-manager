@@ -10,6 +10,7 @@ import { Dashboard } from './screens/Dashboard'
 import { MatchScreen } from './screens/Match'
 import { NewGame } from './screens/NewGame'
 import { Squad } from './screens/Squad'
+import { Standings } from './screens/Standings'
 import { Tactics } from './screens/Tactics'
 
 /** Em desenvolvimento, /?tela=squad abre direto numa tela (junto com ?time=). */
@@ -26,7 +27,7 @@ export function App() {
   const team = userTeam(game)
   // A aba da partida só existe enquanto o time do jogador tem um jogo por jogar.
   const hasMatch = game.pendingUserMatch !== undefined
-  const tabs: ScreenId[] = hasMatch ? ['home', 'match', 'squad', 'tactics'] : ['home', 'squad', 'tactics']
+  const tabs: ScreenId[] = hasMatch ? ['home', 'match', 'squad', 'tactics', 'standings'] : ['home', 'squad', 'tactics', 'standings']
   const current: ScreenId = screen === 'match' && !hasMatch ? 'home' : screen
 
   return (
@@ -56,6 +57,7 @@ export function App() {
         {current === 'match' && <MatchScreen game={game} onNavigate={setScreen} />}
         {current === 'squad' && <Squad game={game} />}
         {current === 'tactics' && <Tactics game={game} />}
+        {current === 'standings' && <Standings game={game} />}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-800 bg-slate-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">

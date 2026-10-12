@@ -185,6 +185,14 @@ export const MATCH_STAT_LABELS: Record<keyof TeamMatchStats, string> = {
   xg: 'Gols esperados (xG)',
 }
 
+/** Zonas da classificação. */
+export type Zone = 'promotion' | 'relegation'
+
+export const ZONE_LABELS: Record<Zone, string> = {
+  promotion: 'Zona de acesso',
+  relegation: 'Zona de rebaixamento',
+}
+
 export const SET_PIECE_LABELS: Record<'penalty' | 'free-kick', string> = {
   penalty: 'Pênaltis',
   'free-kick': 'Faltas',

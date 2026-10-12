@@ -2,13 +2,14 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
-import { advanceGame, createGame } from '../store/game'
+import { advanceGame, createGame, playPendingAuto } from '../store/game'
 import { setGame } from '../store/gameStore'
 import { beginLive } from '../store/liveMatch'
 
 // Atalhos de desenvolvimento (só com `npm run dev`):
 //   /?time=imp&semente=7       começa o jogo com o time (sigla de 3 letras)
 //   &tela=squad|tactics|match  abre direto numa tela
+//   &dias=10                   joga 10 dias de jogos antes (a partida do time é simulada)
 //   &jogo=1                    avança até a partida do time
 //   &minuto=60                 e deixa a partida ao vivo parada nesse minuto
 if (import.meta.env.DEV) {
@@ -16,6 +17,7 @@ if (import.meta.env.DEV) {
   const team = params.get('time')
   if (team) {
     let game = createGame(Number(params.get('semente') ?? 1), `team-${team.toLowerCase()}`)
+    for (let i = 0; i < Number(params.get('dias') ?? 0); i++) game = playPendingAuto(advanceGame(game))
     if (params.get('jogo')) {
       while (!game.pendingUserMatch && game.season.matches.some((m) => m.status === 'scheduled')) game = advanceGame(game)
       const minute = params.get('minuto')
