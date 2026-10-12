@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "description": "Jogo de técnico de futebol",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --project unit",
+    "test:balance": "vitest run --project balance",
+    "test:all": "vitest run",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test:watch": "vitest",
+    "test:watch": "vitest --project unit",
     "typecheck": "tsc -b --noEmit"
   },
   "type": "module",

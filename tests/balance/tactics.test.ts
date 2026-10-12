@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { generateWorld } from '../src/data/generateWorld'
-import { MATCH } from '../src/engine/config'
-import { buildTactic } from '../src/engine/lineup'
-import { simulateMatch } from '../src/engine/match'
-import type { MatchInput, MatchSideInput } from '../src/engine/match'
-import { crowdFill, homeFactor } from '../src/engine/match/state'
-import type { MatchResult, Mentality, Player, PlayStyle, Team, Tactic } from '../src/engine/types'
+import { generateWorld } from '../../src/data/generateWorld'
+import { MATCH } from '../../src/engine/config'
+import { buildTactic } from '../../src/engine/lineup'
+import { simulateMatch } from '../../src/engine/match'
+import type { MatchInput, MatchSideInput } from '../../src/engine/match'
+import { crowdFill, homeFactor } from '../../src/engine/match/state'
+import type { MatchResult, Mentality, Player, PlayStyle, Team, Tactic } from '../../src/engine/types'
 
 const world = generateWorld({ seed: 77 })
 const team = (abbr: string) => world.teams.find((t) => t.abbreviation === abbr) as Team
@@ -123,8 +123,9 @@ describe('estilo de jogo', () => {
     expect(possessionOf(possession)).toBeGreaterThan(possessionOf(counter) + 5)
   })
 
-  it('contra-ataque cria chances de mais qualidade (mais cara a cara) que a posse', () => {
-    expect(xgPerShot(counter, 'home')).toBeGreaterThan(xgPerShot(possession, 'home') * 1.05)
+  it('contra-ataque é mais eficiente com a bola que tem: mais xG por posse que a posse', () => {
+    const xgPerPossession = (rs: MatchResult[]) => avg(rs.map((r) => r.homeStats.xg)) / possessionOf(rs)
+    expect(xgPerPossession(counter)).toBeGreaterThan(xgPerPossession(possession) * 1.1)
   })
 
   it('pressão alta recupera mais a bola, mas cede chances melhores ao rival', () => {

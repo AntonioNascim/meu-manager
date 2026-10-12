@@ -53,7 +53,7 @@ const VETERAN_AGE = 32
 const PROSPECT_MAX_AGE = 20
 
 /** Variação do nível entre times de mesma reputação (pontos de força). */
-const TEAM_LEVEL_SD = 1.75
+const TEAM_LEVEL_SD = 1
 
 /** Força média esperada dos 11 titulares, a partir da série e da reputação (1 a 20) do time. */
 export function teamLevelFor(def: Pick<TeamDefinition, 'tier' | 'reputation'>): number {

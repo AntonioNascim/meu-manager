@@ -7,6 +7,26 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+    projects: [
+      {
+        // npm test: testes rápidos (regras, geração, consistência do motor)
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+          exclude: ['tests/balance/**'],
+        },
+      },
+      {
+        // npm run test:balance: milhares de partidas e temporadas inteiras
+        extends: true,
+        test: {
+          name: 'balance',
+          include: ['tests/balance/**/*.test.ts'],
+          testTimeout: 600_000,
+          hookTimeout: 600_000,
+        },
+      },
+    ],
   },
 })

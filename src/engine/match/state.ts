@@ -62,6 +62,8 @@ export interface PitchPlayer {
   fitFactor: number
   /** Multiplicador do lado (fator casa para o mandante, 1 para o visitante). */
   sideFactor: number
+  /** Moral × forma × "dia" (consistência), sorteado quando o jogador entra em campo. */
+  dayFactor: number
   minuteOn: number
   /** Minuto em que saiu (substituição, expulsão, lesão); `null` = em campo. */
   minuteOff: number | null
@@ -88,7 +90,9 @@ export interface SideState {
   style: PlayStyle
   /** Mentalidade escolhida na tática. */
   baseMentality: Mentality
-  /** Mentalidade em vigor no momento (a escolhida + ajuste conforme o placar). */
+  /** Níveis de mentalidade a menos por ser bem mais fraco que o rival (IA). */
+  underdogShift: number
+  /** Mentalidade em vigor no momento (a escolhida − recuo de azarão + ajuste conforme o placar). */
   mentality: number
   /** Multiplicador de atributos deste lado (fator casa). */
   sideFactor: number
@@ -135,6 +139,7 @@ export function createPitchPlayer(
   sector: Sector,
   minuteOn: number,
   sideFactor = 1,
+  dayFactor = 1,
 ): PitchPlayer {
   return {
     player,
@@ -143,6 +148,7 @@ export function createPitchPlayer(
     fitness: player.condition.fitness,
     fitFactor: 1 - (1 - positionFit(player, slot)) * MATCH.improvisationWeight,
     sideFactor,
+    dayFactor,
     minuteOn,
     minuteOff: null,
     yellowCards: 0,
@@ -163,7 +169,32 @@ export function homeFactor(team: Team, attendance?: number): number {
   return 1 + MATCH.home.base + MATCH.home.crowd * crowdFill(team, attendance)
 }
 
-export function buildSide(input: MatchSideInput, sideFactor = 1): SideState {
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+/** Efeito da moral (0–100) nos atributos. */
+export function moraleFactor(morale: number): number {
+  const { neutral, effect } = MATCH.modifiers.morale
+  return 1 + (effect * (morale - neutral)) / 30
+}
+
+/** Efeito da forma (média das últimas notas; 0 = ainda não jogou) nos atributos. */
+export function formFactor(form: number): number {
+  if (form <= 0) return 1
+  const { neutral, perPoint, maxEffect } = MATCH.modifiers.form
+  return 1 + clamp((form - neutral) * perPoint, -maxEffect, maxEffect)
+}
+
+/**
+ * Rendimento do jogador nesta partida: moral × forma × "dia" sorteado.
+ * Quanto menor a consistência, mais o dia varia (para cima ou para baixo).
+ */
+export function dayFactorFor(rng: Rng, player: Player): number {
+  const sd = MATCH.modifiers.consistency.maxSd * (1 - player.hidden.consistency / 100)
+  const day = 1 + clamp(rng.normal(0, sd), -3 * sd, 3 * sd)
+  return moraleFactor(player.condition.morale) * formFactor(player.condition.form) * day
+}
+
+export function buildSide(input: MatchSideInput, sideFactor: number, rng: Rng): SideState {
   const { team } = input
   const byId = new Map(input.players.map((p) => [p.id, p]))
   const formation = getFormation(team.tactic.formationId)
@@ -172,7 +203,7 @@ export function buildSide(input: MatchSideInput, sideFactor = 1): SideState {
     throw new Error(`Escalação inválida para ${team.name}`)
   }
   const players = formation.slots.map((slot, i) =>
-    createPitchPlayer(xi[i] as Player, slot.position, slot.sector, 0, sideFactor),
+    createPitchPlayer(xi[i] as Player, slot.position, slot.sector, 0, sideFactor, dayFactorFor(rng, xi[i] as Player)),
   )
   const bench = team.tactic.bench
     .map((id) => byId.get(id))
@@ -183,6 +214,7 @@ export function buildSide(input: MatchSideInput, sideFactor = 1): SideState {
     formation,
     style: team.tactic.style,
     baseMentality: team.tactic.mentality,
+    underdogShift: 0,
     mentality: team.tactic.mentality,
     sideFactor,
     players,
@@ -217,10 +249,11 @@ export function fitnessFactor(name: AttributeName, fitness: number): number {
 }
 
 /**
- * Atributo efetivo usado nos duelos: valor bruto × posição improvisada × fator casa × condição física.
+ * Atributo efetivo usado nos duelos: valor bruto × posição improvisada × fator casa
+ * × moral/forma/consistência × condição física.
  */
 export function attr(p: PitchPlayer, name: AttributeName): number {
-  return p.player.attributes[name] * p.fitFactor * p.sideFactor * fitnessFactor(name, p.fitness)
+  return p.player.attributes[name] * p.fitFactor * p.sideFactor * p.dayFactor * fitnessFactor(name, p.fitness)
 }
 
 /** Sorteia um jogador em campo pelo peso da posição; ignora o goleiro e quem estiver em `exclude`. */

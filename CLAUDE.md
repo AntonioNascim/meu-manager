@@ -115,6 +115,10 @@ Pontuação de cada lado = média ponderada dos atributos envolvidos × modifica
 - **Formação:** define quantos jogadores entram em cada setor/duelo.
 - Toda opção tática precisa ter um custo.
 
+### Comportamento da IA durante a partida
+O motor hoje ajusta sozinho, para os dois times: trocas por cansaço (a partir dos 60'), postura conforme o placar na reta final (quem vence recua, quem perde ataca) e postura de azarão (time bem mais fraco que o rival entra mais defensivo).
+- **Etapa 6 (pendente):** o motor precisa de uma opção na entrada da partida para a IA **não alterar a tática do time controlado pelo jogador** (nem mentalidade, nem substituições por cansaço); esse time só muda quando o jogador mandar (intervalo, substituições). Os testes de balanceamento continuam com IA nos dois lados.
+
 ### Nota do jogador
 Parte de 6,0 e soma/subtrai por ações (gols, assistências, desarmes, erros, defesas, cartões).
 
@@ -123,7 +127,11 @@ Parte de 6,0 e soma/subtrai por ações (gols, assistências, desarmes, erros, d
 - mandante vence ~45–50%, empates ~25–30%
 - ~12 finalizações por time por jogo
 
-Criar testes de balanceamento que simulem temporadas inteiras e verifiquem esses intervalos.
+Metas por temporada da Série A (temporada média; cada temporada isolada varia por sorte):
+- campeão com ~70 a 82 pontos
+- empates entre 24% e 30%
+
+Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e temporadas inteiras e verificam esses intervalos. Não reduzir o `k` do duelo para atingir as metas: os atributos precisam continuar pesando.
 
 ---
 
@@ -182,5 +190,8 @@ Criar testes de balanceamento que simulem temporadas inteiras e verifiquem esses
 ## Convenções
 - Componentes React pequenos e focados; lógica fica no `engine`, não nos componentes.
 - Constantes de balanceamento centralizadas em `src/engine/config.ts`.
-- Rodar os testes depois de qualquer mudança no motor.
+- Rodar os testes depois de qualquer mudança no motor:
+  - `npm test`: testes rápidos (regras, geração, consistência do motor), poucos segundos.
+  - `npm run test:balance`: balanceamento e experimentos estatísticos (milhares de partidas, temporadas inteiras; ~30 s). Obrigatório depois de mexer em `config.ts`, no motor de partida ou na geração.
+  - `npm run test:all`: os dois.
 - Interface pensada primeiro para celular.

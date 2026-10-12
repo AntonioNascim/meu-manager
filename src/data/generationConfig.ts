@@ -8,7 +8,7 @@ export const GENERATION = {
    * `base` na reputação de referência, somando `perReputation` por ponto acima dela.
    */
   teamLevel: {
-    1: { base: 62, referenceReputation: 7, perReputation: 0.95 },
+    1: { base: 62, referenceReputation: 7, perReputation: 0.4 },
     2: { base: 47, referenceReputation: 3, perReputation: 2.2 },
   },
   /** Desvio padrão do talento individual em torno do nível do time. */
@@ -22,7 +22,7 @@ export const GENERATION = {
   star: {
     minReputation: 12,
     /** Chance por titular no time de reputação máxima (19); cai linearmente até `minReputation`. */
-    maxChance: 0.07,
+    maxChance: 0.05,
     bonusMin: 8,
     bonusMax: 14,
   },

@@ -43,7 +43,7 @@ export const MATCH = {
    */
   duelK: 0.037,
   /** Chance de a posse chegar ao terço final e virar jogada (o resto é troca de passes sem perigo). */
-  attackRate: 0.52,
+  attackRate: 0.55,
   /** Substituições permitidas por time. */
   maxSubs: 5,
 
@@ -107,13 +107,13 @@ export const MATCH = {
   },
 
   /** xG base por tipo de finalização. */
-  xg: { longShot: 0.035, inBox: 0.121, header: 0.09, oneOnOne: 0.38, penalty: 0.76, freeKick: 0.06 } satisfies Record<ShotType, number>,
+  xg: { longShot: 0.035, inBox: 0.141, header: 0.096, oneOnOne: 0.41, penalty: 0.76, freeKick: 0.06 } satisfies Record<ShotType, number>,
   /** Chance de a finalização ser bloqueada antes de chegar ao goleiro. */
   blockChance: { longShot: 0.25, inBox: 0.2, header: 0.05, oneOnOne: 0, penalty: 0, freeKick: 0.3 } satisfies Record<ShotType, number>,
   /** Quando não é gol (nem bloqueio): chance de ir no alvo (defesa do goleiro). */
   onTargetIfMissed: { longShot: 0.35, inBox: 0.45, header: 0.4, oneOnOne: 0.6, penalty: 0.6, freeKick: 0.35 } satisfies Record<ShotType, number>,
   /** Sensibilidade da finalização: e^(shotK × (finalizador − goleiro)) multiplica o xG. */
-  shotK: 0.02,
+  shotK: 0.016,
   maxGoalChance: 0.95,
 
   corner: { afterBlock: 0.45, afterSave: 0.35, afterLostCross: 0.35, afterLostHeader: 0.3 },
@@ -139,9 +139,9 @@ export const MATCH = {
   /** Fator casa: multiplica todos os atributos do mandante. Cresce com a lotação do estádio. */
   home: {
     /** Vantagem com estádio vazio. */
-    base: 0.025,
+    base: 0.05,
     /** Vantagem extra com estádio cheio (proporcional à ocupação). */
-    crowd: 0.055,
+    crowd: 0.025,
     /** Fração da torcida que vai ao jogo (estimativa de público até existir bilheteria). */
     fanTurnout: 0.012,
     minFill: 0.2,
@@ -151,7 +151,7 @@ export const MATCH = {
   fatigue: {
     /** Queda por momento para resistência 50 (escala: (1,5 − resistência/100)). */
     perMoment: 0.3,
-    style: { possession: 0.9, 'counter-attack': 1, 'high-press': 1.3 } satisfies Record<PlayStyle, number>,
+    style: { possession: 0.9, 'counter-attack': 1, 'high-press': 1.2 } satisfies Record<PlayStyle, number>,
     /** Cada nível de mentalidade ofensiva cansa um pouco mais. */
     perMentality: 0.05,
     /** Com condição 0, atributos físicos caem até este fator; os demais até `otherFloor`. */
@@ -176,26 +176,43 @@ export const MATCH = {
     },
     counter: {
       /** Abre mão da bola... */
-      control: -7,
+      control: -5,
       /** ...mas, ao recuperá-la, sai em transição rápida. */
-      transitionChance: 0.5,
-      transitionProgression: 0.5,
-      transitionOneOnOne: 0.9,
+      transitionChance: 0.3,
+      transitionProgression: 0.3,
+      transitionOneOnOne: 0.7,
     },
     highPress: {
       /** Recupera a bola mais alto... */
-      press: 7,
+      press: 9,
       /** ...e deixa espaço nas costas (passe em profundidade e cara a cara do rival). */
       spaceBehind: 0.4,
     },
-    /** Mentalidade (−2 a +2): muda a frequência de ataques e o espaço deixado atrás. */
-    /** `control`: pontos de controle do meio por nível (quem recua cede a bola). */
-    mentality: { attackRate: 0.08, openness: 0.12, control: 2.5 },
+    /**
+     * Mentalidade (−2 a +2): muda a frequência de ataques, o espaço deixado atrás e
+     * o controle do meio (`control`, pontos por nível: quem recua cede a bola).
+     */
+    mentality: { attackRate: 0.08, openness: 0.2, control: 2.5 },
     /**
      * Comportamento conforme o placar (IA): a partir de `fromMinute`, quem vence recua
      * (`shift` níveis de mentalidade a menos) e quem perde se lança ao ataque.
      */
     gameState: { fromMinute: 65, shift: 2 },
+    /**
+     * Time bem mais fraco recua (IA): a cada `gap` pontos de força média dos titulares
+     * abaixo do rival (já com fator casa), um nível de mentalidade a menos, até `maxShift`.
+     */
+    underdog: { gap: 3, maxShift: 2 },
+  },
+
+  /** Moral, forma e consistência: efeitos pequenos, multiplicam todos os atributos. */
+  modifiers: {
+    /** Moral 0–100: cada 30 pontos acima/abaixo do neutro valem `effect`. */
+    morale: { neutral: 70, effect: 0.02 },
+    /** Forma (média das últimas notas, 0 = sem jogos): `perPoint` por ponto de nota acima/abaixo do neutro. */
+    form: { neutral: 6.5, perPoint: 0.015, maxEffect: 0.03 },
+    /** Consistência 1–100: variação do "dia" do jogador; consistência 0 tem desvio `maxSd`, 100 não varia. */
+    consistency: { maxSd: 0.14 },
   },
 
   /** Formação: número de jogadores por setor (referência: 4 no meio e na defesa, 2 no ataque). */

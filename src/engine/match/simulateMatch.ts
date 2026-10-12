@@ -20,6 +20,7 @@ import {
   attr,
   buildSide,
   createPitchPlayer,
+  dayFactorFor,
   displayName,
   goalkeeperOf,
   homeFactor,
@@ -34,11 +35,13 @@ export function simulateMatch(input: MatchInput): MatchResult {
   const ctx: MatchContext = {
     rng,
     textRng: rng.fork('narration'),
-    home: buildSide(input.home, homeFactor(input.home.team, input.attendance)),
-    away: buildSide(input.away),
+    home: buildSide(input.home, homeFactor(input.home.team, input.attendance), rng),
+    away: buildSide(input.away, 1, rng),
     minute: 0,
     events: [],
   }
+  applyUnderdogPosture(ctx.home, ctx.away)
+  applyUnderdogPosture(ctx.away, ctx.home)
 
   for (let i = 0; i < MATCH.moments; i++) {
     ctx.minute = Math.min(MATCH_MINUTES, 1 + Math.floor((i * MATCH_MINUTES) / MATCH.moments))
@@ -142,8 +145,24 @@ function updateGameState(ctx: MatchContext): void {
   ] as const) {
     const diff = side.goals - other.goals
     const adjust = ctx.minute < fromMinute || diff === 0 ? 0 : diff > 0 ? -shift : shift
-    side.mentality = Math.max(-2, Math.min(2, side.baseMentality + adjust))
+    side.mentality = Math.max(-2, Math.min(2, side.baseMentality - side.underdogShift + adjust))
   }
+}
+
+/** Força média dos titulares como o técnico vê (posição e fator casa; sem o "dia" de cada um). */
+function lineupStrength(side: SideState): number {
+  return mean(activePlayers(side).map((p) => overallAt(p.player, p.slot) * p.sideFactor))
+}
+
+/** IA: quantos níveis de mentalidade um time recua por ser bem mais fraco que o rival. */
+export function underdogShiftFor(side: SideState, opponent: SideState): number {
+  const { gap, maxShift } = MATCH.tactics.underdog
+  const deficit = lineupStrength(opponent) - lineupStrength(side)
+  return Math.max(0, Math.min(maxShift, Math.floor(deficit / gap)))
+}
+
+function applyUnderdogPosture(side: SideState, opponent: SideState): void {
+  side.underdogShift = underdogShiftFor(side, opponent)
 }
 
 /** Quem joga no contra-ataque, ao recuperar a bola, pode sair em transição rápida. */
@@ -541,7 +560,9 @@ function substitute(
   side.bench = side.bench.filter((p) => p !== incoming)
   side.subsLeft--
   const sector = slot === 'GK' ? 'defense' : outgoing.sector
-  side.players.push(createPitchPlayer(incoming, slot, sector, ctx.minute, side.sideFactor))
+  side.players.push(
+    createPitchPlayer(incoming, slot, sector, ctx.minute, side.sideFactor, dayFactorFor(ctx.rng, incoming)),
+  )
   addEvent(
     ctx,
     side,
