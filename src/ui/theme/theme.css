@@ -144,3 +144,42 @@ body {
   border: 3px solid var(--color-accent);
   cursor: pointer;
 }
+
+/* Campo 2D da partida: marcação que aparece com um "pop" e jogador que entra em campo. */
+@keyframes pitch-pop {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pitch-mark {
+  animation: pitch-pop 0.35s ease-out;
+}
+
+@keyframes pitch-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.pitch-player {
+  animation: pitch-in 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pitch-mark,
+  .pitch-player {
+    animation: none;
+  }
+}

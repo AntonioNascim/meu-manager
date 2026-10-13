@@ -115,6 +115,28 @@ export interface SideState {
   tally: TeamTally
 }
 
+/**
+ * Rastro de um momento de posse, só para a tela desenhar o campo: quem tinha a bola, quem marcou, para quem foi o
+ * passe ou o cruzamento e como terminou. O motor apenas anota o que já decidiu; nada aqui entra em nenhuma conta
+ * nem consome sorteio (os resultados são idênticos com ou sem o rastro: tests/matchGolden.test.ts).
+ */
+export interface PlayTrace {
+  minute: number
+  /** Time com a bola. */
+  side: 'home' | 'away'
+  /** Transição rápida depois de recuperar a bola (contra-ataque). */
+  transition: boolean
+  /** 'held' = o time só ficou com a bola no meio e não chegou a atacar. */
+  play: 'held' | 'dribble' | 'through' | 'cross' | 'long-shot'
+  carrierId?: string
+  /** Marcador, interceptador ou zagueiro que ganhou o duelo. */
+  markerId?: string
+  /** Alvo do passe em profundidade ou do cruzamento. */
+  receiverId?: string
+  outcome?: 'won' | 'lost' | 'foul' | 'intercepted'
+  shot?: { shooterId: string; type: string; assisterId?: string; keeperId?: string; result: 'goal' | 'saved' | 'off-target' | 'blocked' }
+}
+
 export interface MatchContext {
   rng: Rng
   /** Gerador separado para os textos: mudar a narração não muda resultados. */
@@ -123,6 +145,10 @@ export interface MatchContext {
   away: SideState
   minute: number
   events: MatchEvent[]
+  /** Rastro dos lances (só leitura, para o campo 2D). */
+  trace: PlayTrace[]
+  /** Momento em andamento. */
+  current?: PlayTrace
 }
 
 export const emptyTally = (): PlayerTally => ({

@@ -20,6 +20,7 @@ import {
   POSITION_SHORT_LABELS,
 } from '../labels'
 import type { ScreenId } from '../navigation'
+import { Pitch } from './match/Pitch'
 
 const SPEEDS = [1, 2, 4, 8] as const
 /** Duração de um minuto de jogo na velocidade 1x (ms). */
@@ -266,12 +267,53 @@ function SubsPanel({ game, live, side, canEdit, refresh }: { game: Game; live: L
 }
 
 type LiveTab = 'log' | 'stats' | 'tactics' | 'subs'
+type LiveView = 'field' | 'log'
+
+const VIEW_KEY = 'meu-manager:partida-vista'
+
+/** Preferência entre ver o campo ou só os lances (guardada no aparelho; sem armazenamento, volta ao campo). */
+export function readView(): LiveView {
+  try {
+    return window.localStorage.getItem(VIEW_KEY) === 'log' ? 'log' : 'field'
+  } catch {
+    return 'field'
+  }
+}
+
+export function writeView(view: LiveView): void {
+  try {
+    window.localStorage.setItem(VIEW_KEY, view)
+  } catch {
+    /* sem armazenamento: a escolha vale só nesta sessão */
+  }
+}
+
+/** Tela larga (computador): os lances ficam numa coluna ao lado, como na referência. */
+function useDesktop(): boolean {
+  const query = '(min-width: 1024px)'
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches)
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const media = window.matchMedia(query)
+    const on = () => setWide(media.matches)
+    media.addEventListener('change', on)
+    return () => media.removeEventListener('change', on)
+  }, [])
+  return wide
+}
 
 function LiveView({ game, live, autoStart, onNavigate }: { game: Game; live: LiveSession; autoStart: boolean; onNavigate: (s: ScreenId) => void }) {
   const [snap, setSnap] = useState(() => live.match.snapshot())
   const [running, setRunning] = useState(autoStart)
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(2)
+  const desktop = useDesktop()
   const [tab, setTab] = useState<LiveTab>('log')
+  const [view, setView] = useState<LiveView>(readView)
+  const chooseView = (v: LiveView) => {
+    setView(v)
+    writeView(v)
+  }
+  const shownTab: LiveTab = desktop && tab === 'log' ? 'stats' : tab
   const refresh = () => setSnap(live.match.snapshot())
 
   useEffect(() => {
@@ -315,10 +357,23 @@ function LiveView({ game, live, autoStart, onNavigate }: { game: Game; live: Liv
   }
 
   return (
-    <div className="space-y-3">
-      <div className="sticky top-[57px] z-10 -mx-4 bg-slate-900/95 px-4 pb-2 pt-1 backdrop-blur">
+    <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 lg:space-y-0">
+      <div className="space-y-3">
+      <div className="sticky top-[57px] z-10 -mx-4 bg-slate-900/95 px-4 pb-2 pt-1 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0">
         <Scoreboard game={game} snap={snap} label={label} />
       </div>
+
+      <div className="flex items-center justify-between gap-2" role="group" aria-label="Como ver a partida">
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Ao vivo</span>
+        <div className="flex gap-1 rounded-full border border-line bg-surface p-1">
+          {([['field', 'Campo'], ['log', 'Só lances']] as const).map(([id, text]) => (
+            <button key={id} type="button" aria-pressed={view === id} onClick={() => chooseView(id)} className={`min-h-9 rounded-full px-4 text-sm font-bold ${view === id ? 'bg-accent text-accent-ink' : 'text-muted'}`}>
+              {text}
+            </button>
+          ))}
+        </div>
+      </div>
+      {view === 'field' && <Pitch game={game} snap={snap} speed={speed} running={running} />}
 
       {finished ? (
         <Button className="w-full text-lg" onClick={conclude}>
@@ -352,20 +407,28 @@ function LiveView({ game, live, autoStart, onNavigate }: { game: Game; live: Liv
       )}
 
       <Tabs
-        value={tab}
+        value={shownTab}
         options={[
-          { id: 'log', label: 'Lances' },
-          { id: 'stats', label: 'Dados' },
-          { id: 'tactics', label: 'Tática' },
-          { id: 'subs', label: 'Trocas' },
+          ...(desktop ? [] : [{ id: 'log' as LiveTab, label: 'Lances' }]),
+          { id: 'stats' as LiveTab, label: 'Dados' },
+          { id: 'tactics' as LiveTab, label: 'Tática' },
+          { id: 'subs' as LiveTab, label: 'Trocas' },
         ]}
         onChange={setTab}
       />
 
-      {tab === 'log' && <LogList game={game} lines={lines} showFouls={showFouls} onToggleFouls={() => setShowFouls((v) => !v)} />}
-      {tab === 'stats' && <StatsList game={game} snap={snap} />}
-      {tab === 'tactics' && <TacticPanel live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} />}
-      {tab === 'subs' && <SubsPanel game={game} live={live} side={mySide} canEdit={canEdit} refresh={refresh} />}
+      {shownTab === 'log' && <LogList game={game} lines={lines} showFouls={showFouls} onToggleFouls={() => setShowFouls((v) => !v)} />}
+      {shownTab === 'stats' && <StatsList game={game} snap={snap} />}
+      {shownTab === 'tactics' && <TacticPanel live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} />}
+      {shownTab === 'subs' && <SubsPanel game={game} live={live} side={mySide} canEdit={canEdit} refresh={refresh} />}
+      </div>
+
+      {desktop && (
+        <aside className="max-h-[calc(100dvh-140px)] overflow-y-auto lg:sticky lg:top-16" aria-label="Lances ao vivo">
+          <h2 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Lances ao vivo</h2>
+          <LogList game={game} lines={lines} showFouls={showFouls} onToggleFouls={() => setShowFouls((v) => !v)} />
+        </aside>
+      )}
     </div>
   )
 }

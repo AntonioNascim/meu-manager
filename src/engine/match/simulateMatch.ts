@@ -28,7 +28,7 @@ import {
   homeFactor,
   pickByPosition,
 } from './state'
-import type { MatchContext, MatchInput, PitchPlayer, SideState } from './state'
+import type { MatchContext, MatchInput, PitchPlayer, PlayTrace, SideState } from './state'
 
 const MATCH_MINUTES = 90
 
@@ -74,6 +74,8 @@ export interface MatchSnapshot {
   homeGoals: number
   awayGoals: number
   events: MatchEvent[]
+  /** Rastro dos momentos de posse, na ordem (só leitura: serve para desenhar o campo). */
+  trace: PlayTrace[]
   homeStats: TeamMatchStats
   awayStats: TeamMatchStats
   home: SideSnapshot
@@ -113,6 +115,7 @@ export function startMatch(input: MatchInput): LiveMatch {
     away: buildSide(input.away, 1, rng, input.userControlled?.away),
     minute: 0,
     events: [],
+    trace: [],
   }
   applyUnderdogPosture(ctx.home, ctx.away)
   applyUnderdogPosture(ctx.away, ctx.home)
@@ -164,6 +167,7 @@ export function startMatch(input: MatchInput): LiveMatch {
         homeGoals: ctx.home.goals,
         awayGoals: ctx.away.goals,
         events: [...ctx.events],
+        trace: [...ctx.trace],
         homeStats: teamStats(ctx.home, homeShare),
         awayStats: teamStats(ctx.away, 100 - homeShare),
         home: snapshotSide(ctx.home),
@@ -383,8 +387,15 @@ export function homePossessionChance(home: SideState, away: SideState): number {
 // 2. Progressão
 // ---------------------------------------------------------------------------
 
+/** Anota no rastro do momento em andamento (só leitura; não mexe em nada do jogo). */
+function mark(ctx: MatchContext, patch: Partial<PlayTrace>): void {
+  if (ctx.current) Object.assign(ctx.current, patch)
+}
+
 function playMoment(ctx: MatchContext, att: SideState, def: SideState, transition = false): void {
   const { rng } = ctx
+  ctx.current = { minute: ctx.minute, side: att === ctx.home ? 'home' : 'away', transition, play: 'held' }
+  ctx.trace.push(ctx.current)
   // Transição de contra-ataque é um lance rápido: não conta como momento de posse.
   if (!transition) att.tally.possession++
 
@@ -400,18 +411,21 @@ function playMoment(ctx: MatchContext, att: SideState, def: SideState, transitio
 
   const carrier = pickByPosition(rng, att, MATCH.carrierWeight)
   if (!carrier) return
+  mark(ctx, { carrierId: carrier.player.id })
   const typeWeights = MATCH.playTypeWeight[carrier.slot]
   const styleWeights: Partial<Record<PlayType, number>> = att.style === 'possession' ? MATCH.tactics.possession.playType : {}
   // Em transição não há tempo para chutar de longe ou cruzar: é passe em profundidade ou drible.
   const types = (Object.keys(typeWeights) as PlayType[]).filter((t) => !transition || t === 'through' || t === 'dribble')
   const type = rng.weighted(types, (t) => typeWeights[t] * (styleWeights[t] ?? 1))
 
+  mark(ctx, { play: type === 'longShot' ? 'long-shot' : type })
   if (type === 'longShot') {
     shoot(ctx, att, def, carrier, 'longShot')
     return
   }
 
   const marker = pickByPosition(rng, def, MATCH.markerWeight[carrier.slot], MATCH.markerFallbackWeight)
+  if (marker) mark(ctx, { markerId: marker.player.id })
   if (!marker) {
     shoot(ctx, att, def, carrier, 'oneOnOne')
     return
@@ -439,7 +453,9 @@ function dribble(
 
   if (rng.chance(duelChance(attack, defense, offset))) {
     carrier.tally.dribblesWon++
+    mark(ctx, { outcome: 'won' })
     if (rng.chance(MATCH.foul.onBeaten)) {
+      mark(ctx, { outcome: 'foul' })
       commitFoul(ctx, def, att, marker, carrier, isAttacker(carrier))
       return
     }
@@ -454,7 +470,9 @@ function dribble(
   }
 
   carrier.tally.dribblesLost++
+  mark(ctx, { outcome: 'lost' })
   if (rng.chance(MATCH.foul.onFailedDribble)) {
+    mark(ctx, { outcome: 'foul' })
     commitFoul(ctx, def, att, marker, carrier, isAttacker(carrier))
     return
   }
@@ -469,6 +487,7 @@ function throughBall(ctx: MatchContext, att: SideState, def: SideState, passer: 
     shoot(ctx, att, def, passer, 'longShot')
     return
   }
+  mark(ctx, { receiverId: receiver.player.id })
   const defenders = activePlayers(def).filter((p) => p.sector === 'defense' && p.slot !== 'GK')
   const line = defenders.length > 0 ? defenders : activePlayers(def)
   const lineReading = mean(line.map((p) => attr(p, 'positioning')))
@@ -481,11 +500,13 @@ function throughBall(ctx: MatchContext, att: SideState, def: SideState, passer: 
     // Passe interceptado pela defesa.
     const interceptor = rng.pick(line)
     interceptor.tally.tacklesWon++
+    mark(ctx, { outcome: 'intercepted', markerId: interceptor.player.id })
     maybeCounter(ctx, def, att, transition)
     return
   }
 
   passer.tally.keyPasses++
+  mark(ctx, { outcome: 'won' })
   const runner = (attr(receiver, 'pace') + attr(receiver, 'decisions')) / 2
   const cover = mean(line.map((p) => (attr(p, 'pace') + attr(p, 'positioning')) / 2))
   const oneOnOne = rng.chance(duelChance(runner, cover, MATCH.offset.oneOnOne + oneOnOneOffset(att, def, transition)))
@@ -505,6 +526,7 @@ function cross(
   if (!rng.chance(duelChance(attr(crosser, 'crossing'), attr(marker, 'positioning'), offset))) {
     // Cruzamento travado.
     marker.tally.tacklesWon++
+    mark(ctx, { outcome: 'lost' })
     if (rng.chance(MATCH.corner.afterLostCross)) corner(ctx, att, def)
     else maybeCounter(ctx, def, att, transition)
     return
@@ -520,13 +542,16 @@ function aerialDuel(ctx: MatchContext, att: SideState, def: SideState, crosser: 
   const target = pickByPosition(rng, att, MATCH.crossReceiverWeight, 0, crosser)
   const defender = pickByPosition(rng, def, MATCH.aerialDefenderWeight, MATCH.markerFallbackWeight)
   if (!target || !defender) return
+  mark(ctx, { receiverId: target.player.id })
 
   if (rng.chance(duelChance(aerialScore(target), aerialScore(defender), offset))) {
     target.tally.headersWon++
+    mark(ctx, { outcome: 'won' })
     shoot(ctx, att, def, target, 'header', crosser)
     return
   }
   defender.tally.headersWon++
+  mark(ctx, { outcome: 'lost', markerId: defender.player.id })
   if (rng.chance(MATCH.ownGoalOnLostHeader)) {
     ownGoal(ctx, att, def, defender)
     return
@@ -564,6 +589,8 @@ function shoot(
   assister?: PitchPlayer,
 ): void {
   const { rng } = ctx
+  const shot: NonNullable<PlayTrace['shot']> = { shooterId: shooter.player.id, type, result: 'off-target', ...(assister ? { assisterId: assister.player.id } : {}) }
+  mark(ctx, { shot })
   const base = MATCH.xg[type]
   const block = MATCH.blockChance[type]
   att.tally.shots++
@@ -571,11 +598,13 @@ function shoot(
   shooter.tally.shots++
 
   if (rng.chance(block)) {
+    shot.result = 'blocked'
     if (rng.chance(MATCH.corner.afterBlock)) corner(ctx, att, def)
     return
   }
 
   const keeper = goalkeeperOf(def)
+  if (keeper) shot.keeperId = keeper.player.id
   const skill =
     type === 'header'
       ? 0.8 * attr(shooter, 'heading') + 0.2 * attr(shooter, 'strength')
@@ -589,6 +618,7 @@ function shoot(
   const goalChance = Math.min(MATCH.maxGoalChance, (base / (1 - block)) * Math.exp(MATCH.shotK * (skill - keeping)))
 
   if (rng.chance(goalChance)) {
+    shot.result = 'goal'
     att.tally.shotsOnTarget++
     shooter.tally.shotsOnTarget++
     scoreGoal(ctx, att, def, shooter, type, assister)
@@ -597,6 +627,7 @@ function shoot(
 
   const onTarget = rng.chance(MATCH.onTargetIfMissed[type])
   if (onTarget) {
+    shot.result = 'saved'
     att.tally.shotsOnTarget++
     shooter.tally.shotsOnTarget++
     if (keeper) keeper.tally.saves++

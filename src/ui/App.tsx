@@ -76,7 +76,7 @@ export function App() {
   const goTab = (tab: NavTab) => setScreen(tab)
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col bg-bg text-slate-100">
+    <div className={`mx-auto flex min-h-dvh flex-col bg-bg text-slate-100 ${current === 'match' ? 'max-w-6xl' : 'max-w-xl'}`}>
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-4 py-2 backdrop-blur">
         {current === 'home' ? (
           <div className="min-w-0 flex-1 text-xs text-muted">
