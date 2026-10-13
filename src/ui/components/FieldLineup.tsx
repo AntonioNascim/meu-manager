@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { getFormation } from '../../engine/formations'
-import type { Player, Position } from '../../engine/types'
+import type { GridPoint, Player, Position } from '../../engine/types'
 import { playerName } from '../format'
-import { pitchLayout } from '../pitchLayout'
+import { gridCoords, pitchLayout } from '../pitchLayout'
 import type { PitchPoint } from '../pitchLayout'
 import { inkFor } from '../screens/match/pitchModel'
 import { conditionBand } from '../colors'
@@ -11,6 +11,8 @@ import { Jersey } from '../theme'
 export interface FieldSlot {
   playerId: string
   slot: Position
+  /** Ponto da grade que ocupa (posicionamento livre); sem ele, a vaga da formação pelo papel. */
+  point?: GridPoint | undefined
 }
 
 /** Nome curto para caber embaixo da camisa. */
@@ -25,6 +27,8 @@ export function shortPlayerName(p: Pick<Player, 'name' | 'nickname'>): string {
  * se sobrar alguém (posições trocadas durante o jogo), ele ocupa as vagas que sobraram.
  */
 export function placeLineup(formationId: string, lineup: readonly FieldSlot[]): { entry: FieldSlot; point: PitchPoint }[] {
+  // Com o ponto da grade de todos, cada um fica exatamente onde está (inclusive no posicionamento livre).
+  if (lineup.length > 0 && lineup.every((e) => e.point)) return lineup.map((entry) => ({ entry, point: gridCoords(entry.point as GridPoint) }))
   const slots = getFormation(formationId).slots
   const points = pitchLayout(formationId)
   const left = [...lineup]

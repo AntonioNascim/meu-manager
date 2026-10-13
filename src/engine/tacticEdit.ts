@@ -3,11 +3,12 @@
  * cobradores. Funções puras: devolvem uma tática nova e nunca deixam a escalação inválida
  * (11 titulares únicos, banco sem repetidos, funções só para titulares).
  */
-import { getFormation } from './formations'
+import { formationOf, getFormation, labelOfGrid } from './formations'
+import { GK_POINT, gridKey, gridProblem } from './grid'
 import { BENCH_SIZE } from './config'
 import { evaluateFormation } from './lineup'
 import { overallAt, playerOverall } from './overall'
-import type { Player, PlayerId, SavedLineup, Tactic } from './types'
+import type { GridPoint, Player, PlayerId, SavedLineup, Tactic } from './types'
 
 export type SetPieceKind = 'penalty' | 'free-kick'
 
@@ -59,14 +60,37 @@ export function swapPlayers(tactic: Tactic, a: PlayerId, b: PlayerId): Tactic {
  * O banco, o capitão e os cobradores continuam como estavam.
  */
 export function changeFormation(tactic: Tactic, squad: readonly Player[], formationId: string): Tactic {
-  if (formationId === tactic.formationId) return tactic
   const formation = getFormation(formationId)
+  if (formationOf(tactic) === formation) return tactic
   const players = tactic.startingXI.map((id) => squad.find((p) => p.id === id)).filter((p): p is Player => p !== undefined)
   if (players.length !== formation.slots.length) throw new Error('Escalação inválida')
   // Todos os 11 entram, mesmo lesionados (o jogador decide); o encaixe só escolhe as vagas.
   const available = players.map((p) => ({ ...p, condition: { ...p.condition, injuryDaysLeft: 0, suspensionGames: 0 } }))
   const { startingXI } = evaluateFormation(available, formation)
-  return { ...tactic, formationId, startingXI }
+  return { ...tactic, formationId, grid: formation.grid.map((p) => ({ ...p })), startingXI }
+}
+
+/**
+ * Posicionamento livre: leva o titular para um ponto da grade. Se o ponto está ocupado os dois trocam de lugar; o
+ * goleiro nunca deixa o gol sem ser trocado por outro. A formação vira a pronta de mesmos pontos ou "custom".
+ */
+export function movePlayerTo(tactic: Tactic, id: PlayerId, target: GridPoint): Tactic {
+  const i = tactic.startingXI.indexOf(id)
+  if (i < 0) throw new Error('Só os titulares podem ser posicionados')
+  const grid = formationOf(tactic).grid.map((p) => ({ ...p }))
+  const j = grid.findIndex((p) => gridKey(p) === gridKey(target))
+  if (j === i) return tactic
+  if (j >= 0) {
+    const a = grid[i] as GridPoint
+    grid[i] = grid[j] as GridPoint
+    grid[j] = a
+  } else {
+    if (gridKey(grid[i] as GridPoint) === gridKey(GK_POINT)) throw new Error('O gol não pode ficar sem goleiro')
+    grid[i] = { row: target.row, lane: target.lane }
+  }
+  const problem = gridProblem(grid)
+  if (problem) throw new Error(problem)
+  return { ...tactic, formationId: labelOfGrid(grid), grid }
 }
 
 /** Define o capitão (precisa ser titular). */
@@ -99,7 +123,7 @@ export function setTaker(tactic: Tactic, kind: SetPieceKind, rank: number, id: P
  * guardados: o jogador vê e decide.
  */
 export function applySavedLineup(tactic: Tactic, squad: readonly Player[], saved: SavedLineup): Tactic {
-  const formation = getFormation(saved.formationId)
+  const formation = formationOf(saved)
   if (saved.startingXI.length !== formation.slots.length) throw new Error('Escalação guardada inválida')
   const byId = new Map(squad.map((p) => [p.id, p]))
   const taken = new Set(saved.startingXI.filter((id) => byId.has(id)))
@@ -119,7 +143,8 @@ export function applySavedLineup(tactic: Tactic, squad: readonly Player[], saved
   const keepTakers = (ids: PlayerId[]) => (ids.filter((id) => inXI.has(id)).length > 0 ? ids.filter((id) => inXI.has(id)) : [captainId])
   return {
     ...tactic,
-    formationId: saved.formationId,
+    formationId: formation.id,
+    grid: formation.grid.map((p) => ({ ...p })),
     style: saved.style,
     startingXI,
     bench,

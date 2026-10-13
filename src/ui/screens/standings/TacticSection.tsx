@@ -1,12 +1,12 @@
 import { useMemo, useRef } from 'react'
-import { getFormation } from '../../../engine/formations'
+import { formationOf } from '../../../engine/formations'
 import { aiTactic } from '../../../engine/season'
 import type { Mentality, Player, PlayStyle } from '../../../engine/types'
 import { squadOf, teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { FieldLineup } from '../../components/FieldLineup'
 import type { FieldSlot } from '../../components/FieldLineup'
-import { MENTALITY_LABELS, PLAY_STYLE_DESCRIPTIONS, PLAY_STYLE_LABELS } from '../../labels'
+import { MENTALITY_LABELS, PLAY_STYLE_DESCRIPTIONS, PLAY_STYLE_LABELS, formationLabel } from '../../labels'
 import { assignNumber } from '../match/pitchModel'
 import { Eyebrow, Panel } from '../../theme'
 
@@ -19,7 +19,7 @@ export interface LiveTactic {
   mentality: Mentality
   /** Mentalidade em uso agora (a IA ajusta pelo placar e pelo tamanho do rival). */
   activeMentality: Mentality
-  onPitch: { playerId: string; slot: FieldSlot['slot']; fitness: number; yellowCards: number }[]
+  onPitch: { playerId: string; slot: FieldSlot['slot']; fitness: number; yellowCards: number; point?: FieldSlot['point'] }[]
 }
 
 /**
@@ -33,14 +33,14 @@ export function TacticSection({ game, teamId, live }: { game: Game; teamId: stri
   const numbers = useRef(new Map<string, number>())
   const probable = useMemo(() => {
     const tactic = teamId === game.userTeamId ? team.tactic : aiTactic(team, squad)
-    const formation = getFormation(tactic.formationId)
-    return { tactic, lineup: tactic.startingXI.map((id, i) => ({ playerId: id, slot: formation.slots[i]!.position })) }
+    const formation = formationOf(tactic)
+    return { tactic, lineup: tactic.startingXI.map((id, i) => ({ playerId: id, slot: formation.slots[i]!.position, point: formation.grid[i] })) }
   }, [game, team, squad, teamId])
 
   const formationId = live ? live.formationId : probable.tactic.formationId
   const style = live ? live.style : probable.tactic.style
   const mentality = live ? live.activeMentality : probable.tactic.mentality
-  const lineup: FieldSlot[] = live ? live.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot })) : probable.lineup
+  const lineup: FieldSlot[] = live ? live.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point })) : probable.lineup
   const fitness = new Map(live ? live.onPitch.map((p) => [p.playerId, p.fitness]) : [])
   const yellow = new Map(live ? live.onPitch.map((p) => [p.playerId, p.yellowCards > 0]) : [])
   const adjusted = live !== undefined && live.activeMentality !== live.mentality
@@ -51,7 +51,7 @@ export function TacticSection({ game, teamId, live }: { game: Game; teamId: stri
       <Eyebrow>{live ? 'Tática agora, no jogo' : teamId === game.userTeamId ? 'Sua tática' : 'Tática e escalação provável'}</Eyebrow>
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         {[
-          ['Formação', formationId],
+          ['Formação', formationLabel(formationId)],
           ['Estilo', PLAY_STYLE_LABELS[style]],
           ['Mentalidade', MENTALITY_LABELS[mentality]],
         ].map(([label, value]) => (

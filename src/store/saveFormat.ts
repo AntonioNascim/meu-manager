@@ -6,12 +6,13 @@
  * antigo não satisfaz, aumente `SAVE_VERSION` e acrescente em `MIGRATIONS` a função que leva os dados da
  * versão anterior para a nova. O teste `tests/saves.test.ts` confere que a versão atual abre e valida.
  */
+import { FORMATION_IDS, readyGrid } from '../engine/formations'
 import { createAcademy } from '../data/generateAcademy'
 import type { MatchResult, Player, Team } from '../engine/types'
 import { userTeam } from './game'
 import type { Game } from './game'
 
-export const SAVE_VERSION = 8
+export const SAVE_VERSION = 9
 
 /** O que vai para o disco (e para o arquivo de backup). */
 export interface SaveEnvelope {
@@ -44,6 +45,7 @@ export type Migration = (envelope: { version: number; savedAt: string; game: unk
 
 /**
  * Migrações por versão de origem: `MIGRATIONS[1]` leva a versão 1 para a 2, e assim por diante.
+ * 8 → 9: posicionamento livre (`tactic.grid`, o ponto da grade de cada titular): as táticas dos times e as escalações guardadas ganham a grade da formação pronta que já tinham, então nada muda no jogo.
  * 7 → 8: contagens novas por jogador (gols em casa e fora, assistências de passe e de cruzamento); saves antigos começam em zero (a artilharia geral não muda, as abas Casa, Fora, Passes e Cruzamentos contam dali em diante).
  * 6 → 7: orçamento (`finances.budgetShift`, `purchaseBonus` e `fundsRequests` em todos os times); saves antigos começam sem nada movido nem pedido.
  * 5 → 6: pré-contratos (`season.market.preContracts` e `lastReport.preContracts`); saves antigos começam sem nenhum.
@@ -113,6 +115,16 @@ export const MIGRATIONS: Record<number, Migration> = {
       for (const key of ['homeGoals', 'awayGoals', 'passAssists', 'crossAssists']) p.seasonStats[key] ??= 0
     }
     return { ...envelope, version: 8 }
+  },
+  8: (envelope) => {
+    const game = envelope.game as { season?: { teams?: { tactic?: { formationId?: string; grid?: unknown } }[] }; savedLineups?: ({ formationId?: string; grid?: unknown } | null)[] }
+    const withGrid = (t: { formationId?: string; grid?: unknown } | null | undefined) => {
+      if (!t || t.grid || !t.formationId || !FORMATION_IDS.includes(t.formationId)) return
+      t.grid = readyGrid(t.formationId)
+    }
+    for (const team of game.season?.teams ?? []) withGrid(team.tactic)
+    for (const saved of game.savedLineups ?? []) withGrid(saved)
+    return { ...envelope, version: 9 }
   },
 }
 

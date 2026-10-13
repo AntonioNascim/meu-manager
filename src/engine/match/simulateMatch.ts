@@ -12,8 +12,10 @@ import type { PlayType, ShotType } from '../config'
 import { overallAt, playerOverall } from '../overall'
 import { createRng } from '../rng'
 import { getFormation } from '../formations'
+import { GK_POINT } from '../grid'
+import { READY_CAPS, gapsOf, profileOf } from './formationProfile'
 import { evaluateFormation } from '../lineup'
-import type { MatchEvent, Mentality, MatchResult, Player, PlayerMatchResult, PlayStyle, Position, TeamMatchStats } from '../types'
+import type { GridPoint, MatchEvent, Mentality, MatchResult, Player, PlayerMatchResult, PlayStyle, Position, TeamMatchStats } from '../types'
 import { duelChance } from './duel'
 import * as text from './narration'
 import { playerRating } from './ratings'
@@ -61,7 +63,9 @@ export interface SideSnapshot {
   activeMentality: Mentality
   goals: number
   /** Quem está em campo agora, com a vaga e a condição. */
-  onPitch: { playerId: string; slot: Position; fitness: number; yellowCards: number }[]
+  onPitch: { playerId: string; slot: Position; fitness: number; yellowCards: number; point?: GridPoint }[]
+  /** Ponto da grade de cada vaga da formação (a formação pronta ou a montada pelo técnico). */
+  grid: GridPoint[]
   /** Reservas que ainda podem entrar. */
   bench: string[]
   subsLeft: number
@@ -153,7 +157,8 @@ export function startMatch(input: MatchInput): LiveMatch {
     mentality: side.baseMentality,
     activeMentality: side.mentality as Mentality,
     goals: side.goals,
-    onPitch: activePlayers(side).map((p) => ({ playerId: p.player.id, slot: p.slot, fitness: Math.round(p.fitness), yellowCards: p.yellowCards })),
+    onPitch: activePlayers(side).map((p) => ({ playerId: p.player.id, slot: p.slot, fitness: Math.round(p.fitness), yellowCards: p.yellowCards, ...(p.point ? { point: p.point } : {}) })),
+    grid: side.formation.grid,
     bench: side.bench.map((p) => p.id),
     subsLeft: side.subsLeft,
     stopsLeft: MATCH.maxSubStops - side.subStops.length,
@@ -205,6 +210,7 @@ export function startMatch(input: MatchInput): LiveMatch {
         const slot = formation.slots[i] as (typeof formation.slots)[number]
         pitchPlayer.slot = slot.position
         pitchPlayer.sector = slot.sector
+        pitchPlayer.point = formation.grid[i]
         pitchPlayer.fitFactor = createPitchPlayer(pitchPlayer.player, slot.position, slot.sector, 0).fitFactor
       })
       s.formation = formation
@@ -257,7 +263,9 @@ const sectorCount = (side: SideState, sector: PitchPlayer['sector']) =>
 /** Bônus da formação no meio-campo: cada meio-campista acima/abaixo da referência vale pontos. */
 function midfieldNumbers(side: SideState): number {
   const f = MATCH.formation
-  return f.perMidfielder * (sectorCount(side, 'midfield') - f.referenceMidfielders) + (f.profile[side.formation.id]?.control ?? 0)
+  const profile = profileOf(side.formation)
+  const control = f.perMidfielder * (sectorCount(side, 'midfield') - f.referenceMidfielders) + profile.control - MATCH.grid.midfieldGap * gapsOf(side.formation).midfield
+  return profile.custom ? Math.min(control, READY_CAPS.control) : control
 }
 
 /**
@@ -309,15 +317,36 @@ function pressScore(side: SideState): number {
  * ataque com mais gente abre; mentalidade ofensiva de quem defende deixa espaço;
  * transição de contra-ataque pega a defesa desarrumada.
  */
-function progressionOffset(att: SideState, def: SideState, transition: boolean): number {
+function progressionOffset(att: SideState, def: SideState, transition: boolean, carrier?: PitchPlayer): number {
   const f = MATCH.formation
   return (
     -f.perDefender * (sectorCount(def, 'defense') - f.referenceDefenders) +
     f.perAttacker * (sectorCount(att, 'attack') - f.referenceAttackers) +
-    (f.profile[att.formation.id]?.attack ?? 0) +
+    profileOf(att.formation).attack +
+    attackExcess(att) +
+    gridGap(def, carrier) +
     MATCH.tactics.mentality.openness * def.mentality +
     (transition ? MATCH.tactics.counter.transitionProgression : 0)
   )
+}
+
+/** Quanto o ganho de progressão de uma grade livre passa do teto das formações prontas (negativo: é descontado; 0 nas prontas). */
+function attackExcess(att: SideState): number {
+  const f = MATCH.formation
+  const profile = profileOf(att.formation)
+  if (!profile.custom) return 0
+  const bonus = f.perAttacker * (sectorCount(att, 'attack') - f.referenceAttackers) + profile.attack
+  return -Math.max(0, bonus - READY_CAPS.attack)
+}
+
+/**
+ * Custo dos buracos do posicionamento livre de quem defende: linha de defesa curta e, na faixa por onde o rival
+ * conduz a bola, pouca gente cobrindo (a faixa espelhada e as vizinhas). Formações prontas não têm buracos.
+ */
+function gridGap(def: SideState, carrier?: PitchPlayer): number {
+  const gaps = gapsOf(def.formation)
+  const lane = carrier?.point?.lane
+  return MATCH.grid.defenseGap * gaps.defense + (lane === undefined ? 0 : MATCH.grid.flankGap * (gaps.flank[lane] ?? 0))
 }
 
 /** Chance de virar cara a cara: posse tem menos; pressão alta do rival e contra-ataque dão mais. */
@@ -474,7 +503,7 @@ function dribble(
   const { rng } = ctx
   const attack = (2 * attr(carrier, 'dribbling') + attr(carrier, 'pace') + attr(carrier, 'ballControl')) / 4
   const defense = (2 * attr(marker, 'tackling') + attr(marker, 'pace') + attr(marker, 'positioning')) / 4
-  const offset = MATCH.offset.dribble + progressionOffset(att, def, transition)
+  const offset = MATCH.offset.dribble + progressionOffset(att, def, transition, carrier)
 
   if (rng.chance(duelChance(attack, defense, offset))) {
     carrier.tally.dribblesWon++
@@ -520,7 +549,7 @@ function throughBall(ctx: MatchContext, att: SideState, def: SideState, passer: 
 
   // Pressão alta do rival deixa espaço nas costas também para o passe.
   const spaceBehind = def.style === 'high-press' ? MATCH.tactics.highPress.spaceBehind / 2 : 0
-  const offset = MATCH.offset.through + progressionOffset(att, def, transition) + spaceBehind
+  const offset = MATCH.offset.through + progressionOffset(att, def, transition, passer) + spaceBehind
   if (!rng.chance(duelChance(attack, lineReading, offset))) {
     // Passe interceptado pela defesa.
     const interceptor = rng.pick(line)
@@ -547,7 +576,7 @@ function cross(
   transition: boolean,
 ): void {
   const { rng } = ctx
-  const offset = MATCH.offset.cross + progressionOffset(att, def, transition)
+  const offset = MATCH.offset.cross + progressionOffset(att, def, transition, crosser)
   if (!rng.chance(duelChance(attr(crosser, 'crossing'), attr(marker, 'positioning'), offset))) {
     // Cruzamento travado.
     marker.tally.tacklesWon++
@@ -806,7 +835,7 @@ function substitute(
   if (ctx.minute !== MATCH.halftimeMinute && !side.subStops.includes(ctx.minute)) side.subStops.push(ctx.minute)
   const sector = slot === 'GK' ? 'defense' : outgoing.sector
   side.players.push(
-    createPitchPlayer(incoming, slot, sector, ctx.minute, side.sideFactor, dayFactorFor(ctx.rng, incoming)),
+    createPitchPlayer(incoming, slot, sector, ctx.minute, side.sideFactor, dayFactorFor(ctx.rng, incoming), slot === 'GK' ? GK_POINT : outgoing.point),
   )
   addEvent(
     ctx,

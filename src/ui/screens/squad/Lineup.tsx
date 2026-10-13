@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { FORMATION_IDS, getFormation } from '../../../engine/formations'
+import { FORMATION_IDS, formationOf } from '../../../engine/formations'
+import { shapeOf } from '../../../engine/grid'
 import { overallAt, playerOverall } from '../../../engine/overall'
-import { changeFormation, swapPlayers } from '../../../engine/tacticEdit'
-import type { Player, Position, Tactic } from '../../../engine/types'
+import { changeFormation, movePlayerTo, swapPlayers } from '../../../engine/tacticEdit'
+import type { GridPoint, Player, Position, Tactic } from '../../../engine/types'
 import {
   LINEUP_SLOTS,
   deleteUserLineup,
@@ -17,8 +18,8 @@ import { updateGame } from '../../../store/gameStore'
 import { getLive } from '../../../store/liveMatch'
 import { StatusTags } from '../../components/PlayerDetail'
 import { playerName } from '../../format'
-import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS } from '../../labels'
-import { pitchLayout } from '../../pitchLayout'
+import { GridPitch } from '../../components/GridPitch'
+import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, formationLabel } from '../../labels'
 import { isUnavailable } from '../../squadSort'
 import { ConditionBar, ConditionStrip, Eyebrow, Flag, Jersey, MoodIcon, Panel, ValueBadge } from '../../theme'
 
@@ -31,11 +32,11 @@ function shortName(p: Player): string {
 
 const outOfPosition = (p: Player, slot: Position) => p.position !== slot && !p.secondaryPositions.includes(slot)
 
-function Token({ player, slot, captain, selected, colors, onTap }: { player: Player; slot: Position; captain: boolean; selected: boolean; colors: [string, string]; onTap: () => void }) {
+function Token({ player, slot, captain, selected, colors }: { player: Player; slot: Position; captain: boolean; selected: boolean; colors: [string, string] }) {
   const value = overallAt(player, slot)
   const improvised = outOfPosition(player, slot)
   return (
-    <button type="button" onClick={onTap} className="flex w-[3.9rem] flex-col items-center gap-0.5" aria-label={`${playerName(player)}, ${POSITION_SHORT_LABELS[slot]}`}>
+    <div className="flex w-[3.9rem] flex-col items-center gap-0.5" aria-label={`${playerName(player)}, ${POSITION_SHORT_LABELS[slot]}`}>
       <span className={`relative rounded-full p-0.5 ${selected ? 'bg-white/90 ring-4 ring-white/60' : ''}`}>
         <Jersey team={{ colors }} size={38} />
         <span className="absolute -right-2 -top-1">
@@ -52,39 +53,20 @@ function Token({ player, slot, captain, selected, colors, onTap }: { player: Pla
         {POSITION_SHORT_LABELS[slot]} · {Math.round(value)}
       </span>
       <ConditionStrip fitness={player.condition.fitness} />
-    </button>
+    </div>
   )
 }
 
-function Pitch({ tactic, players, colors, selectedId, onTap }: { tactic: Tactic; players: Map<string, Player>; colors: [string, string]; selectedId: string | null; onTap: (id: string) => void }) {
-  const formation = getFormation(tactic.formationId)
-  const points = useMemo(() => pitchLayout(tactic.formationId), [tactic.formationId])
+function Pitch({ tactic, players, colors, selectedId, onTap, onMove }: { tactic: Tactic; players: Map<string, Player>; colors: [string, string]; selectedId: string | null; onTap: (id: string) => void; onMove: (id: string, point: GridPoint) => void }) {
   return (
-    <div className="relative mx-auto aspect-[3/5.1] w-full max-w-md overflow-hidden rounded-2xl border border-emerald-950 bg-[#1d5a3a]">
-      <div className="absolute inset-0 bg-[repeating-linear-gradient(180deg,rgb(255_255_255/0.045)_0_12.5%,transparent_12.5%_25%)]" />
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 170" preserveAspectRatio="none" aria-hidden="true">
-        <g fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.55">
-          <rect x="4" y="4" width="92" height="162" />
-          <line x1="4" y1="85" x2="96" y2="85" />
-          <circle cx="50" cy="85" r="11" />
-          <rect x="24" y="4" width="52" height="21" />
-          <rect x="38" y="4" width="24" height="8" />
-          <rect x="24" y="145" width="52" height="21" />
-          <rect x="38" y="158" width="24" height="8" />
-        </g>
-      </svg>
-      {tactic.startingXI.map((id, i) => {
-        const player = players.get(id)
-        const point = points[i]
-        const slot = formation.slots[i]
-        if (!player || !point || !slot) return null
-        return (
-          <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
-            <Token player={player} slot={slot.position} captain={tactic.captainId === id} selected={selectedId === id} colors={colors} onTap={() => onTap(id)} />
-          </div>
-        )
-      })}
-    </div>
+    <GridPitch
+      tactic={tactic}
+      players={players}
+      selectedId={selectedId}
+      onTap={onTap}
+      onMove={onMove}
+      renderToken={(player, slot, selected) => <Token player={player} slot={slot} captain={tactic.captainId === player.id} selected={selected} colors={colors} />}
+    />
   )
 }
 
@@ -143,7 +125,7 @@ function SavedLineups({ game }: { game: Game }) {
                 <button type="button" className="min-w-0 flex-1 px-2.5 py-2 text-left" onClick={() => attempt((g) => loadUserLineup(g, i), `${saved.name} carregada.`)}>
                   <span className="block truncate text-sm font-bold">{saved.name}</span>
                   <span className="block truncate text-[11px] text-muted">
-                    {saved.formationId} · {PLAY_STYLE_LABELS[saved.style]}
+                    {formationLabel(saved.formationId)} · {PLAY_STYLE_LABELS[saved.style]}
                   </span>
                 </button>
                 <button type="button" aria-label={`Opções de ${saved.name}`} className="w-8 shrink-0 text-lg font-bold text-muted" onClick={() => setMenu(menu === i ? null : i)}>
@@ -212,6 +194,11 @@ export function Lineup({ game }: { game: Game }) {
     }
   }
 
+  const move = (id: string, point: GridPoint) => {
+    apply((t) => movePlayerTo(t, id, point))
+    setSelectedId(null)
+  }
+
   const bench = tactic.bench.map((id) => byId.get(id)).filter((p): p is Player => p !== undefined)
   const rest = squad.filter((p) => !tactic.startingXI.includes(p.id) && !tactic.bench.includes(p.id)).sort((a, b) => playerOverall(b) - playerOverall(a))
   const selected = selectedId ? byId.get(selectedId) : undefined
@@ -245,6 +232,11 @@ export function Lineup({ game }: { game: Game }) {
               {id}
             </button>
           ))}
+          {tactic.formationId === 'custom' && (
+            <span aria-pressed="true" data-testid="free-chip" className="inline-flex min-h-10 items-center rounded-full border border-accent bg-accent px-4 text-sm font-bold text-accent-ink">
+              Livre · {shapeOf(formationOf(tactic).grid)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -254,10 +246,10 @@ export function Lineup({ game }: { game: Game }) {
             <b className="text-white">{playerName(selected)}</b> selecionado: toque em outro jogador (do campo, do banco ou de fora do banco) para trocar de lugar.
           </>
         ) : (
-          'Toque em um jogador e depois em outro para trocá-los de lugar.'
+          'Arraste um jogador para o ponto que quiser, ou toque em um e depois em outro para trocá-los de lugar.'
         )}
       </p>
-      <Pitch tactic={tactic} players={byId} colors={team.colors} selectedId={selectedId} onTap={tap} />
+      <Pitch tactic={tactic} players={byId} colors={team.colors} selectedId={selectedId} onTap={tap} onMove={move} />
       <p className="text-[11px] text-muted">Selo = posição da vaga e força nela · selo roxo = fora da posição natural · C capitão · barra = condição · carinha = moral</p>
       {error && <p className="rounded-xl border border-loss/40 bg-loss/10 p-2 text-sm text-loss">{error}</p>}
 

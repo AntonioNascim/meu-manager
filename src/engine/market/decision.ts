@@ -4,7 +4,7 @@
  * As decisões são determinísticas, para o jogador poder entender e negociar.
  */
 import { MARKET } from '../config'
-import { getFormation } from '../formations'
+import { formationOf } from '../formations'
 import { playerOverall } from '../overall'
 import { SQUAD_MAX } from '../types'
 import type { IsoDate, OfferKind, OfferReason, Player, Team } from '../types'
@@ -16,7 +16,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 export function playingTimeIn(player: Player, squad: readonly Player[], team: Pick<Team, 'tactic'>): number {
   const strength = playerOverall(player)
   const better = squad.filter((q) => q.id !== player.id && q.position === player.position && playerOverall(q) > strength).length
-  const slots = Math.max(1, getFormation(team.tactic.formationId).slots.filter((s) => s.position === player.position).length)
+  const slots = Math.max(1, formationOf(team.tactic).slots.filter((s) => s.position === player.position).length)
   if (better === 0) return 1
   if (better < slots) return 0.5
   if (better === slots) return -0.3

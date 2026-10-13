@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getFormation } from '../../../engine/formations'
+import { slotAt } from '../../../engine/grid'
 import type { MatchSnapshot } from '../../../engine/match'
 import { teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
@@ -80,8 +80,8 @@ export function Pitch({ game, snap, speed, running, numbers: shared }: { game: G
   const away = teamById(game, snap.away.teamId)
   const kits = useMemo(() => kitsFor(home.colors, away.colors), [home.colors, away.colors])
   const wingers = {
-    home: getFormation(snap.home.formationId).slots.find((s) => s.position === 'RW' || s.position === 'LW')?.sector === 'attack',
-    away: getFormation(snap.away.formationId).slots.find((s) => s.position === 'RW' || s.position === 'LW')?.sector === 'attack',
+    home: snap.home.grid.map(slotAt).some((s) => (s.position === 'RW' || s.position === 'LW') && s.sector === 'attack'),
+    away: snap.away.grid.map(slotAt).some((s) => (s.position === 'RW' || s.position === 'LW') && s.sector === 'attack'),
   }
   const layout = useMemo(() => layoutFrom(snap, wingers), [snap, wingers.home, wingers.away]) // eslint-disable-line react-hooks/exhaustive-deps
   const known = useRef<Layout>(new Map())

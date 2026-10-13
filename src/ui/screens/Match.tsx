@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_IDS } from '../../engine/formations'
+import { shapeOf } from '../../engine/grid'
 import { playerOverall } from '../../engine/overall'
 import type { MatchSnapshot, SideSnapshot } from '../../engine/match'
 import type { MatchEvent, Mentality, Player, PlayStyle, Position } from '../../engine/types'
@@ -202,6 +203,9 @@ function TacticPanel({ live, side, snap, canEdit, refresh }: { live: LiveSession
               {id}
             </button>
           ))}
+          {side.formationId === 'custom' && (
+            <span className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-slate-950">Livre · {shapeOf(side.grid)}</span>
+          )}
         </div>
         {pitchCount !== 11 && <p className="mt-1 text-xs text-amber-300">A formação só muda com 11 jogadores em campo.</p>}
       </Card>
@@ -306,7 +310,7 @@ function SubsPanel({
       <Card title="Em campo (toque em quem sai)">
         <FieldLineup
           formationId={side.formationId}
-          lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot }))}
+          lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point }))}
           players={players}
           kit={kit}
           keeperKit={keeperKit}

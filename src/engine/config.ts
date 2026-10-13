@@ -256,6 +256,23 @@ export const MATCH = {
     } as Record<string, { control: number; attack: number }>,
   },
 
+  /**
+   * Posicionamento livre (grade): uma grade fora das formações prontas herda o perfil da mais parecida com um imposto
+   * por jogador de papel diferente, e deixar faixas ou linhas sem gente custa (o rival progride mais por ali).
+   */
+  grid: {
+    distanceTax: { control: 3, attack: 0.1 },
+    /** Cobertura mínima de uma faixa (jogadores de defesa e meio na faixa do rival e vizinhas): abaixo disso o rival progride mais. */
+    flankCover: 2,
+    /** Deslocamento a favor da progressão do rival por jogador que falta na cobertura da faixa. */
+    flankGap: 0.6,
+    /** Linhas com gente de menos: defesa (mínimo 3) e meio (mínimo 3), por jogador que falta. */
+    minDefenders: 3,
+    defenseGap: 0.4,
+    minMidfielders: 3,
+    midfieldGap: 4,
+  },
+
   /** Chance de lesão por momento, por jogador com propensão 50 (escala com a propensão). */
   injuryPerMoment: 1.5e-4,
   /** Condição física abaixo disto aumenta o risco de lesão. */

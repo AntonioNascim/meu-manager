@@ -1,7 +1,7 @@
 import { ATTRIBUTE_MAX, BENCH_SIZE, LINEUP, MATCH } from './config'
-import { getFormation } from './formations'
+import { formationOf } from './formations'
 import { overallAt, playerOverall } from './overall'
-import type { Formation, Mentality, Player, PlayerId, PlayStyle, Position, Tactic } from './types'
+import type { Formation, GridPoint, Mentality, Player, PlayerId, PlayStyle, Position, Tactic } from './types'
 
 export function isAvailable(player: Player): boolean {
   return player.condition.injuryDaysLeft === 0 && player.condition.suspensionGames === 0
@@ -150,10 +150,11 @@ function topBy(players: readonly Player[], score: (p: Player) => number, count: 
 /** Tática completa com escalação automática (usada pela IA e como sugestão ao jogador). */
 export function buildTactic(
   players: readonly Player[],
-  options: { formationId: string; style: PlayStyle; mentality: Mentality },
+  options: { formationId: string; grid?: GridPoint[] | undefined; style: PlayStyle; mentality: Mentality },
   lineup: LineupOptions = {},
 ): Tactic {
-  const formation = getFormation(options.formationId)
+  // Com `grid` o time mantém o posicionamento livre; só os 11 nomes são escolhidos de novo.
+  const formation = formationOf({ formationId: options.formationId, grid: options.grid })
   const startingXI = pickStartingXI(players, formation, lineup)
   const xi = startingXI.map((id) => players.find((p) => p.id === id) as Player)
   const outfield = xi.filter((p) => p.position !== 'GK')
@@ -162,7 +163,8 @@ export function buildTactic(
     p.attributes.determination + p.attributes.decisions + p.hidden.professionalism * 0.5 + (p.age >= 27 ? 15 : 0)
 
   return {
-    formationId: options.formationId,
+    formationId: formation.id,
+    grid: formation.grid.map((p) => ({ ...p })),
     style: options.style,
     mentality: options.mentality,
     startingXI,
@@ -180,7 +182,7 @@ export function buildTactic(
  */
 export function repairTactic(tactic: Tactic, squad: readonly Player[]): Tactic {
   const byId = new Map(squad.map((p) => [p.id, p]))
-  const formation = getFormation(tactic.formationId)
+  const formation = formationOf(tactic)
   const ok = (id: PlayerId) => {
     const p = byId.get(id)
     return p !== undefined && isAvailable(p)

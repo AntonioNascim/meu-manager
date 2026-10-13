@@ -3,7 +3,8 @@
  * Vem só das posições das vagas, então qualquer formação nova funciona sem tabela própria.
  */
 import { getFormation } from '../engine/formations'
-import type { FormationSlot, Position } from '../engine/types'
+import { GK_POINT, allGridPoints } from '../engine/grid'
+import type { FormationSlot, GridPoint, Position } from '../engine/types'
 
 export interface PitchPoint {
   x: number
@@ -51,4 +52,25 @@ export function pitchLayout(formationId: string): PitchPoint[] {
     })
   }
   return points
+}
+
+/** Posição (percentual) de cada faixa e de cada linha da grade no campo desenhado (ataque para cima, goleiro embaixo). */
+export const LANE_X = [14, 32, 50, 68, 86] as const
+export const ROW_Y = [91, 75, 59, 46, 33, 16] as const
+
+export const gridCoords = (p: GridPoint): PitchPoint => ({ x: LANE_X[p.lane] as number, y: ROW_Y[p.row] as number })
+
+/** Ponto da grade mais perto de uma posição (percentual) do campo; `w` e `h` são o tamanho do campo, para medir a distância em pixels. */
+export function nearestGridPoint(x: number, y: number, w = 3, h = 5.1): GridPoint {
+  let best: GridPoint = GK_POINT
+  let bestDistance = Infinity
+  for (const p of allGridPoints()) {
+    const c = gridCoords(p)
+    const d = Math.hypot(((c.x - x) / 100) * w, ((c.y - y) / 100) * h)
+    if (d < bestDistance) {
+      bestDistance = d
+      best = p
+    }
+  }
+  return best
 }

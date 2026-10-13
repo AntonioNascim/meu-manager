@@ -362,3 +362,6 @@ export const MARKET_SORT_LABELS: Record<MarketSort, string> = {
   'value-asc': 'Menor valor',
   salary: 'Menor salário',
 }
+
+/** Nome da formação: as prontas pelo número; a montada à mão aparece como "Livre". */
+export const formationLabel = (id: string): string => (id === 'custom' ? 'Livre' : id)

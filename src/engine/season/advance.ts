@@ -11,7 +11,8 @@ import { collectGate, matchAttendance, monthStartsBetween, settleMonth } from '.
 import { buildTactic, repairTactic } from '../lineup'
 import { expireOffers, nextMarketEvent, refreshListings, resolveDueOffers, runMarketTick, runPreContractTick } from '../market'
 import type { MarketEvent } from '../market'
-import { getFormation } from '../formations'
+import { formationOf } from '../formations'
+import { gridProblem } from '../grid'
 import { simulateMatch } from '../match'
 import type { MatchInput } from '../match'
 import type { IsoDate, MarketNotice, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
@@ -252,7 +253,8 @@ export function completeMatch(state: SeasonState, played: Match): SeasonState {
 /** Troca a tática do time (o jogador edita a dele entre os jogos). Valida a escalação. */
 export function setTeamTactic(state: SeasonState, teamId: TeamId, tactic: Tactic): SeasonState {
   const squad = state.players.filter((p) => p.teamId === teamId)
-  const formation = getFormation(tactic.formationId)
+  const formation = formationOf(tactic)
+  if (tactic.grid && gridProblem(tactic.grid)) throw new Error('Escalação inválida')
   const ids = new Set(squad.map((p) => p.id))
   if (tactic.startingXI.length !== formation.slots.length || new Set(tactic.startingXI).size !== tactic.startingXI.length || tactic.startingXI.some((id) => !ids.has(id))) {
     throw new Error('Escalação inválida')

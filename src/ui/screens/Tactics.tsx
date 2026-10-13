@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { FORMATION_IDS, getFormation } from '../../engine/formations'
+import { FORMATION_IDS, formationOf } from '../../engine/formations'
+import { shapeOf } from '../../engine/grid'
 import { buildTactic } from '../../engine/lineup'
 import { overallAt, playerOverall } from '../../engine/overall'
-import { MAX_TAKERS, changeFormation, setCaptain, setTaker, swapPlayers } from '../../engine/tacticEdit'
+import { MAX_TAKERS, changeFormation, movePlayerTo, setCaptain, setTaker, swapPlayers } from '../../engine/tacticEdit'
 import type { SetPieceKind } from '../../engine/tacticEdit'
-import type { Mentality, Player, PlayStyle, Tactic } from '../../engine/types'
+import type { GridPoint, Mentality, Player, PlayStyle, Tactic } from '../../engine/types'
 import { setUserTactic, squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
@@ -20,7 +21,7 @@ import {
   POSITION_SHORT_LABELS,
   SET_PIECE_LABELS,
 } from '../labels'
-import { pitchLayout } from '../pitchLayout'
+import { GridPitch } from '../components/GridPitch'
 
 const STYLES: PlayStyle[] = ['possession', 'counter-attack', 'high-press']
 const MENTALITIES: Mentality[] = [-2, -1, 0, 1, 2]
@@ -34,7 +35,7 @@ function shortName(p: Player): string {
 
 const unavailable = (p: Player) => p.condition.injuryDaysLeft > 0 || p.condition.suspensionGames > 0
 
-function Token({ player, slot, tactic, selected, onTap }: { player: Player; slot: Player['position']; tactic: Tactic; selected: boolean; onTap: () => void }) {
+function Token({ player, slot, tactic, selected }: { player: Player; slot: Player['position']; tactic: Tactic; selected: boolean }) {
   const value = overallAt(player, slot)
   const outOfPosition = player.position !== slot && !player.secondaryPositions.includes(slot)
   const badges = [
@@ -43,7 +44,7 @@ function Token({ player, slot, tactic, selected, onTap }: { player: Player; slot
     tactic.freeKickTakerIds[0] === player.id ? 'F' : null,
   ].filter(Boolean)
   return (
-    <button type="button" onClick={onTap} className="flex w-16 flex-col items-center" aria-label={`${playerName(player)}, ${POSITION_SHORT_LABELS[slot]}`}>
+    <div className="flex w-16 flex-col items-center" aria-label={`${playerName(player)}, ${POSITION_SHORT_LABELS[slot]}`}>
       <span
         className={`relative flex h-11 w-11 items-center justify-center rounded-full border-2 bg-slate-900/90 text-sm font-bold tabular-nums ${bandFor(value).text} ${selected ? 'border-white ring-4 ring-emerald-300' : outOfPosition ? 'border-amber-400' : 'border-slate-500'}`}
       >
@@ -61,39 +62,12 @@ function Token({ player, slot, tactic, selected, onTap }: { player: Player; slot
       </span>
       <span className="mt-0.5 w-full truncate rounded bg-slate-950/60 px-1 text-center text-[10px] font-semibold leading-4">{shortName(player)}</span>
       <span className="text-[9px] leading-3 text-emerald-100/80">{POSITION_SHORT_LABELS[slot]}</span>
-    </button>
+    </div>
   )
 }
 
-function Pitch({ tactic, players, selectedId, onTap }: { tactic: Tactic; players: Map<string, Player>; selectedId: string | null; onTap: (id: string) => void }) {
-  const formation = getFormation(tactic.formationId)
-  const points = useMemo(() => pitchLayout(tactic.formationId), [tactic.formationId])
-  return (
-    <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-xl bg-gradient-to-b from-emerald-700 to-emerald-800 ring-2 ring-emerald-900">
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 133" preserveAspectRatio="none" aria-hidden="true">
-        <g fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="0.6">
-          <rect x="3" y="3" width="94" height="127" />
-          <line x1="3" y1="66.5" x2="97" y2="66.5" />
-          <circle cx="50" cy="66.5" r="11" />
-          <rect x="24" y="3" width="52" height="20" />
-          <rect x="38" y="3" width="24" height="8" />
-          <rect x="24" y="110" width="52" height="20" />
-          <rect x="38" y="122" width="24" height="8" />
-        </g>
-      </svg>
-      {tactic.startingXI.map((id, i) => {
-        const player = players.get(id)
-        const point = points[i]
-        const slot = formation.slots[i]
-        if (!player || !point || !slot) return null
-        return (
-          <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
-            <Token player={player} slot={slot.position} tactic={tactic} selected={selectedId === id} onTap={() => onTap(id)} />
-          </div>
-        )
-      })}
-    </div>
-  )
+function Pitch({ tactic, players, selectedId, onTap, onMove }: { tactic: Tactic; players: Map<string, Player>; selectedId: string | null; onTap: (id: string) => void; onMove: (id: string, point: GridPoint) => void }) {
+  return <GridPitch tactic={tactic} players={players} selectedId={selectedId} onTap={onTap} onMove={onMove} renderToken={(player, slot, selected) => <Token player={player} slot={slot} tactic={tactic} selected={selected} />} />
 }
 
 function ListRow({ player, selected, onTap, tag }: { player: Player; selected: boolean; onTap: () => void; tag?: string }) {
@@ -168,10 +142,15 @@ export function Tactics({ game }: { game: Game }) {
     }
   }
 
+  const move = (id: string, point: GridPoint) => {
+    apply((t) => movePlayerTo(t, id, point))
+    setSelectedId(null)
+  }
+
   const xi = tactic.startingXI.map((id) => byId.get(id)).filter((p): p is Player => p !== undefined)
   const bench = tactic.bench.map((id) => byId.get(id)).filter((p): p is Player => p !== undefined)
   const rest = squad.filter((p) => !tactic.startingXI.includes(p.id) && !tactic.bench.includes(p.id))
-  const strength = xi.reduce((s, p, i) => s + overallAt(p, getFormation(tactic.formationId).slots[i]?.position ?? p.position), 0) / Math.max(1, xi.length)
+  const strength = xi.reduce((s, p, i) => s + overallAt(p, formationOf(tactic).slots[i]?.position ?? p.position), 0) / Math.max(1, xi.length)
   const unavailableStarters = xi.filter(unavailable)
   const selected = selectedId ? byId.get(selectedId) : undefined
   const matchStarted = game.pendingUserMatch !== undefined && (getLive(game.pendingUserMatch.id)?.match.minute ?? 0) > 0
@@ -206,7 +185,13 @@ export function Tactics({ game }: { game: Game }) {
               {id}
             </button>
           ))}
+          {tactic.formationId === 'custom' && (
+            <span data-testid="free-chip" className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-slate-950">
+              Livre · {shapeOf(formationOf(tactic).grid)}
+            </span>
+          )}
         </div>
+        <p className="mt-1 text-[11px] text-slate-400">As formações são atalhos que já posicionam o time. Depois é só arrastar cada jogador para o ponto da grade que quiser.</p>
       </Card>
 
       {unavailableStarters.length > 0 && (
@@ -222,10 +207,10 @@ export function Tactics({ game }: { game: Game }) {
             <b className="text-emerald-300">{playerName(selected)}</b> selecionado: toque em outro jogador (do campo, do banco ou das reservas) para trocar de lugar.
           </>
         ) : (
-          'Toque em um jogador e depois em outro para trocá-los de lugar.'
+          'Arraste um jogador para o ponto que quiser, ou toque em um e depois em outro para trocá-los de lugar.'
         )}
       </p>
-      <Pitch tactic={tactic} players={byId} selectedId={selectedId} onTap={tap} />
+      <Pitch tactic={tactic} players={byId} selectedId={selectedId} onTap={tap} onMove={move} />
       <p className="text-[11px] text-slate-500">Número = força na vaga · borda laranja = improvisado · C capitão · P pênaltis · F faltas</p>
       {error && <p className="rounded-lg bg-rose-900/60 p-2 text-sm text-rose-100">{error}</p>}
 
@@ -277,7 +262,7 @@ export function Tactics({ game }: { game: Game }) {
         variant="secondary"
         className="w-full"
         onClick={() => {
-          apply((t) => buildTactic(squad, { formationId: t.formationId, style: t.style, mentality: t.mentality }, { rested: true }))
+          apply((t) => buildTactic(squad, { formationId: t.formationId, grid: t.grid, style: t.style, mentality: t.mentality }, { rested: true }))
           setSelectedId(null)
         }}
       >

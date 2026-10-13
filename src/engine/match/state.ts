@@ -3,12 +3,13 @@
  * é criado do zero a cada partida e nunca altera os jogadores/times recebidos.
  */
 import { MATCH } from '../config'
-import { getFormation } from '../formations'
+import { formationOf } from '../formations'
 import { positionFit } from '../overall'
 import type { Rng } from '../rng'
 import type {
   AttributeName,
   Formation,
+  GridPoint,
   MatchEvent,
   Mentality,
   Player,
@@ -68,6 +69,8 @@ export interface PitchPlayer {
   /** Posição em que está jogando (vaga da formação). */
   slot: Position
   sector: Sector
+  /** Ponto da grade que ocupa (papel e faixa); a substituição herda o do jogador que saiu. */
+  point?: GridPoint | undefined
   fitness: number
   /** Multiplicador por jogar fora da posição principal (1 = posição natural). */
   fitFactor: number
@@ -185,11 +188,13 @@ export function createPitchPlayer(
   minuteOn: number,
   sideFactor = 1,
   dayFactor = 1,
+  point?: GridPoint,
 ): PitchPlayer {
   return {
     player,
     slot,
     sector,
+    ...(point ? { point } : {}),
     fitness: player.condition.fitness,
     fitFactor: 1 - (1 - positionFit(player, slot)) * MATCH.improvisationWeight,
     sideFactor,
@@ -248,13 +253,13 @@ export function dayFactorFor(rng: Rng, player: Player): number {
 export function buildSide(input: MatchSideInput, sideFactor: number, rng: Rng, userControlled = false): SideState {
   const { team } = input
   const byId = new Map(input.players.map((p) => [p.id, p]))
-  const formation = getFormation(team.tactic.formationId)
+  const formation = formationOf(team.tactic)
   const xi = team.tactic.startingXI.map((id) => byId.get(id))
   if (xi.length !== formation.slots.length || xi.some((p) => !p)) {
     throw new Error(`Escalação inválida para ${team.name}`)
   }
   const players = formation.slots.map((slot, i) =>
-    createPitchPlayer(xi[i] as Player, slot.position, slot.sector, 0, sideFactor, dayFactorFor(rng, xi[i] as Player)),
+    createPitchPlayer(xi[i] as Player, slot.position, slot.sector, 0, sideFactor, dayFactorFor(rng, xi[i] as Player), formation.grid[i]),
   )
   const bench = team.tactic.bench
     .map((id) => byId.get(id))

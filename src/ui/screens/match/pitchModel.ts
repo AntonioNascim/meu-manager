@@ -6,7 +6,7 @@
  * O mandante ataca para a direita.
  */
 import type { MatchSnapshot, PlayTrace } from '../../../engine/match'
-import type { MatchEvent, Position } from '../../../engine/types'
+import type { GridPoint, MatchEvent, Position } from '../../../engine/types'
 
 export type Side = 'home' | 'away'
 export interface Pt {
@@ -40,7 +40,13 @@ const LANE: Record<Position, number> = { GK: 0.5, LB: 0.1, LW: 0.1, CB: 0.5, DM:
 export interface OnPitch {
   playerId: string
   slot: Position
+  /** Ponto da grade que ocupa (posicionamento livre): com ele de todos, a base é exatamente o ponto. */
+  point?: GridPoint | undefined
 }
+
+/** Profundidade (0 = própria linha de fundo, 1 = a do rival) de cada linha da grade e posição de cada faixa (0 = esquerda do time). */
+const ROW_DEPTH = [0.05, 0.2, 0.34, 0.46, 0.6, 0.76] as const
+const LANE_Y = [0.1, 0.3, 0.5, 0.7, 0.9] as const
 
 export interface Placed {
   playerId: string
@@ -52,6 +58,14 @@ export interface Placed {
 
 /** Base de um time: cada vaga na profundidade da posição e espalhada na largura quando há mais de um na mesma posição. */
 export function basePositions(side: Side, onPitch: readonly OnPitch[], wingersAttack: boolean): Placed[] {
+  if (onPitch.length > 0 && onPitch.every((p) => p.point)) {
+    return onPitch.map((p) => {
+      const { row, lane } = p.point as GridPoint
+      const depth = ROW_DEPTH[row] ?? 0.5
+      const y = LANE_Y[lane] ?? 0.5
+      return { playerId: p.playerId, side, slot: p.slot, base: { x: side === 'home' ? depth : 1 - depth, y: side === 'home' ? y : 1 - y } }
+    })
+  }
   const groups = new Map<Position, OnPitch[]>()
   for (const p of onPitch) groups.set(p.slot, [...(groups.get(p.slot) ?? []), p])
   const placed: Placed[] = []

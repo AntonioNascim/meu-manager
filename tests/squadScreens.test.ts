@@ -123,7 +123,7 @@ describe('escalações salvas', () => {
     let g = createGame(5, USER)
     const original = userTeam(g).tactic
     g = saveUserLineup(g, 0, '  Time titular ')
-    expect(g.savedLineups?.[0]).toEqual({ name: 'Time titular', formationId: original.formationId, style: original.style, startingXI: original.startingXI })
+    expect(g.savedLineups?.[0]).toEqual({ name: 'Time titular', formationId: original.formationId, style: original.style, startingXI: original.startingXI, grid: original.grid })
     expect(g.savedLineups?.[1]).toBeNull()
     const other = FORMATION_IDS.find((f) => f !== original.formationId) as string
     g = setUserTactic(g, { ...userTeam(g).tactic, formationId: other, style: 'high-press' })

@@ -4,7 +4,7 @@
  * do time do jogador (que ele aceita ou recusa).
  */
 import { MARKET } from '../config'
-import { getFormation } from '../formations'
+import { formationOf } from '../formations'
 import { monthlyOperations, monthlyPayroll } from '../finance'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
@@ -33,7 +33,7 @@ interface Need {
 /** Posições em que o time pode melhorar, com a força do titular mais fraco de cada uma. */
 export function needsOf(team: Team, squad: readonly Player[]): Need[] {
   const slots = new Map<Position, number>()
-  for (const s of getFormation(team.tactic.formationId).slots) slots.set(s.position, (slots.get(s.position) ?? 0) + 1)
+  for (const s of formationOf(team.tactic).slots) slots.set(s.position, (slots.get(s.position) ?? 0) + 1)
   const needs: Need[] = []
   for (const [position, count] of slots) {
     // Titulares da vaga + 1 reserva de verdade: o reserva também conta para a profundidade.

@@ -261,7 +261,7 @@ export function saveUserLineup(game: Game, slot: number, name: string): Game {
   if (!Number.isInteger(slot) || slot < 0 || slot >= LINEUP_SLOTS) throw new Error('Espaço de escalação inválido')
   const tactic = userTeam(game).tactic
   const slots: (SavedLineup | null)[] = Array.from({ length: LINEUP_SLOTS }, (_, i) => game.savedLineups?.[i] ?? null)
-  slots[slot] = { name: name.trim() || `Escalação ${slot + 1}`, formationId: tactic.formationId, style: tactic.style, startingXI: [...tactic.startingXI] }
+  slots[slot] = { name: name.trim() || `Escalação ${slot + 1}`, formationId: tactic.formationId, style: tactic.style, startingXI: [...tactic.startingXI], ...(tactic.grid ? { grid: tactic.grid.map((p) => ({ ...p })) } : {}) }
   return { ...game, savedLineups: slots }
 }
 
