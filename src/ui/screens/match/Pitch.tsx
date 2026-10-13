@@ -4,7 +4,7 @@ import type { MatchSnapshot } from '../../../engine/match'
 import { teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { playerName } from '../../format'
-import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor, HOLD_MS, devFlag } from './pitchModel'
+import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor, HOLD_MS, devFlag, devParam } from './pitchModel'
 import type { Beat, Layout, MarkKind, Placed, Pt, Side } from './pitchModel'
 
 /** Tempo de um minuto de jogo em 1x (ms), o mesmo da tela de partida. */
@@ -75,7 +75,7 @@ interface View {
  * relógio da partida. A cada minuto simulado o lance mais recente vira uma sequência curta de batidas (meio,
  * progressão, chance, finalização); em 4x e 8x só a batida final aparece, sem setas.
  */
-export function Pitch({ game, snap, speed, running }: { game: Game; snap: MatchSnapshot; speed: number; running: boolean }) {
+export function Pitch({ game, snap, speed, running, numbers: shared }: { game: Game; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number> }) {
   const home = teamById(game, snap.home.teamId)
   const away = teamById(game, snap.away.teamId)
   const kits = useMemo(() => kitsFor(home.colors, away.colors), [home.colors, away.colors])
@@ -85,7 +85,9 @@ export function Pitch({ game, snap, speed, running }: { game: Game; snap: MatchS
   }
   const layout = useMemo(() => layoutFrom(snap, wingers), [snap, wingers.home, wingers.away]) // eslint-disable-line react-hooks/exhaustive-deps
   const known = useRef<Layout>(new Map())
-  const numbers = useRef(new Map<string, number>())
+  const ownNumbers = useRef(new Map<string, number>())
+  // Os números podem vir de fora (as Trocas usam os mesmos); sem eles o campo guarda os seus.
+  const numbers = { current: shared ?? ownNumbers.current }
   const names = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
   for (const [id, p] of layout) known.current.set(id, p)
   for (const p of layout.values()) assignNumber(numbers.current, p.side, p.playerId, p.slot)
@@ -114,7 +116,11 @@ export function Pitch({ game, snap, speed, running }: { game: Game; snap: MatchS
     const slow = fresh.length <= 2 || forceFull ? slowFor(last) : 0
     const tick = slow || MINUTE_MS / speed
     const simplified = !forceFull && !slow && (speed >= 4 || fresh.length > 2)
-    const { beats: seq, arrows } = playbackFor(beats, slow ? 1 : speed, simplified)
+    const played = playbackFor(beats, slow ? 1 : speed, simplified)
+    const { arrows } = played
+    // Em desenvolvimento, &passo=N mostra só a batida N da sequência (para conferir a cena parada).
+    const only = devParam('passo')
+    const seq = only !== null && played.beats[Number(only)] ? [played.beats[Number(only)] as Beat] : played.beats
     const slot = tick / Math.max(1, seq.length)
     const glide = !arrows ? Math.min(160, tick) : Math.max(90, Math.min(480, slot * 0.9))
     seq.forEach((beat, i) => {

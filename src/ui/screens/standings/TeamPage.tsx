@@ -7,9 +7,11 @@ import { POSITION_SHORT_LABELS, TIER_LABELS } from '../../labels'
 import { playerOverall } from '../../../engine/overall'
 import { shortName } from './parts'
 import { Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
+import { TacticSection } from './TacticSection'
+import type { LiveTactic } from './TacticSection'
 
 /** Página simples de um time para estudar o adversário: posição, força, últimos resultados e elenco. */
-export function TeamPage({ game, teamId, onBack, onTeam }: { game: Game; teamId: string; onBack: () => void; onTeam: (id: string) => void }) {
+export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; teamId: string; onBack: () => void; onTeam: (id: string) => void; live?: LiveTactic | undefined }) {
   const team = teamById(game, teamId)
   const competition = game.season.season.competitions.find((c) => c.teamIds.includes(teamId))
   const rows: StandingRow[] = competition ? standingsOf(game, competition) : []
@@ -56,6 +58,8 @@ export function TeamPage({ game, teamId, onBack, onTeam }: { game: Game; teamId:
           </Panel>
         ))}
       </div>
+
+      <TacticSection game={game} teamId={teamId} live={live && live.teamId === teamId ? live : undefined} />
 
       <Panel className="p-4">
         <Eyebrow>Últimos resultados</Eyebrow>

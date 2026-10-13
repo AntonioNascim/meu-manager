@@ -15,6 +15,7 @@ import { beginLive } from '../store/liveMatch'
 //   &dias=10                   joga 10 dias de jogos antes (a partida do time é simulada)
 //   &jogo=1                    avança até a partida do time
 //   &minuto=60                 e deixa a partida ao vivo parada nesse minuto
+//   &oponente=1                abre a página do adversário (no painel e na partida); &aba=trocas abre as Trocas na partida
 //   &iniciar=1                a partida do time já começa rodando (junto com &jogo=1)
 //   &ate=gol|cartao|lesao      joga a partida do time até o primeiro gol, cartão ou lesão do time (com &anim=1 o campo mostra o lance)
 //   &decidir=1                 três jovens da base do time já com 20 anos (esperando decisão)

@@ -201,6 +201,10 @@ const markFor = (e: MatchEvent): MarkKind | null =>
  * lado do escanteio) usa um hash do minuto e dos ids, o mesmo em qualquer máquina.
  */
 export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly MatchEvent[]): Beat[] {
+  if (trace.shot && (trace.shot.type === 'penalty' || trace.shot.type === 'freeKick')) {
+    const scene = setPieceBeats(trace, layout, events)
+    if (scene.length > 0) return scene
+  }
   const att = trace.side
   const def: Side = att === 'home' ? 'away' : 'home'
   const dir = att === 'home' ? 1 : -1
@@ -333,6 +337,117 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
   return beats
 }
 
+/** Pênalti: a área (16,5 m de fundo, 40,3 m de largura em 105 × 68) e a marca (11 m). */
+export const BOX_DEPTH = 0.157
+export const BOX_Y: [number, number] = [0.204, 0.796]
+export const PENALTY_MARK = 0.114
+
+/**
+ * Cena de bola parada (só visual, a partir do lance que o motor já gerou):
+ * - pênalti: todos fora da área, o cobrador na marca e o goleiro na linha; depois a corrida e a cobrança;
+ * - falta perigosa: o time que defende forma a barreira (alguns jogadores a ~9 m da bola, na linha do gol), o cobrador
+ *   se posiciona atrás da bola e bate.
+ * Quem cobra pode ser de qualquer lado (a falta é a favor de quem sofreu). Sem sorteio: as escolhas vêm de um hash.
+ */
+export function setPieceBeats(trace: PlayTrace, layout: Layout, events: readonly MatchEvent[]): Beat[] {
+  const shot = trace.shot
+  const taker = shot ? layout.get(shot.shooterId) : undefined
+  if (!shot || !taker) return []
+  const S = taker.side
+  const D: Side = S === 'home' ? 'away' : 'home'
+  const dir = S === 'home' ? 1 : -1
+  const gx = goalX(S)
+  const placed = [...layout.values()]
+  const keeper = (shot.keeperId ? layout.get(shot.keeperId) : undefined) ?? placed.find((p) => p.side === D && p.slot === 'GK')
+  const penalty = shot.type === 'penalty'
+  const ballY = penalty ? 0.5 : clamp(0.5 + (hash(`${trace.minute}:${shot.shooterId}:fk`) - 0.5) * 0.5, 0.26, 0.74)
+  const ballX = penalty ? gx - dir * PENALTY_MARK : gx - dir * (0.2 + hash(`${trace.minute}:${shot.shooterId}:fkx`) * 0.06)
+  const spot: Pt = { x: ballX, y: ballY }
+  const line = (y: number): Pt => ({ x: gx - dir * 0.012, y })
+
+  const moves: Record<string, Pt> = {}
+  const others = placed.filter((p) => p.playerId !== taker.playerId && p.playerId !== keeper?.playerId)
+  const goalkeepers = placed.filter((p) => p.slot === 'GK' && p.playerId !== keeper?.playerId)
+  for (const g of goalkeepers) moves[g.playerId] = shifted(g, S, 'midfield', 0.5)
+
+  if (penalty) {
+    // Todos atrás da área: o time que cobra um pouco mais longe, o outro na meia-lua.
+    for (const side of [S, D] as const) {
+      const mates = others.filter((p) => p.side === side && p.slot !== 'GK').sort((a, b) => a.playerId.localeCompare(b.playerId, 'en', { numeric: true }))
+      const depth = side === S ? 0.3 : 0.25
+      mates.forEach((p, i) => {
+        moves[p.playerId] = { x: gx - dir * depth - dir * (i % 2) * 0.05, y: clamp(0.1 + (0.8 * (i + 0.5)) / Math.max(1, mates.length), 0.08, 0.92) }
+      })
+    }
+  } else {
+    // Barreira: até 4 de quem defende (meio e defesa), a ~9 m da bola, no caminho do gol.
+    const pool = others.filter((p) => p.side === D && p.slot !== 'GK').sort((a, b) => hash(`${trace.minute}:${a.playerId}`) - hash(`${trace.minute}:${b.playerId}`))
+    const wall = pool.slice(0, Math.min(4, pool.length))
+    const wallY = ballY + (0.5 - ballY) * 0.28
+    wall.forEach((p, i) => {
+      moves[p.playerId] = { x: ballX + dir * 0.09, y: clamp(wallY + (i - (wall.length - 1) / 2) * 0.052, 0.05, 0.95) }
+    })
+    // Os outros se espalham: atacantes na área esperando o chute, o resto perto da posição de jogo.
+    const rest = others.filter((p) => p.slot !== 'GK' && !moves[p.playerId])
+    const inBox = rest.filter((p) => p.side === S).sort((a, b) => Math.abs(b.base.x - gx) - Math.abs(a.base.x - gx)).slice(-3)
+    inBox.forEach((p, i) => {
+      // Esperando o chute na altura da barreira, mas longe dela (a bola pode sobrar).
+      moves[p.playerId] = { x: ballX + dir * 0.07, y: clamp(wallY + [-0.22, 0.22, -0.34][i]!, 0.06, 0.94) }
+    })
+    for (const p of rest) if (!moves[p.playerId]) moves[p.playerId] = shifted(p, S, 'midfield', ballY)
+  }
+  // Goleiro na linha (na falta, um passo para o lado da bola).
+  if (keeper) moves[keeper.playerId] = line(penalty ? 0.5 : 0.5 + (ballY - 0.5) * 0.12)
+
+  const setupTaker: Pt = penalty ? { x: ballX - dir * 0.03, y: ballY + 0.015 } : { x: ballX - dir * 0.045, y: ballY + (ballY < 0.5 ? -0.035 : 0.035) }
+  const fouled = events.some((e) => e.minute === trace.minute && e.type === 'foul')
+  const setup: Beat = {
+    phase: 'chance',
+    holder: taker.playerId,
+    ball: spot,
+    moves: { ...moves, [taker.playerId]: setupTaker },
+    attSide: S,
+    focusY: ballY,
+    marks: fouled ? [{ kind: 'foul', at: spot }] : [],
+  }
+  const runUp: Beat = { ...setup, moves: { ...setup.moves, [taker.playerId]: { x: ballX - dir * 0.012, y: ballY } }, marks: [] }
+
+  // A cobrança: onde a bola termina e o goleiro se joga.
+  const mouthY = clamp(0.5 + (hash(`${trace.minute}:${shot.shooterId}:y`) - 0.5) * 0.2, 0.4, 0.6)
+  const mouth: Pt = { x: gx, y: mouthY }
+  let end = mouth
+  let holder: string | undefined = taker.playerId
+  const keeperMoves: Record<string, Pt> = {}
+  if (keeper) {
+    const dive = mouthY < 0.5 ? 0.07 : -0.07
+    keeperMoves[keeper.playerId] = shot.result === 'saved' ? { x: gx - dir * 0.012, y: mouthY } : shot.result === 'goal' ? { x: gx - dir * 0.012, y: 0.5 + dive } : line(0.5)
+  }
+  if (shot.result === 'saved' && keeper) {
+    end = { x: gx - dir * 0.012, y: mouthY }
+    holder = keeper.playerId
+  }
+  if (shot.result === 'off-target') end = { x: gx + dir * 0.03, y: clamp(0.5 + (hash(`${trace.minute}:${shot.shooterId}:o`) < 0.5 ? -1 : 1) * 0.16, 0.18, 0.82) }
+  if (shot.result === 'blocked') {
+    const wallPlayer = Object.entries(moves).find(([id]) => layout.get(id)?.side === D && layout.get(id)?.slot !== 'GK' && !penalty)
+    if (wallPlayer) {
+      end = wallPlayer[1]
+      holder = wallPlayer[0]
+    } else end = { x: gx - dir * 0.05, y: mouthY }
+  }
+  const kind: MarkKind | null = shot.result === 'goal' ? 'goal' : shot.result === 'saved' ? 'save' : shot.result === 'off-target' ? 'off' : null
+  const kick: Beat = {
+    phase: 'shot',
+    ...(holder ? { holder } : {}),
+    ball: end,
+    arrow: { from: spot, to: end, curve: !penalty && shot.result !== 'blocked', solid: true },
+    moves: { ...setup.moves, [taker.playerId]: { x: ballX + dir * 0.015, y: ballY }, ...keeperMoves },
+    attSide: S,
+    focusY: ballY,
+    marks: kind ? [{ kind, at: end }] : [],
+  }
+  return [setup, runUp, kick]
+}
+
 const isFoulOrCard = (e: MatchEvent) => e.type === 'foul' || e.type === 'yellow-card' || e.type === 'red-card'
 
 function nudge(p: Pt, dir: number): Pt {
@@ -378,10 +493,15 @@ export function layoutFrom(snap: MatchSnapshot, wingers: { home: boolean; away: 
 // ---------------------------------------------------------------------------
 
 /** Duração (ms) da animação de cada tipo de lance; o relógio da partida espera esse tempo (`holdFor`). */
-export const HOLD_MS = { goal: 3000, shot: 2000, card: 2000 } as const
+export const HOLD_MS = { goal: 3000, shot: 2000, card: 2000, setPiece: 1000 } as const
 
 /** Quanto o campo demora num momento: o gol e a finalização passam devagar; o resto segue o ritmo da velocidade. */
-export const slowFor = (trace: PlayTrace): number => (trace.shot ? (trace.shot.result === 'goal' ? HOLD_MS.goal : HOLD_MS.shot) : 0)
+export const slowFor = (trace: PlayTrace): number => {
+  if (!trace.shot) return 0
+  // Pênalti e falta perigosa têm a preparação (barreira, marca) antes da cobrança: um segundo a mais.
+  const extra = trace.shot.type === 'penalty' || trace.shot.type === 'freeKick' ? HOLD_MS.setPiece : 0
+  return (trace.shot.result === 'goal' ? HOLD_MS.goal : HOLD_MS.shot) + extra
+}
 
 /** Quanto o relógio espera depois de um passo, pelos lances e eventos novos (0 quando nada pede câmera lenta). */
 export function holdFor(traces: readonly PlayTrace[], events: readonly MatchEvent[]): number {
@@ -396,3 +516,6 @@ export function holdFor(traces: readonly PlayTrace[], events: readonly MatchEven
 
 /** Atalho de desenvolvimento da URL (só com `npm run dev`; fora do navegador ou em produção é sempre falso). */
 export const devFlag = (name: string): boolean => import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has(name)
+
+/** Valor de um parâmetro de desenvolvimento da URL (`null` fora do navegador ou em produção). */
+export const devParam = (name: string): string | null => (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get(name) : null)

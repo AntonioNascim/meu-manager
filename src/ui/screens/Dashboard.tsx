@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { OpponentOverlay } from '../components/OpponentOverlay'
+import { devFlag } from './match/pitchModel'
 import type { DepartedPlayer, MarketNotice, Match, OffseasonReport } from '../../engine/types'
 import { monthlyPayroll } from '../../engine/finance'
 import { pendingIncoming, windowAt } from '../../engine/market'
@@ -139,6 +142,7 @@ function LastMatchCard({ game, match }: { game: Game; match: Match }) {
 
 /** Painel principal (aba Clube): situação do time, próximo jogo e o botão de avançar, atalhos, diretoria e orçamento. */
 export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId) => void }) {
+  const [opponentOpen, setOpponentOpen] = useState(() => devFlag('oponente'))
   const team = userTeam(game)
   const competition = userCompetition(game)
   const table = standingsOf(game, competition)
@@ -235,15 +239,17 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
           <Eyebrow>Próximo jogo</Eyebrow>
           {next && opponent ? (
             <>
-              <div className="mt-2 flex items-center gap-3">
+              <button type="button" onClick={() => setOpponentOpen(true)} aria-label={`Ver a tática de ${opponent.name}`} className="mt-2 flex w-full items-center gap-3 text-left">
                 <Crest team={opponent} size="md" />
                 <div className="min-w-0">
                   <div className="title line-clamp-2 text-3xl">{opponent.name}</div>
                   <div className="text-sm text-muted">
                     {competition.name} · rodada {next.round} · {next.homeTeamId === team.id ? 'em casa' : 'fora'} · {inDays(daysBetween(today, next.date))}
                   </div>
+                  <div className="mt-0.5 text-xs font-bold text-accent">Ver a tática do adversário ›</div>
                 </div>
-              </div>
+              </button>
+              {opponentOpen && <OpponentOverlay game={game} teamId={opponent.id} onClose={() => setOpponentOpen(false)} />}
               <div className="mt-2 text-xs text-muted">
                 Força dos titulares: {teamStrength(game, team).toFixed(0)} (você) x {teamStrength(game, opponent).toFixed(0)} ({opponent.abbreviation})
               </div>

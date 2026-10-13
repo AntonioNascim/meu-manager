@@ -12,7 +12,7 @@ import type { Game } from '../src/store/game'
 import { beginLive, clearLive } from '../src/store/liveMatch'
 import { MatchScreen } from '../src/ui/screens/Match'
 import { Pitch } from '../src/ui/screens/match/Pitch'
-import { HOLD_MS, assignNumber, basePositions, beatsFor, colorDistance, hash, holdFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor } from '../src/ui/screens/match/pitchModel'
+import { BOX_DEPTH, BOX_Y, HOLD_MS, PENALTY_MARK, assignNumber, basePositions, beatsFor, colorDistance, hash, holdFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor } from '../src/ui/screens/match/pitchModel'
 import { otherGamesOf, scoreAt } from '../src/ui/screens/match/otherGames'
 import type { Layout, Placed } from '../src/ui/screens/match/pitchModel'
 
@@ -184,7 +184,8 @@ describe('bola, setas e marcações de cada lance', () => {
     for (const t of snap.trace) {
       const beats = beatsFor(t, everyone, snap.events)
       expect(beats.length).toBeGreaterThan(0)
-      expect(beats[0]?.phase).toBe('midfield')
+      // Pênalti e falta perigosa começam pela cena da bola parada; os outros lances, pela disputa do meio.
+      expect(beats[0]?.phase).toBe(t.shot?.type === 'penalty' || t.shot?.type === 'freeKick' ? 'chance' : 'midfield')
       for (const beat of beats) {
         expect(beat.ball.x).toBeGreaterThanOrEqual(-0.05)
         expect(beat.ball.x).toBeLessThanOrEqual(1.05)
@@ -542,5 +543,69 @@ describe('a animação não usa o gerador do motor', () => {
       const text = readFileSync(new URL(file, import.meta.url), 'utf8')
       expect(text).not.toMatch(/engine\/rng|createRng|Math\.random/)
     }
+  })
+})
+
+describe('cenas de bola parada no campo', () => {
+  const scenes = (type: 'penalty' | 'freeKick') => {
+    const found: { trace: MatchSnapshot['trace'][number]; layout: Layout; snap: MatchSnapshot }[] = []
+    for (let seed = 1; seed < 160 && found.length < 6; seed++) {
+      const snap = full(seed, a, b)
+      const layout = layoutFrom(snap, wingers(snap))
+      for (const trace of snap.trace) if (trace.shot?.type === type && layout.has(trace.shot.shooterId)) found.push({ trace, layout, snap })
+    }
+    return found
+  }
+  const inBox = (p: { x: number; y: number }, gx: number) => Math.abs(p.x - gx) < BOX_DEPTH && p.y > BOX_Y[0] && p.y < BOX_Y[1]
+
+  it('pênalti: todos fora da área, o cobrador perto da marca e o goleiro na linha; só depois a cobrança', () => {
+    const list = scenes('penalty')
+    expect(list.length).toBeGreaterThan(0)
+    for (const { trace, layout, snap } of list) {
+      const beats = beatsFor(trace, layout, snap.events)
+      expect(beats).toHaveLength(3)
+      const taker = layout.get(trace.shot!.shooterId)!
+      const gx = taker.side === 'home' ? 1 : 0
+      const dir = taker.side === 'home' ? 1 : -1
+      const [setup, , kick] = beats as [(typeof beats)[number], (typeof beats)[number], (typeof beats)[number]]
+      expect(setup.ball).toEqual({ x: gx - dir * PENALTY_MARK, y: 0.5 })
+      expect(setup.arrow).toBeUndefined()
+      expect(Math.abs((setup.moves[taker.playerId] as { x: number }).x - setup.ball.x)).toBeLessThan(0.05)
+      const keeper = [...layout.values()].find((p) => p.side !== taker.side && p.slot === 'GK')!
+      expect(Math.abs((setup.moves[keeper.playerId] as { x: number }).x - gx)).toBeLessThan(0.03)
+      for (const [id, at] of Object.entries(setup.moves)) {
+        if (id === taker.playerId || id === keeper.playerId || layout.get(id)?.slot === 'GK') continue
+        expect(inBox(at, gx)).toBe(false)
+      }
+      expect(kick.arrow?.solid).toBe(true)
+      expect(kick.ball).not.toEqual(setup.ball)
+    }
+  })
+
+  it('falta perigosa: barreira com alguns do time que defende entre a bola e o gol, a ~9 m, e o cobrador atrás da bola', () => {
+    const list = scenes('freeKick')
+    expect(list.length).toBeGreaterThan(0)
+    for (const { trace, layout, snap } of list) {
+      const beats = beatsFor(trace, layout, snap.events)
+      expect(beats).toHaveLength(3)
+      const taker = layout.get(trace.shot!.shooterId)!
+      const gx = taker.side === 'home' ? 1 : 0
+      const dir = taker.side === 'home' ? 1 : -1
+      const setup = beats[0]!
+      const wall = Object.entries(setup.moves).filter(([id, at]) => layout.get(id)?.side !== taker.side && layout.get(id)?.slot !== 'GK' && Math.abs(at.x - (setup.ball.x + dir * 0.09)) < 0.001)
+      expect(wall.length).toBeGreaterThanOrEqual(3)
+      expect(wall.length).toBeLessThanOrEqual(4)
+      for (const [, at] of wall) expect((gx - at.x) * dir).toBeGreaterThan(0)
+      const t = setup.moves[taker.playerId] as { x: number }
+      expect((setup.ball.x - t.x) * dir).toBeGreaterThan(0)
+      expect(beats[2]!.arrow?.curve).toBe(trace.shot!.result !== 'blocked')
+    }
+  })
+
+  it('a cena é só visual: depende só do lance (mesma entrada, mesmas batidas) e passa em câmera lenta', () => {
+    const [one] = scenes('penalty')
+    const again = beatsFor(one!.trace, one!.layout, one!.snap.events)
+    expect(again).toEqual(beatsFor(one!.trace, one!.layout, one!.snap.events))
+    expect(slowFor(one!.trace)).toBeGreaterThan(one!.trace.shot!.result === 'goal' ? HOLD_MS.goal : HOLD_MS.shot)
   })
 })

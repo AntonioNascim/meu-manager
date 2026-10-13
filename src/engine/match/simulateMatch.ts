@@ -57,6 +57,8 @@ export interface SideSnapshot {
   style: PlayStyle
   /** Mentalidade escolhida (a do técnico, sem os ajustes automáticos da IA). */
   mentality: Mentality
+  /** Mentalidade em uso agora: a da IA muda pelo placar e pelo tamanho do rival (no time do jogador é a mesma). */
+  activeMentality: Mentality
   goals: number
   /** Quem está em campo agora, com a vaga e a condição. */
   onPitch: { playerId: string; slot: Position; fitness: number; yellowCards: number }[]
@@ -149,6 +151,7 @@ export function startMatch(input: MatchInput): LiveMatch {
     formationId: side.formation.id,
     style: side.style,
     mentality: side.baseMentality,
+    activeMentality: side.mentality as Mentality,
     goals: side.goals,
     onPitch: activePlayers(side).map((p) => ({ playerId: p.player.id, slot: p.slot, fitness: Math.round(p.fitness), yellowCards: p.yellowCards })),
     bench: side.bench.map((p) => p.id),
