@@ -12,6 +12,7 @@ import { BottomNav } from './theme'
 import type { NavItem } from './theme'
 import { Dismissed } from './screens/Dismissed'
 import { Market } from './screens/Market'
+import type { MarketTab } from './screens/Market'
 import { Finance } from './screens/Finance'
 import { Dashboard } from './screens/Dashboard'
 import { MatchScreen } from './screens/Match'
@@ -32,6 +33,12 @@ function initialScreen(): ScreenId {
 function initialSquadTab(): SquadTab {
   const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
   return wanted === 'lineup' || wanted === 'numbers' || wanted === 'academy' || wanted === 'training' ? wanted : 'players'
+}
+
+/** Em desenvolvimento, &aba=free|proposals abre a aba do Mercado. */
+function initialMarketTab(): MarketTab {
+  const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
+  return wanted === 'free' || wanted === 'proposals' || wanted === 'contracts' ? wanted : 'search'
 }
 
 export function App() {
@@ -106,7 +113,7 @@ export function App() {
         {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={current} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab()} />}
         {current === 'tactics' && <Tactics game={game} />}
         {current === 'standings' && <Standings game={game} />}
-        {(current === 'market' || current === 'contracts') && <Market key={current} game={game} initialTab={current === 'contracts' ? 'contracts' : 'search'} />}
+        {(current === 'market' || current === 'contracts') && <Market key={current} game={game} initialTab={current === 'contracts' ? 'contracts' : initialMarketTab()} />}
         {current === 'finance' && <Finance game={game} />}
       </main>
 

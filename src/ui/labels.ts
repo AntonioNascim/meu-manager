@@ -26,7 +26,7 @@ import type {
   TeamMatchStats,
   WindowName,
 } from '../engine/types'
-import type { SquadRole } from '../engine/market'
+import type { InterestLevel, MarketSort, QuickFilter, Situation, SquadRole } from '../engine/market'
 
 export const POSITION_LABELS: Record<Position, string> = {
   GK: 'Goleiro',
@@ -323,4 +323,41 @@ export const TRAINING_FOCUS_DESCRIPTIONS: Record<TrainingFocus, string> = {
   technical: 'Passe, finalização, drible, cruzamento e controle evoluem mais.',
   defensive: 'Desarme, cabeceio, posicionamento, força e determinação evoluem mais (e os reflexos do goleiro).',
   offensive: 'Finalização, drible, cruzamento, passe, velocidade e visão evoluem mais.',
+}
+
+/** Interesse do jogador em vir para o seu clube. */
+export const INTEREST_LABELS: Record<InterestLevel, string> = {
+  none: 'nenhum',
+  low: 'baixo',
+  medium: 'médio',
+  high: 'alto',
+}
+
+export const INTEREST_COLORS: Record<InterestLevel, string> = {
+  none: 'text-loss',
+  low: 'text-orange-400',
+  medium: 'text-amber-300',
+  high: 'text-win',
+}
+
+export const SITUATION_LABELS: Record<Situation, string> = {
+  all: 'Todos',
+  club: 'Com clube',
+  free: 'Livres',
+  expiring: 'Contrato acabando',
+}
+
+export const QUICK_FILTER_LABELS: Record<QuickFilter, string> = {
+  budget: 'Cabem no bolso',
+  bargain: 'Barganhas',
+  prospect: 'Jovens promessas',
+  expiring: 'Contrato acabando',
+}
+
+export const MARKET_SORT_LABELS: Record<MarketSort, string> = {
+  overall: 'Maior força',
+  age: 'Mais jovem',
+  'value-desc': 'Maior valor',
+  'value-asc': 'Menor valor',
+  salary: 'Menor salário',
 }

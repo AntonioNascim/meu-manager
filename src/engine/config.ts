@@ -435,6 +435,11 @@ export const MARKET = {
     offerValidDays: 7,
   },
 
+  /** Busca de jogadores: atalhos "Barganhas" (valor até esta fração do valor pela força sozinha) e "Jovens promessas" (idade e potencial estimado). */
+  search: { bargainShare: 0.55, prospectAge: 21, prospectPotential: 78 },
+  /** Interesse do jogador em vir para o seu clube: salário mínimo que ele aceitaria ÷ salário esperado pela força dele. */
+  interest: { high: 0.8, medium: 1, low: 1.6 },
+
   /** Decisão do jogador: soma ponderada de salário, reputação do clube e tempo de jogo; aceita se ≥ 0. */
   player: {
     salaryWeight: 1,

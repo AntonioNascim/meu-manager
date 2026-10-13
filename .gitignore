@@ -23,3 +23,6 @@ npm-debug.log*
 .idea
 .DS_Store
 Thumbs.db
+
+# Capturas de tela de conferência
+.shots/

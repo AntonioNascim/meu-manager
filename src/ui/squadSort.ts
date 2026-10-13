@@ -1,7 +1,7 @@
 import { CONDITION } from '../engine/config'
 import { playerOverall } from '../engine/overall'
 import { POSITIONS } from '../engine/types'
-import type { Player, Position } from '../engine/types'
+import type { Player } from '../engine/types'
 import { playerName } from './format'
 
 export type SquadSortKey = 'position' | 'name' | 'age' | 'overall' | 'fitness' | 'form' | 'morale'
@@ -30,16 +30,8 @@ export function sortSquad(players: readonly Player[], key: SquadSortKey, directi
   })
 }
 
-export type PositionGroup = 'all' | 'GK' | 'DEF' | 'MID' | 'FWD'
-
-export const POSITION_GROUPS: Record<Exclude<PositionGroup, 'all'>, readonly Position[]> = {
-  GK: ['GK'],
-  DEF: ['CB', 'RB', 'LB'],
-  MID: ['DM', 'CM', 'AM'],
-  FWD: ['RW', 'LW', 'ST'],
-}
-
-export const inGroup = (p: Player, group: PositionGroup): boolean => group === 'all' || POSITION_GROUPS[group].includes(p.position)
+export { POSITION_GROUPS, inGroup } from '../engine/market/search'
+export type { PositionGroup } from '../engine/market/search'
 
 export const isUnavailable = (p: Player): boolean => p.condition.injuryDaysLeft > 0 || p.condition.suspensionGames > 0
 
