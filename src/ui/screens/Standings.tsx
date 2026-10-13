@@ -29,7 +29,7 @@ export function Standings({ game, initialSection = 'table' }: { game: Game; init
   const mine = competitions.find((c) => c.teamIds.includes(game.userTeamId)) as Competition
   const [competitionId, setCompetitionId] = useState(mine.id)
   const [section, setSection] = useState<Section>(initialSection)
-  const [teamId, setTeamId] = useState<string | null>(null)
+  const [teamId, setTeamId] = useState<string | null>(() => (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('equipe') : null))
   const competition = competitions.find((c) => c.id === competitionId) as Competition
 
   if (teamId) return <TeamPage game={game} teamId={teamId} onBack={() => setTeamId(null)} onTeam={setTeamId} />

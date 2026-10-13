@@ -58,14 +58,14 @@ export function Table({ game, competition, onTeam }: { game: Game; competition: 
         </button>
       </div>
 
-      <div className="-mx-2 overflow-x-auto rounded-2xl border border-line bg-surface">
-        <div className="min-w-[352px] text-[12px]">
+      <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+        <div className="text-[12px]">
           <div className="flex items-center border-b border-line px-1 py-2 text-[11px] font-bold uppercase text-muted">
             <span className="sticky left-0 z-10 flex w-[128px] shrink-0 bg-surface pl-2">
               <span className="w-5">#</span>Clube
             </span>
             {cols.map((h) => (
-              <span key={h} className={`${h === 'SG' ? 'w-6' : h === 'GP' || h === 'GC' ? 'w-[22px]' : 'w-[18px]'} shrink-0 text-center`}>
+              <span key={h} className={`${h === 'SG' ? 'w-6' : h === 'GP' || h === 'GC' ? 'w-[22px] max-[419px]:hidden' : 'w-[18px]'} shrink-0 text-center`}>
                 {h}
               </span>
             ))}
@@ -87,7 +87,7 @@ export function Table({ game, competition, onTeam }: { game: Game; competition: 
                     <TeamLink team={team} onOpen={onTeam} className="flex-1 gap-1.5 pr-1" />
                   </span>
                   {[row.played, row.wins, row.draws, row.losses, row.goalsFor, row.goalsAgainst].map((v, k) => (
-                    <span key={k} className={`${k >= 4 ? 'w-[22px]' : 'w-[18px]'} shrink-0 text-center tabular-nums text-slate-300`}>
+                    <span key={k} className={`${k >= 4 ? 'w-[22px] max-[419px]:hidden' : 'w-[18px]'} shrink-0 text-center tabular-nums text-slate-300`}>
                       {v}
                     </span>
                   ))}
@@ -116,7 +116,7 @@ export function Table({ game, competition, onTeam }: { game: Game; competition: 
             </span>
           ))}
       </div>
-      <p className="text-[11px] text-muted">Desempate: pontos, vitórias, saldo, gols pró, confronto direto, cartões. Toque num time para estudá-lo.</p>
+      <p className="text-[11px] text-muted">Em telas pequenas a tabela esconde GP e GC (gols pró e contra). Desempate: pontos, vitórias, saldo, gols pró, confronto direto, cartões. Toque num time para estudá-lo.</p>
     </div>
   )
 }

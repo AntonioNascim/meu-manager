@@ -5,6 +5,7 @@ import type { Game } from '../../../store/game'
 import { formatDate, playerName } from '../../format'
 import { POSITION_SHORT_LABELS, TIER_LABELS } from '../../labels'
 import { playerOverall } from '../../../engine/overall'
+import { shortName } from './parts'
 import { Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
 
 /** Página simples de um time para estudar o adversário: posição, força, últimos resultados e elenco. */
@@ -73,7 +74,7 @@ export function TeamPage({ game, teamId, onBack, onTeam }: { game: Game; teamId:
                   <ResultDot outcome={outcome} />
                   <button type="button" onClick={() => onTeam(other.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-label={`Abrir ${other.name}`}>
                     <Crest team={other} size="xs" />
-                    <span className="truncate font-semibold">{other.name}</span>
+                    <span className="truncate font-semibold">{shortName(other)}</span>
                   </button>
                   <span className="shrink-0 text-xs text-muted">{home ? 'em casa' : 'fora'}</span>
                   <span className="w-12 shrink-0 text-right font-extrabold tabular-nums">
@@ -86,7 +87,7 @@ export function TeamPage({ game, teamId, onBack, onTeam }: { game: Game; teamId:
         )}
         {next && (
           <p className="mt-3 text-xs text-muted">
-            Próximo jogo: {opponentLine(next).home ? 'em casa contra' : 'fora contra'} <b className="text-slate-200">{opponentLine(next).other.name}</b>, {formatDate(next.date)} (rodada {next.round}).
+            Próximo jogo: {opponentLine(next).home ? 'em casa contra' : 'fora contra'} <b className="text-slate-200">{shortName(opponentLine(next).other)}</b>, {formatDate(next.date)} (rodada {next.round}).
           </p>
         )}
       </Panel>

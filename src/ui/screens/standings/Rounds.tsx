@@ -72,12 +72,12 @@ export function MatchSummary({ game, match, onClose }: { game: Game; match: Matc
 export function Rounds({ game, competition, onTeam }: { game: Game; competition: Competition; onTeam: (id: string) => void }) {
   const matches = useMemo(() => competitionMatches(game, competition.id), [game, competition.id])
   const [chosen, setChosen] = useState<number | null>(null)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(() => (import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('resumo') !== null ? (matches.find((m) => m.status === 'finished' && m.result && m.result.homeGoals + m.result.awayGoals >= 2)?.id ?? null) : null))
   const round = Math.min(competition.roundCount, Math.max(1, chosen ?? currentRound(matches, competition.roundCount)))
   const list = matches.filter((m) => m.round === round).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
   const date = list[0]?.date
   const played = list.filter((m) => m.status === 'finished').length
-  const open = list.find((m) => m.id === openId)
+  const open = matches.find((m) => m.id === openId)
 
   return (
     <div className="space-y-3">

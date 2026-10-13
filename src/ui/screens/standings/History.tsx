@@ -2,7 +2,7 @@ import type { Game } from '../../../store/game'
 import { teamById } from '../../../store/game'
 import { TIER_LABELS } from '../../labels'
 import { Icon, Panel } from '../../theme'
-import { SectionHeader, TeamLink } from './parts'
+import { SectionHeader, TeamLink, shortName } from './parts'
 
 /** Histórico: campeões de cada temporada, quem subiu e quem caiu, e a posição do seu time em cada ano. */
 export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => void }) {
@@ -33,13 +33,13 @@ export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => 
             <li className="flex items-start gap-2">
               <span className="mt-0.5 text-win">▲</span>
               <span className="min-w-0 flex-1 text-slate-200">
-                <b className="text-win">Subiram:</b> {s.promoted.map((id) => name(id).name).join(', ') || '–'}
+                <b className="text-win">Subiram:</b> {s.promoted.map((id) => shortName(name(id))).join(', ') || '–'}
               </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-0.5 text-loss">▼</span>
               <span className="min-w-0 flex-1 text-slate-200">
-                <b className="text-loss">Caíram:</b> {s.relegated.map((id) => name(id).name).join(', ') || '–'}
+                <b className="text-loss">Caíram:</b> {s.relegated.map((id) => shortName(name(id))).join(', ') || '–'}
               </span>
             </li>
           </ul>
