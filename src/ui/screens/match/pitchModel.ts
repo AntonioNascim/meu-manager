@@ -372,3 +372,27 @@ export function layoutFrom(snap: MatchSnapshot, wingers: { home: boolean; away: 
   for (const p of basePositions('away', snap.away.onPitch, wingers.away)) out.set(p.playerId, p)
   return out
 }
+
+// ---------------------------------------------------------------------------
+// Câmera lenta: finalizações, gols e cartões ganham tempo para serem vistos, em qualquer velocidade
+// ---------------------------------------------------------------------------
+
+/** Duração (ms) da animação de cada tipo de lance; o relógio da partida espera esse tempo (`holdFor`). */
+export const HOLD_MS = { goal: 3000, shot: 2000, card: 2000 } as const
+
+/** Quanto o campo demora num momento: o gol e a finalização passam devagar; o resto segue o ritmo da velocidade. */
+export const slowFor = (trace: PlayTrace): number => (trace.shot ? (trace.shot.result === 'goal' ? HOLD_MS.goal : HOLD_MS.shot) : 0)
+
+/** Quanto o relógio espera depois de um passo, pelos lances e eventos novos (0 quando nada pede câmera lenta). */
+export function holdFor(traces: readonly PlayTrace[], events: readonly MatchEvent[]): number {
+  let hold = 0
+  for (const t of traces) hold = Math.max(hold, slowFor(t))
+  for (const e of events) {
+    if (e.type === 'goal' || e.type === 'own-goal') hold = Math.max(hold, HOLD_MS.goal)
+    else if (e.type === 'yellow-card' || e.type === 'red-card') hold = Math.max(hold, HOLD_MS.card)
+  }
+  return hold
+}
+
+/** Atalho de desenvolvimento da URL (só com `npm run dev`; fora do navegador ou em produção é sempre falso). */
+export const devFlag = (name: string): boolean => import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has(name)

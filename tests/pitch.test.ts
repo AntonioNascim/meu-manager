@@ -10,9 +10,10 @@ import type { Player, Team } from '../src/engine/types'
 import { advanceToMatchday, createGame } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { beginLive, clearLive } from '../src/store/liveMatch'
-import { MatchScreen, readView, writeView } from '../src/ui/screens/Match'
+import { MatchScreen } from '../src/ui/screens/Match'
 import { Pitch } from '../src/ui/screens/match/Pitch'
-import { assignNumber, basePositions, beatsFor, colorDistance, hash, kitsFor, layoutFrom, pickTrace, playbackFor, shifted } from '../src/ui/screens/match/pitchModel'
+import { HOLD_MS, assignNumber, basePositions, beatsFor, colorDistance, hash, holdFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor } from '../src/ui/screens/match/pitchModel'
+import { otherGamesOf, scoreAt } from '../src/ui/screens/match/otherGames'
 import type { Layout, Placed } from '../src/ui/screens/match/pitchModel'
 
 const world = generateWorld({ seed: 11 })
@@ -293,41 +294,245 @@ describe('campo na tela', () => {
   })
 })
 
-describe('tela de partida: Campo ou Só lances', () => {
-  afterEach(() => {
-    clearLive()
-    delete (globalThis as { window?: unknown }).window
-  })
+describe('outros jogos da rodada (revelados pelo relógio)', () => {
+  afterEach(() => clearLive())
   const toDay = (): Game => {
     let g = createGame(3, 'team-imp')
     while (!g.pendingUserMatch) g = advanceToMatchday(g)
     return g
   }
 
-  it('a preferência é guardada no aparelho e, sem armazenamento, volta ao campo', () => {
-    const store = new Map<string, string>()
-    ;(globalThis as { window?: unknown }).window = { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) } }
-    expect(readView()).toBe('field')
-    writeView('log')
-    expect(readView()).toBe('log')
-    writeView('field')
-    expect(readView()).toBe('field')
-    ;(globalThis as { window?: unknown }).window = { localStorage: { getItem: () => { throw new Error('bloqueado') }, setItem: () => { throw new Error('bloqueado') } } }
-    expect(readView()).toBe('field')
-    expect(() => writeView('log')).not.toThrow()
+  it('são os jogos da mesma série, rodada e data, já decididos, menos o do jogador', () => {
+    const g = toDay()
+    const mine = g.pendingUserMatch!
+    const others = otherGamesOf(g)
+    expect(others.length).toBeGreaterThan(0)
+    for (const m of others) {
+      expect(m.id).not.toBe(mine.id)
+      expect([m.competitionId, m.round, m.date]).toEqual([mine.competitionId, mine.round, mine.date])
+      expect(m.status).toBe('finished')
+    }
   })
 
-  it('a tela ao vivo traz o botão Campo / Só lances, o campo em cima e os lances e dados embaixo; Só lances esconde o campo', () => {
+  it('os gols aparecem no minuto em que acontecem e no minuto 90 o placar é o resultado fechado', () => {
     const g = toDay()
-    beginLive(g).match.playUntil(20)
+    for (const m of otherGamesOf(g)) {
+      const r = m.result!
+      expect(scoreAt(m, 0)).toMatchObject({ home: 0, away: 0 })
+      let before = 0
+      for (let minute = 0; minute <= 90; minute++) {
+        const s = scoreAt(m, minute)
+        expect(s.home + s.away).toBeGreaterThanOrEqual(before)
+        expect(s.goals.every((e) => e.minute <= minute || minute >= 90)).toBe(true)
+        before = s.home + s.away
+      }
+      expect(scoreAt(m, 90)).toMatchObject({ home: r.homeGoals, away: r.awayGoals })
+      expect(scoreAt(m, 89).home + scoreAt(m, 89).away).toBeLessThanOrEqual(r.homeGoals + r.awayGoals)
+    }
+  })
+
+  it('ler o relógio não muda o resultado dos jogos', () => {
+    const g = toDay()
+    const before = JSON.stringify(otherGamesOf(g).map((m) => m.result))
+    for (const m of otherGamesOf(g)) for (let minute = 0; minute <= 90; minute += 7) scoreAt(m, minute)
+    expect(JSON.stringify(otherGamesOf(g).map((m) => m.result))).toBe(before)
+  })
+
+  it('a aba Jogos é a primeira e lista os outros jogos', () => {
+    const g = toDay()
     const html = renderToStaticMarkup(createElement(MatchScreen, { game: g, onNavigate: () => {} }))
-    for (const t of ['Campo', 'Só lances', 'Lances', 'Dados', 'Tática', 'Trocas']) expect(html).toContain(t)
+    expect(html).toContain('data-testid="other-game"')
+    expect(html.match(/data-testid="other-game"/g)).toHaveLength(otherGamesOf(g).length)
+    expect(html.indexOf('>Jogos<')).toBeLessThan(html.indexOf('>Dados<'))
+  })
+})
+
+describe('câmera lenta em finalizações, gols e cartões', () => {
+  const trace = (shot?: 'goal' | 'saved'): MatchSnapshot['trace'][number] => ({
+    minute: 10,
+    side: 'home',
+    transition: false,
+    play: 'through',
+    ...(shot ? { shot: { shooterId: 'x', type: 'insideBox', result: shot } } : {}),
+  })
+  const event = (type: 'goal' | 'yellow-card' | 'red-card' | 'foul') => ({ minute: 10, type, teamId: 't', playerId: 'p', text: '' })
+
+  it('gol é mais lento que finalização, que é mais lenta que o lance comum (que segue a velocidade)', () => {
+    expect(slowFor(trace('goal'))).toBe(HOLD_MS.goal)
+    expect(slowFor(trace('saved'))).toBe(HOLD_MS.shot)
+    expect(slowFor(trace())).toBe(0)
+    expect(HOLD_MS.goal).toBeGreaterThan(HOLD_MS.shot)
+    expect(HOLD_MS.shot).toBeGreaterThan(700 / 8)
+  })
+
+  it('o relógio espera depois de gol, finalização e cartão, em qualquer velocidade, e não espera por falta', () => {
+    expect(holdFor([trace('goal')], [event('goal')])).toBe(HOLD_MS.goal)
+    expect(holdFor([trace('saved')], [])).toBe(HOLD_MS.shot)
+    expect(holdFor([trace()], [event('yellow-card')])).toBe(HOLD_MS.card)
+    expect(holdFor([trace()], [event('red-card')])).toBe(HOLD_MS.card)
+    expect(holdFor([trace()], [event('foul')])).toBe(0)
+    expect(holdFor([], [])).toBe(0)
+  })
+})
+
+describe('lesão no seu time: o jogo para e o técnico escolhe', () => {
+  const hold = (seed: number) => startMatch({ ...input(a, b, seed), userControlled: { home: true }, holdInjurySubs: true })
+
+  /** Joga até a primeira lesão do mandante (ou o fim) e devolve a partida e o instante. */
+  const untilInjury = (m: ReturnType<typeof hold>) => {
+    for (let minute = 1; minute <= 90 && !m.finished; minute++) {
+      m.playUntil(minute)
+      const s = m.snapshot()
+      if (s.injuryPending || s.events.some((e) => e.type === 'injury' && e.teamId === a.id)) return s
+    }
+    return m.snapshot()
+  }
+  const seedWithInjury = (): number => {
+    for (let seed = 1; seed < 600; seed++) if (untilInjury(hold(seed)).injuryPending) return seed
+    throw new Error('nenhuma lesão do mandante nas sementes testadas')
+  }
+
+  it('o jogador sai, o relógio não anda e a troca não é feita sozinha', () => {
+    const m = hold(seedWithInjury())
+    const s = untilInjury(m)
+    const pending = s.injuryPending!
+    expect(pending.side).toBe('home')
+    expect(s.home.onPitch.some((p) => p.playerId === pending.playerId)).toBe(false)
+    expect(s.home.onPitch).toHaveLength(10)
+    expect(s.home.subsLeft).toBe(5)
+    const minute = m.minute
+    m.playUntil(90)
+    expect(m.minute).toBe(minute)
+    expect(m.finished).toBe(false)
+  })
+
+  it('escolher o reserva coloca o time com 11 de novo, gasta uma troca e o jogo segue até o fim', () => {
+    const m = hold(seedWithInjury())
+    const s = untilInjury(m)
+    const pick = s.home.bench[0]!
+    m.resolveInjury('home', pick)
+    const after = m.snapshot()
+    expect(after.injuryPending).toBeUndefined()
+    expect(after.home.onPitch).toHaveLength(11)
+    expect(after.home.onPitch.some((p) => p.playerId === pick)).toBe(true)
+    expect(after.home.subsLeft).toBe(4)
+    expect(after.home.stopsLeft).toBe(2)
+    m.playUntil(90)
+    expect(m.finished || m.snapshot().injuryPending !== undefined).toBe(true)
+  })
+
+  it('seguir com um a menos mantém o time com 10 e libera o jogo', () => {
+    const m = hold(seedWithInjury())
+    untilInjury(m)
+    m.resolveInjury('home')
+    const s = m.snapshot()
+    expect(s.injuryPending).toBeUndefined()
+    expect(s.home.subsLeft).toBe(5)
+    expect(s.home.onPitch.length).toBeLessThanOrEqual(10)
+  })
+
+  it('sem trocas disponíveis o time fica com um a menos e o jogo não espera ninguém', () => {
+    for (let seed = 1; seed < 800; seed++) {
+      const m = hold(seed)
+      m.playUntil(1)
+      const s0 = m.snapshot()
+      const bench = [...s0.home.bench]
+      const outs = s0.home.onPitch.filter((p) => p.slot !== 'GK').slice(0, 5)
+      if (bench.length < 5 || outs.length < 5) continue
+      outs.forEach((o, i) => m.substitute('home', o.playerId, bench[i]!))
+      const before = m.snapshot().events.length
+      m.playUntil(90)
+      const s = m.snapshot()
+      const hurt = s.events.slice(before).find((e) => e.type === 'injury' && e.teamId === a.id)
+      if (!hurt) continue
+      expect(s.injuryPending).toBeUndefined()
+      expect(s.home.subsLeft).toBe(0)
+      expect(s.home.onPitch.length).toBeLessThanOrEqual(10)
+      return
+    }
+    throw new Error('nenhuma lesão sem trocas nas sementes testadas')
+  })
+
+  it('a regra de 3 paradas vale: sem parada disponível a lesão também deixa o time com um a menos', () => {
+    for (let seed = 1; seed < 1200; seed++) {
+      const m = hold(seed)
+      m.playUntil(1)
+      let ok = true
+      for (const minute of [10, 20, 30]) {
+        m.playUntil(minute)
+        const s = m.snapshot()
+        if (s.injuryPending) {
+          ok = false
+          break
+        }
+        const out = s.home.onPitch.find((p) => p.slot !== 'GK')
+        const inn = s.home.bench[0]
+        if (!out || !inn) {
+          ok = false
+          break
+        }
+        m.substitute('home', out.playerId, inn)
+      }
+      if (!ok || m.snapshot().home.stopsLeft !== 0) continue
+      const before = m.snapshot().events.length
+      m.playUntil(90)
+      const s = m.snapshot()
+      if (!s.events.slice(before).some((e) => e.type === 'injury' && e.teamId === a.id)) continue
+      expect(s.injuryPending).toBeUndefined()
+      return
+    }
+    throw new Error('nenhuma lesão depois das 3 paradas nas sementes testadas')
+  })
+
+  it('sem o aviso (padrão) nada muda: o melhor reserva entra na hora, como sempre', () => {
+    const seed = seedWithInjury()
+    const plain = startMatch({ ...input(a, b, seed), userControlled: { home: true } })
+    plain.playUntil(90)
+    const s = plain.snapshot()
+    expect(s.injuryPending).toBeUndefined()
+    expect(s.events.some((e) => e.type === 'injury' && e.teamId === a.id)).toBe(true)
+  })
+})
+
+describe('tela de partida: abas, controles e velocidade', () => {
+  afterEach(() => clearLive())
+  const toDay = (): Game => {
+    let g = createGame(3, 'team-imp')
+    while (!g.pendingUserMatch) g = advanceToMatchday(g)
+    return g
+  }
+
+  it('o campo está sempre na tela e não existe mais Campo / Só lances', () => {
+    const html = renderToStaticMarkup(createElement(MatchScreen, { game: toDay(), onNavigate: () => {} }))
     expect(html).toContain('data-testid="pitch"')
-    expect(html.indexOf('data-testid="pitch"')).toBeLessThan(html.indexOf('Mostrar faltas'))
-    ;(globalThis as { window?: unknown }).window = { localStorage: { getItem: () => 'log', setItem: () => {} } }
-    const log = renderToStaticMarkup(createElement(MatchScreen, { game: g, onNavigate: () => {} }))
-    expect(log).not.toContain('data-testid="pitch"')
-    expect(log).toContain('Mostrar faltas')
+    expect(html).not.toContain('Só lances')
+    expect(html).not.toContain('Como ver a partida')
+    for (const old of ['>1x<', '>4x<', '>8x<', 'Velocidade</span>']) expect(html).not.toContain(old)
+  })
+
+  it('um único botão de velocidade (2x de início) fica no placar', () => {
+    const html = renderToStaticMarkup(createElement(MatchScreen, { game: toDay(), onNavigate: () => {} }))
+    expect(html.match(/data-testid="speed"/g)).toHaveLength(1)
+    expect(html.indexOf('data-testid="speed"')).toBeLessThan(html.indexOf('data-testid="pitch"'))
+  })
+
+  it('a lista de lances fica numa seção própria depois das abas', () => {
+    const g = toDay()
+    beginLive(g, true).match.playUntil(20)
+    const html = renderToStaticMarkup(createElement(MatchScreen, { game: g, onNavigate: () => {} }))
+    expect(html.indexOf('>Trocas<')).toBeLessThan(html.indexOf('Lances ao vivo'))
+    expect(html).toContain('Mostrar faltas')
+  })
+
+  it('no intervalo os botões são Começar o 2º tempo e Ir ao fim', () => {
+    const g = toDay()
+    const live = beginLive(g, true)
+    live.match.playUntil(45)
+    live.halftimeDone = true
+    const html = renderToStaticMarkup(createElement(MatchScreen, { game: g, onNavigate: () => {} }))
+    expect(html).toContain('Começar o 2º tempo')
+    expect(html).toContain('Ir ao fim')
+    expect(html).toContain('Intervalo')
   })
 })
 

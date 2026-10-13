@@ -215,7 +215,7 @@ export function Lineup({ game }: { game: Game }) {
   const bench = tactic.bench.map((id) => byId.get(id)).filter((p): p is Player => p !== undefined)
   const rest = squad.filter((p) => !tactic.startingXI.includes(p.id) && !tactic.bench.includes(p.id)).sort((a, b) => playerOverall(b) - playerOverall(a))
   const selected = selectedId ? byId.get(selectedId) : undefined
-  const matchStarted = game.pendingUserMatch !== undefined && getLive(game.pendingUserMatch.id) !== null
+  const matchStarted = game.pendingUserMatch !== undefined && (getLive(game.pendingUserMatch.id)?.match.minute ?? 0) > 0
 
   if (matchStarted) {
     return (

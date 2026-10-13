@@ -4,7 +4,7 @@ import type { MatchSnapshot } from '../../../engine/match'
 import { teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { playerName } from '../../format'
-import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted } from './pitchModel'
+import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor, HOLD_MS, devFlag } from './pitchModel'
 import type { Beat, Layout, MarkKind, Placed, Pt, Side } from './pitchModel'
 
 /** Tempo de um minuto de jogo em 1x (ms), o mesmo da tela de partida. */
@@ -108,11 +108,13 @@ export function Pitch({ game, snap, speed, running }: { game: Game; snap: MatchS
     if (!last) return
     const beats = beatsFor(last, new Map([...latest.current.known, ...latest.current.layout]), snap.events)
     if (beats.length === 0) return
-    const tick = MINUTE_MS / speed
+    // Finalizações e gols passam em câmera lenta em qualquer velocidade (o relógio da partida espera: ver `holdFor`).
     // Em desenvolvimento, &anim=1 mostra a sequência completa mesmo ao abrir a partida no meio (para conferir as setas).
-    const forceFull = import.meta.env.DEV && new URLSearchParams(window.location.search).has('anim')
-    const simplified = !forceFull && (speed >= 4 || fresh.length > 2)
-    const { beats: seq, arrows } = playbackFor(beats, speed, simplified)
+    const forceFull = devFlag('anim')
+    const slow = fresh.length <= 2 || forceFull ? slowFor(last) : 0
+    const tick = slow || MINUTE_MS / speed
+    const simplified = !forceFull && !slow && (speed >= 4 || fresh.length > 2)
+    const { beats: seq, arrows } = playbackFor(beats, slow ? 1 : speed, simplified)
     const slot = tick / Math.max(1, seq.length)
     const glide = !arrows ? Math.min(160, tick) : Math.max(90, Math.min(480, slot * 0.9))
     seq.forEach((beat, i) => {
@@ -130,6 +132,24 @@ export function Pitch({ game, snap, speed, running }: { game: Game; snap: MatchS
     },
     [],
   )
+
+  // Cartão: aparece na tela, com o nome de quem levou, por um instante.
+  // (em desenvolvimento, &anim=1 mostra também os cartões do minuto em que a partida foi aberta)
+  const seenEvents = useRef(devFlag('anim') ? snap.events.findIndex((e) => e.minute >= snap.minute) >>> 0 : snap.events.length)
+  const cardTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(cardTimer.current), [])
+  const [card, setCard] = useState<{ kind: 'yellow' | 'red'; name: string; team: string; key: number } | null>(null)
+  useEffect(() => {
+    if (snap.events.length < seenEvents.current) seenEvents.current = 0
+    const fresh = snap.events.slice(seenEvents.current)
+    seenEvents.current = snap.events.length
+    const shown = [...fresh].reverse().find((e) => e.type === 'yellow-card' || e.type === 'red-card')
+    if (!shown) return
+    const who = names.get(shown.playerId)
+    setCard({ kind: shown.type === 'red-card' ? 'red' : 'yellow', name: who ? playerName(who) : '', team: teamById(game, shown.teamId).abbreviation, key: snap.events.length })
+    window.clearTimeout(cardTimer.current)
+    cardTimer.current = window.setTimeout(() => setCard(null), HOLD_MS.card)
+  }, [snap.events.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const beat = view.beat
   const position = (p: Placed): Pt => {
@@ -210,6 +230,17 @@ export function Pitch({ game, snap, speed, running }: { game: Game; snap: MatchS
             </span>
           </div>
         ))}
+
+        {card && (
+          <div key={card.key} className="pointer-events-none absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2" role="status" aria-label={`Cartão ${card.kind === 'red' ? 'vermelho' : 'amarelo'}: ${card.name}`} data-testid="pitch-card">
+            <div className="pitch-mark flex flex-col items-center gap-1">
+              <span className={`block h-14 w-10 rotate-6 rounded-md shadow-lg ring-2 ring-white/80 ${card.kind === 'red' ? 'bg-red-600' : 'bg-yellow-300'}`} />
+              <span className="whitespace-nowrap rounded-md bg-bg/90 px-2 py-0.5 text-xs font-bold text-white shadow ring-1 ring-white/30">
+                {card.name} <span className="text-muted">({card.team})</span>
+              </span>
+            </div>
+          </div>
+        )}
 
         <span className="pointer-events-none absolute left-2 top-1 text-[10px] font-bold uppercase tracking-wider text-white/70">{home.abbreviation} →</span>
         <span className="pointer-events-none absolute right-2 top-1 text-[10px] font-bold uppercase tracking-wider text-white/70">← {away.abbreviation}</span>

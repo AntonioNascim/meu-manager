@@ -22,13 +22,14 @@ let session: LiveSession | null = null
 export const getLive = (matchId: string): LiveSession | null => (session?.matchId === matchId ? session : null)
 
 /** Cria a partida ao vivo com a escalação atual do jogador (indisponíveis já trocados). */
-export function beginLive(game: Game): LiveSession {
+/** `holdInjury`: lesão no time do jogador para o jogo e espera a escolha de quem entra (a tela de partida liga). */
+export function beginLive(game: Game, holdInjury = false): LiveSession {
   const pending = game.pendingUserMatch
   if (!pending) throw new Error('Não há partida do jogador para jogar')
   if (session?.matchId === pending.id) return session
   session = {
     matchId: pending.id,
-    match: startMatch(userMatchInput(game.season, pending, game.userTeamId)),
+    match: startMatch({ ...userMatchInput(game.season, pending, game.userTeamId), ...(holdInjury ? { holdInjurySubs: true } : {}) }),
     side: pending.homeTeamId === game.userTeamId ? 'home' : 'away',
     halftimeDone: false,
   }

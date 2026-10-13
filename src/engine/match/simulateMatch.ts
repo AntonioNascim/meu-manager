@@ -76,6 +76,8 @@ export interface MatchSnapshot {
   events: MatchEvent[]
   /** Rastro dos momentos de posse, na ordem (só leitura: serve para desenhar o campo). */
   trace: PlayTrace[]
+  /** Jogador do seu time machucado esperando a escolha de quem entra (o jogo está parado). */
+  injuryPending?: { side: MatchSide; playerId: string }
   homeStats: TeamMatchStats
   awayStats: TeamMatchStats
   home: SideSnapshot
@@ -100,6 +102,8 @@ export interface LiveMatch {
   setFormation(side: MatchSide, formationId: string): void
   /** Troca um jogador em campo por um reserva (limite de substituições e banco respeitados). */
   substitute(side: MatchSide, outgoingId: string, incomingId: string): void
+  /** Resolve a lesão que parou o jogo: com `incomingId` o reserva entra na vaga; sem ele o time segue com um a menos. */
+  resolveInjury(side: MatchSide, incomingId?: string): void
   /** Resultado completo (só depois do apito final). */
   result(): MatchResult
 }
@@ -116,6 +120,10 @@ export function startMatch(input: MatchInput): LiveMatch {
     minute: 0,
     events: [],
     trace: [],
+  }
+  if (input.holdInjurySubs) {
+    if (input.userControlled?.home) ctx.home.holdInjury = true
+    if (input.userControlled?.away) ctx.away.holdInjury = true
   }
   applyUnderdogPosture(ctx.home, ctx.away)
   applyUnderdogPosture(ctx.away, ctx.home)
@@ -156,7 +164,7 @@ export function startMatch(input: MatchInput): LiveMatch {
       return moment >= MATCH.moments
     },
     playUntil(minute) {
-      while (moment < MATCH.moments && minuteOfMoment(moment) <= minute) stepMoment()
+      while (moment < MATCH.moments && minuteOfMoment(moment) <= minute && !ctx.pendingInjury) stepMoment()
     },
     snapshot() {
       const total = ctx.home.tally.possession + ctx.away.tally.possession
@@ -168,6 +176,7 @@ export function startMatch(input: MatchInput): LiveMatch {
         awayGoals: ctx.away.goals,
         events: [...ctx.events],
         trace: [...ctx.trace],
+        ...(ctx.pendingInjury ? { injuryPending: ctx.pendingInjury } : {}),
         homeStats: teamStats(ctx.home, homeShare),
         awayStats: teamStats(ctx.away, 100 - homeShare),
         home: snapshotSide(ctx.home),
@@ -206,6 +215,19 @@ export function startMatch(input: MatchInput): LiveMatch {
       if (s.subsLeft <= 0) throw new Error('Sem substituições disponíveis')
       if (!canSubstituteAt(s, ctx.minute)) throw new Error('Sem paradas disponíveis: no máximo 3 paradas além do intervalo')
       substitute(ctx, s, outgoing, incoming)
+    },
+    resolveInjury(side, incomingId) {
+      const pending = ctx.pendingInjury
+      if (!pending || pending.side !== side) throw new Error('Não há lesão à espera de troca')
+      const s = sideOf(side)
+      if (incomingId !== undefined) {
+        const injured = s.players.find((p) => p.player.id === pending.playerId)
+        const incoming = s.bench.find((p) => p.id === incomingId)
+        if (!injured) throw new Error('O jogador não está mais em campo')
+        if (!incoming) throw new Error('O reserva não está no banco')
+        substitute(ctx, s, injured, incoming)
+      }
+      ctx.pendingInjury = undefined
     },
     result() {
       if (moment < MATCH.moments) throw new Error('A partida ainda não terminou')
@@ -749,6 +771,12 @@ function checkInjury(ctx: MatchContext): void {
   addEvent(ctx, side, 'injury', injured, text.injuryText(displayName(injured)))
 
   const replacement = bestReplacement(side, injured)
+  if (side.holdInjury) {
+    // O jogador sai e o jogo espera o técnico, se ainda há troca e parada; sem elas o time segue com um a menos.
+    injured.minuteOff = ctx.minute
+    if (replacement && side.subsLeft > 0 && canSubstituteAt(side, ctx.minute)) ctx.pendingInjury = { side: side === ctx.home ? 'home' : 'away', playerId: injured.player.id }
+    return
+  }
   if (replacement && side.subsLeft > 0) substitute(ctx, side, injured, replacement)
   else injured.minuteOff = ctx.minute
 }

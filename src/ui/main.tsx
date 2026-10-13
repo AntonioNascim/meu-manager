@@ -15,6 +15,8 @@ import { beginLive } from '../store/liveMatch'
 //   &dias=10                   joga 10 dias de jogos antes (a partida do time é simulada)
 //   &jogo=1                    avança até a partida do time
 //   &minuto=60                 e deixa a partida ao vivo parada nesse minuto
+//   &iniciar=1                a partida do time já começa rodando (junto com &jogo=1)
+//   &ate=gol|cartao|lesao      joga a partida do time até o primeiro gol, cartão ou lesão do time (com &anim=1 o campo mostra o lance)
 //   &decidir=1                 três jovens da base do time já com 20 anos (esperando decisão)
 //   &anos=2                    simula 2 temporadas inteiras antes (histórico e tabelas passadas)
 //   &equipe=team-sol           abre a página do time na Tabela; &resumo=1 abre o resumo de um jogo nas Rodadas
@@ -29,7 +31,14 @@ if (import.meta.env.DEV) {
     if (params.get('jogo')) {
       while (!game.pendingUserMatch && game.season.matches.some((m) => m.status === 'scheduled')) game = advanceGame(game)
       const minute = params.get('minuto')
-      if (minute) beginLive(game).match.playUntil(Number(minute))
+      const until = params.get('ate')
+      if (minute || until) {
+        const live = beginLive(game, true)
+        if (minute) live.match.playUntil(Number(minute))
+        if (Number(minute) === 45) live.halftimeDone = true
+        const wanted = (e: { type: string; teamId: string }) => (until === 'gol' ? e.type === 'goal' : until === 'cartao' ? e.type === 'yellow-card' || e.type === 'red-card' : e.type === 'injury' && e.teamId === game.userTeamId)
+        for (let m = 1; until && m <= 90 && !live.match.snapshot().injuryPending && !live.match.snapshot().events.some(wanted); m++) live.match.playUntil(m)
+      }
     }
     if (params.get('decidir')) {
       let n = 0

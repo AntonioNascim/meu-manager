@@ -87,18 +87,21 @@ describe('telas da partida (renderização)', () => {
     expect(html).toContain('Ir para a partida')
   })
 
-  it('antes de começar mostra o confronto e as opções', () => {
+  it('antes de começar mostra o campo, o confronto e os botões Começar e Ir ao fim', () => {
     const html = renderToStaticMarkup(createElement(MatchScreen, { game: toMatchDay(), onNavigate: () => {} }))
-    expect(html).toContain('Começar a partida')
-    expect(html).toContain('Ajustar tática')
-    expect(html).toContain('A IA não mexe no seu time')
+    for (const text of ['Começar', 'Ir ao fim', 'Antes do apito', 'Ajustar tática', 'data-testid="pitch"']) expect(html).toContain(text)
+    expect(html).not.toContain('Pausar')
   })
 
   it('com a partida em andamento mostra placar, velocidade e abas', () => {
     const game = toMatchDay()
     beginLive(game).match.playUntil(30)
     const html = renderToStaticMarkup(createElement(MatchScreen, { game, onNavigate: () => {} }))
-    for (const text of ['Continuar', 'Velocidade', 'Lances', 'Dados', 'Tática', 'Trocas', 'Apita o árbitro']) expect(html).toContain(text)
+    for (const text of ['Continuar', 'Ir ao fim', 'Jogos', 'Lances ao vivo', 'Dados', 'Tática', 'Trocas', 'Apita o árbitro']) expect(html).toContain(text)
+    expect(html).toContain('data-testid="speed"')
+    expect(html).toContain('2x')
+    expect(html).not.toContain('Só lances')
+    expect(html).not.toContain('Velocidade</span>')
     expect(html).toContain('30&#x27; · pausado')
   })
 
@@ -116,7 +119,7 @@ describe('telas da partida (renderização)', () => {
   it('depois que a partida começa, a tela de tática avisa que a mudança é feita na partida', () => {
     const game = toMatchDay()
     expect(renderToStaticMarkup(createElement(Tactics, { game }))).toContain('Capitão')
-    beginLive(game)
+    beginLive(game).match.playUntil(1)
     expect(renderToStaticMarkup(createElement(Tactics, { game }))).toContain('A partida já começou')
   })
 

@@ -37,6 +37,11 @@ export interface MatchInput {
    * jogador de campo (entra o melhor reserva).
    */
   userControlled?: { home?: boolean; away?: boolean }
+  /**
+   * Nos times controlados pelo jogador, a lesão não troca ninguém sozinha: o jogador sai, o jogo para (`playUntil` não
+   * avança) e o técnico escolhe quem entra (`resolveInjury`). Sem isso (padrão), o melhor reserva entra na hora.
+   */
+  holdInjurySubs?: boolean
 }
 
 /** Contagem de ações de um jogador na partida (base da nota). */
@@ -96,6 +101,8 @@ export interface SideState {
   style: PlayStyle
   /** Time do jogador: a IA do motor não altera a tática. */
   userControlled: boolean
+  /** Lesão espera a escolha do técnico (ver `MatchInput.holdInjurySubs`). */
+  holdInjury?: boolean
   /** Mentalidade escolhida na tática. */
   baseMentality: Mentality
   /** Níveis de mentalidade a menos por ser bem mais fraco que o rival (IA). */
@@ -149,6 +156,8 @@ export interface MatchContext {
   trace: PlayTrace[]
   /** Momento em andamento. */
   current?: PlayTrace
+  /** Lesão de um time do jogador à espera da troca (o jogo fica parado até `resolveInjury`). */
+  pendingInjury?: { side: 'home' | 'away'; playerId: string }
 }
 
 export const emptyTally = (): PlayerTally => ({

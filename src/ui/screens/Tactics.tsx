@@ -174,7 +174,7 @@ export function Tactics({ game }: { game: Game }) {
   const strength = xi.reduce((s, p, i) => s + overallAt(p, getFormation(tactic.formationId).slots[i]?.position ?? p.position), 0) / Math.max(1, xi.length)
   const unavailableStarters = xi.filter(unavailable)
   const selected = selectedId ? byId.get(selectedId) : undefined
-  const matchStarted = game.pendingUserMatch !== undefined && getLive(game.pendingUserMatch.id) !== null
+  const matchStarted = game.pendingUserMatch !== undefined && (getLive(game.pendingUserMatch.id)?.match.minute ?? 0) > 0
 
   if (matchStarted) {
     return (
