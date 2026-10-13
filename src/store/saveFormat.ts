@@ -11,7 +11,7 @@ import type { MatchResult, Player, Team } from '../engine/types'
 import { userTeam } from './game'
 import type { Game } from './game'
 
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 /** O que vai para o disco (e para o arquivo de backup). */
 export interface SaveEnvelope {
@@ -44,6 +44,7 @@ export type Migration = (envelope: { version: number; savedAt: string; game: unk
 
 /**
  * Migrações por versão de origem: `MIGRATIONS[1]` leva a versão 1 para a 2, e assim por diante.
+ * 6 → 7: orçamento (`finances.budgetShift`, `purchaseBonus` e `fundsRequests` em todos os times); saves antigos começam sem nada movido nem pedido.
  * 5 → 6: pré-contratos (`season.market.preContracts` e `lastReport.preContracts`); saves antigos começam sem nenhum.
  * 4 → 5: listas do mercado (`season.market.listings`); saves antigos começam sem anúncios (os clubes da IA anunciam na próxima rodada de negociações).
  * 3 → 4: treino (`season.training`); saves antigos começam com o treino Normal e foco equilibrado para o time do jogador e sem histórico de força.
@@ -93,6 +94,16 @@ export const MIGRATIONS: Record<number, Migration> = {
     if (game.season?.market) game.season.market.preContracts ??= []
     if (game.lastReport) game.lastReport.preContracts ??= []
     return { ...envelope, version: 6 }
+  },
+  6: (envelope) => {
+    const game = envelope.game as { season?: { teams?: { finances?: Record<string, unknown> }[] } }
+    for (const t of game.season?.teams ?? []) {
+      if (!t.finances) continue
+      t.finances.budgetShift ??= 0
+      t.finances.purchaseBonus ??= 0
+      t.finances.fundsRequests ??= []
+    }
+    return { ...envelope, version: 7 }
   },
 }
 

@@ -35,6 +35,12 @@ export interface Finances {
   ledger: FinanceEntry[]
   /** Fechamento das temporadas anteriores. */
   pastSeasons: SeasonFinance[]
+  /** Dinheiro de compras que o jogador moveu para salários na barra do orçamento (negativo = o contrário); zera na virada. */
+  budgetShift: number
+  /** Verba extra liberada pela diretoria e ainda não gasta: entra no orçamento de compras todo mês até acabar. */
+  purchaseBonus: number
+  /** Janelas de transferência em que a diretoria já liberou verba (`ano:janela`). */
+  fundsRequests: string[]
 }
 
 export interface SeasonFinance {

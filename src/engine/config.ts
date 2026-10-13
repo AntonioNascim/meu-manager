@@ -350,6 +350,10 @@ export const LINEUP = {
 // ---------------------------------------------------------------------------
 
 export const FINANCE = {
+  /** Divisão do orçamento: o total é compras + salários mensais × este número de meses (mover dinheiro de um lado para o outro não muda o total). */
+  budget: { salaryMonths: 12 },
+  /** Pedir verba: o caixa mantém `reserveMonths` meses de folha + operação, a diretoria só ouve acima da confiança mínima, libera até `maxShareOfCash` do caixa (× confiança) e nada abaixo de `minGrant`. */
+  funds: { reserveMonths: 3, minConfidence: 40, maxShareOfCash: 0.2, minGrant: 500_000 },
   /** Máximo de lançamentos guardados por clube na temporada (os mais antigos saem; o saldo e o balanço por categoria não dependem do que sai). */
   ledgerMax: 400,
   ticket: {

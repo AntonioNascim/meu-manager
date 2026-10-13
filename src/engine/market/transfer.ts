@@ -51,7 +51,9 @@ export function executeTransfer(state: SeasonState, spec: TransferSpec): SeasonS
     if (t.id === spec.toTeamId) {
       let next: Team = { ...t, squad: [...t.squad, moved.id] }
       next = recordEntry(next, spec.date, 'player-purchases', -spec.fee, `${description}: ${player.nickname ?? player.name}`)
-      return { ...next, finances: { ...next.finances, transferBudget: Math.max(0, next.finances.transferBudget - spec.fee) } }
+      const transferBudget = Math.max(0, next.finances.transferBudget - spec.fee)
+      // Gastar compras consome primeiro o orçamento normal e só depois a verba extra.
+      return { ...next, finances: { ...next.finances, transferBudget, purchaseBonus: Math.min(next.finances.purchaseBonus, transferBudget) } }
     }
     if (t.id === fromId) {
       let next = withoutPlayer(t, players.filter((p) => p.teamId === t.id), moved.id)

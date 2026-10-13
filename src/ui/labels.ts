@@ -220,7 +220,7 @@ export const OFFER_REASON_LABELS: Record<OfferReason, string> = {
   'playing-time': 'O jogador não terá espaço no time',
   unavailable: 'Jogador não está mais disponível',
   budget: 'Orçamento de transferências insuficiente',
-  'salary-budget': 'Orçamento de salários insuficiente',
+  'salary-budget': 'Orçamento de salários insuficiente: ajuste a divisão em Finanças',
   'squad-full': 'Elenco cheio',
   'window-closed': 'Janela de transferências fechada',
   'own-player': 'O jogador já é do seu time',

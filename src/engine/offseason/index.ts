@@ -181,6 +181,9 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
       finances: {
         ...t.finances,
         ledger: [],
+        budgetShift: 0,
+        purchaseBonus: 0,
+        fundsRequests: [],
         pastSeasons: [...t.finances.pastSeasons, { year, income: summary.income, expenses: summary.expenses, endBalance: t.finances.balance, byCategory: summary.byCategory }],
         salaryBudget: Math.round((isUser ? payroll * FINANCE.salaryBudgetMargin : Math.max(payroll, Math.min(payroll * 1.1, sustainablePayroll(t)))) / 1_000) * 1_000,
       },

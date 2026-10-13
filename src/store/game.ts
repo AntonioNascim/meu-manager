@@ -10,7 +10,8 @@ import { evaluateBoard } from '../engine/board'
 import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth } from '../engine/academy'
 import { applySavedLineup } from '../engine/tacticEdit'
 import { DEFAULT_PLAN, cancelIndividualTraining, setTrainingPlan, startIndividualTraining, strengthTrend } from '../engine/training'
-import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
+import { fundsDecision, monthlyOperations, monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../engine/finance'
+import type { FundsResult } from '../engine/finance'
 import { offerPreContract, userPreContracts } from '../engine/market'
 import type { PreContractOffer, PreContractResult } from '../engine/market'
 import { listUserPlayer, makeOffer, releaseUserPlayer, respondToOffer, sellPlayer, unlistUserPlayer } from '../engine/market'
@@ -153,6 +154,22 @@ export function playPendingAuto(game: Game): Game {
 export function setUserTicketPrice(game: Game, price: number): Game {
   const team = setTicketPrice(userTeam(game), price)
   return { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === team.id ? team : t)) } }
+}
+
+/** O jogador arrasta a barra do orçamento: `salary` é o novo orçamento de salários por mês (as compras se ajustam, com o total igual). */
+export function setUserSalaryBudget(game: Game, salary: number): Game {
+  const payroll = monthlyPayroll(squadOf(game, game.userTeamId))
+  const team = setSalaryBudget(userTeam(game), salary, payroll)
+  return { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === team.id ? team : t)) } }
+}
+
+/** O que a diretoria responderia a um pedido de verba agora (sem alterar nada). */
+export const userFundsDecision = (game: Game) => fundsDecision(game.season, game.userTeamId, boardOf(game).confidence)
+
+/** Pede verba à diretoria: libera um extra para compras ou recusa com o motivo. */
+export function requestUserFunds(game: Game): { game: Game; result: FundsResult } {
+  const result = requestFunds(game.season, game.userTeamId, boardOf(game).confidence)
+  return { game: result.granted ? { ...game, season: result.state } : game, result }
 }
 
 export function setUserTactic(game: Game, tactic: Tactic): Game {

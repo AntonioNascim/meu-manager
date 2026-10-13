@@ -5,8 +5,9 @@ import { boardOf, squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { BOARD_STATUS_LABELS, FINANCE_CATEGORY_LABELS } from '../labels'
 import { formatCompactMoney, formatDate, formatMoney } from '../format'
-import { Eyebrow, Icon, Panel, ProgressBar } from '../theme'
+import { Eyebrow, Icon, Panel } from '../theme'
 import type { IconName } from '../theme'
+import { BudgetBar, FundsButton } from './finance/Budget'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SeasonBalance, Statement, TicketSheet } from './finance/Sheets'
 
 const ICONS: Record<FinanceCategory, IconName> = {
@@ -21,8 +22,6 @@ const ICONS: Record<FinanceCategory, IconName> = {
 }
 
 const STATUS_COLOR = { safe: 'text-win', warning: 'text-amber-300', danger: 'text-loss' } as const
-
-const chip = 'inline-flex items-center gap-2 rounded-full border border-line bg-surface-2 px-3 py-2 text-sm font-bold'
 
 /** Tela de Finanças: caixa, alerta de risco, extrato e balanço, estádio e ingresso, folha, até quando o caixa paga e categorias. */
 export function Finance({ game }: { game: Game }) {
@@ -39,7 +38,6 @@ export function Finance({ game }: { game: Game }) {
   const summary = summarizeLedger(team.finances.ledger)
   const gate = averageGate(team.finances.ledger)
   const balance = team.finances.balance
-  const budget = team.finances.salaryBudget
 
   const tight = outlook.coversSeason && outlook.alerts.includes('payroll')
   const reasons: string[] = []
@@ -64,6 +62,9 @@ export function Finance({ game }: { game: Game }) {
           Diretoria: {Math.round(board.confidence)}/100 de confiança · {BOARD_STATUS_LABELS[board.status]}
         </div>
         <div className="mt-3 flex gap-2">
+          <FundsButton game={game} />
+        </div>
+        <div className="mt-2 flex gap-2">
           <button type="button" onClick={() => setSheet('statement')} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-surface font-bold active:scale-95">
             <Icon name="contract" size={18} /> Extrato
           </button>
@@ -101,22 +102,7 @@ export function Finance({ game }: { game: Game }) {
         </span>
       </button>
 
-      <Panel className="p-4">
-        <Eyebrow>Folha salarial</Eyebrow>
-        <div className="mt-3">
-          <ProgressBar value={budget > 0 ? (100 * outlook.payroll) / budget : 100} tone="striped" height="h-4" label="Folha salarial no orçamento" />
-        </div>
-        <div className="mt-2 flex items-start justify-between gap-3 text-sm">
-          <div className="font-bold text-pink-300">Salários {formatCompactMoney(budget)}/mês</div>
-          <div className="text-right font-bold text-accent">Compras {formatCompactMoney(team.finances.transferBudget)}</div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className={chip}>
-            <Icon name="finance" size={16} /> Folha {formatCompactMoney(outlook.payroll)}/mês
-          </span>
-          <span className={`${chip} ${outlook.slack < 0 ? 'text-loss' : ''}`}>Folga {formatCompactMoney(outlook.slack)}/mês</span>
-        </div>
-      </Panel>
+      <BudgetBar game={game} />
 
       <section
         className={`flex items-start gap-3 rounded-2xl border p-4 text-sm ${!outlook.coversSeason ? 'border-loss/50 bg-loss/10 text-loss' : tight ? 'border-amber-300/50 bg-amber-300/10 text-amber-300' : 'border-win/40 bg-win/10 text-win'}`}

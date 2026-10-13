@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * Janela por cima da tela: sobe de baixo (`bottom`, para negociações) ou aparece no centro (`center`, para filtros).
@@ -24,7 +25,7 @@ export function Sheet({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   const bottom = placement === 'bottom'
-  return (
+  const content = (
     <div className={`fixed inset-0 z-40 flex bg-black/70 ${bottom ? 'items-end' : 'items-center px-3'}`} onClick={onClose}>
       <div
         role="dialog"
@@ -44,4 +45,6 @@ export function Sheet({
       </div>
     </div>
   )
+  // Fora de qualquer cartão (um recorte ou transformação no cartão prenderia a janela dentro dele).
+  return typeof document === 'undefined' ? content : createPortal(content, document.body)
 }

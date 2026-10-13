@@ -80,7 +80,9 @@ export function settleMonth(team: Team, players: readonly Player[], date: IsoDat
     const excess = next.finances.balance - ceiling
     if (excess > 0) next = recordEntry(next, date, 'operations', -Math.round((excess * FINANCE.ceilingSpendPerMonth) / 1_000) * 1_000, 'Investimento em estrutura')
   }
-  return { ...next, finances: { ...next.finances, transferBudget: Math.max(0, Math.round((next.finances.balance * FINANCE.transferShare) / 10_000) * 10_000) } }
+  // Compras do mês: parte do caixa, menos o que o jogador moveu para salários, mais a verba extra que a diretoria liberou e ainda não foi gasta.
+  const natural = Math.round((next.finances.balance * FINANCE.transferShare) / 10_000) * 10_000
+  return { ...next, finances: { ...next.finances, transferBudget: Math.max(0, natural - next.finances.budgetShift) + next.finances.purchaseBonus } }
 }
 
 /** Primeiros dias de mês no intervalo (de, até]. */
