@@ -38,7 +38,7 @@ function initialSquadTab(): SquadTab {
 /** Em desenvolvimento, &aba=free|proposals abre a aba do Mercado. */
 function initialMarketTab(): MarketTab {
   const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
-  return wanted === 'free' || wanted === 'proposals' || wanted === 'contracts' ? wanted : 'search'
+  return wanted === 'favorites' || wanted === 'lists' || wanted === 'free' || wanted === 'proposals' || wanted === 'history' || wanted === 'contracts' ? wanted : 'search'
 }
 
 export function App() {

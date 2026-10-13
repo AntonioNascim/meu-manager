@@ -11,7 +11,7 @@ import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth }
 import { applySavedLineup } from '../engine/tacticEdit'
 import { DEFAULT_PLAN, cancelIndividualTraining, setTrainingPlan, startIndividualTraining, strengthTrend } from '../engine/training'
 import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
-import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
+import { listUserPlayer, makeOffer, releaseUserPlayer, respondToOffer, sellPlayer, unlistUserPlayer } from '../engine/market'
 import type { OfferRequest, SaleResult } from '../engine/market'
 import { playerOverall } from '../engine/overall'
 import {
@@ -25,7 +25,7 @@ import {
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
 import { emptyTraining } from '../engine/types'
-import type { BoardEvaluation, Competition, IndividualGoal, IndividualTraining, FinishedTraining, TrainingPlan, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import type { BoardEvaluation, Competition, ListingKind, IndividualGoal, IndividualTraining, FinishedTraining, TrainingPlan, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
 /** Linha resumida da classificação final: time, jogos, vitórias, empates, derrotas, gols pró, gols contra, pontos. */
 export type ArchivedRow = [teamId: string, played: number, wins: number, draws: number, losses: number, goalsFor: number, goalsAgainst: number, points: number]
@@ -61,6 +61,8 @@ export interface Game {
   archive: SeasonArchive[]
   /** O que a última virada de temporada fez; some quando o jogador avança na temporada nova. */
   lastReport?: OffseasonReport
+  /** Jogadores que o jogador marcou com estrela para acompanhar no mercado. */
+  favorites?: string[]
   /** Até 3 escalações guardadas pelo jogador (posição = espaço; vazio = nada guardado). */
   savedLineups?: (SavedLineup | null)[]
 }
@@ -69,7 +71,8 @@ export function createGame(seed: number, userTeamId: TeamId): Game {
   const world = generateWorld({ seed })
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
   const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } } })
-  return { seed, userTeamId, season, lastDay: [], notices: [], seasonLog: [], archive: [] }
+  const market = { ...season.market, listings: season.market.listings.filter((l) => l.teamId !== userTeamId) }
+  return { seed, userTeamId, season: { ...season, market }, lastDay: [], notices: [], seasonLog: [], archive: [] }
 }
 
 /** Avança até o próximo dia de jogos. A partida do jogador fica pendente em `pendingUserMatch`. */
@@ -204,6 +207,24 @@ export function cancelUserIndividualTraining(game: Game): Game {
 
 /** Quanto a força do jogador mudou desde o último mês (em pontos inteiros). */
 export const strengthChange = (game: Game, player: Player): number => strengthTrend(game.season.training.history[player.id], playerOverall(player), game.season.season.currentDate)
+
+/** Jogadores marcados com estrela (some quem já saiu do jogo). */
+export const favoritesOf = (game: Game): string[] => (game.favorites ?? []).filter((id) => game.season.players.some((p) => p.id === id))
+
+/** Marca ou desmarca a estrela de um jogador. */
+export function toggleFavorite(game: Game, playerId: string): Game {
+  const list = game.favorites ?? []
+  return { ...game, favorites: list.includes(playerId) ? list.filter((id) => id !== playerId) : [...list, playerId] }
+}
+
+/** Anuncia um jogador do time (venda ou empréstimo) pelo preço dado. */
+export function listUserSquadPlayer(game: Game, playerId: string, kind: ListingKind, price: number): Game {
+  return { ...game, season: listUserPlayer(game.season, game.userTeamId, playerId, kind, price) }
+}
+
+export function unlistUserSquadPlayer(game: Game, playerId: string): Game {
+  return { ...game, season: unlistUserPlayer(game.season, game.userTeamId, playerId) }
+}
 
 export const LINEUP_SLOTS = 3
 

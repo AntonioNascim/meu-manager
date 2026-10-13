@@ -11,7 +11,7 @@ import type { MatchResult, Player, Team } from '../engine/types'
 import { userTeam } from './game'
 import type { Game } from './game'
 
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 /** O que vai para o disco (e para o arquivo de backup). */
 export interface SaveEnvelope {
@@ -44,6 +44,7 @@ export type Migration = (envelope: { version: number; savedAt: string; game: unk
 
 /**
  * Migrações por versão de origem: `MIGRATIONS[1]` leva a versão 1 para a 2, e assim por diante.
+ * 4 → 5: listas do mercado (`season.market.listings`); saves antigos começam sem anúncios (os clubes da IA anunciam na próxima rodada de negociações).
  * 3 → 4: treino (`season.training`); saves antigos começam com o treino Normal e foco equilibrado para o time do jogador e sem histórico de força.
  * 2 → 3: categorias de base (`season.academy`); saves antigos ganham uma base inicial para cada clube, gerada com a semente do jogo.
  * 1 → 2: as estatísticas da temporada ganharam `ratingSum` e `ratedGames` (nota média); os saves antigos partem das
@@ -80,6 +81,11 @@ export const MIGRATIONS: Record<number, Migration> = {
       game.season.training = { plans: game.userTeamId ? { [game.userTeamId]: { intensity: 'normal', focus: 'balanced' } } : {}, individual: {}, finished: {}, history: {} }
     }
     return { ...envelope, version: 4 }
+  },
+  4: (envelope) => {
+    const game = envelope.game as { season?: { market?: { listings?: unknown[] } } }
+    if (game.season?.market) game.season.market.listings ??= []
+    return { ...envelope, version: 5 }
   },
 }
 
@@ -122,7 +128,7 @@ export function validateGame(game: unknown): string[] {
   if (typeof g.seed !== 'number') problems.push('semente ausente')
   for (const key of ['lastDay', 'notices', 'seasonLog', 'archive'] as const) if (!Array.isArray(g[key])) problems.push(`${key} ausente`)
   const s = g.season
-  if (!s || !Array.isArray(s.teams) || !Array.isArray(s.players) || !Array.isArray(s.matches) || !Array.isArray(s.academy) || typeof s.training !== 'object' || s.training === null || !s.season || !s.market) problems.push('temporada incompleta')
+  if (!s || !Array.isArray(s.teams) || !Array.isArray(s.players) || !Array.isArray(s.matches) || !Array.isArray(s.academy) || typeof s.training !== 'object' || s.training === null || !s.season || !s.market || !Array.isArray(s.market.listings)) problems.push('temporada incompleta')
   else {
     if (typeof g.userTeamId === 'string' && !s.teams.some((t) => t.id === g.userTeamId)) problems.push('o time do jogador não existe')
     if (typeof s.playerCounter !== 'number') problems.push('contador de jogadores ausente')

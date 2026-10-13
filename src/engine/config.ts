@@ -435,6 +435,8 @@ export const MARKET = {
     offerValidDays: 7,
   },
 
+  /** Listas: preço anunciado (fração do valor de mercado / da taxa de empréstimo), quantos anúncios cada clube da IA mantém e quando o elenco é curto demais para anunciar. */
+  listing: { transferShare: 0.7, loanShare: 0.8, maxPerTeam: 2, minSquad: 22, listChance: 0.5, loanAge: 24, youngLoanShare: 0.7, oldLoanShare: 0.15, userBias: 0.6 },
   /** Busca de jogadores: atalhos "Barganhas" (valor até esta fração do valor pela força sozinha) e "Jovens promessas" (idade e potencial estimado). */
   search: { bargainShare: 0.55, prospectAge: 21, prospectPotential: 78 },
   /** Interesse do jogador em vir para o seu clube: salário mínimo que ele aceitaria ÷ salário esperado pela força dele. */

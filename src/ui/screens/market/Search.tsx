@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { defaultFilters, interestContext, interestIn, searchContext, searchPlayers } from '../../../engine/market'
 import type { MarketFilters, MarketSort, PositionGroup, QuickFilter, Situation } from '../../../engine/market'
-import type { Player } from '../../../engine/types'
+import type { OfferKind, Player } from '../../../engine/types'
 import type { Game } from '../../../store/game'
 import { MARKET_SORT_LABELS, POSITION_GROUP_LABELS, QUICK_FILTER_LABELS } from '../../labels'
 import { Icon, Panel } from '../../theme'
 import { FilterSheet } from './FilterSheet'
 import { Negotiation } from './Negotiation'
-import { MarketRow } from './parts'
+import { FavoriteStar, MarketRow } from './parts'
 import type { ReactNode } from 'react'
 
 const PAGE = 40
@@ -29,7 +29,7 @@ export function Search({
   situations = ['all', 'club', 'free', 'expiring'],
   showTier = true,
   restrict,
-  favorite,
+  initialKind,
   trailing,
   note,
   empty = 'Nenhum jogador encontrado.',
@@ -41,7 +41,8 @@ export function Search({
   situations?: readonly Situation[]
   showTier?: boolean
   restrict?: (p: Player) => boolean
-  favorite?: (p: Player) => ReactNode
+  /** Tipo de negócio que a negociação abre (as listas de empréstimo abrem em empréstimo). */
+  initialKind?: OfferKind
   trailing?: (p: Player) => ReactNode
   note?: (p: Player) => ReactNode
   empty?: string
@@ -127,7 +128,7 @@ export function Search({
       <Panel className="overflow-hidden">
         <ul className="divide-y divide-line">
           {shown.map((p) => (
-            <MarketRow key={p.id} game={game} player={p} interest={interestIn(ctx, p)} onOpen={() => setPickedId(p.id)} favorite={favorite?.(p)} trailing={trailing?.(p)} note={note?.(p)} />
+            <MarketRow key={p.id} game={game} player={p} interest={interestIn(ctx, p)} onOpen={() => setPickedId(p.id)} favorite={<FavoriteStar game={game} playerId={p.id} />} trailing={trailing?.(p)} note={note?.(p)} />
           ))}
           {list.length === 0 && <li className="p-4 text-sm text-muted">{empty}</li>}
         </ul>
@@ -140,7 +141,7 @@ export function Search({
       <p className="text-center text-[11px] text-muted">Atalho "Cabem no bolso": valor até {sc.budget > 0 ? 'o orçamento de compras' : 'o orçamento (hoje zerado)'}.</p>
 
       {sheet && <FilterSheet game={game} filters={filters} situations={situations} base={preset} restrict={restrict} onApply={(f) => update(f)} onClose={() => setSheet(false)} />}
-      {picked && <Negotiation key={picked.id} game={game} player={picked} open={open} onClose={() => setPickedId(null)} />}
+      {picked && <Negotiation key={picked.id} game={game} player={picked} open={open} {...(initialKind ? { initialKind } : {})} onClose={() => setPickedId(null)} />}
     </div>
   )
 }

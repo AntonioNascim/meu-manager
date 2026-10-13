@@ -96,8 +96,9 @@ export interface ClubDecision {
 }
 
 /** O clube dono aceita vender (ou emprestar) o jogador por esse valor? */
-export function sellerDecision(args: { seller: Team; sellerSquad: readonly Player[]; player: Player; fee: number; kind: OfferKind; date: IsoDate }): ClubDecision {
-  const { seller, sellerSquad, player, fee, kind, date } = args
+export function sellerDecision(args: { seller: Team; sellerSquad: readonly Player[]; player: Player; fee: number; kind: OfferKind; date: IsoDate; listedPrice?: number }): ClubDecision {
+  const { seller, sellerSquad, player, fee, kind, date, listedPrice } = args
+  const cheaper = (price: number) => (listedPrice === undefined ? price : Math.min(price, listedPrice))
   if (player.contract.loanedFrom) return { accepted: false, reason: 'unavailable' }
   if (sellerSquad.length - 1 < MARKET.minSquadAfterSale) return { accepted: false, reason: 'squad-size' }
   const samePosition = sellerSquad.filter((p) => p.position === player.position).length
@@ -106,10 +107,10 @@ export function sellerDecision(args: { seller: Team; sellerSquad: readonly Playe
   if (kind === 'loan') {
     const role = squadRole(player, sellerSquad)
     if (role === 'key' || role === 'starter') return { accepted: false, reason: 'key-player' }
-    const price = loanFee(player, date)
+    const price = cheaper(loanFee(player, date))
     return fee >= price ? { accepted: true } : { accepted: false, reason: 'fee', counter: price }
   }
-  const price = askingPrice(player, sellerSquad, date)
+  const price = cheaper(askingPrice(player, sellerSquad, date))
   return fee >= price ? { accepted: true } : { accepted: false, reason: 'fee', counter: price }
 }
 

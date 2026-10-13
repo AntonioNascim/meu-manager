@@ -10,6 +10,7 @@ import { addDays } from '../season/dates'
 import { SQUAD_MIN } from '../types'
 import type { IsoDate, OfferKind, OfferReason, Team, TeamId, TransferOffer } from '../types'
 import { buyerCheck, playerDecision, sellerDecision } from './decision'
+import { listingOf } from './listings'
 import { executeTransfer, playersOf } from './transfer'
 import { windowAt } from './windows'
 
@@ -89,7 +90,8 @@ function decide(state: SeasonState, offer: TransferOffer, date: IsoDate): Season
   const sellerSquad = offer.sellerId ? playersOf(state, offer.sellerId) : []
   // A venda proposta pela IA ao time do jogador só depende dele (a resposta é dele); nas demais o dono decide.
   if (seller && offer.direction === 'outgoing') {
-    const club = sellerDecision({ seller, sellerSquad, player, fee: offer.fee, kind: offer.kind, date })
+    const listed = listingOf(state, player.id, offer.kind)
+    const club = sellerDecision({ seller, sellerSquad, player, fee: offer.fee, kind: offer.kind, date, ...(listed ? { listedPrice: listed.price } : {}) })
     if (!club.accepted) return reject(club.reason as OfferReason, club.counter)
   }
   const verdict = playerDecision({ player, buyer, buyerSquad, from: seller, fromSquad: sellerSquad, salary: offer.salary, kind: offer.kind })

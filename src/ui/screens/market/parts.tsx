@@ -3,10 +3,11 @@ import { isWindowOpen, marketValue, transferWindows, windowAt } from '../../../e
 import type { Interest } from '../../../engine/market'
 import { playerOverall } from '../../../engine/overall'
 import type { Player } from '../../../engine/types'
-import { squadOf, teamById, userTeam } from '../../../store/game'
+import { favoritesOf, squadOf, teamById, toggleFavorite, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { daysBetween, formatCompactMoney, formatDate, playerName } from '../../format'
 import { INTEREST_COLORS, INTEREST_LABELS, POSITION_SHORT_LABELS, WINDOW_LABELS } from '../../labels'
+import { updateGame } from '../../../store/gameStore'
 import { Flag, Icon, Panel, ValueBadge } from '../../theme'
 
 /** Valor curto para a lista: "R$ 51 mi", "R$ 8,3 mi", "R$ 840 mil". */
@@ -109,7 +110,7 @@ export function MarketRow({
           <span className="block truncate text-xs text-muted">
             {POSITION_SHORT_LABELS[player.position]} · {clubName(game, player.teamId)}
           </span>
-          <span className="block truncate text-xs text-muted">
+          <span className="block text-xs leading-snug text-muted">
             {player.age} anos
             {interest && (
               <>
@@ -132,5 +133,21 @@ export function MarketRow({
       </button>
       {favorite}
     </li>
+  )
+}
+
+/** Estrela para acompanhar o jogador (aparece na aba Favoritos). */
+export function FavoriteStar({ game, playerId }: { game: Game; playerId: string }) {
+  const on = favoritesOf(game).includes(playerId)
+  return (
+    <button
+      type="button"
+      onClick={() => updateGame((g) => toggleFavorite(g, playerId))}
+      aria-pressed={on}
+      aria-label={on ? 'Tirar dos favoritos' : 'Marcar como favorito'}
+      className={`flex h-12 w-11 shrink-0 items-center justify-center ${on ? 'text-amber-300' : 'text-muted'}`}
+    >
+      <Icon name="star" size={22} className={on ? 'fill-current' : ''} />
+    </button>
   )
 }

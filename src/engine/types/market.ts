@@ -60,11 +60,27 @@ export interface TransferRecord {
   fee: number
 }
 
+/** Tipo de anúncio: venda (transferência) ou empréstimo. */
+export type ListingKind = 'transfer' | 'loan'
+
+/** Jogador à venda ou para empréstimo, com o preço anunciado (menor que o valor de mercado). */
+export interface Listing {
+  playerId: PlayerId
+  teamId: TeamId
+  kind: ListingKind
+  price: number
+  listedOn: IsoDate
+  /** Quem anunciou: um clube da IA ou o jogador. */
+  by: 'ai' | 'user'
+}
+
 export interface MarketState {
   /** Semente dos sorteios da IA (junto com a data). */
   seed: number | string
   offers: TransferOffer[]
   history: TransferRecord[]
+  /** Jogadores anunciados (à venda ou para empréstimo). */
+  listings: Listing[]
   /** Eventos do mercado até esta data (inclusive) já foram processados. */
   handled: IsoDate
   /** Contador para os ids das propostas. */

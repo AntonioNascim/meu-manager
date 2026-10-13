@@ -206,7 +206,9 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     individual: Object.fromEntries(Object.entries(state.training.individual).filter(([teamId, slot]) => players.some((p) => p.id === slot.playerId && p.teamId === teamId))),
     history: Object.fromEntries(Object.entries(state.training.history).filter(([id]) => squadIds.has(id))),
   }
-  return { state: { ...next, academy, playerCounter: counter, training }, report }
+  // Os anúncios da IA já nascem com a temporada; o time do jogador não anuncia nada sozinho.
+  const market = { ...next.market, listings: next.market.listings.filter((l) => l.teamId !== options.userTeamId) }
+  return { state: { ...next, academy, playerCounter: counter, training, market }, report }
 }
 
 /** Reservas que a IA corta para voltar ao tamanho máximo (os de menor valor, sem deixar posição descoberta). */

@@ -9,7 +9,7 @@
  */
 import { collectGate, matchAttendance, monthStartsBetween, settleMonth } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
-import { expireOffers, nextMarketEvent, resolveDueOffers, runMarketTick } from '../market'
+import { expireOffers, nextMarketEvent, refreshListings, resolveDueOffers, runMarketTick } from '../market'
 import type { MarketEvent } from '../market'
 import { getFormation } from '../formations'
 import { simulateMatch } from '../match'
@@ -110,6 +110,7 @@ function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, ma
       current = tick.state
       for (const o of tick.incoming) notices.push({ type: 'offer-received', offerId: o.id })
     }
+    if (marketEvent.opens.length > 0 || marketEvent.tick) current = refreshListings(current, date, options.userTeamId)
     current = { ...current, market: { ...current.market, handled: date } }
   }
   return { state: current, notices }

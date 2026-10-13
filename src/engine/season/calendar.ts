@@ -3,6 +3,7 @@
  * Rodadas aos fins de semana (jogos no sábado e no domingo) e algumas na quarta-feira.
  */
 import { SEASON } from '../config'
+import { refreshListings } from '../market/listings'
 import { createRng, hashSeed } from '../rng'
 import { emptyTraining } from '../types'
 import type { Competition, CompetitionId, IsoDate, MarketState, Match, Player, Season, Team, TrainingState } from '../types'
@@ -125,7 +126,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
   }
 
   matches.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
-  return {
+  const state: SeasonState = {
     season: {
       year: options.year,
       currentDate: makeDate(options.year, 1, 1),
@@ -139,6 +140,8 @@ export function createSeason(options: SeasonOptions): SeasonState {
     academy: [...(options.academy ?? [])],
     training: options.training ?? emptyTraining(),
     playerCounter: [...options.players, ...(options.academy ?? [])].reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
-    market: { seed: options.seed, offers: [], history: [], handled: makeDate(options.year, 1, 1), counter: 0 },
+    market: { seed: options.seed, offers: [], history: [], listings: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }
+  // A janela de janeiro já abre com os anúncios dos clubes da IA (o jogador, se houver, anuncia depois).
+  return refreshListings(state, makeDate(options.year, 1, 1))
 }

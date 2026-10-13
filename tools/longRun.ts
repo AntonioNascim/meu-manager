@@ -52,11 +52,17 @@ export interface YearRow {
   /** Maior base de um clube e jovens de 20 anos ou mais ainda na base (nos clubes da IA, deve ser 0 depois da virada). */
   academyMax: number
   academyOverdue: number
+  /** Concentração dos 40 melhores jogadores: quantos o clube que mais tem possui e em quantos clubes eles estão. */
+  topMaxInClub: number
+  topClubs: number
   report?: OffseasonReport
 }
 
 /** Força geral a partir da qual o jogador é craque. */
 export const STAR_OVERALL = 85
+
+/** Quantos dos melhores jogadores entram na conta de concentração. */
+export const TOP_PLAYERS = 40
 
 /** Potencial a partir do qual um jovem (até 21 anos) é promessa. */
 export const PROSPECT_POTENTIAL = 75
@@ -78,12 +84,17 @@ export function lowestBalance(team: Team): number {
   return lowest
 }
 
-export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'highPotential' | 'youngStars' | 'topOverall' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB' | 'academySize' | 'academyProspects' | 'academyMax' | 'academyOverdue'> {
+export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'highPotential' | 'youngStars' | 'topOverall' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB' | 'academySize' | 'academyProspects' | 'academyMax' | 'academyOverdue' | 'topMaxInClub' | 'topClubs'> {
   const byId = new Map(state.players.map((p) => [p.id, p]))
   const signed = state.players.filter((p) => p.teamId !== null)
   const squads = state.teams.map((t) => state.players.filter((p) => p.teamId === t.id).length)
   const young = signed.filter((p) => p.age <= 21)
+  const top = [...signed].sort((a, b) => playerOverall(b) - playerOverall(a)).slice(0, TOP_PLAYERS)
+  const perClub = new Map<string, number>()
+  for (const p of top) perClub.set(p.teamId as string, (perClub.get(p.teamId as string) ?? 0) + 1)
   return {
+    topMaxInClub: Math.max(...perClub.values()),
+    topClubs: perClub.size,
     strengthA: mean(state.teams.filter((t) => t.tier === 1).map((t) => teamStrength(t, byId))),
     strengthB: mean(state.teams.filter((t) => t.tier === 2).map((t) => teamStrength(t, byId))),
     meanAge: mean(signed.map((p) => p.age)),
@@ -142,7 +153,7 @@ const pct = (x: number) => `${(100 * x).toFixed(0)}%`
 /** Tabela ano a ano para o terminal. */
 export function formatYears(rows: YearRow[]): string {
   return [
-    'ano   forçaA forçaB  idade <22  >30  promessas potMax craques pot85 topFor  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB  base prBase base→pro base→fora',
+    'ano   forçaA forçaB  idade <22  >30  promessas potMax craques pot85 topFor  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB  base prBase base→pro base→fora top40(máx/clubes) campeão',
     ...rows.map((r) =>
       [
         String(r.year),
@@ -168,6 +179,8 @@ export function formatYears(rows: YearRow[]): string {
         String(r.academyProspects).padStart(6),
         (r.report ? String(Object.values(r.report.academyPromoted).reduce((a, b) => a + b, 0)) : '-').padStart(8),
         (r.report ? String(Object.values(r.report.academyReleased).reduce((a, b) => a + b, 0)) : '-').padStart(9),
+        `${r.topMaxInClub}/${r.topClubs}`.padStart(19),
+        (r.report ? String(r.report.champions[0]).replace('team-', '') : '-').padStart(8),
       ].join(' '),
     ),
   ].join('\n')

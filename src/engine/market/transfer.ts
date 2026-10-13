@@ -68,7 +68,7 @@ export function executeTransfer(state: SeasonState, spec: TransferSpec): SeasonS
     ...state,
     players,
     teams,
-    market: { ...state.market, offers, history: [...state.market.history, { date: spec.date, playerId: spec.playerId, fromTeamId: fromId, toTeamId: spec.toTeamId, kind: spec.kind, fee: spec.fee }] },
+    market: { ...state.market, offers, listings: state.market.listings.filter((l) => l.playerId !== spec.playerId), history: [...state.market.history, { date: spec.date, playerId: spec.playerId, fromTeamId: fromId, toTeamId: spec.toTeamId, kind: spec.kind, fee: spec.fee }] },
   }
 }
 
@@ -79,5 +79,5 @@ export function releasePlayer(state: SeasonState, playerId: PlayerId, date: IsoD
   const fromId = player.teamId
   const players = state.players.map((p) => (p.id === playerId ? { ...p, teamId: null, contract: { salary: p.contract.salary, endDate: date, releaseClause: p.contract.releaseClause } } : p))
   const teams = state.teams.map((t) => (t.id === fromId ? withoutPlayer(t, players.filter((p) => p.teamId === t.id), playerId) : t))
-  return { ...state, players, teams }
+  return { ...state, players, teams, market: { ...state.market, listings: state.market.listings.filter((l) => l.playerId !== playerId) } }
 }

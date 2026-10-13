@@ -13,8 +13,9 @@ import type { SeasonState } from '../season/calendar'
 import { addDays } from '../season/dates'
 import type { IsoDate, OfferKind, Player, Position, Team, TeamId, TransferOffer, TransferWindow } from '../types'
 import { buyerCheck, playerDecision, sellerDecision } from './decision'
+import { listingOf, salePrice } from './listings'
 import { executeTransfer, playersOf, releasePlayer } from './transfer'
-import { askingPrice, expectedSalary, loanFee, marketValue, squadRole } from './value'
+import { askingPrice, expectedSalary, marketValue, squadRole } from './value'
 import { windowAt } from './windows'
 
 export interface MarketTickResult {
@@ -54,7 +55,7 @@ interface Candidate {
 }
 
 /** Melhor alvo para o time entre `pool`: ganho de força sobre o titular mais fraco da vaga, menos o custo. */
-function bestTarget(rng: Rng, team: Team, squad: readonly Player[], pool: readonly Player[], date: IsoDate, spendable: number, kind: OfferKind, sellers: Map<TeamId, Player[]>): Candidate | undefined {
+function bestTarget(rng: Rng, team: Team, squad: readonly Player[], pool: readonly Player[], date: IsoDate, spendable: number, kind: OfferKind, sellers: Map<TeamId, Player[]>, market: SeasonState['market']): Candidate | undefined {
   const needs = needsOf(team, squad)
   const roomForSalary = team.finances.salaryBudget - monthlyPayroll(squad)
   let best: Candidate | undefined
@@ -64,7 +65,7 @@ function bestTarget(rng: Rng, team: Team, squad: readonly Player[], pool: readon
     const gain = playerOverall(player) - need.weakest
     if (gain < MARKET.ai.minUpgrade) continue
     const sellerSquad = player.teamId ? sellers.get(player.teamId) ?? [] : []
-    const fee = player.teamId === null ? 0 : kind === 'loan' ? loanFee(player, date) : askingPrice(player, sellerSquad, date)
+    const fee = player.teamId === null ? 0 : salePrice({ market }, player, sellerSquad, kind, date)
     if (fee > spendable) continue
     const salary = kind === 'loan' ? player.contract.salary : expectedSalary(player)
     if (salary > roomForSalary) continue
@@ -119,11 +120,12 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
 
     // 2) Compra no mercado (jogadores livres e de outros clubes da IA).
     const pool = current.players.filter((p) => p.teamId !== team.id && p.teamId !== userTeamId && !p.contract.loanedFrom && p.condition.injuryDaysLeft === 0)
-    const target = bestTarget(rng, team, squad, pool, date, spendable, 'purchase', sellers)
+    const target = bestTarget(rng, team, squad, pool, date, spendable, 'purchase', sellers, current.market)
     if (!target) continue
     const seller = target.player.teamId ? (current.teams.find((t) => t.id === target.player.teamId) as Team) : null
     const sellerSquad = seller ? playersOf(current, seller.id) : []
-    if (seller && !sellerDecision({ seller, sellerSquad, player: target.player, fee: target.fee, kind: 'purchase', date }).accepted) continue
+    const listed = listingOf(current, target.player.id, 'purchase')
+    if (seller && !sellerDecision({ seller, sellerSquad, player: target.player, fee: target.fee, kind: 'purchase', date, ...(listed ? { listedPrice: listed.price } : {}) }).accepted) continue
 
     const baseSalary = expectedSalary(target.player)
     const verdict = playerDecision({ player: target.player, buyer: team, buyerSquad: squad, from: seller, fromSquad: sellerSquad, salary: baseSalary, kind: 'purchase' })
@@ -164,17 +166,22 @@ function proposeToUser(
 ): TransferOffer | undefined {
   const userSquad = sellers.get(userTeamId) ?? []
   if (userSquad.length - 1 < MARKET.minSquadAfterSale) return undefined
-  const kind: OfferKind = rng.chance(MARKET.ai.userLoanShare) ? 'loan' : 'purchase'
+  // Jogadores que o próprio jogador anunciou atraem mais propostas, pelo preço anunciado.
+  const mine = state.market.listings.filter((l) => l.by === 'user' && l.teamId === userTeamId)
+  const listing = mine.length > 0 && rng.chance(MARKET.listing.userBias) ? rng.pick(mine) : undefined
+  const kind: OfferKind = listing ? (listing.kind === 'loan' ? 'loan' : 'purchase') : rng.chance(MARKET.ai.userLoanShare) ? 'loan' : 'purchase'
   // Empréstimo: jogador de rodízio ou sobra; compra: qualquer um.
-  const pool = userSquad.filter((p) => !p.contract.loanedFrom && p.teamId === userTeamId && (kind === 'purchase' || squadRole(p, userSquad) === 'rotation' || squadRole(p, userSquad) === 'surplus'))
-  const target = bestTarget(rng, team, squad, pool, date, spendable, kind, sellers)
+  const pool = listing
+    ? userSquad.filter((p) => p.id === listing.playerId)
+    : userSquad.filter((p) => !p.contract.loanedFrom && p.teamId === userTeamId && (kind === 'purchase' || squadRole(p, userSquad) === 'rotation' || squadRole(p, userSquad) === 'surplus'))
+  const target = bestTarget(rng, team, squad, pool, date, spendable, kind, sellers, state.market)
   if (!target) return undefined
   const user = state.teams.find((t) => t.id === userTeamId) as Team
   const samePosition = userSquad.filter((p) => p.position === target.player.position).length
   if (samePosition - 1 < (MARKET.minByPosition[target.player.position] ?? 1)) return undefined
 
   const [low, high] = MARKET.ai.userOfferFee
-  const fee = kind === 'loan' ? target.fee : Math.round((askingPrice(target.player, userSquad, date) * rng.float(low, high)) / 10_000) * 10_000
+  const fee = listing ? listing.price : kind === 'loan' ? target.fee : Math.round((askingPrice(target.player, userSquad, date) * rng.float(low, high)) / 10_000) * 10_000
   if (fee > spendable) return undefined
   const salary = kind === 'loan' ? target.player.contract.salary : Math.max(expectedSalary(target.player), Math.round(target.player.contract.salary * 1.1))
   const verdict = playerDecision({ player: target.player, buyer: team, buyerSquad: squad, from: user, fromSquad: userSquad, salary, kind })

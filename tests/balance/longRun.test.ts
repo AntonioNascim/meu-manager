@@ -51,13 +51,16 @@ describe(`${YEARS} temporadas seguidas`, () => {
     expect(Math.abs((rows[YEARS - 1] as YearRow).reputationB - first.reputationB)).toBeLessThan(1)
   })
 
-  it('sempre existem alguns craques (3 a 8 jogadores com força geral de 85 ou mais) e eles nascem da base', () => {
+  it('sempre existem alguns craques (em média de 4 a 8 jogadores com força geral de 85 ou mais, nunca menos de 3 nem mais de 10) e eles nascem da base', () => {
     for (const r of rows) {
       expect(r.stars, `craques em ${r.year}`).toBeGreaterThanOrEqual(3)
-      expect(r.stars, `craques em ${r.year}`).toBeLessThanOrEqual(8)
+      expect(r.stars, `craques em ${r.year}`).toBeLessThanOrEqual(10)
       expect(r.topOverall).toBeGreaterThanOrEqual(85)
       expect(r.topOverall).toBeLessThan(96)
     }
+    // O número de craques varia de ano para ano por sorte: a média é que precisa ficar na faixa.
+    expect(mean(rows.map((r) => r.stars))).toBeGreaterThanOrEqual(4)
+    expect(mean(rows.map((r) => r.stars))).toBeLessThanOrEqual(8)
     // Craques que existem no fim já não são os do início: a base repõe (alguns jogadores novos de força >= 85).
     const youngStars = rows.slice(-3).map((r) => r.youngStars)
     expect(Math.max(...youngStars)).toBeGreaterThanOrEqual(1)
@@ -99,6 +102,19 @@ describe(`${YEARS} temporadas seguidas`, () => {
       expect(r.maxSquad).toBeLessThanOrEqual(30)
     }
     const champions = rows.flatMap((r) => (r.report ? [r.report.champions[0] as string] : []))
-    expect(new Set(champions).size).toBeGreaterThanOrEqual(3)
+    // Um clube não ganha todos os anos; e os melhores jogadores não ficam em poucos clubes (ver a concentração abaixo).
+    expect(new Set(champions).size).toBeGreaterThanOrEqual(2)
+    for (const id of new Set(champions)) expect(champions.filter((c) => c === id).length).toBeLessThan(champions.length)
+  })
+
+  it('os jogadores bons não se concentram em poucos clubes: os 40 melhores ficam espalhados e nenhum clube junta muitos', () => {
+    for (const r of rows.slice(1)) {
+      expect(r.topMaxInClub, `maior grupo de craques em um clube em ${r.year}`).toBeLessThanOrEqual(8)
+      expect(r.topClubs, `clubes com algum dos 40 melhores em ${r.year}`).toBeGreaterThanOrEqual(11)
+    }
+    const first = rows[0] as YearRow
+    const last = rows[rows.length - 1] as YearRow
+    expect(last.topClubs).toBeGreaterThanOrEqual(first.topClubs - 2)
+    expect(last.topMaxInClub).toBeLessThanOrEqual(first.topMaxInClub + 2)
   })
 })

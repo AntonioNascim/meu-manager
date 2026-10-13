@@ -344,14 +344,14 @@ describe('treino no jogo', () => {
 
 describe('save versão 4', () => {
   it('a versão atual é 4 e a migração 3→4 cria o treino do time do jogador', () => {
-    expect(SAVE_VERSION).toBe(4)
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(4)
     const game = createGame(3, USER)
     const old = JSON.parse(JSON.stringify(makeEnvelope(game, '2026-01-01T00:00:00Z')))
     delete old.game.season.training
     old.version = 3
     expect(validateGame(old.game)).not.toEqual([])
     const migrated = migrateSave(old)
-    expect(migrated.version).toBe(4)
+    expect(migrated.version).toBe(SAVE_VERSION)
     expect(migrated.game.season.training.plans[USER]).toEqual({ intensity: 'normal', focus: 'balanced' })
     expect(migrated.game.season.training.individual).toEqual({})
     expect(MIGRATIONS[3]).toBeTypeOf('function')
