@@ -31,8 +31,12 @@ const BOARD_CHIP = { safe: 'border-win/40 bg-win/10 text-win', warning: 'border-
 const BAR_TONE = { safe: 'accent', warning: 'warning', danger: 'danger' } as const
 
 /** Avisos de propostas (a janela de transferências tem aviso próprio, calculado pela data). */
-function noticeText(n: MarketNotice): string | null {
+function noticeText(n: MarketNotice, game: Game): string | null {
   switch (n.type) {
+    case 'pre-contract-lost': {
+      const player = game.season.players.find((p) => p.id === n.playerId)
+      return `${player ? (player.nickname ?? player.name) : 'Um jogador seu'} assinou pré-contrato com o ${teamById(game, n.teamId).name} e sai de graça no fim da temporada.`
+    }
     case 'offer-answered': return 'Uma proposta sua foi respondida.'
     case 'offer-received': return 'Você recebeu uma proposta por um jogador.'
     default: return null
@@ -79,6 +83,8 @@ function SeasonReport({ game, report }: { game: Game; report: OffseasonReport })
         {reputation && reputation.to !== reputation.from && <li>Reputação do clube: {reputation.from} → {reputation.to}.</li>}
         {gone(report.retired).length > 0 && <li>Aposentaram-se: {gone(report.retired).map((d) => `${d.name} (${d.age})`).join(', ')}.</li>}
         {gone(report.released).length > 0 && <li>Contratos vencidos: {gone(report.released).map((d) => d.name).join(', ')}.</li>}
+        {report.preContracts?.filter((c) => c.toTeamId === game.userTeamId).map((c) => <li key={`in-${c.playerId}`} className="text-win">Chegou de graça por pré-contrato: {game.season.players.find((p) => p.id === c.playerId)?.name ?? c.playerId}.</li>)}
+        {report.preContracts?.filter((c) => c.fromTeamId === game.userTeamId).map((c) => <li key={`out-${c.playerId}`} className="text-loss">Saiu por pré-contrato: {game.season.players.find((p) => p.id === c.playerId)?.name ?? c.playerId} ({teamById(game, c.toTeamId).name}).</li>)}
         {youth > 0 && <li>{youth} {youth === 1 ? 'jovem subiu' : 'jovens subiram'} da base.</li>}
       </ul>
     </Card>
@@ -151,7 +157,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const expiring = lastYearContracts(game)
   const incoming = pendingIncoming(state)
   const transferWindow = windowAt(state.season, state.matches, today)
-  const offerNotices = game.notices.map(noticeText).filter((t): t is string => t !== null)
+  const offerNotices = game.notices.map((n) => noticeText(n, game)).filter((t): t is string => t !== null)
 
   const squad = squadOf(game, team.id)
   const byId = new Map(squad.map((p) => [p.id, p]))

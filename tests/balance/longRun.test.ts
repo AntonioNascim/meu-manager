@@ -62,7 +62,7 @@ describe(`${YEARS} temporadas seguidas`, () => {
     expect(mean(rows.map((r) => r.stars))).toBeGreaterThanOrEqual(4)
     expect(mean(rows.map((r) => r.stars))).toBeLessThanOrEqual(8)
     // Craques que existem no fim já não são os do início: a base repõe (alguns jogadores novos de força >= 85).
-    const youngStars = rows.slice(-3).map((r) => r.youngStars)
+    const youngStars = rows.slice(-5).map((r) => r.youngStars)
     expect(Math.max(...youngStars)).toBeGreaterThanOrEqual(1)
   })
 

@@ -16,6 +16,7 @@ import { computeStandings } from '../season/standings'
 import { SQUAD_MAX, SQUAD_MIN } from '../types'
 import type { DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
 import { turnAcademy } from '../academy/turn'
+import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
 import { desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { ageOneYear, retires } from './evolution'
@@ -110,6 +111,10 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     else players.push(next)
   }
 
+  // Pré-contratos assinados na temporada: quem combinou com outro clube muda de clube de graça.
+  const preContracts = applyPreContracts(players, state.market.preContracts, year)
+  players = preContracts.players
+
   // 5) Fim dos contratos (empréstimos voltam para casa; a IA renova o que faz sentido).
   const contracts = expireContracts({ players, teams, year, rng: rng.fork('contracts'), ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}) })
   players = contracts.players
@@ -199,6 +204,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     academyReleased: academyTurn.released,
     academyPending: academy.filter((p) => p.teamId === options.userTeamId && p.age >= ACADEMY.graduationAge).map((p) => p.id),
     reputationChanges,
+    preContracts: preContracts.applied,
   }
   const squadIds = new Set(players.filter((p) => p.teamId === options.userTeamId).map((p) => p.id))
   const training = {
@@ -207,7 +213,8 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     history: Object.fromEntries(Object.entries(state.training.history).filter(([id]) => squadIds.has(id))),
   }
   // Os anúncios da IA já nascem com a temporada; o time do jogador não anuncia nada sozinho.
-  const market = { ...next.market, listings: next.market.listings.filter((l) => l.teamId !== options.userTeamId) }
+  const arrived = preContracts.applied.map((a) => ({ date: next.season.currentDate, playerId: a.playerId, fromTeamId: a.fromTeamId, toTeamId: a.toTeamId, kind: 'purchase' as const, fee: 0 }))
+  const market = { ...next.market, history: [...next.market.history, ...arrived], listings: next.market.listings.filter((l) => l.teamId !== options.userTeamId) }
   return { state: { ...next, academy, playerCounter: counter, training, market }, report }
 }
 

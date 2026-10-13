@@ -435,6 +435,8 @@ export const MARKET = {
     offerValidDays: 7,
   },
 
+  /** Pré-contrato: abre em 1º do mês `fromMonth`. A IA tenta nos primeiros dias dos meses `months`, com moderação: chance por clube em cada rodada, no máximo `maxPerClub` por clube, ninguém perde mais que `maxLossPerClub` jogadores e só vale a pena com ganho de força maior que o da compra normal. */
+  preContract: { fromMonth: 7, ai: { months: [7, 8, 9, 10, 11] as readonly number[], chance: 0.2, maxPerClub: 1, maxLossPerClub: 2, extraUpgrade: 1 } },
   /** Listas: preço anunciado (fração do valor de mercado / da taxa de empréstimo), quantos anúncios cada clube da IA mantém e quando o elenco é curto demais para anunciar. */
   listing: { transferShare: 0.7, loanShare: 0.8, maxPerTeam: 2, minSquad: 22, listChance: 0.5, loanAge: 24, youngLoanShare: 0.7, oldLoanShare: 0.15, userBias: 0.6 },
   /** Busca de jogadores: atalhos "Barganhas" (valor até esta fração do valor pela força sozinha) e "Jovens promessas" (idade e potencial estimado). */

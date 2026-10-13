@@ -30,6 +30,7 @@ export function Search({
   showTier = true,
   restrict,
   initialKind,
+  onPick,
   trailing,
   note,
   empty = 'Nenhum jogador encontrado.',
@@ -43,6 +44,8 @@ export function Search({
   restrict?: (p: Player) => boolean
   /** Tipo de negócio que a negociação abre (as listas de empréstimo abrem em empréstimo). */
   initialKind?: OfferKind
+  /** Troca a negociação por outra ação ao tocar no jogador (pré-contrato). */
+  onPick?: (p: Player) => void
   trailing?: (p: Player) => ReactNode
   note?: (p: Player) => ReactNode
   empty?: string
@@ -128,7 +131,7 @@ export function Search({
       <Panel className="overflow-hidden">
         <ul className="divide-y divide-line">
           {shown.map((p) => (
-            <MarketRow key={p.id} game={game} player={p} interest={interestIn(ctx, p)} onOpen={() => setPickedId(p.id)} favorite={<FavoriteStar game={game} playerId={p.id} />} trailing={trailing?.(p)} note={note?.(p)} />
+            <MarketRow key={p.id} game={game} player={p} interest={interestIn(ctx, p)} onOpen={() => (onPick ? onPick(p) : setPickedId(p.id))} favorite={<FavoriteStar game={game} playerId={p.id} />} trailing={trailing?.(p)} note={note?.(p)} />
           ))}
           {list.length === 0 && <li className="p-4 text-sm text-muted">{empty}</li>}
         </ul>

@@ -11,6 +11,8 @@ import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth }
 import { applySavedLineup } from '../engine/tacticEdit'
 import { DEFAULT_PLAN, cancelIndividualTraining, setTrainingPlan, startIndividualTraining, strengthTrend } from '../engine/training'
 import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
+import { offerPreContract, userPreContracts } from '../engine/market'
+import type { PreContractOffer, PreContractResult } from '../engine/market'
 import { listUserPlayer, makeOffer, releaseUserPlayer, respondToOffer, sellPlayer, unlistUserPlayer } from '../engine/market'
 import type { OfferRequest, SaleResult } from '../engine/market'
 import { playerOverall } from '../engine/overall'
@@ -225,6 +227,15 @@ export function listUserSquadPlayer(game: Game, playerId: string, kind: ListingK
 export function unlistUserSquadPlayer(game: Game, playerId: string): Game {
   return { ...game, season: unlistUserPlayer(game.season, game.userTeamId, playerId) }
 }
+
+/** O jogador propõe um pré-contrato (o jogador responde na hora). Lança `OfferError` se não for possível. */
+export function offerUserPreContract(game: Game, playerId: string, offer: PreContractOffer): { game: Game; result: PreContractResult } {
+  const result = offerPreContract(game.season, game.userTeamId, playerId, offer)
+  return { game: result.accepted ? { ...game, season: result.state } : game, result }
+}
+
+/** Pré-contratos do seu time: quem chega de graça na virada e quem vai embora. */
+export const userPreContractsOf = (game: Game) => userPreContracts(game.season, game.userTeamId)
 
 export const LINEUP_SLOTS = 3
 

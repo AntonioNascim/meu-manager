@@ -227,6 +227,7 @@ export const OFFER_REASON_LABELS: Record<OfferReason, string> = {
   duplicate: 'Já existe uma proposta pendente por ele',
   invalid: 'Proposta inválida',
   'no-interest': 'O clube não tem interesse no jogador',
+  'not-eligible': 'Só vale para quem está no último ano de contrato, a partir de julho',
 }
 
 export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {

@@ -339,7 +339,7 @@ describe('telas da base', () => {
   })
 
   it('jovens recém-chegados também acendem a bolinha e o aviso', () => {
-    const arrived: Game = { ...game, lastReport: { year: 2026, champions: [world.teams[0]!.id, world.teams[25]!.id], promoted: [], relegated: [], finalPositions: { [USER]: { tier: 1, position: 5 } }, retired: [], released: [], renewed: 0, youth: {}, academyArrivals: { [USER]: 4 }, academyPromoted: {}, academyReleased: {}, academyPending: [], reputationChanges: {} } }
+    const arrived: Game = { ...game, lastReport: { year: 2026, champions: [world.teams[0]!.id, world.teams[25]!.id], promoted: [], relegated: [], finalPositions: { [USER]: { tier: 1, position: 5 } }, retired: [], released: [], renewed: 0, youth: {}, academyArrivals: { [USER]: 4 }, academyPromoted: {}, academyReleased: {}, preContracts: [], academyPending: [], reputationChanges: {} } }
     expect(academyAlert(arrived).arrivals).toBe(4)
     expect(html(arrived)).toContain('Chegaram 4 jovens')
     expect(renderToStaticMarkup(createElement(Dashboard, { game: arrived, onNavigate: () => {} }))).toContain('4 jovens chegaram')

@@ -34,6 +34,8 @@ export interface OffseasonReport {
   /** Jovens do time do jogador que fizeram 20 anos e esperam a decisão (promover ou dispensar). */
   academyPending: PlayerId[]
   reputationChanges: Record<TeamId, { from: number; to: number }>
+  /** Pré-contratos que valeram na virada: o jogador mudou de clube de graça. */
+  preContracts: { playerId: PlayerId; fromTeamId: TeamId; toTeamId: TeamId }[]
 }
 
 /** Pedido de jovens ao gerador de dados (o motor não gera jogadores: quem gera é `src/data`). */

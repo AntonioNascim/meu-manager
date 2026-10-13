@@ -20,6 +20,7 @@ export type OfferReason =
   | 'duplicate'
   | 'invalid'
   | 'no-interest'
+  | 'not-eligible'
 
 export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired'
 
@@ -74,6 +75,17 @@ export interface Listing {
   by: 'ai' | 'user'
 }
 
+/** Pré-contrato: o jogador, no último ano de contrato, combinou com outro clube e chega de graça na virada. */
+export interface PreContract {
+  playerId: PlayerId
+  fromTeamId: TeamId
+  toTeamId: TeamId
+  salary: number
+  /** Anos do contrato novo, contados a partir da virada. */
+  years: number
+  signedOn: IsoDate
+}
+
 export interface MarketState {
   /** Semente dos sorteios da IA (junto com a data). */
   seed: number | string
@@ -81,6 +93,8 @@ export interface MarketState {
   history: TransferRecord[]
   /** Jogadores anunciados (à venda ou para empréstimo). */
   listings: Listing[]
+  /** Pré-contratos assinados nesta temporada (valem na virada). */
+  preContracts: PreContract[]
   /** Eventos do mercado até esta data (inclusive) já foram processados. */
   handled: IsoDate
   /** Contador para os ids das propostas. */
@@ -101,3 +115,5 @@ export type MarketNotice =
   | { type: 'window-last-day'; window: WindowName }
   | { type: 'offer-answered'; offerId: string }
   | { type: 'offer-received'; offerId: string }
+  /** Um jogador do time do jogador assinou pré-contrato com outro clube. */
+  | { type: 'pre-contract-lost'; playerId: PlayerId; teamId: TeamId }

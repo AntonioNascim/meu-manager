@@ -140,7 +140,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
     academy: [...(options.academy ?? [])],
     training: options.training ?? emptyTraining(),
     playerCounter: [...options.players, ...(options.academy ?? [])].reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
-    market: { seed: options.seed, offers: [], history: [], listings: [], handled: makeDate(options.year, 1, 1), counter: 0 },
+    market: { seed: options.seed, offers: [], history: [], listings: [], preContracts: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }
   // A janela de janeiro já abre com os anúncios dos clubes da IA (o jogador, se houver, anuncia depois).
   return refreshListings(state, makeDate(options.year, 1, 1))

@@ -1,5 +1,7 @@
 /** Calendário do mercado: aberturas e fechamentos de janela, rodadas de negociação e respostas às propostas. */
 import type { SeasonState } from '../season/calendar'
+import { MARKET } from '../config'
+import { makeDate } from '../season/dates'
 import type { IsoDate, WindowName } from '../types'
 import { tickDates, transferWindows } from './windows'
 
@@ -11,6 +13,8 @@ export interface MarketEvent {
   tick: boolean
   /** Há resposta a uma proposta do jogador neste dia. */
   responses: boolean
+  /** A IA tenta pré-contratos neste dia. */
+  preContract: boolean
 }
 
 /** Próximo dia com evento do mercado depois do último já tratado (`market.handled`). */
@@ -20,7 +24,7 @@ export function nextMarketEvent(state: SeasonState): MarketEvent | undefined {
   const at = (date: IsoDate) => {
     const existing = days.get(date)
     if (existing) return existing
-    const created: MarketEvent = { date, opens: [], closes: [], tick: false, responses: false }
+    const created: MarketEvent = { date, opens: [], closes: [], tick: false, responses: false, preContract: false }
     days.set(date, created)
     return created
   }
@@ -28,6 +32,10 @@ export function nextMarketEvent(state: SeasonState): MarketEvent | undefined {
     if (w.start > after) at(w.start).opens.push(w.name)
     if (w.end > after) at(w.end).closes.push(w.name)
     for (const d of tickDates(w)) if (d > after) at(d).tick = true
+  }
+  for (const month of MARKET.preContract.ai.months) {
+    const d = makeDate(state.season.year, month, 1)
+    if (d > after) at(d).preContract = true
   }
   for (const o of state.market.offers) {
     if (o.status === 'pending' && o.direction === 'outgoing' && o.dueOn > after) at(o.dueOn).responses = true
