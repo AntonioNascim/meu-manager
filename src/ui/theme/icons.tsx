@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type IconName = 'home' | 'squad' | 'tactics' | 'market' | 'table' | 'finance' | 'contract' | 'calendar' | 'heart' | 'ball' | 'stadium' | 'trophy' | 'swap' | 'filter' | 'star'
+export type IconName = 'home' | 'squad' | 'tactics' | 'market' | 'table' | 'finance' | 'contract' | 'calendar' | 'heart' | 'ball' | 'stadium' | 'trophy' | 'swap' | 'filter' | 'star' | 'boot' | 'card'
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10M10 20v-6h4v6" />,
@@ -48,6 +48,13 @@ const PATHS: Record<IconName, ReactNode> = {
   stadium: <path d="M3 10c0-2 4-3.5 9-3.5s9 1.5 9 3.5v5c0 2-4 3.5-9 3.5S3 17 3 15v-5ZM3 10c0 2 4 3.5 9 3.5s9-1.5 9-3.5M7 13.8v4M12 14v4.5M17 13.8v4" />,
   trophy: <path d="M7 4h10v5a5 5 0 0 1-10 0V4ZM7 6H4v1.5A3.5 3.5 0 0 0 7 11M17 6h3v1.5a3.5 3.5 0 0 1-3 3.5M12 14v3.5M8.5 20h7" />,
   swap: <path d="M4 8h14l-3-3M20 16H6l3 3" />,
+  boot: <path d="M3 15c3 0 5-2 6-5l2-4 3 1 1 3 5 2c1.5.6 2 1.4 2 2.5V18H3v-3ZM3 18h18M10 10l2 1M13 11l2 1" />,
+  card: (
+    <>
+      <rect x="6" y="3.5" width="12" height="17" rx="2" />
+      <path d="M9 8h6" />
+    </>
+  ),
   filter: <path d="M4 7h16M7 12h10M10 17h4" />,
   star: <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />,
 }

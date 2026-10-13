@@ -40,7 +40,7 @@ describe('tela de classificação', () => {
     expect(html.match(/aria-label="Zona de rebaixamento"/g)).toHaveLength(4)
     expect(html).not.toContain('Zona de acesso"')
     expect(html).toContain('Imperial Futebol Clube')
-    expect(html).toContain('bg-emerald-600/20')
+    expect(html).toContain('bg-accent/10')
     expect(html).toContain('Série B')
   })
 

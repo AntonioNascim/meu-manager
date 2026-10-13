@@ -20,6 +20,8 @@ export interface MatchEvent {
   playerId: PlayerId
   /** Assistente (gol) ou jogador que entra (substituição). */
   relatedPlayerId?: PlayerId
+  /** Tipo da assistência de um gol: passe (finalização na área, cara a cara, chute) ou cruzamento (cabeceio). */
+  assistKind?: 'pass' | 'cross'
   /** Texto de narração em português. */
   text: string
 }

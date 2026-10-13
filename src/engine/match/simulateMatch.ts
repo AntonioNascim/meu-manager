@@ -629,6 +629,8 @@ function scoreGoal(
     text.goalText(ctx.textRng, att.team.name, displayName(scorer), type, assister && displayName(assister)),
     assister,
   )
+  const goal = ctx.events[ctx.events.length - 1]
+  if (assister && goal) goal.assistKind = type === 'header' ? 'cross' : 'pass'
 }
 
 /** Gol contra: conta para o time que atacava; o evento aponta o defensor. */

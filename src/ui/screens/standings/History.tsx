@@ -1,0 +1,50 @@
+import type { Game } from '../../../store/game'
+import { teamById } from '../../../store/game'
+import { TIER_LABELS } from '../../labels'
+import { Icon, Panel } from '../../theme'
+import { SectionHeader, TeamLink } from './parts'
+
+/** Histórico: campeões de cada temporada, quem subiu e quem caiu, e a posição do seu time em cada ano. */
+export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => void }) {
+  const log = [...game.seasonLog].reverse()
+  const name = (id: string) => teamById(game, id)
+  return (
+    <div className="space-y-3">
+      <SectionHeader icon="trophy" title="Histórico" subtitle="Temporadas encerradas" tone="violet" />
+      {log.length === 0 && <Panel className="p-4 text-sm text-muted">Nenhuma temporada foi encerrada ainda. Os campeões, os acessos e os rebaixamentos aparecem aqui depois da primeira virada de temporada.</Panel>}
+      {log.map((s) => (
+        <Panel key={s.year} className="p-4">
+          <div className="flex items-baseline justify-between">
+            <h3 className="title text-3xl">{s.year}</h3>
+            <span className="text-xs font-bold text-accent">
+              Seu time: {s.userPosition}º na {TIER_LABELS[s.userTier as 1 | 2] ?? `Série ${s.userTier}`}
+            </span>
+          </div>
+          <ul className="mt-3 space-y-2 text-sm">
+            {s.champions.map((id, i) => (
+              <li key={id} className="flex items-center gap-2">
+                <span className="text-amber-300">
+                  <Icon name="trophy" size={18} />
+                </span>
+                <span className="w-16 shrink-0 text-xs text-muted">{TIER_LABELS[(i + 1) as 1 | 2] ?? `Série ${i + 1}`}</span>
+                <TeamLink team={name(id)} onOpen={onTeam} className="font-bold" />
+              </li>
+            ))}
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-win">▲</span>
+              <span className="min-w-0 flex-1 text-slate-200">
+                <b className="text-win">Subiram:</b> {s.promoted.map((id) => name(id).name).join(', ') || '–'}
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-loss">▼</span>
+              <span className="min-w-0 flex-1 text-slate-200">
+                <b className="text-loss">Caíram:</b> {s.relegated.map((id) => name(id).name).join(', ') || '–'}
+              </span>
+            </li>
+          </ul>
+        </Panel>
+      ))}
+    </div>
+  )
+}

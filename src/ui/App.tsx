@@ -41,6 +41,12 @@ function initialMarketTab(): MarketTab {
   return wanted === 'favorites' || wanted === 'lists' || wanted === 'free' || wanted === 'precontract' || wanted === 'proposals' || wanted === 'history' || wanted === 'contracts' ? wanted : 'search'
 }
 
+/** Em desenvolvimento, &aba=rounds|goals|assists|cards|history abre a seção da Tabela. */
+function initialStandingsSection(): 'table' | 'rounds' | 'goals' | 'assists' | 'cards' | 'history' {
+  const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
+  return wanted === 'rounds' || wanted === 'goals' || wanted === 'assists' || wanted === 'cards' || wanted === 'history' ? wanted : 'table'
+}
+
 export function App() {
   const game = useGame()
   const saveStatus = useSaveStatus()
@@ -112,7 +118,7 @@ export function App() {
         {current === 'match' && <MatchScreen game={game} onNavigate={setScreen} />}
         {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={current} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab()} />}
         {current === 'tactics' && <Tactics game={game} />}
-        {current === 'standings' && <Standings game={game} />}
+        {current === 'standings' && <Standings game={game} initialSection={initialStandingsSection()} />}
         {(current === 'market' || current === 'contracts') && <Market key={current} game={game} initialTab={current === 'contracts' ? 'contracts' : initialMarketTab()} />}
         {current === 'finance' && <Finance game={game} />}
       </main>

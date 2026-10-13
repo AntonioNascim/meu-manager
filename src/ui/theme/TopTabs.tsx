@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
  * Abas no topo da tela: barra arredondada com a aba ativa em degradê e, opcionalmente, uma bolinha de pendência.
  * Com `scroll`, as abas têm largura própria e a barra rola na horizontal (a aba ativa sempre fica à vista).
  */
-export function TopTabs<T extends string>({ value, options, onChange, scroll = false }: { value: T; options: { id: T; label: string; alert?: boolean }[]; onChange: (id: T) => void; scroll?: boolean }) {
+export function TopTabs<T extends string>({ value, options, onChange, scroll = false, activeClass = 'bg-gradient-to-r from-violet-500 to-sky-400 text-white shadow' }: { value: T; options: { id: T; label: string; alert?: boolean }[]; onChange: (id: T) => void; scroll?: boolean; activeClass?: string }) {
   const active = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     if (scroll) active.current?.scrollIntoView?.({ inline: 'center', block: 'nearest', behavior: 'smooth' })
@@ -22,7 +22,7 @@ export function TopTabs<T extends string>({ value, options, onChange, scroll = f
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.id)}
-            className={`relative min-h-11 rounded-xl font-bold transition ${size} ${on ? 'bg-gradient-to-r from-violet-500 to-sky-400 text-white shadow' : 'text-muted'}`}
+            className={`relative min-h-11 rounded-xl font-bold transition ${size} ${on ? activeClass : 'text-muted'}`}
           >
             {o.label}
             {o.alert && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-loss ring-2 ring-surface" role="img" aria-label="Há algo pendente" />}

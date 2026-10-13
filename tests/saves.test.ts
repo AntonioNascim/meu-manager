@@ -88,9 +88,11 @@ describe('compactação', () => {
     const compact = compactGame(game)
     const finished = compact.season.matches.filter((m) => m.status === 'finished')
     expect(finished.length).toBeGreaterThan(20)
-    const withEvents = finished.filter((m) => m.result!.events.length > 0)
-    expect(withEvents).toHaveLength(1)
-    expect([withEvents[0]!.homeTeamId, withEvents[0]!.awayTeamId]).toContain(game.userTeamId)
+    // Só o último jogo do time do jogador guarda tudo (narração e notas); os demais ficam com gols e cartões.
+    const full = finished.filter((m) => m.result!.playerResults.length > 0 || m.result!.events.some((e) => e.text !== ''))
+    expect(full).toHaveLength(1)
+    expect([full[0]!.homeTeamId, full[0]!.awayTeamId]).toContain(game.userTeamId)
+    for (const m of finished) if (m !== full[0]) expect(m.result!.events.every((e) => ['goal', 'own-goal', 'yellow-card', 'red-card'].includes(e.type))).toBe(true)
     for (const c of game.season.season.competitions) {
       const rows = (g: Game) => computeStandings(c.teamIds, g.season.matches.filter((m) => m.competitionId === c.id))
       expect(rows(compact)).toEqual(rows(game))

@@ -11,7 +11,7 @@ import type { MatchResult, Player, Team } from '../engine/types'
 import { userTeam } from './game'
 import type { Game } from './game'
 
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
 
 /** O que vai para o disco (e para o arquivo de backup). */
 export interface SaveEnvelope {
@@ -44,6 +44,7 @@ export type Migration = (envelope: { version: number; savedAt: string; game: unk
 
 /**
  * Migrações por versão de origem: `MIGRATIONS[1]` leva a versão 1 para a 2, e assim por diante.
+ * 7 → 8: contagens novas por jogador (gols em casa e fora, assistências de passe e de cruzamento); saves antigos começam em zero (a artilharia geral não muda, as abas Casa, Fora, Passes e Cruzamentos contam dali em diante).
  * 6 → 7: orçamento (`finances.budgetShift`, `purchaseBonus` e `fundsRequests` em todos os times); saves antigos começam sem nada movido nem pedido.
  * 5 → 6: pré-contratos (`season.market.preContracts` e `lastReport.preContracts`); saves antigos começam sem nenhum.
  * 4 → 5: listas do mercado (`season.market.listings`); saves antigos começam sem anúncios (os clubes da IA anunciam na próxima rodada de negociações).
@@ -105,6 +106,14 @@ export const MIGRATIONS: Record<number, Migration> = {
     }
     return { ...envelope, version: 7 }
   },
+  7: (envelope) => {
+    const game = envelope.game as { season?: { players?: { seasonStats?: Record<string, number> }[]; academy?: { seasonStats?: Record<string, number> }[] } }
+    for (const p of [...(game.season?.players ?? []), ...(game.season?.academy ?? [])]) {
+      if (!p.seasonStats) continue
+      for (const key of ['homeGoals', 'awayGoals', 'passAssists', 'crossAssists']) p.seasonStats[key] ??= 0
+    }
+    return { ...envelope, version: 8 }
+  },
 }
 
 export class SaveError extends Error {
@@ -164,9 +173,11 @@ export function compactGame(game: Game): Game {
   let changed = false
   const matches = game.season.matches.map((m) => {
     const r = m.result
-    if (m.status !== 'finished' || !r || m.id === keep || (r.events.length === 0 && r.playerResults.length === 0)) return m
+    if (m.status !== 'finished' || !r || m.id === keep || (r.playerResults.length === 0 && r.events.every((e) => e.text === ''))) return m
     changed = true
-    const slim: MatchResult = { homeGoals: r.homeGoals, awayGoals: r.awayGoals, homeStats: r.homeStats, awayStats: r.awayStats, events: [], playerResults: [] }
+    // Os gols (com assistência) e os cartões ficam, para o resumo do jogo; narração, lesões, trocas e notas saem.
+    const events = r.events.filter((e) => e.type === 'goal' || e.type === 'own-goal' || e.type === 'yellow-card' || e.type === 'red-card').map(({ minute, type, teamId, playerId, relatedPlayerId, assistKind }) => ({ minute, type, teamId, playerId, text: '', ...(relatedPlayerId ? { relatedPlayerId } : {}), ...(assistKind ? { assistKind } : {}) }))
+    const slim: MatchResult = { homeGoals: r.homeGoals, awayGoals: r.awayGoals, homeStats: r.homeStats, awayStats: r.awayStats, events, playerResults: [] }
     return { ...m, result: slim }
   })
   return changed ? { ...game, season: { ...game.season, matches } } : game

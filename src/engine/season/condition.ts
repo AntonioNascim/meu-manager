@@ -49,12 +49,16 @@ export function applyMatchToPlayers(squads: ReadonlyMap<TeamId, readonly Player[
 
   const goals = new Map<PlayerId, number>()
   const assists = new Map<PlayerId, number>()
+  const crossAssists = new Map<PlayerId, number>()
   const yellows = new Map<PlayerId, number>()
   const reds = new Set<PlayerId>()
   for (const e of result.events) {
     if (e.type === 'goal') {
       goals.set(e.playerId, (goals.get(e.playerId) ?? 0) + 1)
-      if (e.relatedPlayerId) assists.set(e.relatedPlayerId, (assists.get(e.relatedPlayerId) ?? 0) + 1)
+      if (e.relatedPlayerId) {
+        assists.set(e.relatedPlayerId, (assists.get(e.relatedPlayerId) ?? 0) + 1)
+        if (e.assistKind === 'cross') crossAssists.set(e.relatedPlayerId, (crossAssists.get(e.relatedPlayerId) ?? 0) + 1)
+      }
     } else if (e.type === 'yellow-card') yellows.set(e.playerId, (yellows.get(e.playerId) ?? 0) + 1)
     else if (e.type === 'red-card') reds.add(e.playerId)
   }
@@ -90,8 +94,15 @@ export function applyMatchToPlayers(squads: ReadonlyMap<TeamId, readonly Player[
         if (r.injuryDays) c.injuryDaysLeft = Math.max(c.injuryDaysLeft, r.injuryDays)
       }
 
-      stats.goals += goals.get(p.id) ?? 0
-      stats.assists += assists.get(p.id) ?? 0
+      const scored = goals.get(p.id) ?? 0
+      const assisted = assists.get(p.id) ?? 0
+      const crossed = crossAssists.get(p.id) ?? 0
+      stats.goals += scored
+      if (side.teamId === match.homeTeamId) stats.homeGoals += scored
+      else stats.awayGoals += scored
+      stats.assists += assisted
+      stats.crossAssists += crossed
+      stats.passAssists += assisted - crossed
 
       const yellow = yellows.get(p.id) ?? 0
       stats.yellowCards += yellow
