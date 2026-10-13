@@ -60,7 +60,7 @@ describe('telas de elenco', () => {
     expect(html).toContain('GOL')
     for (const tab of ['Jogadores', 'Escalação', 'Números']) expect(html).toContain(tab)
     expect(html).toContain('Base')
-    expect(html).not.toContain('Treino')
+    expect(html).toContain('Treino')
   })
 
   const detail = (p: Player) => renderToStaticMarkup(createElement(PlayerDetail, { player: p, onClose: () => {} }))

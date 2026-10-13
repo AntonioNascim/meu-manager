@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { playerOverall } from '../../../engine/overall'
 import type { Player } from '../../../engine/types'
-import { squadOf, userTeam } from '../../../store/game'
+import { squadOf, strengthChange, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { StatusTags } from '../../components/PlayerDetail'
 import { PlayerDetail } from '../../components/PlayerDetail'
@@ -9,12 +9,12 @@ import { formatCompactMoney, playerName } from '../../format'
 import { POSITION_GROUP_LABELS, POSITION_SHORT_LABELS, SQUAD_SORT_LABELS } from '../../labels'
 import { NATURAL_DIRECTION, inGroup, isUnavailable, sortSquad } from '../../squadSort'
 import type { PositionGroup, SquadSortKey } from '../../squadSort'
-import { ConditionBar, Flag, MoodIcon, Panel, ValueBadge } from '../../theme'
+import { ConditionBar, Flag, MoodIcon, Panel, Trend, ValueBadge } from '../../theme'
 
 const GROUPS = Object.keys(POSITION_GROUP_LABELS) as PositionGroup[]
 const SORT_KEYS: SquadSortKey[] = ['position', 'overall', 'age', 'fitness', 'morale']
 
-function PlayerRow({ player, starter, onOpen }: { player: Player; starter: boolean; onOpen: () => void }) {
+function PlayerRow({ player, starter, change, onOpen }: { player: Player; starter: boolean; change: number; onOpen: () => void }) {
   const out = isUnavailable(player)
   return (
     <li>
@@ -35,7 +35,10 @@ function PlayerRow({ player, starter, onOpen }: { player: Player; starter: boole
         </span>
         <MoodIcon morale={player.condition.morale} />
         <ConditionBar fitness={player.condition.fitness} />
-        <ValueBadge value={playerOverall(player)}>{Math.round(playerOverall(player))}</ValueBadge>
+        <span className="flex w-12 shrink-0 flex-col items-center gap-0.5">
+          <ValueBadge value={playerOverall(player)}>{Math.round(playerOverall(player))}</ValueBadge>
+          <Trend change={change} />
+        </span>
       </button>
     </li>
   )
@@ -107,18 +110,21 @@ export function Players({ game }: { game: Game }) {
         <span className="inline-flex items-center gap-1">
           <ConditionBar fitness={80} className="!h-4" /> condição
         </span>
+        <span className="inline-flex items-center gap-1">
+          <Trend change={1} /> <Trend change={-1} /> força no mês
+        </span>
       </div>
 
       <Panel className="overflow-hidden">
         <ul className="divide-y divide-line">
           {list.map((p) => (
-            <PlayerRow key={p.id} player={p} starter={starters.has(p.id)} onOpen={() => setOpenId(p.id)} />
+            <PlayerRow key={p.id} player={p} starter={starters.has(p.id)} change={strengthChange(game, p)} onOpen={() => setOpenId(p.id)} />
           ))}
           {list.length === 0 && <li className="p-4 text-sm text-muted">Nenhum jogador neste setor.</li>}
         </ul>
       </Panel>
 
-      {open && <PlayerDetail player={open} onClose={() => setOpenId(null)} />}
+      {open && <PlayerDetail player={open} onClose={() => setOpenId(null)} history={game.season.training.history[open.id]} currentDate={game.season.season.currentDate} />}
     </div>
   )
 }

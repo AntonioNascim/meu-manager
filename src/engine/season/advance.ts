@@ -16,6 +16,7 @@ import { simulateMatch } from '../match'
 import type { MatchInput } from '../match'
 import type { IsoDate, MarketNotice, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
 import type { SeasonState } from './calendar'
+import { applyTraining, fitnessProfile } from '../training'
 import { applyMatchToPlayers, progressDays } from './condition'
 import { daysBetween } from './dates'
 
@@ -90,10 +91,10 @@ export interface AdvanceResult {
 /** Passa os dias até `date`: recuperação, fechamento dos meses e, se for dia de negociação, o mercado. */
 function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, marketEvent: MarketEvent | undefined): { state: SeasonState; notices: MarketNotice[] } {
   const days = daysBetween(state.season.currentDate, date)
-  const players = progressDays(state.players, days)
+  const players = progressDays(state.players, days, (teamId) => fitnessProfile(state.training, teamId, days))
   const squads = groupByTeam(players)
   const teams = settleMonths(state.teams, squads, state.season.currentDate, date, options.userTeamId)
-  let current: SeasonState = { ...state, players, teams, season: { ...state.season, currentDate: date } }
+  let current: SeasonState = applyTraining({ ...state, players, teams, season: { ...state.season, currentDate: date } }, state.season.currentDate, date, options.userTeamId)
   const notices: MarketNotice[] = []
   if (!options.market) return { state: current, notices }
 

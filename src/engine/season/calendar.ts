@@ -4,7 +4,8 @@
  */
 import { SEASON } from '../config'
 import { createRng, hashSeed } from '../rng'
-import type { Competition, CompetitionId, IsoDate, MarketState, Match, Player, Season, Team } from '../types'
+import { emptyTraining } from '../types'
+import type { Competition, CompetitionId, IsoDate, MarketState, Match, Player, Season, Team, TrainingState } from '../types'
 import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
 import { buildLeagueRounds } from './schedule'
 
@@ -22,6 +23,8 @@ export interface SeasonState {
   academy: Player[]
   /** Propostas, histórico de transferências e controle dos eventos do mercado. */
   market: MarketState
+  /** Treino: plano de cada time, vaga individual e histórico mensal da força. */
+  training: TrainingState
   /** Último número usado nos ids dos jogadores (`player-N`): jovens novos continuam daqui. */
   playerCounter: number
 }
@@ -78,6 +81,8 @@ export interface SeasonOptions {
   players: readonly Player[]
   /** Base dos clubes (padrão: vazia). */
   academy?: readonly Player[]
+  /** Treino que vem da temporada anterior (padrão: vazio). */
+  training?: TrainingState
   /** Padrão: Série A e Série B com os times de cada `tier`. */
   competitions?: readonly CompetitionSetup[]
 }
@@ -132,6 +137,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
     teams: [...options.teams],
     players: [...options.players],
     academy: [...(options.academy ?? [])],
+    training: options.training ?? emptyTraining(),
     playerCounter: [...options.players, ...(options.academy ?? [])].reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
     market: { seed: options.seed, offers: [], history: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }

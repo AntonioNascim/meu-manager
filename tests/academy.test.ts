@@ -284,7 +284,7 @@ describe('base no jogo e no save', () => {
   })
 
   it('o save versão 2 (sem base) abre na versão atual com uma base coerente para cada clube', () => {
-    expect(SAVE_VERSION).toBe(3)
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(3)
     expect(MIGRATIONS[2]).toBeTypeOf('function')
     const game = createGame(9, USER)
     const envelope = JSON.parse(JSON.stringify(makeEnvelope(game, '2026-01-01T00:00:00Z')))
@@ -292,7 +292,7 @@ describe('base no jogo e no save', () => {
     delete envelope.game.season.academy
     expect(validateGame(envelope.game)).toContain('temporada incompleta')
     const migrated = migrateSave(envelope)
-    expect(migrated.version).toBe(3)
+    expect(migrated.version).toBe(SAVE_VERSION)
     const academy = migrated.game.season.academy
     for (const team of game.season.teams) {
       const n = academy.filter((p) => p.teamId === team.id).length
@@ -322,7 +322,7 @@ describe('telas da base', () => {
     for (const text of ['Categorias de base', 'de 3 a 5 garotos', 'até 15 jovens', 'Quem faz 20 anos', 'ZAG', 'potencial']) expect(out).toContain(text)
     expect(out.match(/<li/g)).toHaveLength(userAcademy(game).length)
     expect(out).toContain('Potencial estimado')
-    expect(out.match(/role="tab"/g)).toHaveLength(4)
+    expect(out.match(/role="tab"/g)).toHaveLength(5)
     expect(out).toContain('>Base<')
   })
 

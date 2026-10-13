@@ -1,5 +1,5 @@
 /**
- * Envelhecimento e evolução dos jogadores na virada de temporada.
+ * Envelhecimento e evolução dos jogadores. O crescimento vem aos poucos pelo treino da temporada (`engine/training`); a virada cuida do envelhecimento e do declínio.
  *
  * A curva média é a mesma que a geração do mundo usa (jovens ganham ~2 pontos por ano até os 22, o auge
  * é plano, o físico cai depois dos 30 e a leitura de jogo sobe até os ~32), para o nível do campeonato
@@ -15,7 +15,7 @@ const E = OFFSEASON.evolution
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
 /** Arredonda sorteando para cima com a probabilidade da parte fracionária (mantém a média). */
-function stochasticRound(rng: Rng, value: number): number {
+export function stochasticRound(rng: Rng, value: number): number {
   const floor = Math.floor(value)
   return floor + (rng.chance(value - floor) ? 1 : 0)
 }
@@ -32,25 +32,42 @@ export function yearlyGain(age: number, overall: number, potential: number): num
   return Math.max(0, base + bonus)
 }
 
-const PHYSICAL_PACE: readonly AttributeName[] = ['pace', 'stamina']
+export const PHYSICAL_PACE: readonly AttributeName[] = ['pace', 'stamina']
 const MENTAL: readonly AttributeName[] = ['vision', 'positioning', 'decisions', 'determination']
 const TECHNICAL: readonly AttributeName[] = ['passing', 'finishing', 'dribbling', 'crossing', 'tackling', 'heading', 'ballControl']
 
+/** Fator de desenvolvimento de quem joga mais: 0,8 + 0,4 × fração dos minutos, ajustado pelo profissionalismo (±10%). */
+export function developmentFactor(player: Player, minutesShare: number): number {
+  const development = E.minutesBase + E.minutesWeight * clamp(minutesShare, 0, 1)
+  const professionalism = 1 + E.professionalismWeight * ((player.hidden.professionalism - 60) / 40)
+  return development * professionalism
+}
+
+/** Ganho médio por ano em todos os atributos, sem ruído: é o ritmo de evolução da temporada (o treino reparte isso pelos dias). */
+export function growthPerYear(player: Player, minutesShare: number): number {
+  const gain = yearlyGain(player.age, playerOverall(player), player.hidden.potential)
+  return gain > 0 ? Math.min(gain * developmentFactor(player, minutesShare), Math.max(0, player.hidden.potential - playerOverall(player))) : 0
+}
+
 /**
- * Um ano a mais: idade, atributos (crescimento ou declínio) e zeragem da condição e das estatísticas.
- * `minutesShare` (0 a 1) é a fração dos minutos possíveis que ele jogou na temporada: quem joga evolui mais.
+ * Ganho do ano em uma tacada só (o que a virada fazia antes do treino semanal). O jogo não usa mais isto na virada;
+ * serve de referência de quanto o treino Normal precisa render por temporada.
  */
-export function evolvePlayer(rng: Rng, player: Player, minutesShare: number): Player {
-  const age = player.age
+export function annualGain(rng: Rng, player: Player, minutesShare: number): number {
   const overall = playerOverall(player)
   const potential = player.hidden.potential
-  let gain = yearlyGain(age, overall, potential) + rng.normal(0, E.playerNoise)
-  if (gain > 0) {
-    const development = E.minutesBase + E.minutesWeight * clamp(minutesShare, 0, 1)
-    const professionalism = 1 + E.professionalismWeight * ((player.hidden.professionalism - 60) / 40)
-    gain = Math.min(gain * development * professionalism, Math.max(0, potential - overall))
-  }
+  const gain = yearlyGain(player.age, overall, potential) + rng.normal(0, E.playerNoise)
+  return gain > 0 ? Math.min(gain * developmentFactor(player, minutesShare), Math.max(0, potential - overall)) : gain
+}
 
+/**
+ * Um ano a mais: idade, declínio dos veteranos, ruído dos atributos e zeragem da condição e das estatísticas.
+ * `gain` é o ganho de crescimento a aplicar agora em todos os atributos: na virada do jogo é 0, porque o
+ * crescimento já veio aos poucos pelo treino da temporada.
+ */
+export function ageOneYear(rng: Rng, player: Player, gain: number): Player {
+  const age = player.age
+  const potential = player.hidden.potential
   const attributes = { ...player.attributes } as Attributes
   for (const name of ATTRIBUTE_NAMES) {
     if ((name === 'reflexes' || name === 'rushingOut') && player.position !== 'GK') continue
@@ -73,6 +90,11 @@ export function evolvePlayer(rng: Rng, player: Player, minutesShare: number): Pl
   }
   const now = playerOverall(evolved)
   return { ...evolved, hidden: { ...player.hidden, potential: clamp(Math.max(potential, Math.round(now)), ATTRIBUTE_MIN, ATTRIBUTE_MAX) } }
+}
+
+/** Evolução do ano inteiro de uma vez (crescimento + envelhecimento). Referência para testes; o jogo reparte o crescimento pelo treino. */
+export function evolvePlayer(rng: Rng, player: Player, minutesShare: number): Player {
+  return ageOneYear(rng, player, annualGain(rng, player, minutesShare))
 }
 
 /** O jogador (já com a idade nova) para de jogar? */

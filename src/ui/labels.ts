@@ -5,6 +5,8 @@
  */
 import type {
   BoardStatus,
+  TrainingFocus,
+  TrainingIntensity,
   DismissalReason,
   AttributeName,
   CompetitionType,
@@ -291,4 +293,34 @@ export const NUMBERS_LABELS: Record<NumbersKey, string> = {
   yellow: 'Amarelos',
   red: 'Vermelhos',
   rating: 'Nota',
+}
+
+/** Treino coletivo: intensidade e foco. */
+export const TRAINING_INTENSITY_LABELS: Record<TrainingIntensity, string> = {
+  light: 'Leve',
+  normal: 'Normal',
+  intense: 'Intensa',
+}
+
+/** O que cada intensidade faz: evolução, recuperação da condição e risco de lesão, de 1 a 5 (3 = Normal). */
+export const TRAINING_INTENSITY_LEVELS: Record<TrainingIntensity, { growth: number; recovery: number; injury: number; summary: string }> = {
+  light: { growth: 2, recovery: 4, injury: 1, summary: 'Evolui menos, recupera mais a condição e quase não machuca.' },
+  normal: { growth: 3, recovery: 3, injury: 2, summary: 'O ritmo padrão: evolução normal e risco baixo.' },
+  intense: { growth: 4, recovery: 2, injury: 4, summary: 'Evolui mais, mas cansa o elenco e aumenta o risco de lesão.' },
+}
+
+export const TRAINING_FOCUS_LABELS: Record<TrainingFocus, string> = {
+  balanced: 'Equilibrado',
+  physical: 'Físico',
+  technical: 'Técnico',
+  defensive: 'Defensivo',
+  offensive: 'Ofensivo',
+}
+
+export const TRAINING_FOCUS_DESCRIPTIONS: Record<TrainingFocus, string> = {
+  balanced: 'Todos os atributos evoluem no mesmo ritmo.',
+  physical: 'Velocidade, resistência e força evoluem mais.',
+  technical: 'Passe, finalização, drible, cruzamento e controle evoluem mais.',
+  defensive: 'Desarme, cabeceio, posicionamento, força e determinação evoluem mais (e os reflexos do goleiro).',
+  offensive: 'Finalização, drible, cruzamento, passe, velocidade e visão evoluem mais.',
 }

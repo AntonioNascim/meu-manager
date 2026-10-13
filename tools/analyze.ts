@@ -10,7 +10,8 @@
  * Seções: bands (posição e pontos por faixa de força), styles (estilos com elencos equivalentes),
  * home (vantagem de jogar em casa por série e por ocupação do estádio), years (várias temporadas seguidas
  * com virada de temporada: força das séries, idades, promessas, finanças e elencos, ano a ano).
- * save (tamanho do save em KB depois de cada uma de `--years` temporadas jogadas pelo store).
+ * save (tamanho do save em KB depois de cada uma de `--years` temporadas jogadas pelo store), training (times que treinam sempre
+ * Leve, Normal ou Intensa, lado a lado: pontos, evolução da força, lesões e condição; `--years`, `--longworlds`).
  * Opções: --seasons N (bands), --worlds N (styles e home), --matches N (home), --years N e --longworlds N (years;
  * cada mundo leva ~10 s por temporada), --seed N (primeira semente).
  */
@@ -24,9 +25,10 @@ import type { Player, PlayStyle, Team } from '../src/engine/types'
 import { formatYears, simulateYears } from './longRun'
 import { formatSizes, measureSaveSizes } from './saveSize'
 import { simulateSeasons } from './seasons'
+import { formatTraining, simulateTrainingExperiment } from './trainingRun'
 import type { SeasonSummary } from '../tests/balance/helpers'
 
-const SECTIONS = ['bands', 'styles', 'home', 'years', 'save'] as const
+const SECTIONS = ['bands', 'styles', 'home', 'years', 'save', 'training'] as const
 type Section = (typeof SECTIONS)[number]
 
 function parseArgs(argv: string[]) {
@@ -210,6 +212,14 @@ ${formatYears(rows)}`)
   }
 }
 
+/** Intensidade do treino: times que treinam sempre Leve, Normal ou Intensa, lado a lado. */
+function runTraining(years: number, worlds: number, firstSeed: number) {
+  const seeds = Array.from({ length: worlds }, (_, i) => firstSeed + i)
+  console.log(`
+Intensidade de treino (${years} temporadas, mundos ${seeds.join(', ')}; grupos em zigue-zague por força)
+${formatTraining(simulateTrainingExperiment({ seeds, years }))}`)
+}
+
 const { sections, options } = parseArgs(process.argv.slice(2))
 const t0 = performance.now()
 for (const section of sections) {
@@ -219,6 +229,7 @@ for (const section of sections) {
   if (section === 'save') console.log(`
 Tamanho do save (${options.years} temporadas, time jogado no automático)
 ${formatSizes(measureSaveSizes(options.years as number, options.seed as number))}`)
+  if (section === 'training') runTraining(options.years as number, options.longworlds as number, options.seed as number)
   if (section === 'years') runYears(options.years as number, options.longworlds as number, options.seed as number)
 }
 console.log(`\n(${f((performance.now() - t0) / 1000)} s)`)

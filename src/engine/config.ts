@@ -625,6 +625,38 @@ export const OFFSEASON = {
   },
 } as const
 
+// ---------------------------------------------------------------------------
+// Treino
+// ---------------------------------------------------------------------------
+
+/**
+ * Treino durante a temporada. A evolução que antes vinha toda na virada agora chega aos poucos, a cada avanço
+ * (proporcional aos dias que passaram, entre a primeira e a última rodada); a virada cuida só do envelhecimento
+ * e do declínio. No treino Normal o total por temporada é o mesmo de antes (`OFFSEASON.evolution`).
+ */
+export const TRAINING = {
+  /** Efeito de cada intensidade: multiplicador do ganho, da recuperação diária da condição, teto da condição e do risco de lesão no treino. */
+  intensity: {
+    light: { growth: 0.8, recovery: 1.16, fitnessCeiling: 100, injury: 0.5 },
+    normal: { growth: 1, recovery: 1, fitnessCeiling: 100, injury: 1 },
+    intense: { growth: 1.3, recovery: 0.96, fitnessCeiling: 98, injury: 1.8 },
+  },
+  /** Multiplica todo o ganho de treino: compensa o treino Leve que a IA faz em semana de jogo no meio da semana, para o mundo evoluir como antes. */
+  growthScale: 1.03,
+  /** Foco: os atributos do foco evoluem `boost` vezes mais; os outros descem para o total não mudar. */
+  focusBoost: 1.8,
+  /** Lesão no treino: chance por dia (jogador de propensão média, treino Normal) e duração em dias. */
+  injury: { perDay: 0.0004, days: [5, 25] as readonly [number, number], pronenessWeight: 1 },
+  /** A IA treina Leve quando o intervalo entre dois avanços é de 2 a 4 dias (semana com jogo no meio da semana; sábado→domingo, 1 dia, não conta). */
+  ai: { shortWeek: [2, 4] as readonly [number, number] },
+  /** Treino individual: duração, pontos extras por atributo do grupo ao longo dele (limitados pela distância até o potencial). */
+  individual: { days: 30, pointsPerAttribute: 0.5 },
+  /** Histórico mensal da força: quantos pontos guardar por jogador e quantos dias antes a comparação "desde o último mês" olha. */
+  history: { maxEntries: 40, compareDays: 25 },
+  /** Faixa estimada do potencial: desvio da estimativa aos 17 anos ou menos e aos 30 ou mais (entre eles, linear). */
+  potentialRange: { sdYoung: 6, sdOld: 2, youngAge: 17, oldAge: 30 },
+} as const
+
 /** Categorias de base: elenco de jovens separado do profissional, que não joga partidas. */
 export const ACADEMY = {
   /** Idades na base: de 15 a 19 anos; quem faz 20 precisa ser promovido ou dispensado. */

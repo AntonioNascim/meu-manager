@@ -18,7 +18,7 @@ import type { DepartedPlayer, OffseasonReport, Player, PlayerId, Position, Stand
 import { turnAcademy } from '../academy/turn'
 import { expireContracts } from './contracts'
 import { desiredSquadSize, positionDeficits, payrollCuts } from './squad'
-import { evolvePlayer, retires } from './evolution'
+import { ageOneYear, retires } from './evolution'
 
 export * from './contracts'
 export * from './evolution'
@@ -100,13 +100,12 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
 
   // 3) Envelhecimento e evolução; 4) aposentadorias. Quem ficou o ano inteiro sem clube sai do jogo.
   const retired: DepartedPlayer[] = []
-  const gamesPossible = (state.season.competitions[0]?.roundCount ?? 38) * 90
   const evolveRng = rng.fork('evolution')
   const retireRng = rng.fork('retirement')
   let players: Player[] = []
   for (const p of state.players) {
     if (p.teamId === null) continue
-    const next = evolvePlayer(evolveRng, p, p.seasonStats.minutes / gamesPossible)
+    const next = ageOneYear(evolveRng, p, 0)
     if (retires(retireRng, next)) retired.push(departed(next))
     else players.push(next)
   }
@@ -201,7 +200,13 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     academyPending: academy.filter((p) => p.teamId === options.userTeamId && p.age >= ACADEMY.graduationAge).map((p) => p.id),
     reputationChanges,
   }
-  return { state: { ...next, academy, playerCounter: counter }, report }
+  const squadIds = new Set(players.filter((p) => p.teamId === options.userTeamId).map((p) => p.id))
+  const training = {
+    ...state.training,
+    individual: Object.fromEntries(Object.entries(state.training.individual).filter(([teamId, slot]) => players.some((p) => p.id === slot.playerId && p.teamId === teamId))),
+    history: Object.fromEntries(Object.entries(state.training.history).filter(([id]) => squadIds.has(id))),
+  }
+  return { state: { ...next, academy, playerCounter: counter, training }, report }
 }
 
 /** Reservas que a IA corta para voltar ao tamanho máximo (os de menor valor, sem deixar posição descoberta). */

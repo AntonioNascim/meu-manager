@@ -103,6 +103,8 @@ export interface PlayerSeasonStats {
   /** Soma das notas das partidas em que jogou o mínimo de minutos (a nota média é `ratingSum / ratedGames`). */
   ratingSum: number
   ratedGames: number
+  /** Força geral no começo da temporada, guardada pelo treino na primeira vez que passa: o ritmo de evolução da temporada parte dela. */
+  startOverall?: number
 }
 
 export interface Player {

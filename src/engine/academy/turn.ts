@@ -1,6 +1,6 @@
 /** Virada de temporada da base: evolução, decisões dos 20 anos, promoções da IA e chegada dos jovens novos. */
 import { ACADEMY } from '../config'
-import { evolvePlayer } from '../offseason/evolution'
+import { ageOneYear } from '../offseason/evolution'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits } from '../offseason/squad'
 import type { Rng } from '../rng'
 import { SQUAD_MAX } from '../types'
@@ -78,7 +78,7 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
     // 1) Quem já tinha 20 anos e o jogador deixou sem decisão: a regra da IA decide.
     if (isUser) youths = youths.filter((p) => p.age < ACADEMY.graduationAge || !aiDecides(p, true))
     // 2) Um ano a mais para todos (evoluem um pouco mais devagar que quem joga).
-    youths = youths.map((p) => asAcademy(evolvePlayer(evolveRng, p, ACADEMY.evolutionShare), nextYear))
+    youths = youths.map((p) => asAcademy(ageOneYear(evolveRng, p, 0), nextYear))
     // 3) A IA decide sobre os de 20 anos e promove os que já valem a pena, do mais valioso para o menos.
     if (!isUser) youths = [...youths].sort((a, b) => youthValue(b) - youthValue(a)).filter((p) => !aiDecides(p, p.age >= ACADEMY.graduationAge))
     // 4) Chegam de 3 a 5 jovens. Base cheia: a IA dispensa os de menor valor; o jogador fica sem as vagas que faltam.

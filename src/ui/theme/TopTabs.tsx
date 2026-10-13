@@ -11,7 +11,7 @@ export function TopTabs<T extends string>({ value, options, onChange }: { value:
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.id)}
-            className={`relative min-h-11 flex-1 rounded-xl px-2 text-sm font-bold transition ${on ? 'bg-gradient-to-r from-violet-500 to-sky-400 text-white shadow' : 'text-muted'}`}
+            className={`relative min-h-11 min-w-0 flex-1 rounded-xl font-bold transition ${options.length > 4 ? 'px-0 text-[12px] tracking-tight' : 'px-2 text-sm'} ${on ? 'bg-gradient-to-r from-violet-500 to-sky-400 text-white shadow' : 'text-muted'}`}
           >
             {o.label}
             {o.alert && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-loss ring-2 ring-surface" role="img" aria-label="Há algo pendente" />}

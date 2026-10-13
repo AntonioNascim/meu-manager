@@ -31,7 +31,7 @@ function initialScreen(): ScreenId {
 /** Em desenvolvimento, &aba=lineup|numbers abre a aba do Elenco. */
 function initialSquadTab(): SquadTab {
   const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
-  return wanted === 'lineup' || wanted === 'numbers' || wanted === 'academy' ? wanted : 'players'
+  return wanted === 'lineup' || wanted === 'numbers' || wanted === 'academy' || wanted === 'training' ? wanted : 'players'
 }
 
 export function App() {
@@ -103,7 +103,7 @@ export function App() {
       <main className="flex-1 px-4 pb-28 pt-4">
         {current === 'home' && <Dashboard game={game} onNavigate={setScreen} />}
         {current === 'match' && <MatchScreen game={game} onNavigate={setScreen} />}
-        {(current === 'squad' || current === 'academy') && <Squad key={current} game={game} initialTab={current === 'academy' ? 'academy' : initialSquadTab()} />}
+        {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={current} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab()} />}
         {current === 'tactics' && <Tactics game={game} />}
         {current === 'standings' && <Standings game={game} />}
         {(current === 'market' || current === 'contracts') && <Market key={current} game={game} initialTab={current === 'contracts' ? 'contracts' : 'search'} />}

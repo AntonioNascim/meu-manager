@@ -8,13 +8,14 @@ import { Academy } from './squad/Academy'
 import { Lineup } from './squad/Lineup'
 import { Numbers } from './squad/Numbers'
 import { Players } from './squad/Players'
+import { Training } from './squad/Training'
 
 export { sortSquad }
 export type { SquadSortKey }
 
-export type SquadTab = 'players' | 'lineup' | 'numbers' | 'academy'
+export type SquadTab = 'players' | 'lineup' | 'numbers' | 'academy' | 'training'
 
-/** Tela de Elenco: abas Jogadores, Escalação, Números e Base (Treino virá depois). */
+/** Tela de Elenco: abas Jogadores, Escalação, Números, Base e Treino. */
 export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab?: SquadTab }) {
   const [tab, setTab] = useState<SquadTab>(initialTab)
   const team = userTeam(game)
@@ -37,12 +38,14 @@ export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab
           { id: 'lineup', label: 'Escalação', alert: lineupAlert },
           { id: 'numbers', label: 'Números' },
           { id: 'academy', label: 'Base', alert: academy.pending > 0 || academy.arrivals > 0 },
+          { id: 'training', label: 'Treino' },
         ]}
       />
       {tab === 'players' && <Players game={game} />}
       {tab === 'lineup' && <Lineup game={game} />}
       {tab === 'numbers' && <Numbers game={game} />}
       {tab === 'academy' && <Academy game={game} />}
+      {tab === 'training' && <Training game={game} />}
     </div>
   )
 }

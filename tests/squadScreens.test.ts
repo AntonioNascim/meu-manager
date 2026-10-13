@@ -209,10 +209,10 @@ describe('números da temporada', () => {
 describe('abas do Elenco', () => {
   const g = playDays(createGame(7, USER), 4)
 
-  it('existem Jogadores, Escalação, Números e Base (o Treino ainda não)', () => {
+  it('existem Jogadores, Escalação, Números, Base e Treino', () => {
     const html = renderToStaticMarkup(createElement(Squad, { game: g }))
-    expect(html.match(/role="tab"/g)).toHaveLength(4)
-    expect(html).not.toContain('Treino')
+    expect(html.match(/role="tab"/g)).toHaveLength(5)
+    expect(html).toContain('Treino')
   })
 
   it('Jogadores: filtros por setor, resumo de disponíveis, etiquetas de titular, lesão e suspensão', () => {

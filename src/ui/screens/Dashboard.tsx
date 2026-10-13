@@ -15,14 +15,16 @@ import {
   teamById,
   teamStrength,
   userCompetition,
+  userIndividualTraining,
   userTeam,
+  userTrainingPlan,
 } from '../../store/game'
 import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
 import { Card } from '../components/ui'
 import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TIER_LABELS, WINDOW_LABELS } from '../labels'
+import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TIER_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS, WINDOW_LABELS } from '../labels'
 import { Crest, Eyebrow, Icon, Panel, ProgressBar, ResultDot, SegmentedBar, ShortcutTile } from '../theme'
 
 const BOARD_CHIP = { safe: 'border-win/40 bg-win/10 text-win', warning: 'border-amber-300/40 bg-amber-300/10 text-amber-300', danger: 'border-loss/40 bg-loss/10 text-loss' } as const
@@ -35,6 +37,29 @@ function noticeText(n: MarketNotice): string | null {
     case 'offer-received': return 'Você recebeu uma proposta por um jogador.'
     default: return null
   }
+}
+
+/** Treino atual: intensidade, foco e a vaga individual. */
+function TrainingCard({ game, onOpen }: { game: Game; onOpen: () => void }) {
+  const plan = userTrainingPlan(game)
+  const slot = userIndividualTraining(game)
+  const trainee = slot ? squadOf(game, game.userTeamId).find((p) => p.id === slot.playerId) : undefined
+  return (
+    <Panel className="p-4">
+      <div className="flex items-start justify-between gap-2">
+        <Eyebrow>Treino</Eyebrow>
+        <button type="button" className="min-h-10 text-sm font-bold text-accent" onClick={onOpen}>
+          Mudar
+        </button>
+      </div>
+      <div className="title mt-1 text-3xl">
+        {TRAINING_INTENSITY_LABELS[plan.intensity]} · {TRAINING_FOCUS_LABELS[plan.focus]}
+      </div>
+      <p className="text-sm text-muted">
+        {trainee && slot ? `Individual: ${trainee.nickname ?? trainee.name}, faltam ${slot.daysLeft} dias.` : 'Vaga de treino individual livre.'}
+      </p>
+    </Panel>
+  )
 }
 
 function SeasonReport({ game, report }: { game: Game; report: OffseasonReport }) {
@@ -299,6 +324,8 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
           </button>
         </Panel>
       )}
+
+      <TrainingCard game={game} onOpen={() => onNavigate('training')} />
 
       {last && <LastMatchCard game={game} match={last} />}
 

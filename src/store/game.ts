@@ -9,6 +9,7 @@ import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
 import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth } from '../engine/academy'
 import { applySavedLineup } from '../engine/tacticEdit'
+import { DEFAULT_PLAN, cancelIndividualTraining, setTrainingPlan, startIndividualTraining, strengthTrend } from '../engine/training'
 import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
 import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
 import type { OfferRequest, SaleResult } from '../engine/market'
@@ -23,7 +24,8 @@ import {
   setTeamTactic,
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
-import type { BoardEvaluation, Competition, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import { emptyTraining } from '../engine/types'
+import type { BoardEvaluation, Competition, IndividualGoal, IndividualTraining, FinishedTraining, TrainingPlan, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
 /** Linha resumida da classificação final: time, jogos, vitórias, empates, derrotas, gols pró, gols contra, pontos. */
 export type ArchivedRow = [teamId: string, played: number, wins: number, draws: number, losses: number, goalsFor: number, goalsAgainst: number, points: number]
@@ -66,7 +68,7 @@ export interface Game {
 export function createGame(seed: number, userTeamId: TeamId): Game {
   const world = generateWorld({ seed })
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
-  const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy })
+  const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } } })
   return { seed, userTeamId, season, lastDay: [], notices: [], seasonLog: [], archive: [] }
 }
 
@@ -178,6 +180,30 @@ export function releaseUserYouth(game: Game, playerId: string): Game {
 export function academyAlert(game: Game): { arrivals: number; pending: number } {
   return { arrivals: game.lastReport?.academyArrivals?.[game.userTeamId] ?? 0, pending: pendingAcademy(game).length }
 }
+
+/** Treino coletivo do time do jogador (intensidade e foco). */
+export const userTrainingPlan = (game: Game): TrainingPlan => game.season.training.plans[game.userTeamId] ?? DEFAULT_PLAN
+
+/** O jogador escolhe a intensidade e o foco do treino (vale a partir do próximo avanço). */
+export function setUserTrainingPlan(game: Game, plan: TrainingPlan): Game {
+  return { ...game, season: setTrainingPlan(game.season, game.userTeamId, plan) }
+}
+
+/** Vaga de treino individual do time do jogador e o último treino que terminou. */
+export const userIndividualTraining = (game: Game): IndividualTraining | undefined => game.season.training.individual[game.userTeamId]
+export const userFinishedTraining = (game: Game): FinishedTraining | undefined => game.season.training.finished[game.userTeamId]
+
+/** Põe um jogador na vaga de treino individual (lança `TrainingError` se a vaga está ocupada ou a escolha é inválida). */
+export function startUserIndividualTraining(game: Game, playerId: string, goal: IndividualGoal): Game {
+  return { ...game, season: startIndividualTraining(game.season, game.userTeamId, playerId, goal) }
+}
+
+export function cancelUserIndividualTraining(game: Game): Game {
+  return { ...game, season: cancelIndividualTraining(game.season, game.userTeamId) }
+}
+
+/** Quanto a força do jogador mudou desde o último mês (em pontos inteiros). */
+export const strengthChange = (game: Game, player: Player): number => strengthTrend(game.season.training.history[player.id], playerOverall(player), game.season.season.currentDate)
 
 export const LINEUP_SLOTS = 3
 

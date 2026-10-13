@@ -14,13 +14,18 @@ export function fitnessRecoveryPerDay(player: Player): number {
   return CONDITION.fitnessPerDay * (1 + (CONDITION.staminaEffect * (player.attributes.stamina - 60)) / 40)
 }
 
+/** Recuperação do dia a dia de um time: multiplica a velocidade e limita a condição (intensidade do treino). */
+export type RecoveryProfile = (teamId: TeamId | null) => { recovery: number; ceiling: number }
+
 /** Passa `days` dias: recupera a condição física, desconta os dias de lesão e aproxima a moral do neutro. */
-export function progressDays(players: readonly Player[], days: number): Player[] {
+export function progressDays(players: readonly Player[], days: number, profile?: RecoveryProfile): Player[] {
   if (days <= 0) return [...players]
   const drift = 1 - (1 - CONDITION.moraleDriftPerDay) ** days
   return players.map((p) => {
     const c = p.condition
-    const fitness = Math.min(100, c.fitness + days * fitnessRecoveryPerDay(p))
+    const { recovery, ceiling } = profile ? profile(p.teamId) : { recovery: 1, ceiling: 100 }
+    // O teto só limita a recuperação: quem já está acima dele (treino mudou) não perde condição por isso.
+    const fitness = Math.min(Math.max(ceiling, c.fitness), c.fitness + days * fitnessRecoveryPerDay(p) * recovery)
     const injuryDaysLeft = Math.max(0, c.injuryDaysLeft - days)
     const morale = c.morale + (MORALE_NEUTRAL - c.morale) * drift
     if (fitness === c.fitness && injuryDaysLeft === c.injuryDaysLeft && morale === c.morale) return p

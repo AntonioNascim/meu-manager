@@ -149,3 +149,15 @@ export function Stars({ value, size = 14 }: { value: number; size?: number }) {
     </span>
   )
 }
+
+/** Setinha de quanto a força mudou desde o último mês (some quando não mudou). */
+export function Trend({ change }: { change: number }) {
+  if (change === 0) return null
+  const up = change > 0
+  return (
+    <span className={`inline-flex items-center text-[11px] font-extrabold leading-none ${up ? 'text-win' : 'text-loss'}`} role="img" aria-label={`${up ? 'Subiu' : 'Caiu'} ${Math.abs(change)} desde o último mês`}>
+      {up ? '▲' : '▼'}
+      {Math.abs(change)}
+    </span>
+  )
+}

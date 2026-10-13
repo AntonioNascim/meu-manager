@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { CONDITION } from '../../engine/config'
 import { overallAt, playerOverall } from '../../engine/overall'
 import { GOALKEEPER_ATTRIBUTES, MENTAL_ATTRIBUTES, PHYSICAL_ATTRIBUTES, TECHNICAL_ATTRIBUTES } from '../../engine/types'
-import type { AttributeName, Player, Position } from '../../engine/types'
+import type { AttributeName, IsoDate, Player, Position, StrengthSnapshot } from '../../engine/types'
 import { bandFor, conditionBand, formBand } from '../colors'
 import { formatMoney, playerName } from '../format'
 import {
@@ -54,6 +54,32 @@ function Stat({ label, value, bar, color }: { label: string; value: string; bar?
   )
 }
 
+/** Linha da força ao longo do tempo (um ponto por mês, mais o valor de hoje). */
+function StrengthChart({ history, now, date }: { history: readonly StrengthSnapshot[]; now: number; date: IsoDate }) {
+  const points: StrengthSnapshot[] = [...history, [date, now]]
+  const values = points.map((p) => p[1])
+  const min = Math.floor(Math.min(...values) - 1)
+  const max = Math.ceil(Math.max(...values) + 1)
+  const x = (i: number) => 8 + (points.length === 1 ? 0 : (i / (points.length - 1)) * 304)
+  const y = (v: number) => 8 + (1 - (v - min) / Math.max(1, max - min)) * 84
+  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ')
+  const last = points[points.length - 1] as StrengthSnapshot
+  const first = points[0] as StrengthSnapshot
+  return (
+    <div>
+      <svg viewBox="0 0 320 100" className="h-28 w-full" role="img" aria-label={`Força de ${first[1].toFixed(1)} a ${last[1].toFixed(1)}`}>
+        <path d={path} fill="none" className="stroke-accent" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={x(points.length - 1)} cy={y(last[1])} r="4" className="fill-accent" />
+      </svg>
+      <div className="flex justify-between text-[11px] text-muted">
+        <span>{first[0].split('-').reverse().join('/')} · {Math.round(first[1])}</span>
+        <span>mín. {min + 1} · máx. {max - 1}</span>
+        <span>hoje · {Math.round(now)}</span>
+      </div>
+    </div>
+  )
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Panel className="p-4">
@@ -70,7 +96,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * Detalhe do jogador. Na base (`academy`), mostra a estimativa de potencial em estrelas (`stars`) no lugar de estado,
  * temporada e contrato, e o `footer` traz os botões de promover e dispensar.
  */
-export function PlayerDetail({ player, onClose, academy = false, stars, footer }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode }) {
+export function PlayerDetail({ player, onClose, academy = false, stars, footer, history, currentDate }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode; history?: readonly StrengthSnapshot[]; currentDate?: IsoDate }) {
   const c = player.condition
   const overall = playerOverall(player)
   const isKeeper = player.position === 'GK'
@@ -149,6 +175,12 @@ export function PlayerDetail({ player, onClose, academy = false, stars, footer }
           <Stat label="Suspensão" value={c.suspensionGames > 0 ? `${c.suspensionGames} jogo${c.suspensionGames > 1 ? 's' : ''}` : 'Não'} />
           <Stat label="Amarelos acumulados" value={`${c.yellowCards} / ${CONDITION.yellowsPerSuspension}`} />
         </Section>}
+
+        {history && history.length > 0 && currentDate && (
+          <Section title="Evolução da força">
+            <StrengthChart history={history} now={overall} date={currentDate} />
+          </Section>
+        )}
 
         <Section title="Força por posição">
           <div className="flex flex-wrap gap-2">

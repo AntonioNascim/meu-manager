@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
-import { advanceGame, createGame, playPendingAuto } from '../store/game'
+import { advanceGame, createGame, playPendingAuto, setUserTrainingPlan, squadOf, startUserIndividualTraining } from '../store/game'
 import { initPwa } from '../pwa/pwa'
 import { startAutosave } from '../store/autosave'
 import { setGame } from '../store/gameStore'
@@ -15,6 +15,7 @@ import { beginLive } from '../store/liveMatch'
 //   &jogo=1                    avança até a partida do time
 //   &minuto=60                 e deixa a partida ao vivo parada nesse minuto
 //   &decidir=1                 três jovens da base do time já com 20 anos (esperando decisão)
+//   &treino=intensa|leve       treino coletivo escolhido e a vaga individual ocupada (grupo físico, primeiro jogador de linha)
 if (import.meta.env.DEV) {
   const params = new URLSearchParams(window.location.search)
   const team = params.get('time')
@@ -29,6 +30,12 @@ if (import.meta.env.DEV) {
     if (params.get('decidir')) {
       let n = 0
       game = { ...game, season: { ...game.season, academy: game.season.academy.map((p) => (p.teamId === game.userTeamId && n++ < 3 ? { ...p, age: 20 } : p)) } }
+    }
+    const training = params.get('treino')
+    if (training) {
+      game = setUserTrainingPlan(game, { intensity: training === 'leve' ? 'light' : 'intense', focus: 'technical' })
+      const trainee = squadOf(game, game.userTeamId).find((p) => p.position !== 'GK')
+      if (trainee) game = startUserIndividualTraining(game, trainee.id, { type: 'group', group: 'physical' })
     }
     setGame(game)
   }
