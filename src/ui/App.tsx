@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { pendingIncoming } from '../engine/market'
-import { lastYearContracts, userTeam } from '../store/game'
+import { academyAlert, lastYearContracts, userTeam } from '../store/game'
 import { flushAutosave, useSaveStatus } from '../store/autosave'
 import { setGame, useGame } from '../store/gameStore'
 import { clearLive } from '../store/liveMatch'
@@ -18,6 +18,7 @@ import { MatchScreen } from './screens/Match'
 import { PwaBanner } from './components/PwaBanner'
 import { Start } from './screens/Start'
 import { Squad } from './screens/Squad'
+import type { SquadTab } from './screens/Squad'
 import { Standings } from './screens/Standings'
 import { Tactics } from './screens/Tactics'
 
@@ -28,9 +29,9 @@ function initialScreen(): ScreenId {
 }
 
 /** Em desenvolvimento, &aba=lineup|numbers abre a aba do Elenco. */
-function initialSquadTab(): 'players' | 'lineup' | 'numbers' {
+function initialSquadTab(): SquadTab {
   const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
-  return wanted === 'lineup' || wanted === 'numbers' ? wanted : 'players'
+  return wanted === 'lineup' || wanted === 'numbers' || wanted === 'academy' ? wanted : 'players'
 }
 
 export function App() {
@@ -54,7 +55,7 @@ export function App() {
   const current: ScreenId = screen === 'match' && !hasMatch ? 'home' : screen
   const tabs: NavItem<NavTab>[] = [
     { id: 'home', label: 'Clube', icon: 'home' },
-    { id: 'squad', label: 'Elenco', icon: 'squad' },
+    { id: 'squad', label: 'Elenco', icon: 'squad', alert: academyAlert(game).pending > 0 || academyAlert(game).arrivals > 0 },
     { id: 'market', label: 'Mercado', icon: 'market', alert: pendingIncoming(game.season).length > 0 || lastYearContracts(game).length > 0 },
     { id: 'standings', label: 'Tabela', icon: 'table' },
     { id: 'finance', label: 'Finanças', icon: 'finance' },
@@ -102,7 +103,7 @@ export function App() {
       <main className="flex-1 px-4 pb-28 pt-4">
         {current === 'home' && <Dashboard game={game} onNavigate={setScreen} />}
         {current === 'match' && <MatchScreen game={game} onNavigate={setScreen} />}
-        {current === 'squad' && <Squad game={game} initialTab={initialSquadTab()} />}
+        {(current === 'squad' || current === 'academy') && <Squad key={current} game={game} initialTab={current === 'academy' ? 'academy' : initialSquadTab()} />}
         {current === 'tactics' && <Tactics game={game} />}
         {current === 'standings' && <Standings game={game} />}
         {(current === 'market' || current === 'contracts') && <Market key={current} game={game} initialTab={current === 'contracts' ? 'contracts' : 'search'} />}

@@ -624,3 +624,34 @@ export const OFFSEASON = {
     qualityBelowTeam: { 1: 5, 2: 18 } as Record<number, number>,
   },
 } as const
+
+/** Categorias de base: elenco de jovens separado do profissional, que não joga partidas. */
+export const ACADEMY = {
+  /** Idades na base: de 15 a 19 anos; quem faz 20 precisa ser promovido ou dispensado. */
+  minAge: 15,
+  graduationAge: 20,
+  /** Máximo de jovens na base de um clube. */
+  maxSize: 15,
+  /** Quantos chegam por temporada (mín., máx.) e com que idade. */
+  arrivals: [3, 5] as readonly [number, number],
+  arrivalAge: [15, 17] as readonly [number, number],
+  /** Base inicial de um mundo novo (ou de um save antigo): tamanho por reputação e idades. */
+  initialSize: { min: 7, max: 12 },
+  /** Fração dos minutos possíveis que conta na evolução anual: a base evolui um pouco mais devagar que quem joga. */
+  evolutionShare: 0.2,
+  /** Qualidade dos garotos da base em relação à dos jovens do profissional (pontos): a IA escolhe os melhores entre vários, então o conjunto precisa começar mais fraco. */
+  qualityOffset: { 1: -8, 2: -20 } as Record<number, number>,
+  /** Ajuste do potencial dos garotos da base por divisão (pontos): clubes menores formam gente de teto mais baixo. */
+  potentialOffset: { 1: -2, 2: -10 } as Record<number, number>,
+  /** Chance de promessa entre os garotos da base (são mais garotos por ano que antes, e a IA escolhe os melhores: sem isso sobram craques demais). */
+  prospectChance: 0.04,
+  /** Fenômeno que chega à base: raro, mas existe (cerca de 1 a cada poucos anos no mundo todo). */
+  wonderkidChance: 0.001,
+  /** Promoção pela IA: o jovem vale a pena se o valor dele (força + parte da margem até o potencial) alcança o do jogador que ocupa esta posição do ranking do clube, menos a tolerância. Só promove por mérito a partir de `minAge`. */
+  ai: { benchmarkRank: 18, tolerance: 0, potentialShare: 0.15, minAge: 19 },
+  /** Salário do contrato profissional de jovem: esta fração do salário esperado, no mínimo `OFFSEASON.renewal.minimumSalary`. */
+  salaryShare: 0.6,
+  contractYears: 3,
+  /** Estrelas do potencial (1 a 5): limites mínimos de potencial para 2, 3, 4 e 5 estrelas, e a incerteza (desvio, em pontos) aos 15 e aos 19 anos. */
+  stars: { thresholds: [58, 66, 74, 82] as readonly number[], uncertaintyAt15: 5, uncertaintyAt19: 2 },
+} as const

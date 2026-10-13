@@ -136,3 +136,16 @@ export function Jersey({ team, size = 40 }: { team: Pick<Team, 'colors'>; size?:
     </svg>
   )
 }
+
+/** Estrelas do potencial estimado (1 a 5). */
+export function Stars({ value, size = 14 }: { value: number; size?: number }) {
+  return (
+    <span className="inline-flex gap-0.5" role="img" aria-label={`Potencial estimado: ${value} de 5 estrelas`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <svg key={i} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m12 2.5 2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.4 6.1 20.7l1.2-6.6L2.5 9.5l6.6-.9L12 2.5Z" fill={i < value ? '#f2c94c' : 'none'} stroke={i < value ? '#f2c94c' : '#4a5372'} strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+      ))}
+    </span>
+  )
+}

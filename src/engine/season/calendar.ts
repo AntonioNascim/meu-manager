@@ -18,6 +18,8 @@ export interface SeasonState {
   matches: Match[]
   teams: Team[]
   players: Player[]
+  /** Categorias de base: jovens de 15 a 19 anos (e quem fez 20 e espera decisão), de todos os clubes (`teamId`). Não jogam partidas. */
+  academy: Player[]
   /** Propostas, histórico de transferências e controle dos eventos do mercado. */
   market: MarketState
   /** Último número usado nos ids dos jogadores (`player-N`): jovens novos continuam daqui. */
@@ -74,6 +76,8 @@ export interface SeasonOptions {
   seed: number | string
   teams: readonly Team[]
   players: readonly Player[]
+  /** Base dos clubes (padrão: vazia). */
+  academy?: readonly Player[]
   /** Padrão: Série A e Série B com os times de cada `tier`. */
   competitions?: readonly CompetitionSetup[]
 }
@@ -127,7 +131,8 @@ export function createSeason(options: SeasonOptions): SeasonState {
     matches,
     teams: [...options.teams],
     players: [...options.players],
-    playerCounter: options.players.reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
+    academy: [...(options.academy ?? [])],
+    playerCounter: [...options.players, ...(options.academy ?? [])].reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
     market: { seed: options.seed, offers: [], history: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }
 }

@@ -7,6 +7,7 @@ import { generateWorld } from '../data/generateWorld'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
 import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
+import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth } from '../engine/academy'
 import { applySavedLineup } from '../engine/tacticEdit'
 import { monthlyOperations, monthlyPayroll, setTicketPrice } from '../engine/finance'
 import { makeOffer, releaseUserPlayer, respondToOffer, sellPlayer } from '../engine/market'
@@ -65,7 +66,7 @@ export interface Game {
 export function createGame(seed: number, userTeamId: TeamId): Game {
   const world = generateWorld({ seed })
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
-  const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players })
+  const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy })
   return { seed, userTeamId, season, lastDay: [], notices: [], seasonLog: [], archive: [] }
 }
 
@@ -149,6 +150,33 @@ export function setUserTicketPrice(game: Game, price: number): Game {
 
 export function setUserTactic(game: Game, tactic: Tactic): Game {
   return { ...game, season: setTeamTactic(game.season, game.userTeamId, tactic) }
+}
+
+/** Jovens da base do time do jogador. */
+export const userAcademy = (game: Game): Player[] => academyOf(game.season, game.userTeamId)
+
+/** Jovens do time do jogador que fizeram 20 anos e esperam a decisão (promover ou dispensar). */
+export const pendingAcademy = (game: Game): Player[] => pendingDecisions(game.season, game.userTeamId)
+
+const ownYouth = (game: Game, playerId: string): void => {
+  if (!userAcademy(game).some((p) => p.id === playerId)) throw new AcademyError('not-found', 'Esse jovem não é da sua base')
+}
+
+/** Promove um jovem da base ao elenco (lança `AcademyError` se o elenco já tem 30 jogadores). */
+export function promoteUserYouth(game: Game, playerId: string): Game {
+  ownYouth(game, playerId)
+  return { ...game, season: promoteYouth(game.season, playerId) }
+}
+
+/** Dispensa um jovem da base (ele vira jogador livre). */
+export function releaseUserYouth(game: Game, playerId: string): Game {
+  ownYouth(game, playerId)
+  return { ...game, season: releaseYouth(game.season, playerId) }
+}
+
+/** O que pede a atenção do jogador na base: jovens que chegaram na última virada e jovens esperando decisão. */
+export function academyAlert(game: Game): { arrivals: number; pending: number } {
+  return { arrivals: game.lastReport?.academyArrivals?.[game.userTeamId] ?? 0, pending: pendingAcademy(game).length }
 }
 
 export const LINEUP_SLOTS = 3

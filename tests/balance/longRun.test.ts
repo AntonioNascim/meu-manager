@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { generateWorld } from '../../src/data/generateWorld'
-import { FINANCE } from '../../src/engine/config'
+import { ACADEMY, FINANCE } from '../../src/engine/config'
 import { SQUAD_MIN } from '../../src/engine/types'
 import { formatYears, simulateYears } from '../../tools/longRun'
 import type { YearRow } from '../../tools/longRun'
@@ -70,6 +70,18 @@ describe(`${YEARS} temporadas seguidas`, () => {
       expect(r.under22).toBeLessThan(0.4)
       expect(r.over30).toBeGreaterThan(0.12)
       expect(r.over30).toBeLessThan(0.32)
+    }
+  })
+
+  it('as categorias de base se mantêm: de 7 a 15 jovens por clube, ninguém com 20 anos esquecido e a IA promove todo ano', () => {
+    for (const r of rows) {
+      expect(r.academySize, `base média em ${r.year}`).toBeGreaterThan(7)
+      expect(r.academyMax, `maior base em ${r.year}`).toBeLessThanOrEqual(ACADEMY.maxSize)
+      expect(r.academyOverdue, `jovens de 20 anos na base em ${r.year}`).toBe(0)
+    }
+    for (const r of rows.slice(0, -1)) {
+      const promoted = Object.values(r.report?.academyPromoted ?? {}).reduce((a, b) => a + b, 0)
+      expect(promoted, `promoções em ${r.year}`).toBeGreaterThan(20)
     }
   })
 

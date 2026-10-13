@@ -46,6 +46,12 @@ export interface YearRow {
   /** Reputação média da Série A. */
   reputationA: number
   reputationB: number
+  /** Base: jovens por clube (média), jovens com potencial ≥ 75 em todas as bases e maior potencial entre eles. */
+  academySize: number
+  academyProspects: number
+  /** Maior base de um clube e jovens de 20 anos ou mais ainda na base (nos clubes da IA, deve ser 0 depois da virada). */
+  academyMax: number
+  academyOverdue: number
   report?: OffseasonReport
 }
 
@@ -72,7 +78,7 @@ export function lowestBalance(team: Team): number {
   return lowest
 }
 
-export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'highPotential' | 'youngStars' | 'topOverall' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB'> {
+export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'highPotential' | 'youngStars' | 'topOverall' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB' | 'academySize' | 'academyProspects' | 'academyMax' | 'academyOverdue'> {
   const byId = new Map(state.players.map((p) => [p.id, p]))
   const signed = state.players.filter((p) => p.teamId !== null)
   const squads = state.teams.map((t) => state.players.filter((p) => p.teamId === t.id).length)
@@ -94,11 +100,15 @@ export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'stren
     freeAgents: state.players.length - signed.length,
     reputationA: mean(state.teams.filter((t) => t.tier === 1).map((t) => t.reputation)),
     reputationB: mean(state.teams.filter((t) => t.tier === 2).map((t) => t.reputation)),
+    academySize: state.academy.length / state.teams.length,
+    academyProspects: state.academy.filter((p) => p.hidden.potential >= PROSPECT_POTENTIAL).length,
+    academyMax: Math.max(...state.teams.map((t) => state.academy.filter((p) => p.teamId === t.id).length)),
+    academyOverdue: state.academy.filter((p) => p.age >= 20).length,
   }
 }
 
 export function simulateYears(world: World, years: number, seed: string | number = 'years', options: { market?: boolean } = {}): YearRow[] {
-  let state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players })
+  let state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy })
   const rows: YearRow[] = []
   for (let i = 0; i < years; i++) {
     const start = snapshot(state)
@@ -132,7 +142,7 @@ const pct = (x: number) => `${(100 * x).toFixed(0)}%`
 /** Tabela ano a ano para o terminal. */
 export function formatYears(rows: YearRow[]): string {
   return [
-    'ano   forçaA forçaB  idade <22  >30  promessas potMax craques pot85 topFor  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB',
+    'ano   forçaA forçaB  idade <22  >30  promessas potMax craques pot85 topFor  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB  base prBase base→pro base→fora',
     ...rows.map((r) =>
       [
         String(r.year),
@@ -154,6 +164,10 @@ export function formatYears(rows: YearRow[]): string {
         `${r.negativeEver}/${r.negativeAtEnd}`.padStart(5),
         r.reputationA.toFixed(1).padStart(7),
         r.reputationB.toFixed(1).padStart(7),
+        r.academySize.toFixed(1).padStart(6),
+        String(r.academyProspects).padStart(6),
+        (r.report ? String(Object.values(r.report.academyPromoted).reduce((a, b) => a + b, 0)) : '-').padStart(8),
+        (r.report ? String(Object.values(r.report.academyReleased).reduce((a, b) => a + b, 0)) : '-').padStart(9),
       ].join(' '),
     ),
   ].join('\n')

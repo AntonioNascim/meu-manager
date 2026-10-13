@@ -3,7 +3,7 @@
  * aposentadorias, fim de contratos, jovens da base, nova meta da diretoria e nova tabela de jogos.
  * Funções puras: recebem a temporada encerrada e devolvem a nova, mais um relatório do que aconteceu.
  */
-import { FINANCE, MARKET, OFFSEASON } from '../config'
+import { ACADEMY, FINANCE, MARKET, OFFSEASON } from '../config'
 import { defaultTicketPrice, monthlyPayroll, summarizeLedger, sustainablePayroll } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
 import { playerOverall } from '../overall'
@@ -15,6 +15,7 @@ import { makeDate } from '../season/dates'
 import { computeStandings } from '../season/standings'
 import { SQUAD_MAX, SQUAD_MIN } from '../types'
 import type { DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
+import { turnAcademy } from '../academy/turn'
 import { expireContracts } from './contracts'
 import { desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { evolvePlayer, retires } from './evolution'
@@ -115,10 +116,13 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   players = contracts.players
   const released = contracts.released
 
-  // 6) Jovens da base e corte do excesso na IA.
+  // 6) Categorias de base (evolução, decisões dos 20 anos, chegada de jovens) e depois a reposição de posições descobertas e o corte do excesso na IA.
   const youthRng = rng.fork('youth')
-  const taken = new Set(players.map((p) => p.name))
-  let counter = state.playerCounter
+  const taken = new Set([...players, ...state.academy].map((p) => p.name))
+  const academyTurn = turnAcademy({ teams, players, academy: state.academy, rng: rng.fork('academy'), year, ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}), createYouth: options.createYouth, taken, counter: state.playerCounter })
+  players = academyTurn.players
+  const academy = academyTurn.academy
+  let counter = academyTurn.counter
   const youth: OffseasonReport['youth'] = {}
   const nextYear = year + 1
   for (const team of teams) {
@@ -191,9 +195,13 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     released,
     renewed: contracts.renewed,
     youth,
+    academyArrivals: academyTurn.arrivals,
+    academyPromoted: academyTurn.promoted,
+    academyReleased: academyTurn.released,
+    academyPending: academy.filter((p) => p.teamId === options.userTeamId && p.age >= ACADEMY.graduationAge).map((p) => p.id),
     reputationChanges,
   }
-  return { state: { ...next, playerCounter: counter }, report }
+  return { state: { ...next, academy, playerCounter: counter }, report }
 }
 
 /** Reservas que a IA corta para voltar ao tamanho máximo (os de menor valor, sem deixar posição descoberta). */

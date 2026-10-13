@@ -14,7 +14,7 @@ import {
   POSITION_SHORT_LABELS,
 } from '../labels'
 import type { AttributeGroup } from '../labels'
-import { Eyebrow, Flag, MoodIcon, Panel, ValueBadge } from '../theme'
+import { Eyebrow, Flag, MoodIcon, Panel, Stars, ValueBadge } from '../theme'
 import { isOnYellowEdge } from '../squadSort'
 
 /** Barra de 0 a 100 com a cor da faixa. */
@@ -66,7 +66,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Detalhe do jogador em folha deslizante (tela cheia no celular). */
-export function PlayerDetail({ player, onClose }: { player: Player; onClose: () => void }) {
+/**
+ * Detalhe do jogador. Na base (`academy`), mostra a estimativa de potencial em estrelas (`stars`) no lugar de estado,
+ * temporada e contrato, e o `footer` traz os botões de promover e dispensar.
+ */
+export function PlayerDetail({ player, onClose, academy = false, stars, footer }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode }) {
   const c = player.condition
   const overall = playerOverall(player)
   const isKeeper = player.position === 'GK'
@@ -84,7 +88,7 @@ export function PlayerDetail({ player, onClose }: { player: Player; onClose: () 
           <span className="text-[11px] font-bold uppercase tracking-wider text-muted">{POSITION_SHORT_LABELS[player.position]}</span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="title truncate text-3xl">{playerName(player)}</div>
+          <div className="title line-clamp-2 text-3xl">{playerName(player)}</div>
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
             <Flag nationality={player.nationality} />
             <span className="truncate">
@@ -92,6 +96,11 @@ export function PlayerDetail({ player, onClose }: { player: Player; onClose: () 
               {player.age} anos · {NATIONALITY_LABELS[player.nationality]} · Pé {FOOT_LABELS[player.foot].toLowerCase()}
             </span>
           </div>
+          {stars !== undefined && (
+            <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+              <Stars value={stars} /> potencial estimado
+            </div>
+          )}
           <div className="mt-1 flex flex-wrap gap-1">
             <StatusTags player={player} />
             {isOnYellowEdge(player) && <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">Pendurado</span>}
@@ -103,7 +112,16 @@ export function PlayerDetail({ player, onClose }: { player: Player; onClose: () 
       </header>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-10 pt-4">
-        <Section title="Estado atual">
+        {academy && (
+          <Section title="Base">
+            <p className="text-sm text-slate-300">
+              Jovem da base: não joga partidas e evolui a cada virada de temporada. As estrelas são uma estimativa do olheiro, com margem de erro (maior nos mais novos); o potencial exato é oculto.
+              {player.age >= 20 ? ' Já fez 20 anos: precisa ser promovido ou dispensado.' : ''}
+            </p>
+          </Section>
+        )}
+
+        {!academy && <Section title="Estado atual">
           <Stat label="Condição física" value={`${Math.round(c.fitness)}%`} bar={c.fitness} color={conditionBand(c.fitness).bg} />
           <div className="flex items-center gap-2 py-1 text-sm">
             <span className="w-32 shrink-0 text-slate-300">Moral</span>
@@ -130,7 +148,7 @@ export function PlayerDetail({ player, onClose }: { player: Player; onClose: () 
           <Stat label="Lesão" value={c.injuryDaysLeft > 0 ? `${c.injuryDaysLeft} d` : 'Não'} />
           <Stat label="Suspensão" value={c.suspensionGames > 0 ? `${c.suspensionGames} jogo${c.suspensionGames > 1 ? 's' : ''}` : 'Não'} />
           <Stat label="Amarelos acumulados" value={`${c.yellowCards} / ${CONDITION.yellowsPerSuspension}`} />
-        </Section>
+        </Section>}
 
         <Section title="Força por posição">
           <div className="flex flex-wrap gap-2">
@@ -158,7 +176,7 @@ export function PlayerDetail({ player, onClose }: { player: Player; onClose: () 
           </Section>
         ))}
 
-        <Section title="Temporada">
+        {!academy && <Section title="Temporada">
           <div className="grid grid-cols-3 gap-2 text-center text-sm">
             {[
               ['Jogos', stats.appearances],
@@ -175,14 +193,15 @@ export function PlayerDetail({ player, onClose }: { player: Player; onClose: () 
               </div>
             ))}
           </div>
-        </Section>
+        </Section>}
 
-        <Section title="Contrato">
+        {!academy && <Section title="Contrato">
           <Stat label="Salário mensal" value={formatMoney(player.contract.salary)} />
           <Stat label="Término" value={player.contract.endDate.split('-').reverse().join('/')} />
           <Stat label="Multa rescisória" value={formatMoney(player.contract.releaseClause)} />
-        </Section>
+        </Section>}
       </div>
+      {footer && <footer className="border-t border-line bg-bg px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{footer}</footer>}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { beginLive } from '../store/liveMatch'
 //   &dias=10                   joga 10 dias de jogos antes (a partida do time é simulada)
 //   &jogo=1                    avança até a partida do time
 //   &minuto=60                 e deixa a partida ao vivo parada nesse minuto
+//   &decidir=1                 três jovens da base do time já com 20 anos (esperando decisão)
 if (import.meta.env.DEV) {
   const params = new URLSearchParams(window.location.search)
   const team = params.get('time')
@@ -24,6 +25,10 @@ if (import.meta.env.DEV) {
       while (!game.pendingUserMatch && game.season.matches.some((m) => m.status === 'scheduled')) game = advanceGame(game)
       const minute = params.get('minuto')
       if (minute) beginLive(game).match.playUntil(Number(minute))
+    }
+    if (params.get('decidir')) {
+      let n = 0
+      game = { ...game, season: { ...game.season, academy: game.season.academy.map((p) => (p.teamId === game.userTeamId && n++ < 3 ? { ...p, age: 20 } : p)) } }
     }
     setGame(game)
   }

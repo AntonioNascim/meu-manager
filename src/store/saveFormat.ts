@@ -6,11 +6,12 @@
  * antigo não satisfaz, aumente `SAVE_VERSION` e acrescente em `MIGRATIONS` a função que leva os dados da
  * versão anterior para a nova. O teste `tests/saves.test.ts` confere que a versão atual abre e valida.
  */
-import type { MatchResult } from '../engine/types'
+import { createAcademy } from '../data/generateAcademy'
+import type { MatchResult, Player, Team } from '../engine/types'
 import { userTeam } from './game'
 import type { Game } from './game'
 
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 /** O que vai para o disco (e para o arquivo de backup). */
 export interface SaveEnvelope {
@@ -43,6 +44,7 @@ export type Migration = (envelope: { version: number; savedAt: string; game: unk
 
 /**
  * Migrações por versão de origem: `MIGRATIONS[1]` leva a versão 1 para a 2, e assim por diante.
+ * 2 → 3: categorias de base (`season.academy`); saves antigos ganham uma base inicial para cada clube, gerada com a semente do jogo.
  * 1 → 2: as estatísticas da temporada ganharam `ratingSum` e `ratedGames` (nota média); os saves antigos partem das
  * notas das últimas partidas (`recentRatings`), a única informação que eles guardavam.
  */
@@ -57,6 +59,19 @@ export const MIGRATIONS: Record<number, Migration> = {
       }
     }
     return { ...envelope, version: 2 }
+  },
+  2: (envelope) => {
+    const game = envelope.game as { seed: number; season?: { teams?: Team[]; players?: Player[]; academy?: Player[]; playerCounter?: number; season?: { year?: number } }; lastReport?: Record<string, unknown> }
+    const s = game.season
+    if (s && !s.academy && s.teams && s.players) {
+      s.academy = createAcademy({ teams: s.teams, seed: game.seed, year: s.season?.year ?? 2026, firstNumber: (s.playerCounter ?? 0) + 1, takenNames: s.players.map((p) => p.name) })
+      s.playerCounter = (s.playerCounter ?? 0) + s.academy.length
+    }
+    if (game.lastReport) {
+      for (const key of ['academyArrivals', 'academyPromoted', 'academyReleased']) game.lastReport[key] ??= {}
+      game.lastReport.academyPending ??= []
+    }
+    return { ...envelope, version: 3 }
   },
 }
 
@@ -99,7 +114,7 @@ export function validateGame(game: unknown): string[] {
   if (typeof g.seed !== 'number') problems.push('semente ausente')
   for (const key of ['lastDay', 'notices', 'seasonLog', 'archive'] as const) if (!Array.isArray(g[key])) problems.push(`${key} ausente`)
   const s = g.season
-  if (!s || !Array.isArray(s.teams) || !Array.isArray(s.players) || !Array.isArray(s.matches) || !s.season || !s.market) problems.push('temporada incompleta')
+  if (!s || !Array.isArray(s.teams) || !Array.isArray(s.players) || !Array.isArray(s.matches) || !Array.isArray(s.academy) || !s.season || !s.market) problems.push('temporada incompleta')
   else {
     if (typeof g.userTeamId === 'string' && !s.teams.some((t) => t.id === g.userTeamId)) problems.push('o time do jogador não existe')
     if (typeof s.playerCounter !== 'number') problems.push('contador de jogadores ausente')

@@ -17,9 +17,12 @@ describe('tamanho do save', () => {
   })
 
   it('depois de 10 temporadas o save tem praticamente o mesmo tamanho (e fica abaixo de 3 MB)', () => {
-    expect(last.endBytes).toBeLessThan(first.endBytes * 1.15)
+    // Nos primeiros anos o save cresce um pouco porque as bases dos clubes se enchem (de ~9 para ~13 jovens); daí em diante fica plano.
+    expect(last.endBytes).toBeLessThan(first.endBytes * 1.25)
     expect(last.endBytes).toBeLessThan(3 * 1024 * 1024)
-    expect(last.startBytes).toBeLessThan(first.startBytes * 1.2)
+    const settled = rows[5]!
+    expect(last.endBytes).toBeLessThan(settled.endBytes * 1.05)
+    expect(last.startBytes).toBeLessThan(settled.startBytes * 1.05)
   })
 
   it('cada temporada passada guardada pesa poucos KB', () => {

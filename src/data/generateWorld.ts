@@ -1,5 +1,6 @@
 import { createRng } from '../engine/rng'
 import type { Player, Team } from '../engine/types'
+import { createAcademy } from './generateAcademy'
 import { createGenerationContext, generateTeam } from './generateTeam'
 import { TEAM_DEFINITIONS } from './teamDefinitions'
 
@@ -15,6 +16,8 @@ export interface World {
   /** Séries A e B, na ordem das definições (Série A primeiro). */
   teams: Team[]
   players: Player[]
+  /** Categorias de base de todos os clubes (jovens de 15 a 19 anos; não jogam partidas). */
+  academy: Player[]
 }
 
 export const DEFAULT_START_YEAR = 2026
@@ -41,5 +44,6 @@ export function generateWorld(options: WorldOptions): World {
     players.push(...generated.players)
   }
 
-  return { seed: options.seed, startYear, teams, players }
+  const academy = createAcademy({ teams, seed: options.seed, year: startYear, firstNumber: ctx.nextPlayerNumber, takenNames: players.map((p) => p.name) })
+  return { seed: options.seed, startYear, teams, players, academy }
 }

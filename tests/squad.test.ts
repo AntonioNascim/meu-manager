@@ -59,7 +59,7 @@ describe('telas de elenco', () => {
     expect(html.match(/<li/g)).toHaveLength(squad.length)
     expect(html).toContain('GOL')
     for (const tab of ['Jogadores', 'Escalação', 'Números']) expect(html).toContain(tab)
-    expect(html).not.toContain('Base')
+    expect(html).toContain('Base')
     expect(html).not.toContain('Treino')
   })
 

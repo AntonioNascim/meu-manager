@@ -26,6 +26,13 @@ export interface OffseasonReport {
   renewed: number
   /** Jovens que subiram da base, por time. */
   youth: Record<TeamId, number>
+  /** Jovens que chegaram à base, por time. */
+  academyArrivals: Record<TeamId, number>
+  /** Jovens da base promovidos ao profissional pela IA, e quantos foram dispensados (por time). */
+  academyPromoted: Record<TeamId, number>
+  academyReleased: Record<TeamId, number>
+  /** Jovens do time do jogador que fizeram 20 anos e esperam a decisão (promover ou dispensar). */
+  academyPending: PlayerId[]
   reputationChanges: Record<TeamId, { from: number; to: number }>
 }
 
@@ -35,6 +42,10 @@ export interface YouthRequest {
   tier: number
   reputation: number
   positions: Position[]
+  /** Idade de cada jovem (mesma ordem de `positions`); sem isso o gerador usa a faixa padrão dos jovens do profissional. */
+  ages?: number[]
+  /** Jovens para a base (15 a 19 anos): o gerador usa a chance de fenômeno da base. */
+  academy?: boolean
   /** Ano da nova temporada. */
   year: number
 }

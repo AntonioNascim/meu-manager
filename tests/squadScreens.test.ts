@@ -101,7 +101,7 @@ describe('nota média da temporada', () => {
   })
 
   it('save da versão 1 abre na versão atual com a nota média partindo das últimas notas', () => {
-    expect(SAVE_VERSION).toBe(2)
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(2)
     expect(MIGRATIONS[1]).toBeTypeOf('function')
     const game = playDays(createGame(7, USER), 6)
     const envelope = JSON.parse(JSON.stringify(makeEnvelope(game, '2026-01-01T00:00:00Z')))
@@ -111,7 +111,7 @@ describe('nota média da temporada', () => {
       delete p.seasonStats.ratedGames
     }
     const migrated = migrateSave(envelope)
-    expect(migrated.version).toBe(2)
+    expect(migrated.version).toBe(SAVE_VERSION)
     const withRatings = migrated.game.season.players.find((p) => p.condition.recentRatings.length > 0) as Player
     expect(withRatings.seasonStats.ratedGames).toBe(withRatings.condition.recentRatings.length)
     expect(withRatings.seasonStats.ratingSum).toBeCloseTo(withRatings.condition.recentRatings.reduce((a, b) => a + b, 0))
@@ -209,9 +209,10 @@ describe('números da temporada', () => {
 describe('abas do Elenco', () => {
   const g = playDays(createGame(7, USER), 4)
 
-  it('só existem Jogadores, Escalação e Números', () => {
+  it('existem Jogadores, Escalação, Números e Base (o Treino ainda não)', () => {
     const html = renderToStaticMarkup(createElement(Squad, { game: g }))
-    expect(html.match(/role="tab"/g)).toHaveLength(3)
+    expect(html.match(/role="tab"/g)).toHaveLength(4)
+    expect(html).not.toContain('Treino')
   })
 
   it('Jogadores: filtros por setor, resumo de disponíveis, etiquetas de titular, lesão e suspensão', () => {

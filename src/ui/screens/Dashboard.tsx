@@ -2,6 +2,7 @@ import type { DepartedPlayer, MarketNotice, Match, OffseasonReport } from '../..
 import { monthlyPayroll } from '../../engine/finance'
 import { pendingIncoming, windowAt } from '../../engine/market'
 import {
+  academyAlert,
   advanceGame,
   boardOf,
   lastYearContracts,
@@ -120,6 +121,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const opponent = next ? teamById(game, next.homeTeamId === team.id ? next.awayTeamId : next.homeTeamId) : undefined
 
   const pending = game.pendingUserMatch
+  const academy = academyAlert(game)
   const board = boardOf(game)
   const expiring = lastYearContracts(game)
   const incoming = pendingIncoming(state)
@@ -143,6 +145,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
   const advance = () => {
+    if (academy.pending > 0) return onNavigate('academy')
     if (seasonOver) {
       if (expiring.length > 0 && !window.confirm(`${expiring.length} contrato(s) vencem agora e esses jogadores vão embora. Encerrar a temporada mesmo assim?`)) return
       return updateGame(startNextSeason)
@@ -229,12 +232,12 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
           onClick={advance}
           className="mt-5 flex min-h-14 w-full items-center justify-center rounded-xl bg-accent font-display text-2xl font-extrabold uppercase tracking-wide text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
         >
-          {seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
+          {academy.pending > 0 ? 'Decidir sobre a base' : seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
         </button>
       </Panel>
 
       <div className="grid grid-cols-3 gap-2">
-        <ShortcutTile icon="squad" label="Elenco" tone="sky" onClick={() => onNavigate('squad')} />
+        <ShortcutTile icon="squad" label="Elenco" tone="sky" alert={academy.pending > 0 || academy.arrivals > 0} onClick={() => onNavigate('squad')} />
         <ShortcutTile icon="tactics" label="Tática" tone="amber" onClick={() => onNavigate('tactics')} />
         <ShortcutTile icon="market" label="Mercado" tone="rose" alert={incoming.length > 0} onClick={() => onNavigate('market')} />
         <ShortcutTile icon="finance" label="Finanças" tone="teal" onClick={() => onNavigate('finance')} />
@@ -280,6 +283,19 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
           </p>
           <button type="button" className="mt-2 min-h-12 text-sm font-bold text-accent" onClick={() => onNavigate('contracts')}>
             Renovar na aba Contratos
+          </button>
+        </Panel>
+      )}
+
+      {(academy.arrivals > 0 || academy.pending > 0) && (
+        <Panel glow className="p-4">
+          <div className="font-bold">Categorias de base</div>
+          <ul className="mt-1 space-y-1 text-sm">
+            {academy.arrivals > 0 && <li>{plural(academy.arrivals, 'jovem chegou', 'jovens chegaram')} à base.</li>}
+            {academy.pending > 0 && <li>{plural(academy.pending, 'jovem fez', 'jovens fizeram')} 20 anos: promova ou dispense para o jogo seguir.</li>}
+          </ul>
+          <button type="button" className="mt-2 min-h-12 text-sm font-bold text-accent" onClick={() => onNavigate('academy')}>
+            Abrir a base
           </button>
         </Panel>
       )}
