@@ -42,6 +42,8 @@ export interface SeasonFinance {
   income: number
   expenses: number
   endBalance: number
+  /** Resultado por categoria da temporada (positivo = receita); ausente nos saves antigos. */
+  byCategory?: Partial<Record<FinanceCategory, number>>
 }
 
 export interface BoardObjective {

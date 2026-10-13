@@ -350,6 +350,8 @@ export const LINEUP = {
 // ---------------------------------------------------------------------------
 
 export const FINANCE = {
+  /** Máximo de lançamentos guardados por clube na temporada (os mais antigos saem; o saldo e o balanço por categoria não dependem do que sai). */
+  ledgerMax: 400,
   ticket: {
     /** Preço padrão do ingresso: base + perReputation × reputação do time. */
     base: 8,

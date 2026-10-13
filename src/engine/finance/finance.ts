@@ -50,7 +50,8 @@ export const sustainablePayroll = (team: Team): number =>
 
 /** Lança uma receita (positiva) ou despesa (negativa), atualizando o saldo. */
 export function addEntry(finances: Finances, entry: FinanceEntry): Finances {
-  return { ...finances, balance: finances.balance + entry.amount, ledger: [...finances.ledger, entry] }
+  const ledger = [...finances.ledger, entry]
+  return { ...finances, balance: finances.balance + entry.amount, ledger: ledger.length > FINANCE.ledgerMax ? ledger.slice(-FINANCE.ledgerMax) : ledger }
 }
 
 export function recordEntry(team: Team, date: IsoDate, category: FinanceCategory, amount: number, description?: string): Team {

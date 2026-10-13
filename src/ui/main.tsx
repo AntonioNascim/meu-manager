@@ -15,6 +15,7 @@ import { beginLive } from '../store/liveMatch'
 //   &jogo=1                    avança até a partida do time
 //   &minuto=60                 e deixa a partida ao vivo parada nesse minuto
 //   &decidir=1                 três jovens da base do time já com 20 anos (esperando decisão)
+//   &crise=1                  caixa pequeno e folha quatro vezes maior (mostra o alerta das finanças)
 //   &treino=intensa|leve       treino coletivo escolhido e a vaga individual ocupada (grupo físico, primeiro jogador de linha)
 if (import.meta.env.DEV) {
   const params = new URLSearchParams(window.location.search)
@@ -30,6 +31,9 @@ if (import.meta.env.DEV) {
     if (params.get('decidir')) {
       let n = 0
       game = { ...game, season: { ...game.season, academy: game.season.academy.map((p) => (p.teamId === game.userTeamId && n++ < 3 ? { ...p, age: 20 } : p)) } }
+    }
+    if (params.get('crise')) {
+      game = { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === game.userTeamId ? { ...t, finances: { ...t.finances, balance: 2_000_000 } } : t)), players: game.season.players.map((p) => (p.teamId === game.userTeamId ? { ...p, contract: { ...p.contract, salary: p.contract.salary * 4 } } : p)) } }
     }
     const training = params.get('treino')
     if (training) {

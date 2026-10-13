@@ -214,6 +214,7 @@ describe('rescisão na tela de finanças', () => {
     expect(entry.amount).toBe(-cost)
     const html = renderToStaticMarkup(createElement(Finance, { game: g }))
     expect(html).toContain('Rescisões de contrato')
-    expect(html).toContain('Rescisão:')
+    const { Statement } = await import('../src/ui/screens/finance/Sheets')
+    expect(renderToStaticMarkup(createElement(Statement, { game: g, onClose: () => {} }))).toContain('Rescisão:')
   })
 })

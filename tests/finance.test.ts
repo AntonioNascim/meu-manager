@@ -198,19 +198,16 @@ describe('time do jogador', () => {
 })
 
 describe('tela de finanças', () => {
-  it('mostra saldo, preço do ingresso, categorias e lançamentos', () => {
+  it('mostra o caixa, o estádio com o ingresso, a folha, as categorias e os botões de extrato e balanço', () => {
     let game = createGame(5, 'team-imp')
     for (let i = 0; i < 4; i++) game = playPendingAuto(advanceToMatchday(game))
     const html = renderToStaticMarkup(createElement(Finance, { game }))
-    expect(html).toContain('Saldo')
-    expect(html).toContain('Preço do ingresso')
-    expect(html).toContain('Patrocínio')
-    expect(html).toContain('Salários')
-    expect(html).toContain('Últimos lançamentos')
+    for (const text of ['Caixa', 'Extrato', 'Balanço', 'ingresso', 'última renda', 'Folha', 'Folga', 'Patrocínio', 'Salários', 'Renda média em casa']) expect(html).toContain(text)
   })
 
-  it('antes de qualquer lançamento avisa que não há histórico', () => {
-    const html = renderToStaticMarkup(createElement(Finance, { game: createGame(5, 'team-imp') }))
+  it('antes de qualquer lançamento o extrato avisa que não há histórico', async () => {
+    const { Statement } = await import('../src/ui/screens/finance/Sheets')
+    const html = renderToStaticMarkup(createElement(Statement, { game: createGame(5, 'team-imp'), onClose: () => {} }))
     expect(html).toContain('Nenhum lançamento ainda')
   })
 })
