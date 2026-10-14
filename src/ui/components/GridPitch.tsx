@@ -31,13 +31,15 @@ export function GridPitch({
   onTap,
   onMove,
   renderToken,
+  testId = 'grid-pitch',
 }: {
-  tactic: Tactic
+  tactic: Pick<Tactic, 'formationId' | 'startingXI'> & { grid?: GridPoint[] | undefined }
   players: ReadonlyMap<string, Player>
   selectedId: string | null
   onTap: (playerId: string) => void
   onMove: (playerId: string, point: GridPoint) => void
   renderToken: (player: Player, slot: Position, selected: boolean, dragging: boolean) => ReactNode
+  testId?: string
 }) {
   const formation = formationOf(tactic)
   const field = useRef<HTMLDivElement>(null)
@@ -108,7 +110,7 @@ export function GridPitch({
   const dragging = drag !== null
   const target = drag ? gridKey(drag.target) : null
   return (
-    <div ref={field} className="relative mx-auto aspect-[3/5.1] w-full max-w-md select-none overflow-hidden rounded-2xl border border-emerald-950 bg-[#1d5a3a]" data-testid="grid-pitch">
+    <div ref={field} className="relative mx-auto aspect-[3/5.1] w-full max-w-md select-none overflow-hidden rounded-2xl border border-emerald-950 bg-[#1d5a3a]" data-testid={testId}>
       <div className="absolute inset-0 bg-[repeating-linear-gradient(180deg,rgb(255_255_255/0.045)_0_12.5%,transparent_12.5%_25%)]" />
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 170" preserveAspectRatio="none" aria-hidden="true">
         <g fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.55">

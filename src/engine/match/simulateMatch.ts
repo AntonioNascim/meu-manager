@@ -11,8 +11,8 @@ import { MATCH } from '../config'
 import type { PlayType, ShotType } from '../config'
 import { overallAt, playerOverall } from '../overall'
 import { createRng } from '../rng'
-import { getFormation } from '../formations'
-import { GK_POINT } from '../grid'
+import { getFormation, labelOfGrid } from '../formations'
+import { GK_POINT, formationFromGrid, gridKey, gridProblem } from '../grid'
 import { READY_CAPS, gapsOf, profileOf } from './formationProfile'
 import { evaluateFormation } from '../lineup'
 import type { GridPoint, MatchEvent, Mentality, MatchResult, Player, PlayerMatchResult, PlayStyle, Position, TeamMatchStats } from '../types'
@@ -106,6 +106,8 @@ export interface LiveMatch {
   setMentality(side: MatchSide, mentality: Mentality): void
   /** Muda a formação mantendo os mesmos jogadores em campo (só com 11 em campo). */
   setFormation(side: MatchSide, formationId: string): void
+  /** Leva um jogador em campo a um ponto da grade (ponto ocupado = os dois trocam de lugar). Só com 11 em campo. */
+  setPosition(side: MatchSide, playerId: string, target: GridPoint): void
   /** Troca um jogador em campo por um reserva (limite de substituições e banco respeitados). */
   substitute(side: MatchSide, outgoingId: string, incomingId: string): void
   /** Resolve a lesão que parou o jogo: com `incomingId` o reserva entra na vaga; sem ele o time segue com um a menos. */
@@ -213,6 +215,37 @@ export function startMatch(input: MatchInput): LiveMatch {
         pitchPlayer.point = formation.grid[i]
         pitchPlayer.fitFactor = createPitchPlayer(pitchPlayer.player, slot.position, slot.sector, 0).fitFactor
       })
+      s.formation = formation
+    },
+    setPosition(side, playerId, target) {
+      const s = sideOf(side)
+      const active = activePlayers(s)
+      if (active.length !== 11) throw new Error('O posicionamento só muda com 11 jogadores em campo')
+      const mover = active.find((p) => p.player.id === playerId)
+      if (!mover) throw new Error('O jogador não está em campo')
+      const from = mover.point as GridPoint
+      const other = active.find((p) => p.point && gridKey(p.point) === gridKey(target))
+      if (other === mover) return
+      if (other) {
+        other.point = { ...from }
+      } else if (gridKey(from) === gridKey(GK_POINT)) {
+        throw new Error('O gol não pode ficar sem goleiro')
+      }
+      mover.point = { row: target.row, lane: target.lane }
+      const grid = active.map((p) => p.point as GridPoint)
+      const problem = gridProblem(grid)
+      if (problem) {
+        mover.point = from
+        if (other) other.point = { ...target }
+        throw new Error(problem)
+      }
+      const formation = formationFromGrid(grid, labelOfGrid(grid))
+      for (const [i, p] of active.entries()) {
+        const slot = formation.slots[i] as (typeof formation.slots)[number]
+        p.slot = slot.position
+        p.sector = slot.sector
+        p.fitFactor = createPitchPlayer(p.player, slot.position, slot.sector, 0).fitFactor
+      }
       s.formation = formation
     },
     substitute(side, outgoingId, incomingId) {

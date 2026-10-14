@@ -7,6 +7,7 @@ import type { PitchPoint } from '../pitchLayout'
 import { inkFor } from '../screens/match/pitchModel'
 import { conditionBand } from '../colors'
 import { Jersey } from '../theme'
+import { GridPitch } from './GridPitch'
 
 export interface FieldSlot {
   playerId: string
@@ -92,6 +93,7 @@ export function FieldLineup({
   yellowOf,
   selectedId,
   onTap,
+  onMove,
 }: {
   formationId: string
   lineup: readonly FieldSlot[]
@@ -103,8 +105,25 @@ export function FieldLineup({
   yellowOf?: (playerId: string) => boolean
   selectedId?: string | null
   onTap?: (playerId: string) => void
+  /** Com ele o campo vira a grade de posicionamento: arrastar leva o jogador ao ponto mais perto (ponto ocupado = troca). */
+  onMove?: (playerId: string, point: GridPoint) => void
 }) {
   const placed = useMemo(() => placeLineup(formationId, lineup), [formationId, lineup])
+  if (onMove && lineup.length === 11 && lineup.every((e) => e.point)) {
+    return (
+      <GridPitch
+        testId="field-lineup"
+        tactic={{ formationId, startingXI: lineup.map((e) => e.playerId), grid: lineup.map((e) => e.point as GridPoint) }}
+        players={players}
+        selectedId={selectedId ?? null}
+        onTap={(id) => onTap?.(id)}
+        onMove={onMove}
+        renderToken={(player, slot, selected) => (
+          <Token player={player} number={numberOf(player.id, slot)} fitness={fitnessOf(player.id)} yellow={yellowOf?.(player.id) ?? false} kit={slot === 'GK' && keeperKit ? keeperKit : kit} selected={selected} />
+        )}
+      />
+    )
+  }
   return (
     <div className="relative mx-auto aspect-[3/5.1] w-full max-w-md overflow-hidden rounded-2xl border border-emerald-950 bg-[#1d5a3a]" data-testid="field-lineup">
       <div className="absolute inset-0 bg-[repeating-linear-gradient(180deg,rgb(255_255_255/0.045)_0_12.5%,transparent_12.5%_25%)]" />

@@ -3,7 +3,7 @@ import { FORMATION_IDS } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
 import { playerOverall } from '../../engine/overall'
 import type { MatchSnapshot, SideSnapshot } from '../../engine/match'
-import type { MatchEvent, Mentality, Player, PlayStyle, Position } from '../../engine/types'
+import type { GridPoint, MatchEvent, Mentality, Player, PlayStyle, Position } from '../../engine/types'
 import { finishPendingMatch, teamById } from '../../store/game'
 import type { Game } from '../../store/game'
 import { updateGame } from '../../store/gameStore'
@@ -176,8 +176,32 @@ function StatsList({ game, snap }: { game: Game; snap: MatchSnapshot }) {
   )
 }
 
-function TacticPanel({ live, side, snap, canEdit, refresh }: { live: LiveSession; side: SideSnapshot; snap: MatchSnapshot; canEdit: boolean; refresh: () => void }) {
+function TacticPanel({
+  game,
+  live,
+  side,
+  snap,
+  canEdit,
+  refresh,
+  kit,
+  keeperKit,
+  numbers,
+}: {
+  game: Game
+  live: LiveSession
+  side: SideSnapshot
+  snap: MatchSnapshot
+  canEdit: boolean
+  refresh: () => void
+  kit: Kit
+  keeperKit: Kit
+  numbers: Map<string, number>
+}) {
   const [error, setError] = useState<string | null>(null)
+  const [pickedId, setPickedId] = useState<string | null>(null)
+  const players = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
+  const fitness = new Map(side.onPitch.map((p) => [p.playerId, p.fitness]))
+  const yellow = new Map(side.onPitch.map((p) => [p.playerId, p.yellowCards > 0]))
   const act = (change: () => void) => {
     try {
       change()
@@ -188,6 +212,18 @@ function TacticPanel({ live, side, snap, canEdit, refresh }: { live: LiveSession
     }
   }
   const pitchCount = side.onPitch.length
+  const move = (id: string, point: GridPoint) => {
+    act(() => live.match.setPosition(live.side, id, point))
+    setPickedId(null)
+  }
+  const tapPlayer = (id: string) => {
+    if (!pickedId || pickedId === id) {
+      setPickedId(pickedId === id ? null : id)
+      return
+    }
+    const target = side.onPitch.find((p) => p.playerId === id)?.point
+    if (target) move(pickedId, target)
+  }
   return (
     <div className={`space-y-3 ${canEdit ? '' : 'pointer-events-none opacity-60'}`}>
       {!canEdit && <p className="pointer-events-auto rounded-lg bg-slate-800 p-2 text-xs text-slate-300">Pause o jogo para mexer na tática.</p>}
@@ -208,6 +244,26 @@ function TacticPanel({ live, side, snap, canEdit, refresh }: { live: LiveSession
           )}
         </div>
         {pitchCount !== 11 && <p className="mt-1 text-xs text-amber-300">A formação só muda com 11 jogadores em campo.</p>}
+      </Card>
+      <Card title="Posição dos jogadores">
+        {pitchCount === 11 ? (
+          <FieldLineup
+            formationId={side.formationId}
+            lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point }))}
+            players={players}
+            kit={kit}
+            keeperKit={keeperKit}
+            numberOf={(id, slot) => assignNumber(numbers, live.side, id, slot)}
+            fitnessOf={(id) => fitness.get(id) ?? 0}
+            yellowOf={(id) => yellow.get(id) ?? false}
+            selectedId={pickedId}
+            onTap={tapPlayer}
+            onMove={move}
+          />
+        ) : (
+          <p className="text-xs text-amber-300">O posicionamento só muda com 11 jogadores em campo.</p>
+        )}
+        <p className="mt-2 text-[11px] text-muted">Arraste um jogador para o ponto que quiser, ou toque em dois para trocá-los de lugar. Vale a partir do próximo lance.</p>
       </Card>
       <Card title="Estilo de jogo">
         <Segmented value={side.style} options={STYLES.map((s) => ({ id: s, label: PLAY_STYLE_LABELS[s] }))} onChange={(s) => act(() => live.match.setStyle(live.side, s))} />
@@ -307,7 +363,7 @@ function SubsPanel({
           {noSubs ? 'Acabaram as 5 trocas: se alguém se machucar, o time fica com um a menos.' : 'As 3 paradas já foram usadas: só dá para trocar numa parada já aberta neste minuto. Se alguém se machucar, o time fica com um a menos.'}
         </p>
       )}
-      <Card title="Em campo (toque em quem sai)">
+      <Card title="Em campo (toque em quem sai, arraste para mudar de posição)">
         <FieldLineup
           formationId={side.formationId}
           lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point }))}
@@ -318,6 +374,15 @@ function SubsPanel({
           fitnessOf={(id) => fitness.get(id) ?? 0}
           yellowOf={(id) => yellow.get(id) ?? false}
           selectedId={outId}
+          onMove={(id, point) => {
+            try {
+              live.match.setPosition(live.side, id, point)
+              setMessage(null)
+              refresh()
+            } catch (e) {
+              setMessage(e instanceof Error ? e.message : 'Não foi possível mudar de posição')
+            }
+          }}
           onTap={(id) => {
             if (injuredId) {
               setMessage('Escolha quem entra no lugar de quem se machucou (banco abaixo).')
@@ -405,7 +470,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const names = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
   // Se a partida está parada por uma lesão (ao voltar para a tela, por exemplo), as Trocas já abrem com o aviso.
   const hurtAtOpen = snap.injuryPending?.side === live.side ? snap.injuryPending.playerId : undefined
-  const [tab, setTab] = useState<LiveTab>(hurtAtOpen || devParam('aba') === 'trocas' ? 'subs' : 'games')
+  const [tab, setTab] = useState<LiveTab>(hurtAtOpen || devParam('aba') === 'trocas' ? 'subs' : devParam('aba') === 'tatica' ? 'tactics' : 'games')
   const [alert, setAlert] = useState<string | null>(() => (hurtAtOpen ? `${names.get(hurtAtOpen) ? playerName(names.get(hurtAtOpen) as Player) : 'Um jogador'} se machucou. ${CHOOSE_ALERT} na aba Trocas.` : null))
   const [showFouls, setShowFouls] = useState(false)
   // Quanto da partida a tela já viu: só o que chega depois pede câmera lenta ou aviso.
@@ -550,7 +615,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
 
         {tab === 'games' && <OtherGames game={game} minute={snap.minute} />}
         {tab === 'stats' && <StatsList game={game} snap={snap} />}
-        {tab === 'tactics' && <TacticPanel live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} />}
+        {tab === 'tactics' && <TacticPanel game={game} live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
         {tab === 'subs' && <SubsPanel game={game} live={live} side={mySide} canEdit={canEdit} refresh={refresh} injuredId={pending ? snap.injuryPending?.playerId : undefined} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
 
         {!desktop && <div className="max-h-[28rem] overflow-y-auto">{logSection}</div>}

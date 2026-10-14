@@ -312,3 +312,47 @@ describe('partida com posicionamento livre', () => {
     clearLive()
   })
 })
+
+describe('posicionamento durante a partida ao vivo', () => {
+  const base = buildTactic(squad(a), { formationId: '4-4-2', style: 'possession', mentality: 0 })
+  const live = () => {
+    const m = startMatch({ home: { team: { ...a, tactic: base }, players: squad(a) }, away: { team: b, players: squad(b) }, seed: 5, attendance: 30_000, userControlled: { home: true } })
+    m.playUntil(20)
+    return m
+  }
+
+  it('leva o jogador ao ponto livre, troca com quem está no ponto ocupado e vira "custom"', () => {
+    const m = live()
+    const side = () => m.snapshot().home
+    const lb = side().onPitch.find((p) => p.point?.row === 1 && p.point.lane === 0)!
+    m.setPosition('home', lb.playerId, { row: 4, lane: 2 })
+    expect(side().onPitch.find((p) => p.playerId === lb.playerId)).toMatchObject({ slot: 'AM', point: { row: 4, lane: 2 } })
+    expect(side().formationId).toBe('custom')
+    expect(side().grid).toHaveLength(11)
+    const st = side().onPitch.find((p) => p.point?.row === 5 && p.point.lane === 1)!
+    const cm = side().onPitch.find((p) => p.point?.row === 3 && p.point.lane === 1)!
+    m.setPosition('home', st.playerId, { row: 3, lane: 1 })
+    expect(side().onPitch.find((p) => p.playerId === st.playerId)?.point).toEqual({ row: 3, lane: 1 })
+    expect(side().onPitch.find((p) => p.playerId === cm.playerId)?.point).toEqual({ row: 5, lane: 1 })
+  })
+
+  it('voltar a uma formação pronta devolve o rótulo e o goleiro não sai do gol', () => {
+    const m = live()
+    const gk = m.snapshot().home.onPitch.find((p) => p.slot === 'GK')!
+    expect(() => m.setPosition('home', gk.playerId, { row: 3, lane: 2 })).toThrow()
+    const lb = m.snapshot().home.onPitch.find((p) => p.point?.row === 1 && p.point.lane === 0)!
+    m.setPosition('home', lb.playerId, { row: 4, lane: 2 })
+    m.setPosition('home', lb.playerId, { row: 1, lane: 0 })
+    expect(m.snapshot().home.formationId).toBe('4-4-2')
+    expect(() => m.setPosition('home', 'ninguem', { row: 2, lane: 2 })).toThrow()
+  })
+
+  it('o jogo segue normalmente depois da mudança e o campo mostra o time na nova posição', () => {
+    const m = live()
+    const lb = m.snapshot().home.onPitch.find((p) => p.point?.row === 1 && p.point.lane === 0)!
+    m.setPosition('home', lb.playerId, { row: 5, lane: 2 })
+    m.playUntil(90)
+    expect(m.finished).toBe(true)
+    expect(m.snapshot().home.grid).toHaveLength(11)
+  })
+})
