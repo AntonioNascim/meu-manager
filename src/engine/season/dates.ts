@@ -7,9 +7,18 @@ export const SATURDAY = 6
 export const SUNDAY = 0
 export const WEDNESDAY = 3
 
+/** As mesmas datas são convertidas milhões de vezes (valor de mercado, contratos): guarda o resultado. */
+const MS_CACHE = new Map<IsoDate, number>()
+
 function toMs(date: IsoDate): number {
-  const [y, m, d] = date.split('-').map(Number)
-  return Date.UTC(y as number, (m as number) - 1, d as number)
+  let ms = MS_CACHE.get(date)
+  if (ms === undefined) {
+    const [y, m, d] = date.split('-').map(Number)
+    ms = Date.UTC(y as number, (m as number) - 1, d as number)
+    if (MS_CACHE.size > 50_000) MS_CACHE.clear()
+    MS_CACHE.set(date, ms)
+  }
+  return ms
 }
 
 export function makeDate(year: number, month: number, day: number): IsoDate {

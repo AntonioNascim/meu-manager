@@ -24,8 +24,18 @@ function ageFactor(age: number): number {
   return MARKET.value.olderFactor
 }
 
-/** Valor de mercado em R$ (arredondado em 10 mil). */
+const VALUE_CACHE = new WeakMap<Player, { date: IsoDate; value: number }>()
+
+/** Valor de mercado em R$ (arredondado em 10 mil). Guardado por jogador e data: o jogador é imutável, então só muda se virar outro objeto. */
 export function marketValue(player: Player, date: IsoDate): number {
+  const cached = VALUE_CACHE.get(player)
+  if (cached && cached.date === date) return cached.value
+  const value = computeMarketValue(player, date)
+  VALUE_CACHE.set(player, { date, value })
+  return value
+}
+
+function computeMarketValue(player: Player, date: IsoDate): number {
   const v = MARKET.value
   const overall = playerOverall(player)
   // Jovem vale pelo que pode vir a ser: o potencial entra com peso que some até os ~27 anos.
@@ -48,9 +58,25 @@ export function squadRole(player: Player, squad: readonly Player[]): SquadRole {
   return better < 3 ? 'key' : better < 11 ? 'starter' : better < 18 ? 'rotation' : 'surplus'
 }
 
+/** Mesma regra de `squadRole`, a partir das forças do elenco já em ordem decrescente (para avaliar muitos jogadores do mesmo clube). */
+export function squadRoleIn(strength: number, sortedStrengths: readonly number[]): SquadRole {
+  // Quantos do elenco são mais fortes que ele (ele mesmo nunca conta).
+  let low = 0
+  let high = sortedStrengths.length
+  while (low < high) {
+    const mid = (low + high) >> 1
+    if ((sortedStrengths[mid] as number) > strength) low = mid + 1
+    else high = mid
+  }
+  return low < 3 ? 'key' : low < 11 ? 'starter' : low < 18 ? 'rotation' : 'surplus'
+}
+
+/** Preço mínimo que o clube pede por um jogador na função `role` do elenco dele. */
+export const askingPriceAs = (player: Player, role: SquadRole, date: IsoDate): number => Math.round((marketValue(player, date) * MARKET.ask[role]) / 10_000) * 10_000
+
 /** Preço mínimo que o clube aceita pela venda. */
 export function askingPrice(player: Player, squad: readonly Player[], date: IsoDate): number {
-  return Math.round((marketValue(player, date) * MARKET.ask[squadRole(player, squad)]) / 10_000) * 10_000
+  return askingPriceAs(player, squadRole(player, squad), date)
 }
 
 /** Taxa de empréstimo até o fim do contrato/empréstimo. */

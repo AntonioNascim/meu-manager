@@ -243,6 +243,8 @@ function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason:
   const dates: string[] = []
   const perDayMatches: number[] = []
   let peak = 0
+  let live = 0
+  const trackLive = process.argv.includes('--live')
   let midSave: ReturnType<typeof saveCost> | undefined
   const total = s.matches.length
   const wall = performance.now()
@@ -257,6 +259,7 @@ function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason:
     dates.push(game.season.season.currentDate)
     perDayMatches.push(game.lastDay.length)
     peak = Math.max(peak, process.memoryUsage().heapUsed)
+    if (trackLive) live = Math.max(live, heap() - heapBase)
     if (!midSave && game.season.matches.filter((m) => m.status === 'finished').length >= total / 2) midSave = saveCost(game)
   }
   game = advanceToMatchday(game)
@@ -267,6 +270,7 @@ function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason:
   const slow = clicks.map((ms, i) => ({ ms, date: dates[i] })).sort((a, b) => b.ms - a.ms).slice(0, 4)
   console.log(`avanços mais lentos: ${slow.map((x) => `${x.date} ${x.ms.toFixed(0)} ms`).join('; ')}`)
   console.log(`soma dos avanços ${(sum / 1000).toFixed(1)} s; simulação pura estimada ${((total * msPerMatch) / 1000).toFixed(1)} s (${total} partidas)`)
+  if (trackLive) console.log(`memória viva (depois de coletar o lixo a cada avanço): pico ${mb(live)} MB líquidos`)
   console.log(`memória: pico durante a temporada ${mb(peak)} MB (com lixo), no fim da temporada ${mb(heap())} MB depois da coleta`)
   if (midSave) console.log(`save no meio: ${(midSave.bytes / 1024).toFixed(0)} KB (compactar ${midSave.compactMs.toFixed(0)} ms, JSON ${midSave.stringifyMs.toFixed(0)} ms, clone ${midSave.cloneMs.toFixed(0)} ms)`)
   const end = saveCost(game)

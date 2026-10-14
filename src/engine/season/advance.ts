@@ -19,6 +19,7 @@ import type { IsoDate, MarketNotice, Match, Player, PlayerId, Tactic, Team, Team
 import type { SeasonState } from './calendar'
 import { applyTraining, fitnessProfile } from '../training'
 import { applyMatchToPlayers, progressDays } from './condition'
+import { slimResult } from './compact'
 import { daysBetween } from './dates'
 
 export type SeasonEvent = { type: 'matchday'; date: IsoDate } | { type: 'market'; date: IsoDate } | { type: 'season-end' }
@@ -181,7 +182,8 @@ function playMatchday(state: SeasonState, date: IsoDate, options: AdvanceOptions
     for (const p of applyMatchToPlayers(new Map([[home.id, homeSquad], [away.id, awaySquad]]), finished)) changed.set(p.id, p)
     teams.set(home.id, collectGate(home, away, m.date).team)
     played.push(finished)
-    return finished
+    // O que fica na temporada é o resultado enxuto (narração e notas já foram usadas nos jogadores): a memória não cresce com os lances de milhares de jogos.
+    return finished.result ? { ...finished, result: slimResult(finished.result) } : finished
   })
 
   const done = matches.every((m) => m.status === 'finished')

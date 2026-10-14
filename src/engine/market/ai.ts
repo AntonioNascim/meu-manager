@@ -11,11 +11,11 @@ import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { addDays } from '../season/dates'
-import type { IsoDate, OfferKind, Player, Position, Team, TeamId, TransferOffer, TransferWindow } from '../types'
+import type { IsoDate, Listing, OfferKind, Player, Position, Team, TeamId, TransferOffer, TransferWindow } from '../types'
 import { buyerCheck, playerDecision, sellerDecision } from './decision'
-import { listingOf, salePrice } from './listings'
+import { listingOf } from './listings'
 import { executeTransfer, playersOf, releasePlayer } from './transfer'
-import { askingPrice, expectedSalary, marketValue, squadRole } from './value'
+import { askingPrice, askingPriceAs, expectedSalary, loanFee, marketValue, salaryForOverall, squadRole, squadRoleIn } from './value'
 import { windowAt } from './windows'
 
 export interface MarketTickResult {
@@ -48,10 +48,123 @@ const spendableOf = (team: Team, squad: readonly Player[]): number => {
   return Math.max(0, Math.min(team.finances.transferBudget, team.finances.balance - reserve))
 }
 
+/** Jogadores que podem ser comprados (sem emprestados nem lesionados), por posição, do mais forte ao mais fraco, com a ordem original da lista. */
+interface PoolEntry {
+  player: Player
+  overall: number
+  order: number
+}
+
+class PoolIndex {
+  private readonly lists = new Map<Position, PoolEntry[]>()
+  private readonly at: (PoolEntry | undefined)[]
+
+  constructor(private players: readonly Player[]) {
+    this.at = players.map((player, order) => {
+      if (!isBuyable(player)) return undefined
+      const entry: PoolEntry = { player, overall: playerOverall(player), order }
+      const list = this.lists.get(player.position)
+      if (list) list.push(entry)
+      else this.lists.set(player.position, [entry])
+      return entry
+    })
+    for (const list of this.lists.values()) list.sort((a, b) => b.overall - a.overall)
+  }
+
+  listOf(position: Position): readonly PoolEntry[] {
+    return this.lists.get(position) ?? []
+  }
+
+  /** Acompanha a lista nova de jogadores trocando só quem mudou (uma transferência muda um jogador); devolve false se a conta não fecha e é preciso refazer. */
+  update(players: readonly Player[]): boolean {
+    if (players === this.players) return true
+    if (players.length !== this.players.length) return false
+    for (let i = 0; i < players.length; i++) {
+      const next = players[i] as Player
+      const before = this.players[i] as Player
+      if (next === before) continue
+      const entry = this.at[i]
+      if (isBuyable(next) !== (entry !== undefined) || next.position !== before.position || next.attributes !== before.attributes) return false
+      if (entry) entry.player = next
+    }
+    this.players = players
+    return true
+  }
+}
+
+const isBuyable = (p: Player): boolean => !p.contract.loanedFrom && p.condition.injuryDaysLeft === 0
+
+/**
+ * Os mesmos jogadores que `bestTarget` consideraria no mercado inteiro, na mesma ordem, sem passar por quem não tem como
+ * dar o ganho mínimo de força: o resultado é igual ao de olhar a lista toda, só que a rodada deixa de custar clubes × jogadores.
+ */
+function marketPool(index: PoolIndex, team: Team, squad: readonly Player[], userTeamId: TeamId | undefined): Player[] {
+  const picked: { player: Player; order: number }[] = []
+  const roomForSalary = team.finances.salaryBudget - monthlyPayroll(squad)
+  for (const need of needsOf(team, squad)) {
+    const list = index.listOf(need.position)
+    // O salário esperado só cresce com a força: quem passa da folga do clube fica no começo da lista (do mais forte ao mais fraco) e é pulado de uma vez.
+    let low = 0
+    let high = list.length
+    while (low < high) {
+      const mid = (low + high) >> 1
+      if (salaryForOverall((list[mid] as { overall: number }).overall) > roomForSalary) low = mid + 1
+      else high = mid
+    }
+    for (let i = low; i < list.length; i++) {
+      const entry = list[i] as PoolEntry
+      if (entry.overall - need.weakest < MARKET.ai.minUpgrade) break
+      const p = entry.player
+      if (p.teamId === team.id || p.teamId === userTeamId) continue
+      picked.push(entry)
+    }
+  }
+  return picked.sort((a, b) => a.order - b.order).map((e) => e.player)
+}
+
 interface Candidate {
   player: Player
   fee: number
   utility: number
+}
+
+/** Para os testes: o que o mercado olha por um clube, sem ter de rodar uma rodada inteira. */
+export function marketPoolOf(players: readonly Player[], team: Team, squad: readonly Player[], userTeamId?: TeamId): Player[] {
+  return marketPool(new PoolIndex(players), team, squad, userTeamId)
+}
+
+/** Forças do elenco em ordem decrescente, guardadas por elenco (o array do elenco só é trocado quando o elenco muda). */
+const STRENGTH_ORDER = new WeakMap<readonly Player[], number[]>()
+function strengthsOf(squad: readonly Player[]): number[] {
+  let sorted = STRENGTH_ORDER.get(squad)
+  if (!sorted) {
+    sorted = squad.map(playerOverall).sort((a, b) => b - a)
+    STRENGTH_ORDER.set(squad, sorted)
+  }
+  return sorted
+}
+
+/** Preço pelo qual o clube vende: igual a `salePrice`, mas o papel do jogador no elenco vem da lista de forças já ordenada. */
+const LISTING_INDEX = new WeakMap<readonly Listing[], Map<string, Listing>>()
+
+/** Anúncio por jogador e tipo de negócio, guardado enquanto a lista de anúncios for a mesma (igual a `listingOf`, sem varrer a lista a cada jogador). */
+function listingFor(market: SeasonState['market'], playerId: string, kind: OfferKind): Listing | undefined {
+  let index = LISTING_INDEX.get(market.listings)
+  if (!index) {
+    index = new Map()
+    for (const l of market.listings) {
+      const key = `${l.playerId}:${l.kind}`
+      if (!index.has(key)) index.set(key, l)
+    }
+    LISTING_INDEX.set(market.listings, index)
+  }
+  return index.get(`${playerId}:${kind === 'loan' ? 'loan' : 'transfer'}`)
+}
+
+function priceOf(market: SeasonState['market'], player: Player, sellerSquad: readonly Player[], kind: OfferKind, date: IsoDate): number {
+  const base = kind === 'loan' ? loanFee(player, date) : askingPriceAs(player, squadRoleIn(playerOverall(player), strengthsOf(sellerSquad)), date)
+  const listed = listingFor(market, player.id, kind)
+  return listed ? Math.min(base, listed.price) : base
 }
 
 /** Melhor alvo para o time entre `pool`: ganho de força sobre o titular mais fraco da vaga, menos o custo. */
@@ -64,11 +177,12 @@ function bestTarget(rng: Rng, team: Team, squad: readonly Player[], pool: readon
     if (!need || player.age > MARKET.ai.maxAge) continue
     const gain = playerOverall(player) - need.weakest
     if (gain < MARKET.ai.minUpgrade) continue
-    const sellerSquad = player.teamId ? sellers.get(player.teamId) ?? [] : []
-    const fee = player.teamId === null ? 0 : salePrice({ market }, player, sellerSquad, kind, date)
-    if (fee > spendable) continue
+    // O salário é barato de calcular e o preço não: quem não cabe na folha sai antes de o preço ser calculado (os dois cortes não sorteiam nada, a ordem não muda o resultado).
     const salary = kind === 'loan' ? player.contract.salary : expectedSalary(player)
     if (salary > roomForSalary) continue
+    const sellerSquad = player.teamId ? sellers.get(player.teamId) ?? [] : []
+    const fee = player.teamId === null ? 0 : priceOf(market, player, sellerSquad, kind, date)
+    if (fee > spendable) continue
     const utility = gain - (spendable > 0 ? (3 * fee) / spendable : 0) + rng.float(-1, 1)
     if (!best || utility > best.utility) best = { player, fee, utility }
   }
@@ -100,14 +214,38 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
   const incoming: TransferOffer[] = []
   const aiTeams = rng.shuffle(state.teams.filter((t) => t.id !== userTeamId))
 
+  // Elenco de cada clube, refeito só quando uma transferência muda a lista de jogadores (antes era refeito a cada clube: custo quadrático).
+  let squadsOf: Map<TeamId, Player[]> | undefined
+  let squadsFor: readonly Player[] | undefined
+  const squadsNow = (): Map<TeamId, Player[]> => {
+    if (squadsOf && squadsFor === current.players) return squadsOf
+    const map = new Map<TeamId, Player[]>()
+    for (const p of current.players) {
+      if (!p.teamId) continue
+      const list = map.get(p.teamId)
+      if (list) list.push(p)
+      else map.set(p.teamId, [p])
+    }
+    // Elenco que não mudou mantém o mesmo array: os cálculos guardados por elenco (ordem de força) continuam valendo.
+    if (squadsOf) {
+      for (const [teamId, list] of map) {
+        const before = squadsOf.get(teamId)
+        if (before && before.length === list.length && before.every((p, i) => p === list[i])) map.set(teamId, before)
+      }
+    }
+    squadsOf = map
+    squadsFor = current.players
+    return map
+  }
+
+  let poolIndex: PoolIndex | undefined
+
   for (const base of aiTeams) {
     const team = current.teams.find((t) => t.id === base.id) as Team
-    const squad = playersOf(current, team.id)
+    const sellers = squadsNow()
+    const squad = sellers.get(team.id) ?? []
     if (signingsInWindow(current, team.id, window) >= MARKET.ai.maxSigningsPerWindow) continue
     const spendable = spendableOf(team, squad)
-    const sellers = new Map<TeamId, Player[]>()
-    for (const p of current.players) if (p.teamId) (sellers.get(p.teamId) ?? sellers.set(p.teamId, []).get(p.teamId)!).push(p)
-
     // 1) Propostas pelos jogadores do time do jogador.
     if (userTeamId && incomingCount(current) < MARKET.ai.maxPendingIncoming && rng.chance(MARKET.ai.userOfferChance)) {
       const offer = proposeToUser(current, team, squad, userTeamId, date, window, spendable, rng, sellers)
@@ -119,11 +257,12 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
     }
 
     // 2) Compra no mercado (jogadores livres e de outros clubes da IA).
-    const pool = current.players.filter((p) => p.teamId !== team.id && p.teamId !== userTeamId && !p.contract.loanedFrom && p.condition.injuryDaysLeft === 0)
+    if (!poolIndex || !poolIndex.update(current.players)) poolIndex = new PoolIndex(current.players)
+    const pool = marketPool(poolIndex, team, squad, userTeamId)
     const target = bestTarget(rng, team, squad, pool, date, spendable, 'purchase', sellers, current.market)
     if (!target) continue
     const seller = target.player.teamId ? (current.teams.find((t) => t.id === target.player.teamId) as Team) : null
-    const sellerSquad = seller ? playersOf(current, seller.id) : []
+    const sellerSquad = seller ? (sellers.get(seller.id) ?? []) : []
     const listed = listingOf(current, target.player.id, 'purchase')
     if (seller && !sellerDecision({ seller, sellerSquad, player: target.player, fee: target.fee, kind: 'purchase', date, ...(listed ? { listedPrice: listed.price } : {}) }).accepted) continue
 

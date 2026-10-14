@@ -8,7 +8,8 @@
  */
 import { FORMATION_IDS, readyGrid } from '../engine/formations'
 import { createAcademy } from '../data/generateAcademy'
-import type { MatchResult, Player, Team } from '../engine/types'
+import { isSlim, slimResult } from '../engine/season/compact'
+import type { Match, Player, Team } from '../engine/types'
 import { userTeam } from './game'
 import type { Game } from './game'
 
@@ -183,16 +184,15 @@ export function validateGame(game: unknown): string[] {
 export function compactGame(game: Game): Game {
   const keep = lastFinishedUserMatchId(game)
   let changed = false
-  const matches = game.season.matches.map((m) => {
+  const slim = (m: Match): Match => {
     const r = m.result
-    if (m.status !== 'finished' || !r || m.id === keep || (r.playerResults.length === 0 && r.events.every((e) => e.text === ''))) return m
+    if (m.status !== 'finished' || !r || m.id === keep || isSlim(r)) return m
     changed = true
-    // Os gols (com assistência) e os cartões ficam, para o resumo do jogo; narração, lesões, trocas e notas saem.
-    const events = r.events.filter((e) => e.type === 'goal' || e.type === 'own-goal' || e.type === 'yellow-card' || e.type === 'red-card').map(({ minute, type, teamId, playerId, relatedPlayerId, assistKind }) => ({ minute, type, teamId, playerId, text: '', ...(relatedPlayerId ? { relatedPlayerId } : {}), ...(assistKind ? { assistKind } : {}) }))
-    const slim: MatchResult = { homeGoals: r.homeGoals, awayGoals: r.awayGoals, homeStats: r.homeStats, awayStats: r.awayStats, events, playerResults: [] }
-    return { ...m, result: slim }
-  })
-  return changed ? { ...game, season: { ...game.season, matches } } : game
+    return { ...m, result: slimResult(r) }
+  }
+  const matches = game.season.matches.map(slim)
+  const lastDay = game.lastDay.map(slim)
+  return changed ? { ...game, lastDay, season: { ...game.season, matches } } : game
 }
 
 function lastFinishedUserMatchId(game: Game): string | undefined {

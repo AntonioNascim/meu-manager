@@ -350,3 +350,41 @@ Observações:
 4. **Save: 3 MB sobre os bytes gravados (comprimidos).** Nova meta: **pico de memória de no máximo ~250 MB, medido no mundo de 282 clubes** (`tools/worldScale.ts`).
 5. **Idade no aniversário.** O mundo fictício passa a gerar datas de nascimento.
 6. **Celular de referência: iPhone 11** (A13, 4 GB, Safari/JavaScriptCore). Correção da estimativa: o fator 3× a 5× era para Android intermediário e básico. O A13 tem desempenho de um thread parecido com o do notebook de medição, então uso **1× a 1,5×** (térmica, JavaScriptCore e o Safari limitando a memória por aba). É estimativa, não medição.
+
+---
+
+## 9. Resultado da parte B1 (desempenho)
+
+Feito sem mudar nenhum resultado do jogo: `npm run analyze -- years --years 30 --seed 41` no mundo atual dá **saída idêntica, linha por linha**, à de antes (de 277 s para 150 a 160 s), e `npm test` passa (593 testes).
+
+**O que mudou**
+1. **Mercado da IA** (`src/engine/market/ai.ts`, `value.ts`, `precontract.ts`), só com atalhos exatos:
+   - força do jogador guardada por objeto de atributos (`overall.ts`) e valor de mercado guardado por jogador e data;
+   - elenco de cada clube montado uma vez por rodada (e reaproveitado enquanto não muda), em vez de um por clube;
+   - lista de candidatos por posição, do mais forte ao mais fraco, que pula de uma vez quem não dá o ganho mínimo ou não cabe na folha de salários (a ordem original e os sorteios ficam iguais);
+   - papel do jogador no elenco por busca binária numa lista ordenada, anúncios por índice e conversão de datas guardada;
+   - pré-contratos da IA com as condições que não mudam por jogador calculadas uma vez.
+2. **Memória:** o resultado das partidas de outras equipes já fica enxuto na temporada (`src/engine/season/compact.ts`: gols, assistências e cartões; sem narração nem notas). O `compactGame` do save usa a mesma função e agora também enxuga `lastDay`.
+3. Teste novo: `tests/marketPerformance.test.ts` (atalhos contra a conta direta).
+
+**Mundo de 282 clubes, mesma máquina** (`node --expose-gc tools/run.mjs worldScale --world full --live`)
+
+| | Antes | Depois |
+|---|---|---|
+| Temporada inteira | 197 a 234 s | **49 a 56 s** |
+| Avanço típico (mediana) | 430 a 535 ms | 440 a 515 ms (é só simulação de ~69 partidas) |
+| Avanço lento (p95) | 13,7 a 16 s | **1,7 a 2,1 s** |
+| Pior avanço (pré-temporada) | 107 a 128 s | **10 a 12 s** |
+| Mercado da IA na temporada | ~186 s | **~15 s** |
+| Pico de memória (com lixo) | ~495 MB | **~123 MB** |
+| Pico de memória viva (depois de coletar o lixo a cada avanço) | n/d | **36 MB líquidos** |
+| Memória no fim da temporada | 95 MB | 49 MB |
+| Roda com o teto de heap em 250 MB? | n/d | **sim** (`--max-old-space-size=250`, 49 s) |
+
+**Meta de memória (≤ 250 MB no mundo de 282 clubes): atingida**, tanto no pico bruto medido (123 MB) quanto na prova com teto de 250 MB.
+
+**iPhone 11 (estimativa de 1× a 1,5×, não medida):** temporada com as 15 ligas completas ~55 a 80 s; avanço típico 0,5 a 0,75 s; primeira rodada de pré-temporada 10 a 15 s; p95 2 a 3 s.
+
+**Meta não atingida:** a meta era mercado ≤ 2 s por temporada e primeiro avanço < 1 s. Ficou em ~15 s e ~10 s. O que resta é custo linear de verdade: 282 clubes × ~14 rodadas na pré-temporada, cada clube avaliando milhares de candidatos. Reduzir mais exige candidatos limitados por clube ou só parte dos clubes agindo por rodada, o que **muda as decisões da IA** (e não pode ser feito no mundo atual sem mudar os resultados). Proponho fazer isso junto com B2/B3, onde as ligas fora do foco passam a negociar em rodízio por desenho. Também não fiz a separação de partidas por liga e jogadores por clube: com a compactação, o pico de memória já está bem abaixo da meta e a cópia das listas custa menos de 1 ms por dia.
+
+**Adiado para B2:** a data de nascimento no mundo fictício e a idade no aniversário. Gerar a data hoje sem mexer nos sorteios é possível, mas só faz sentido junto com a mudança da virada; fazer agora aumentaria o save sem efeito.

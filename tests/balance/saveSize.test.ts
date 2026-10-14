@@ -29,7 +29,8 @@ describe('tamanho do save', () => {
     expect(last.archiveBytes / last.seasonsArchived).toBeLessThan(5 * 1024)
   })
 
-  it('a compactação tira a maior parte do peso do jogo no fim da temporada', () => {
-    expect(first.endBytes).toBeLessThan(first.rawEndBytes * 0.3)
+  it('o jogo na memória já nasce enxuto: sobra pouco para o save compactar (antes era mais de 70% do peso)', () => {
+    expect(first.endBytes).toBeLessThanOrEqual(first.rawEndBytes)
+    expect(first.rawEndBytes).toBeLessThan(first.endBytes * 1.3)
   })
 })

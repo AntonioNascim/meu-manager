@@ -97,8 +97,19 @@ describe('compactação', () => {
       const rows = (g: Game) => computeStandings(c.teamIds, g.season.matches.filter((m) => m.competitionId === c.id))
       expect(rows(compact)).toEqual(rows(game))
     }
-    expect(JSON.stringify(compact).length).toBeLessThan(JSON.stringify(game).length * 0.9)
+    // Os jogos das outras equipes já nascem enxutos na temporada (a memória não guarda os lances de milhares de jogos); só a partida do técnico pesa.
+    expect(JSON.stringify(compact).length).toBeLessThan(JSON.stringify(game).length)
     expect(compactGame(compact)).toBe(compact)
+  })
+
+  it('na memória, os jogos das outras equipes já ficam sem narração nem notas; só os do técnico guardam tudo até salvar', () => {
+    const game = played()
+    const others = game.season.matches.filter((m) => m.status === 'finished' && m.homeTeamId !== game.userTeamId && m.awayTeamId !== game.userTeamId)
+    expect(others.length).toBeGreaterThan(20)
+    for (const m of others) {
+      expect(m.result!.playerResults).toHaveLength(0)
+      expect(m.result!.events.every((e) => e.text === '' && ['goal', 'own-goal', 'yellow-card', 'red-card'].includes(e.type))).toBe(true)
+    }
   })
 })
 

@@ -70,12 +70,28 @@ export function positionFit(player: Pick<Player, 'position' | 'secondaryPosition
   return POSITION_FIT.outOfPosition
 }
 
+/**
+ * Força geral por posição, guardada por objeto de atributos. Os atributos são imutáveis (quem muda um atributo cria um objeto novo),
+ * então o valor guardado nunca fica velho, e a transferência de um jogador (que reaproveita o mesmo objeto) continua acertando o cache.
+ * O mercado da IA pergunta a força de milhares de jogadores a cada rodada; sem isso o custo dominava a temporada.
+ */
+const OVERALL_CACHE = new WeakMap<Attributes, Partial<Record<Position, number>>>()
+
+function cachedOverall(attributes: Attributes, position: Position): number {
+  let byPosition = OVERALL_CACHE.get(attributes)
+  if (!byPosition) {
+    byPosition = {}
+    OVERALL_CACHE.set(attributes, byPosition)
+  }
+  return (byPosition[position] ??= overallForPosition(attributes, position))
+}
+
 /** Força geral na posição principal. */
 export function playerOverall(player: Player): number {
-  return overallForPosition(player.attributes, player.position)
+  return cachedOverall(player.attributes, player.position)
 }
 
 /** Força efetiva ao jogar em `position` (com penalidade se for improvisado). */
 export function overallAt(player: Player, position: Position): number {
-  return overallForPosition(player.attributes, position) * positionFit(player, position)
+  return cachedOverall(player.attributes, position) * positionFit(player, position)
 }

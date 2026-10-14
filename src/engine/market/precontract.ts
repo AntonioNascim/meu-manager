@@ -132,8 +132,12 @@ function pickTarget(state: SeasonState, buyerId: TeamId, date: IsoDate, rng: Rng
   const losses = new Map<TeamId, number>()
   for (const c of state.market.preContracts) losses.set(c.fromTeamId, (losses.get(c.fromTeamId) ?? 0) + 1)
   let best: { player: Player; salary: number; score: number } | undefined
+  // Mesmas condições de `canPreContract`, com o que não muda de jogador para jogador calculado uma vez só.
+  if (!preContractsOpen(state, date)) return undefined
+  const signed = new Set(state.market.preContracts.map((c) => c.playerId))
+  const year = state.season.year
   for (const p of state.players) {
-    if (p.teamId === buyerId || !canPreContract(state, p, date) || p.age > MARKET.ai.maxAge) continue
+    if (p.teamId === buyerId || p.teamId === null || p.contract.loanedFrom || !isLastContractYear(p, year) || signed.has(p.id) || p.age > MARKET.ai.maxAge) continue
     if ((losses.get(p.teamId as TeamId) ?? 0) >= P.maxLossPerClub) continue
     const need = needs.find((n) => n.position === p.position)
     if (!need) continue
