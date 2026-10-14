@@ -127,6 +127,8 @@ export function formationOf(tactic: Pick<Tactic, 'formationId'> & { grid?: GridP
   const { grid, formationId } = tactic
   const ready = FORMATIONS[formationId]
   if (!grid) return getFormation(formationId)
+  // Time reduzido na partida ao vivo (menos de 11 em campo): só a grade dos que restam.
+  if (grid.length < 11) return formationFromGrid(grid, 'custom', true)
   if (ready && sameGridSet(ready.grid, grid)) return ready.grid.every((p, i) => p.row === grid[i]?.row && p.lane === grid[i]?.lane) ? ready : formationFromGrid(grid, formationId)
   return formationFromGrid(grid, ready ? 'custom' : formationId)
 }

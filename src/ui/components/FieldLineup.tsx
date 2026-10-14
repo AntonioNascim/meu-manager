@@ -109,7 +109,7 @@ export function FieldLineup({
   onMove?: (playerId: string, point: GridPoint) => void
 }) {
   const placed = useMemo(() => placeLineup(formationId, lineup), [formationId, lineup])
-  if (onMove && lineup.length === 11 && lineup.every((e) => e.point)) {
+  if (onMove && lineup.length > 0 && lineup.every((e) => e.point)) {
     return (
       <GridPitch
         testId="field-lineup"

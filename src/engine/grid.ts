@@ -56,11 +56,12 @@ export function slotAt(p: GridPoint): FormationSlot {
 }
 
 /** Mensagem do problema da grade (`null` se está válida): 11 pontos da grade, sem repetir, um só no gol. */
-export function gridProblem(grid: readonly GridPoint[]): string | null {
-  if (grid.length !== 11) return 'A grade precisa de 11 jogadores'
+export function gridProblem(grid: readonly GridPoint[], partial = false): string | null {
+  if (partial ? grid.length < 1 || grid.length > 11 : grid.length !== 11) return 'A grade precisa de 11 jogadores'
   if (!grid.every(isGridPoint)) return 'Ponto fora da grade'
   if (new Set(grid.map(gridKey)).size !== grid.length) return 'Dois jogadores no mesmo ponto'
-  if (grid.filter((p) => p.row === 0).length !== 1) return 'É preciso exatamente um goleiro'
+  // Time reduzido (expulsão ou lesão sem troca): o gol pode ficar vazio.
+  if (grid.filter((p) => p.row === 0).length !== 1 && !(partial && grid.every((p) => p.row !== 0))) return 'É preciso exatamente um goleiro'
   return null
 }
 
@@ -84,8 +85,8 @@ export const points = (...list: [number, number][]): GridPoint[] => list.map(([r
 export const CUSTOM_FORMATION_ID = 'custom'
 
 /** Grade com o papel de cada vaga: o que o motor e as telas usam no lugar do nome da formação. */
-export function formationFromGrid(grid: readonly GridPoint[], id: string = CUSTOM_FORMATION_ID): Formation {
-  const problem = gridProblem(grid)
+export function formationFromGrid(grid: readonly GridPoint[], id: string = CUSTOM_FORMATION_ID, partial = false): Formation {
+  const problem = gridProblem(grid, partial)
   if (problem) throw new Error(problem)
   return { id, slots: grid.map(slotAt), grid: grid.map((p) => ({ ...p })) }
 }

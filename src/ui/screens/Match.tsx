@@ -246,7 +246,7 @@ function TacticPanel({
         {pitchCount !== 11 && <p className="mt-1 text-xs text-amber-300">A formação só muda com 11 jogadores em campo.</p>}
       </Card>
       <Card title="Posição dos jogadores">
-        {pitchCount === 11 ? (
+        {pitchCount > 0 ? (
           <FieldLineup
             formationId={side.formationId}
             lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point }))}
@@ -261,9 +261,9 @@ function TacticPanel({
             onMove={move}
           />
         ) : (
-          <p className="text-xs text-amber-300">O posicionamento só muda com 11 jogadores em campo.</p>
+          <p className="text-xs text-amber-300">Não há jogadores em campo.</p>
         )}
-        <p className="mt-2 text-[11px] text-muted">Arraste um jogador para o ponto que quiser, ou toque em dois para trocá-los de lugar. Vale a partir do próximo lance.</p>
+        <p className="mt-2 text-[11px] text-muted">Arraste um jogador para o ponto que quiser, ou toque em dois para trocá-los de lugar. Vale a partir do próximo lance.{pitchCount < 11 && ' Com menos de 11, os lugares vazios custam: cubra as linhas e as faixas que ficaram sem gente.'}</p>
       </Card>
       <Card title="Estilo de jogo">
         <Segmented value={side.style} options={STYLES.map((s) => ({ id: s, label: PLAY_STYLE_LABELS[s] }))} onChange={(s) => act(() => live.match.setStyle(live.side, s))} />

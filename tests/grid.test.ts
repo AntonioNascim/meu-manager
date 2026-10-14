@@ -356,3 +356,82 @@ describe('posicionamento durante a partida ao vivo', () => {
     expect(m.snapshot().home.grid).toHaveLength(11)
   })
 })
+
+describe('posicionamento com menos de 11 em campo', () => {
+  const base = buildTactic(squad(a), { formationId: '4-4-2', style: 'possession', mentality: 0 })
+  /** Joga até faltarem `missing` jogadores no time da casa (lesões sem troca). */
+  const shortHanded = (missing: number, players: Player[] = squad(a), seed = 127) => {
+    const m = startMatch({ home: { team: { ...a, tactic: base }, players }, away: { team: b, players: squad(b) }, seed, attendance: 30_000, userControlled: { home: true }, holdInjurySubs: true })
+    while (!m.finished && m.snapshot().home.onPitch.length > 11 - missing) {
+      m.playUntil(90)
+      const pending = m.snapshot().injuryPending
+      if (!pending) break
+      m.resolveInjury(pending.side)
+    }
+    return m
+  }
+  const pitch = (m: ReturnType<typeof startMatch>) => m.snapshot().home.onPitch
+
+  it('com 10: o lugar fica vazio, os restantes se movem e o custo dos buracos vale', () => {
+    const m = shortHanded(1)
+    expect(pitch(m)).toHaveLength(10)
+    const free = allGridPoints().find((p) => !pitch(m).some((q) => q.point?.row === p.row && q.point.lane === p.lane) && p.row === 3)!
+    const mover = pitch(m).find((p) => p.slot !== 'GK')!
+    m.setPosition('home', mover.playerId, free)
+    expect(pitch(m).find((p) => p.playerId === mover.playerId)?.point).toEqual({ row: free.row, lane: free.lane })
+    expect(m.snapshot().home.formationId).toBe('custom')
+    expect(m.snapshot().home.grid).toHaveLength(10)
+    // tirar todos os defensores deixa a defesa com buracos
+    const g = m.snapshot().home.grid
+    expect(gapsOf(formationFromGrid(g, 'custom', true)).defense).toBeGreaterThanOrEqual(0)
+    m.playUntil(90)
+    expect(m.finished).toBe(true)
+  })
+
+  it('com 9: continua movendo e trocando de lugar, e o jogo termina', () => {
+    const m = shortHanded(2)
+    expect(pitch(m)).toHaveLength(9)
+    const [x, y] = pitch(m).filter((p) => p.slot !== 'GK')
+    const px = x!.point!
+    const py = y!.point!
+    m.setPosition('home', x!.playerId, py)
+    expect(pitch(m).find((p) => p.playerId === x!.playerId)?.point).toEqual(py)
+    expect(pitch(m).find((p) => p.playerId === y!.playerId)?.point).toEqual(px)
+    expect(m.snapshot().home.grid).toHaveLength(9)
+    m.playUntil(90)
+    expect(m.finished).toBe(true)
+  })
+
+  it('o buraco custa: sem ninguém numa faixa, cobrir com um jogador do outro lado reduz os buracos', () => {
+    const ready = getFormation('4-4-2')
+    // o lado esquerdo e o centro-esquerdo sem gente
+    const open = ready.grid.filter((p) => p.lane > 1 || p.row === 0).map((p) => ({ ...p }))
+    const sum = (g: GridPoint[]) => gapsOf(formationFromGrid(g, 'custom', true)).flank.reduce((s, v) => s + v, 0)
+    expect(sum(open)).toBeGreaterThan(0)
+    // um meia da direita vai cobrir a faixa vazia
+    const covered = open.map((p) => (p.row === 3 && p.lane === 3 ? { row: 3, lane: 1 } : p))
+    expect(sum(covered)).toBeLessThan(sum(open))
+    expect(gapsOf(formationFromGrid(ready.grid.filter((p) => p.row !== 1), 'custom', true)).defense).toBe(MATCH.grid.minDefenders)
+  })
+
+  it('goleiro: não sai do gol; expulso/lesionado sem reserva, um jogador de linha pode ir para o gol', () => {
+    const players = squad(a).map((p) => (p.position === 'GK' ? { ...p, hidden: { ...p.hidden, injuryProneness: 100_000 } } : { ...p, hidden: { ...p.hidden, injuryProneness: 1 } }))
+    const m = startMatch({ home: { team: { ...a, tactic: base }, players }, away: { team: b, players: squad(b) }, seed: 4, attendance: 30_000, userControlled: { home: true }, holdInjurySubs: true })
+    const keeper = base.startingXI.find((id) => players.find((p) => p.id === id)?.position === 'GK') as string
+    expect(() => m.setPosition('home', keeper, { row: 3, lane: 2 })).toThrow()
+    for (let guard = 0; guard < 10 && pitch(m).some((p) => p.slot === 'GK'); guard++) {
+      m.playUntil(90)
+      const pending = m.snapshot().injuryPending
+      if (!pending) break
+      m.resolveInjury(pending.side)
+    }
+    expect(pitch(m).some((p) => p.slot === 'GK')).toBe(false)
+    const outfield = pitch(m).find((p) => p.point?.row === 1 && p.point.lane === 2) ?? pitch(m)[0]!
+    m.setPosition('home', outfield.playerId, GK_POINT)
+    expect(pitch(m).find((p) => p.playerId === outfield.playerId)).toMatchObject({ slot: 'GK', point: GK_POINT })
+    // agora é ele o goleiro: não sai do gol
+    expect(() => m.setPosition('home', outfield.playerId, { row: 3, lane: 2 })).toThrow()
+    m.playUntil(90)
+    expect(m.finished).toBe(true)
+  })
+})
