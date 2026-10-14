@@ -95,7 +95,7 @@ function pickNationality(rng: Rng): Nationality {
   return rng.weighted(FOREIGN_NATIONALITIES, (n) => n.weight).nationality
 }
 
-function pickFoot(rng: Rng, position: Position): Foot {
+export function pickFoot(rng: Rng, position: Position): Foot {
   const roll = rng.next()
   if (position === 'LB' || position === 'LW') return roll < 0.78 ? 'left' : roll < 0.9 ? 'right' : 'both'
   if (position === 'RB' || position === 'RW') return roll < 0.78 ? 'right' : roll < 0.9 ? 'left' : 'both'
@@ -133,7 +133,7 @@ function pickUniqueName(rng: Rng, ctx: GenerationContext, nationality: Nationali
   return name
 }
 
-function pickSecondaryPositions(rng: Rng, position: Position): Position[] {
+export function pickSecondaryPositions(rng: Rng, position: Position): Position[] {
   const neighbors = NEIGHBOR_POSITIONS[position]
   if (neighbors.length === 0) return []
   const roll = rng.next()
@@ -175,12 +175,12 @@ function attributeOffsets(position: Position): Record<AttributeName, number> {
 }
 
 /** Comprime valores muito altos, para que atributos acima de 90 sejam raros. */
-function softCap(value: number): number {
+export function softCap(value: number): number {
   const { softCap: cap, softCapFactor } = GENERATION
   return value > cap ? cap + (value - cap) * softCapFactor : value
 }
 
-function generateAttributes(rng: Rng, position: Position, quality: number, age: number): Attributes {
+export function generateAttributes(rng: Rng, position: Position, quality: number, age: number): Attributes {
   const a = GENERATION.age
   // Jovens ainda não se desenvolveram; veteranos perdem físico mas ganham leitura de jogo.
   const base = Math.max(
@@ -209,7 +209,7 @@ function generateAttributes(rng: Rng, position: Position, quality: number, age: 
   return attributes
 }
 
-function hiddenAttribute(rng: Rng, dist: { mean: number; sd: number }): number {
+export function hiddenAttribute(rng: Rng, dist: { mean: number; sd: number }): number {
   return clamp(Math.round(rng.normal(dist.mean, dist.sd)), ATTRIBUTE_MIN, ATTRIBUTE_MAX)
 }
 

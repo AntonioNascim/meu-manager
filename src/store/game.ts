@@ -3,7 +3,8 @@
  * Nada daqui depende de React; o salvamento (Dexie) entra numa etapa futura.
  */
 import { createYouth } from '../data/generateYouth'
-import { generateWorld } from '../data/generateWorld'
+import { loadWorld } from '../data/package/defaultPackage'
+import type { DataPackage } from '../data/package/types'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
 import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
@@ -68,14 +69,33 @@ export interface Game {
   favorites?: string[]
   /** Até 3 escalações guardadas pelo jogador (posição = espaço; vazio = nada guardado). */
   savedLineups?: (SavedLineup | null)[]
+  /** Pacote de dados importado que deu origem ao mundo (guardado no navegador, tabela `packages`); sem ele, o mundo fictício padrão. */
+  dataPackage?: { id: string; name: string }
 }
 
-export function createGame(seed: number, userTeamId: TeamId): Game {
-  const world = generateWorld({ seed })
+export interface NewGameOptions {
+  /** Pacote de dados já validado (padrão: o mundo fictício). */
+  dataPackage?: DataPackage
+  /** Referência do pacote guardado no navegador. */
+  dataPackageId?: string
+}
+
+export function createGame(seed: number, userTeamId: TeamId, options: NewGameOptions = {}): Game {
+  // O mundo sempre nasce de um pacote de dados: o do usuário ou o fictício padrão.
+  const world = loadWorld(seed, options.dataPackage)
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
   const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } } })
   const market = { ...season.market, listings: season.market.listings.filter((l) => l.teamId !== userTeamId) }
-  return { seed, userTeamId, season: { ...season, market }, lastDay: [], notices: [], seasonLog: [], archive: [] }
+  return {
+    seed,
+    userTeamId,
+    season: { ...season, market },
+    lastDay: [],
+    notices: [],
+    seasonLog: [],
+    archive: [],
+    ...(options.dataPackage ? { dataPackage: { id: options.dataPackageId ?? 'sem-id', name: options.dataPackage.name } } : {}),
+  }
 }
 
 /** Avança até o próximo dia de jogos. A partida do jogador fica pendente em `pendingUserMatch`. */

@@ -3,6 +3,7 @@
  * O motor e os tipos usam valores em inglês; só a UI traduz.
  * Os `Record` abaixo fazem o TypeScript acusar rótulo faltando quando um valor novo é criado.
  */
+import type { PackageIssue } from '../data/package/types'
 import type {
   BoardStatus,
   TrainingFocus,
@@ -365,3 +366,30 @@ export const MARKET_SORT_LABELS: Record<MarketSort, string> = {
 
 /** Nome da formação: as prontas pelo número; a montada à mão aparece como "Livre". */
 export const formationLabel = (id: string): string => (id === 'custom' ? 'Livre' : id)
+
+/** Mensagem de um problema do pacote de dados (campos faltando, clube sem jogadores, liga com número errado de times...). */
+export function packageIssueText(issue: PackageIssue): string {
+  const { code, path, detail, expected } = issue
+  switch (code) {
+    case 'not-json': return 'O arquivo não é um JSON válido.'
+    case 'not-object': return 'O arquivo não tem o formato de um pacote de dados.'
+    case 'wrong-format': return 'Este arquivo não é um pacote do Meu Manager (o campo "format" precisa ser "meu-manager-package").'
+    case 'newer-version': return `O pacote é da versão ${detail}; este jogo lê até a versão ${expected}. Atualize o jogo.`
+    case 'missing-field': return `Falta o campo "${detail}" em ${path}.`
+    case 'wrong-type': return `O campo "${detail}" em ${path} está com o tipo errado.`
+    case 'out-of-range': return `Valor fora do permitido em ${path}: ${detail} (esperado: ${expected}).`
+    case 'duplicate-id': return `Repetido em ${path}: "${detail}" já existe no pacote.`
+    case 'unknown-reference': return `${path} aponta para "${detail}", que não existe no pacote.`
+    case 'unknown-value': return `Valor desconhecido em ${path}: "${detail}".`
+    case 'bad-date': return `Data inválida em ${path}: "${detail}" (use AAAA-MM-DD).`
+    case 'bad-color': return `Cor inválida em ${path}: "${detail}" (use #rrggbb).`
+    case 'club-without-players': return `O clube "${detail}" (${path}) não tem jogadores.`
+    case 'club-squad-size': return `O clube em ${path} tem ${detail} jogadores; o elenco precisa ter de ${String(expected).replace('–', ' a ')}.`
+    case 'club-no-goalkeeper': return `O clube "${detail}" (${path}) não tem goleiro.`
+    case 'league-team-count': return `A liga em ${path.replace(/\.teams$/, '')} declara ${expected} times, mas o pacote tem ${detail} clubes nela.`
+    case 'league-size-unsupported': return `Nesta versão cada divisão precisa ter ${expected} times (${path} declara ${detail}).`
+    case 'league-promotion': return `Acesso e rebaixamento em ${path}: o jogo usa ${expected} (veio ${detail}).`
+    case 'unsupported-leagues': return `Este pacote tem ${detail} ligas. Por enquanto o jogo aceita um país com duas divisões (Série A e Série B); pacotes com mais ligas ainda não são suportados.`
+    case 'tiebreakers-unsupported': return `Os critérios de desempate de ${path} são diferentes dos do jogo e serão ignorados: vale a ordem padrão.`
+  }
+}

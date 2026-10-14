@@ -9,9 +9,11 @@ import { SlotInfo } from '../components/SlotInfo'
 import { SlotPicker } from '../components/SlotPicker'
 import { Button, Card } from '../components/ui'
 import { downloadText } from '../download'
+import { ImportPackage } from './ImportPackage'
+import type { ChosenPackage } from './ImportPackage'
 import { NewGame } from './NewGame'
 
-type View = 'menu' | 'new' | 'load'
+type View = 'menu' | 'new' | 'load' | 'package'
 
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
@@ -24,6 +26,8 @@ export function Start() {
   /** Texto do arquivo importado, esperando a escolha do espaço. */
   const [imported, setImported] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  /** Pacote de dados escolhido para o jogo novo (sem ele, o mundo fictício padrão). */
+  const [dataPackage, setDataPackage] = useState<ChosenPackage | undefined>(undefined)
 
   const refresh = useCallback(async () => {
     try {
@@ -95,7 +99,8 @@ export function Start() {
     }
   }
 
-  if (view === 'new') return <NewGame slots={slots} onBack={() => { setView('menu'); void refresh() }} />
+  if (view === 'new') return <NewGame slots={slots} {...(dataPackage ? { dataPackage } : {})} onBack={() => { setDataPackage(undefined); setView('menu'); void refresh() }} />
+  if (view === 'package') return <ImportPackage onBack={() => setView('menu')} onUse={(chosen) => { setDataPackage(chosen); setView('new') }} />
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-bg px-4 py-8 text-slate-100">
@@ -119,6 +124,9 @@ export function Start() {
           )}
           <Button className="w-full" variant={latest ? 'secondary' : 'primary'} onClick={() => setView('new')}>
             Novo jogo
+          </Button>
+          <Button className="w-full" variant="secondary" onClick={() => setView('package')}>
+            Novo jogo com pacote de dados
           </Button>
           <Button className="w-full" variant="secondary" disabled={!latest} onClick={() => setView('load')}>
             Carregar

@@ -16,6 +16,7 @@
  * cada mundo leva ~10 s por temporada), --seed N (primeira semente).
  */
 import { generateWorld } from '../src/data/generateWorld'
+import { loadWorld } from '../src/data/package/defaultPackage'
 import type { World } from '../src/data/generateWorld'
 import { buildTactic } from '../src/engine/lineup'
 import { simulateMatch } from '../src/engine/match'
@@ -202,7 +203,9 @@ function runHome(worlds: number, matches: number, firstSeed: number) {
 function runYears(years: number, worlds: number, firstSeed: number) {
   for (let w = 0; w < worlds; w++) {
     const seed = firstSeed + w
-    const rows = simulateYears(generateWorld({ seed }), years, `years-${seed}`)
+    // O mundo nasce do pacote padrão (o mesmo caminho do jogo); WORLD_DIRECT=1 usa a geração direta, para conferir que dão o mesmo resultado.
+    const world = process.env.WORLD_DIRECT ? generateWorld({ seed }) : loadWorld(seed)
+    const rows = simulateYears(world, years, `years-${seed}`)
     const first = rows[0]!
     const last = rows[rows.length - 1]!
     console.log(`

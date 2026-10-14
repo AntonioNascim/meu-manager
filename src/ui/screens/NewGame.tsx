@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { generateWorld } from '../../data/generateWorld'
+import { loadWorld } from '../../data/package/defaultPackage'
 import { playerOverall } from '../../engine/overall'
 import type { Player, Team } from '../../engine/types'
 import { createGame } from '../../store/game'
@@ -8,6 +8,7 @@ import type { SaveSummary } from '../../store/saveFormat'
 import { TIER_LABELS } from '../labels'
 import { SlotPicker } from '../components/SlotPicker'
 import { Button, Tabs, TeamBadge } from '../components/ui'
+import type { ChosenPackage } from './ImportPackage'
 
 interface Option {
   team: Team
@@ -15,10 +16,10 @@ interface Option {
 }
 
 /** Tela de novo jogo: escolher um time da Série A ou da Série B. */
-export function NewGame({ slots, onBack }: { slots: (SaveSummary | null)[] | null; onBack: () => void }) {
+export function NewGame({ slots, onBack, dataPackage }: { slots: (SaveSummary | null)[] | null; onBack: () => void; dataPackage?: ChosenPackage }) {
   // O mundo é gerado uma vez para mostrar os times; o jogo é criado com a mesma semente.
   const [seed] = useState(() => Math.floor(Math.random() * 1_000_000) + 1)
-  const world = useMemo(() => generateWorld({ seed }), [seed])
+  const world = useMemo(() => loadWorld(seed, dataPackage?.data), [seed, dataPackage])
   const [tier, setTier] = useState<1 | 2>(1)
   const [selected, setSelected] = useState<string | null>(null)
   const [choosingSlot, setChoosingSlot] = useState(false)
@@ -45,7 +46,7 @@ export function NewGame({ slots, onBack }: { slots: (SaveSummary | null)[] | nul
             Voltar
           </button>
         </div>
-        <p className="text-sm text-slate-400">Escolha o time que você vai comandar.</p>
+        <p className="text-sm text-slate-400">{dataPackage ? `Pacote: ${dataPackage.data.name}. ` : ''}Escolha o time que você vai comandar.</p>
         <div className="mt-4">
           <Tabs
             value={String(tier) as '1' | '2'}
@@ -107,7 +108,7 @@ export function NewGame({ slots, onBack }: { slots: (SaveSummary | null)[] | nul
       </footer>
 
       {choosingSlot && chosen && (
-        <SlotPicker title={`Onde salvar o jogo com o ${chosen.name}?`} slots={slots} onCancel={() => setChoosingSlot(false)} onPick={(slot) => openGame(createGame(seed, chosen.id), slot)} />
+        <SlotPicker title={`Onde salvar o jogo com o ${chosen.name}?`} slots={slots} onCancel={() => setChoosingSlot(false)} onPick={(slot) => openGame(createGame(seed, chosen.id, dataPackage ? { dataPackage: dataPackage.data, dataPackageId: dataPackage.id } : {}), slot)} />
       )}
     </div>
   )

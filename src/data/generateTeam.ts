@@ -60,7 +60,7 @@ export function teamLevelFor(def: Pick<TeamDefinition, 'tier' | 'reputation'>): 
 }
 
 /** Chance de cada titular ser um craque: zero fora da Série A, cresce com a reputação. */
-function starChance(def: Pick<TeamDefinition, 'tier' | 'reputation'>): number {
+export function starChance(def: Pick<TeamDefinition, 'tier' | 'reputation'>): number {
   const { minReputation, maxChance } = GENERATION.star
   if (def.tier !== 1 || def.reputation < minReputation) return 0
   return (maxChance * (def.reputation - (minReputation - 1))) / (19 - (minReputation - 1))
@@ -85,7 +85,7 @@ function assignAges(rng: Rng, template: readonly SquadSlot[]): number[] {
   return ages
 }
 
-function pickStyle(rng: Rng, reputation: number): PlayStyle {
+export function pickStyle(rng: Rng, reputation: number): PlayStyle {
   const weights: Record<PlayStyle, number> =
     reputation >= 15
       ? { possession: 55, 'counter-attack': 25, 'high-press': 20 }
@@ -94,7 +94,7 @@ function pickStyle(rng: Rng, reputation: number): PlayStyle {
   return rng.weighted(styles, (s) => weights[s])
 }
 
-function pickMentality(rng: Rng, reputation: number): Mentality {
+export function pickMentality(rng: Rng, reputation: number): Mentality {
   if (reputation >= 16) return rng.chance(0.6) ? 1 : 0
   if (reputation <= 8) return rng.chance(0.4) ? -1 : 0
   return 0

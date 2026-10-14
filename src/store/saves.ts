@@ -4,7 +4,9 @@
  */
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
+import type { DataPackage } from '../data/package/types'
 import type { Game } from './game'
+import { hashSeed } from '../engine/rng'
 import { SLOT_COUNT, SaveError, makeEnvelope, migrateSave, summarizeGame } from './saveFormat'
 import type { SaveEnvelope, SaveSummary } from './saveFormat'
 
@@ -14,14 +16,26 @@ interface GameRow {
   envelope: SaveEnvelope
 }
 
+/** Pacote de dados importado pelo usuário: fica só neste navegador. */
+export interface PackageRow {
+  id: string
+  name: string
+  importedAt: string
+  clubs: number
+  players: number
+  data: DataPackage
+}
+
 class SavesDatabase extends Dexie {
   slots!: Table<SlotRow, number>
   games!: Table<GameRow, number>
+  packages!: Table<PackageRow, string>
 
   constructor(name: string) {
     super(name)
     // Versão do esquema do IndexedDB (não é a versão do formato do save, que fica no envelope).
     this.version(1).stores({ slots: 'slot', games: 'slot' })
+    this.version(2).stores({ slots: 'slot', games: 'slot', packages: 'id' })
   }
 }
 
@@ -96,4 +110,26 @@ export async function loadEnvelope(slot: number): Promise<SaveEnvelope> {
   const row = await db().games.get(slot)
   if (!row) throw new SaveError('not-found', 'Este espaço está vazio.')
   return row.envelope
+}
+
+/** Guarda um pacote importado (o mesmo conteúdo guarda uma vez só) e devolve a linha. */
+export async function savePackage(data: DataPackage, now: Date = new Date()): Promise<PackageRow> {
+  const id = `pkg-${hashSeed(JSON.stringify(data)).toString(36)}`
+  const row: PackageRow = { id, name: data.name, importedAt: now.toISOString(), clubs: data.clubs.length, players: data.players.length, data }
+  await db().packages.put(row)
+  return row
+}
+
+/** Pacotes importados neste navegador, do mais recente ao mais antigo (sem ler o conteúdo de cada um para a lista, só o resumo). */
+export async function listPackages(): Promise<Omit<PackageRow, 'data'>[]> {
+  const rows = await db().packages.toArray()
+  return rows.sort((a, b) => b.importedAt.localeCompare(a.importedAt)).map(({ data: _data, ...summary }) => summary)
+}
+
+export async function loadPackage(id: string): Promise<PackageRow | undefined> {
+  return db().packages.get(id)
+}
+
+export async function deletePackage(id: string): Promise<void> {
+  await db().packages.delete(id)
 }

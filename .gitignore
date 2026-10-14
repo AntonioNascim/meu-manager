@@ -26,3 +26,6 @@ Thumbs.db
 
 # Capturas de tela de conferência
 .shots/
+
+# Dados reais (pacotes que so o usuario importa; nunca no repositorio nem no site)
+dados-reais/
