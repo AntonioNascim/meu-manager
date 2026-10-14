@@ -12,7 +12,7 @@ import type { PlayType, ShotType } from '../config'
 import { overallAt, playerOverall } from '../overall'
 import { createRng } from '../rng'
 import { getFormation, labelOfGrid } from '../formations'
-import { GK_POINT, formationFromGrid, gridKey, gridProblem } from '../grid'
+import { GK_POINT, allGridPoints, formationFromGrid, gridKey, gridProblem, slotAt } from '../grid'
 import { READY_CAPS, gapsOf, profileOf } from './formationProfile'
 import { evaluateFormation } from '../lineup'
 import type { GridPoint, MatchEvent, Mentality, MatchResult, Player, PlayerMatchResult, PlayStyle, Position, TeamMatchStats } from '../types'
@@ -110,10 +110,74 @@ export interface LiveMatch {
   setPosition(side: MatchSide, playerId: string, target: GridPoint): void
   /** Troca um jogador em campo por um reserva (limite de substituições e banco respeitados). */
   substitute(side: MatchSide, outgoingId: string, incomingId: string): void
+  /** Reorganiza sozinho o time com menos de 11 (cobre as linhas e faixas que ficaram vazias), como a IA faz. */
+  reorganize(side: MatchSide): void
   /** Resolve a lesão que parou o jogo: com `incomingId` o reserva entra na vaga; sem ele o time segue com um a menos. */
   resolveInjury(side: MatchSide, incomingId?: string): void
   /** Resultado completo (só depois do apito final). */
   result(): MatchResult
+}
+
+/** Refaz as vagas da formação com os pontos de quem está em campo e atualiza o papel de cada um. */
+function applyPoints(side: SideState, active: PitchPlayer[]): void {
+  const grid = active.map((p) => p.point as GridPoint)
+  const formation = formationFromGrid(grid, grid.length === 11 ? labelOfGrid(grid) : 'custom', true)
+  for (const [i, p] of active.entries()) {
+    const slot = formation.slots[i] as (typeof formation.slots)[number]
+    p.slot = slot.position
+    p.sector = slot.sector
+    p.fitFactor = createPitchPlayer(p.player, slot.position, slot.sector, 0).fitFactor
+  }
+  side.formation = formation
+}
+
+const gapCost = (grid: GridPoint[]): number => {
+  const g = gapsOf(formationFromGrid(grid, 'custom', true))
+  return MATCH.grid.defenseGap * g.defense + MATCH.grid.midfieldGap * g.midfield + MATCH.grid.flankGap * g.flank.reduce((sum, v) => sum + v, 0)
+}
+
+/**
+ * IA com um jogador a menos: cobre a linha ou a faixa que ficou sem gente, movendo quem perde menos jogando ali, até
+ * não haver ganho. Só mexe em quem não é o goleiro e nunca num time do jogador.
+ */
+export function reorganizeShortHanded(side: SideState): void {
+  const active = activePlayers(side)
+  if (active.length >= 11 || active.length < 2) return
+  const free = (): GridPoint[] => allGridPoints().filter((p) => p.row > 0 && !active.some((q) => q.point && gridKey(q.point) === gridKey(p)))
+  for (let step = 0; step < 6; step++) {
+    const now = gapCost(active.map((p) => p.point as GridPoint))
+    if (now <= 0) return
+    let best: { p: PitchPlayer; to: GridPoint; cost: number; loss: number } | null = null
+    for (const p of active) {
+      if (p.slot === 'GK' || !p.point) continue
+      const current = overallAt(p.player, p.slot)
+      const from = p.point
+      for (const to of free()) {
+        const loss = Math.max(0, current - overallAt(p.player, slotAt(to).position))
+        if (loss > 4) continue
+        const cost = gapCost(active.map((q) => (q === p ? to : (q.point as GridPoint))))
+        if (cost >= now - 1e-9) continue
+        if (!best || cost < best.cost - 1e-9 || (Math.abs(cost - best.cost) <= 1e-9 && loss < best.loss)) best = { p, to, cost, loss }
+      }
+      p.point = from
+    }
+    if (!best) return
+    best.p.point = best.to
+    applyPoints(side, active)
+  }
+}
+
+/**
+ * Com menos de 11 em campo (expulsão ou lesão sem troca) o lugar de quem saiu fica vazio e o time paga o custo dos
+ * buracos desde o primeiro lance, mexa o técnico ou não. A IA do motor reorganiza o time; o do jogador só muda quando
+ * ele arrasta os jogadores.
+ */
+function syncShortHanded(side: SideState, forced = false): void {
+  const active = activePlayers(side)
+  if (!forced && active.length === side.formation.grid.length) return
+  if (active.length > 11 || active.some((p) => !p.point)) return
+  if (active.length !== side.formation.grid.length) applyPoints(side, active)
+  if (forced || !side.userControlled) reorganizeShortHanded(side)
 }
 
 const minuteOfMoment = (i: number) => Math.min(MATCH_MINUTES, 1 + Math.floor((i * MATCH_MINUTES) / MATCH.moments))
@@ -133,6 +197,9 @@ export function startMatch(input: MatchInput): LiveMatch {
     if (input.userControlled?.home) ctx.home.holdInjury = true
     if (input.userControlled?.away) ctx.away.holdInjury = true
   }
+  for (const [side, ids] of [[ctx.home, input.startedOff?.home], [ctx.away, input.startedOff?.away]] as const) {
+    for (const p of side.players) if (ids?.includes(p.player.id)) p.minuteOff = 0
+  }
   applyUnderdogPosture(ctx.home, ctx.away)
   applyUnderdogPosture(ctx.away, ctx.home)
   let moment = 0
@@ -141,6 +208,8 @@ export function startMatch(input: MatchInput): LiveMatch {
   const stepMoment = () => {
     ctx.minute = minuteOfMoment(moment)
     checkInjury(ctx)
+    syncShortHanded(ctx.home)
+    syncShortHanded(ctx.away)
     updateGameState(ctx)
     applyFatigue(ctx.home)
     applyFatigue(ctx.away)
@@ -239,14 +308,7 @@ export function startMatch(input: MatchInput): LiveMatch {
         if (other) other.point = { ...target }
         throw new Error(problem)
       }
-      const formation = formationFromGrid(grid, grid.length === 11 ? labelOfGrid(grid) : 'custom', true)
-      for (const [i, p] of active.entries()) {
-        const slot = formation.slots[i] as (typeof formation.slots)[number]
-        p.slot = slot.position
-        p.sector = slot.sector
-        p.fitFactor = createPitchPlayer(p.player, slot.position, slot.sector, 0).fitFactor
-      }
-      s.formation = formation
+      applyPoints(s, active)
     },
     substitute(side, outgoingId, incomingId) {
       const s = sideOf(side)
@@ -257,6 +319,10 @@ export function startMatch(input: MatchInput): LiveMatch {
       if (s.subsLeft <= 0) throw new Error('Sem substituições disponíveis')
       if (!canSubstituteAt(s, ctx.minute)) throw new Error('Sem paradas disponíveis: no máximo 3 paradas além do intervalo')
       substitute(ctx, s, outgoing, incoming)
+    },
+    reorganize(side) {
+      const s = sideOf(side)
+      syncShortHanded(s, true)
     },
     resolveInjury(side, incomingId) {
       const pending = ctx.pendingInjury

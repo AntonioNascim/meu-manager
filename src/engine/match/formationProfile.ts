@@ -30,6 +30,13 @@ function distance(a: Map<string, number>, b: Map<string, number>): number {
   return diff / 2
 }
 
+/** Jogadores de `a` cujo papel não existe em `b` (com 11 contra 11 é o mesmo que `distance`; time reduzido não paga pelo que falta). */
+function unmatched(a: Map<string, number>, b: Map<string, number>): number {
+  let n = 0
+  for (const [key, count] of a) n += Math.max(0, count - (b.get(key) ?? 0))
+  return n
+}
+
 const READY = FORMATION_IDS.map((id) => ({ id, roles: multiset(getFormation(id)), profile: MATCH.formation.profile[id] as { control: number; attack: number } }))
 const cache = new Map<string, FormationProfile>()
 
@@ -38,10 +45,13 @@ export function profileOf(formation: Formation): FormationProfile {
   const key = [...roles.entries()].sort(([a], [b]) => a.localeCompare(b)).join('|')
   const known = cache.get(key)
   if (known) return known
-  const scored = READY.map((r) => ({ r, d: distance(roles, r.roles) }))
+  const short = formation.slots.length < 11
+  const scored = READY.map((r) => ({ r, d: short ? unmatched(roles, r.roles) : distance(roles, r.roles) }))
   const nearest = Math.min(...scored.map((s) => s.d))
   const tied = scored.filter((s) => s.d === nearest)
-  const tax = MATCH.grid.distanceTax
+  // Time reduzido (expulsão ou lesão sem troca): o custo de ficar sem gente já vem dos buracos e do jogador a menos;
+  // reorganizar não paga imposto de papel, senão cobrir o setor vazio sairia mais caro que não mexer.
+  const tax = short ? { control: 0, attack: 0 } : MATCH.grid.distanceTax
   const profile: FormationProfile = {
     custom: nearest > 0,
     control: tied.reduce((sum, s) => sum + s.r.profile.control, 0) / tied.length - tax.control * nearest,
@@ -63,7 +73,7 @@ export interface FormationGaps {
 const gapsCache = new WeakMap<Formation, FormationGaps>()
 
 /**
- * Buracos da formação, pelas vagas (não por quem está em campo, para um cartão vermelho não mudar o desenho do time).
+ * Buracos da formação, pelas vagas. Com menos de 11 em campo as vagas são as de quem sobrou (o lugar de quem saiu fica vazio).
  * As formações prontas não têm nenhum: só o posicionamento livre pode deixar linhas e faixas sem gente.
  */
 export function gapsOf(formation: Formation): FormationGaps {

@@ -371,6 +371,14 @@ describe('posicionamento com menos de 11 em campo', () => {
     return m
   }
   const pitch = (m: ReturnType<typeof startMatch>) => m.snapshot().home.onPitch
+  /** Joga até o fim, seguindo com um a menos se mais alguém se machucar. */
+  const finish = (m: ReturnType<typeof startMatch>) => {
+    for (let guard = 0; guard < 8 && !m.finished; guard++) {
+      m.playUntil(90)
+      const pending = m.snapshot().injuryPending
+      if (pending) m.resolveInjury(pending.side)
+    }
+  }
 
   it('com 10: o lugar fica vazio, os restantes se movem e o custo dos buracos vale', () => {
     const m = shortHanded(1)
@@ -384,7 +392,7 @@ describe('posicionamento com menos de 11 em campo', () => {
     // tirar todos os defensores deixa a defesa com buracos
     const g = m.snapshot().home.grid
     expect(gapsOf(formationFromGrid(g, 'custom', true)).defense).toBeGreaterThanOrEqual(0)
-    m.playUntil(90)
+    finish(m)
     expect(m.finished).toBe(true)
   })
 
@@ -398,7 +406,7 @@ describe('posicionamento com menos de 11 em campo', () => {
     expect(pitch(m).find((p) => p.playerId === x!.playerId)?.point).toEqual(py)
     expect(pitch(m).find((p) => p.playerId === y!.playerId)?.point).toEqual(px)
     expect(m.snapshot().home.grid).toHaveLength(9)
-    m.playUntil(90)
+    finish(m)
     expect(m.finished).toBe(true)
   })
 
@@ -431,7 +439,51 @@ describe('posicionamento com menos de 11 em campo', () => {
     expect(pitch(m).find((p) => p.playerId === outfield.playerId)).toMatchObject({ slot: 'GK', point: GK_POINT })
     // agora é ele o goleiro: não sai do gol
     expect(() => m.setPosition('home', outfield.playerId, { row: 3, lane: 2 })).toThrow()
-    m.playUntil(90)
+    finish(m)
     expect(m.finished).toBe(true)
+  })
+
+  const away = () => ({ team: b, players: squad(b) })
+  const gapSum = (grid: GridPoint[]) => {
+    const g = gapsOf(formationFromGrid(grid, 'custom', true))
+    return g.defense + g.midfield + g.flank.reduce((s, v) => s + v, 0)
+  }
+  const short352 = buildTactic(squad(a), { formationId: '3-5-2', style: 'possession', mentality: 0 })
+  const noCb = short352.startingXI.slice(1, 3)
+
+  it('o time que fica com 10 já paga o custo do lugar vazio, sem ninguém arrastar', () => {
+    const m = startMatch({ home: { team: { ...a, tactic: short352 }, players: squad(a) }, away: away(), seed: 2, attendance: 30_000, userControlled: { home: true }, startedOff: { home: noCb } })
+    m.playUntil(1)
+    const side = m.snapshot().home
+    expect(side.onPitch).toHaveLength(9)
+    expect(side.grid).toHaveLength(9)
+    expect(gapSum(side.grid)).toBeGreaterThan(0)
+  })
+
+  it('a IA reorganiza o time dela com menos de 11 e o time do jogador só muda quando o técnico manda', () => {
+    const run = (userControlled: boolean) => {
+      const m = startMatch({ home: { team: { ...a, tactic: short352 }, players: squad(a) }, away: away(), seed: 2, attendance: 30_000, ...(userControlled ? { userControlled: { home: true } } : {}), startedOff: { home: noCb } })
+      m.playUntil(1)
+      return m
+    }
+    const ai = run(false)
+    const user = run(true)
+    expect(gapSum(user.snapshot().home.grid)).toBeGreaterThan(0)
+    expect(gapSum(ai.snapshot().home.grid)).toBeLessThan(gapSum(user.snapshot().home.grid))
+    expect(pitch(ai)).toHaveLength(9)
+    // o goleiro continua no gol e ninguém sai de campo nem repete ponto
+    const points = pitch(ai).map((p) => p.point!)
+    expect(new Set(points.map((p) => p.row + '.' + p.lane)).size).toBe(9)
+    expect(pitch(ai).find((p) => p.slot === 'GK')?.point).toEqual(GK_POINT)
+  })
+
+  it('reorganizar não custa mais buracos: o time reorganizado tem menos ou os mesmos que sem mexer', () => {
+    const build = () => startMatch({ home: { team: { ...a, tactic: short352 }, players: squad(a) }, away: away(), seed: 2, attendance: 30_000, userControlled: { home: true }, startedOff: { home: noCb } })
+    const still = build()
+    still.playUntil(1)
+    const moved = build()
+    moved.playUntil(1)
+    moved.reorganize('home')
+    expect(gapSum(moved.snapshot().home.grid)).toBeLessThanOrEqual(gapSum(still.snapshot().home.grid))
   })
 })

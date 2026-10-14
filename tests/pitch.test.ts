@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it } from 'vitest'
 import { generateWorld } from '../src/data/generateWorld'
-import { FORMATION_IDS, getFormation } from '../src/engine/formations'
+import { FORMATION_IDS, formationOf, getFormation } from '../src/engine/formations'
 import { startMatch } from '../src/engine/match'
 import type { MatchInput, MatchSnapshot } from '../src/engine/match'
 import type { Player, Team } from '../src/engine/types'
@@ -26,8 +26,8 @@ const full = (seed: number, home = a, away = b): MatchSnapshot => {
   return m.snapshot()
 }
 const wingers = (snap: MatchSnapshot) => ({
-  home: getFormation(snap.home.formationId).slots.find((s) => s.position === 'RW' || s.position === 'LW')?.sector === 'attack',
-  away: getFormation(snap.away.formationId).slots.find((s) => s.position === 'RW' || s.position === 'LW')?.sector === 'attack',
+  home: formationOf({ formationId: snap.home.formationId, grid: snap.home.grid }).slots.find((s) => s.position === 'RW' || s.position === 'LW')?.sector === 'attack',
+  away: formationOf({ formationId: snap.away.formationId, grid: snap.away.grid }).slots.find((s) => s.position === 'RW' || s.position === 'LW')?.sector === 'attack',
 })
 
 describe('rastro dos lances do motor (só leitura)', () => {

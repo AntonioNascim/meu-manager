@@ -43,6 +43,8 @@ export interface MatchInput {
    * avança) e o técnico escolhe quem entra (`resolveInjury`). Sem isso (padrão), o melhor reserva entra na hora.
    */
   holdInjurySubs?: boolean
+  /** Só para medir e testar: jogadores que já começam fora de campo (como se tivessem sido expulsos no minuto 0). */
+  startedOff?: { home?: string[]; away?: string[] }
 }
 
 /** Contagem de ações de um jogador na partida (base da nota). */
