@@ -30,20 +30,20 @@ function initialScreen(): ScreenId {
 }
 
 /** Em desenvolvimento, &aba=lineup|numbers abre a aba do Elenco. */
-function initialSquadTab(): SquadTab {
-  const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
+function initialSquadTab(hint?: string): SquadTab {
+  const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
   return wanted === 'lineup' || wanted === 'numbers' || wanted === 'academy' || wanted === 'training' ? wanted : 'players'
 }
 
 /** Em desenvolvimento, &aba=free|proposals abre a aba do Mercado. */
-function initialMarketTab(): MarketTab {
-  const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
+function initialMarketTab(hint?: string): MarketTab {
+  const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
   return wanted === 'favorites' || wanted === 'lists' || wanted === 'free' || wanted === 'precontract' || wanted === 'proposals' || wanted === 'history' || wanted === 'contracts' ? wanted : 'search'
 }
 
 /** Em desenvolvimento, &aba=rounds|goals|assists|cards|history abre a seção da Tabela. */
-function initialStandingsSection(): 'table' | 'rounds' | 'goals' | 'assists' | 'cards' | 'history' {
-  const wanted = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null
+function initialStandingsSection(hint?: string): 'table' | 'rounds' | 'goals' | 'assists' | 'cards' | 'history' {
+  const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
   return wanted === 'rounds' || wanted === 'goals' || wanted === 'assists' || wanted === 'cards' || wanted === 'history' ? wanted : 'table'
 }
 
@@ -51,6 +51,12 @@ export function App() {
   const game = useGame()
   const saveStatus = useSaveStatus()
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
+  // Aba pedida por quem navegou (atalhos e avisos do painel); some ao trocar de tela pela barra de baixo.
+  const [hint, setHint] = useState<string | undefined>(undefined)
+  const navigate = (to: ScreenId, tab?: string) => {
+    setHint(tab)
+    setScreen(to)
+  }
   if (!game) {
     return (
       <>
@@ -73,7 +79,7 @@ export function App() {
     { id: 'standings', label: 'Tabela', icon: 'table' },
     { id: 'finance', label: 'Finanças', icon: 'finance' },
   ]
-  const goTab = (tab: NavTab) => setScreen(tab)
+  const goTab = (tab: NavTab) => navigate(tab)
 
   return (
     <div className={`mx-auto flex min-h-dvh flex-col bg-bg text-slate-100 ${current === 'match' ? 'max-w-6xl' : 'max-w-xl'}`}>
@@ -114,12 +120,12 @@ export function App() {
       </header>
 
       <main className="flex-1 px-4 pb-28 pt-4">
-        {current === 'home' && <Dashboard game={game} onNavigate={setScreen} />}
-        {current === 'match' && <MatchScreen game={game} onNavigate={setScreen} />}
-        {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={current} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab()} />}
+        {current === 'home' && <Dashboard game={game} onNavigate={navigate} />}
+        {current === 'match' && <MatchScreen game={game} onNavigate={navigate} />}
+        {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab(hint)} />}
         {current === 'tactics' && <Tactics game={game} />}
-        {current === 'standings' && <Standings game={game} initialSection={initialStandingsSection()} />}
-        {(current === 'market' || current === 'contracts') && <Market key={current} game={game} initialTab={current === 'contracts' ? 'contracts' : initialMarketTab()} />}
+        {current === 'standings' && <Standings key={hint ?? ''} game={game} initialSection={initialStandingsSection(hint)} />}
+        {(current === 'market' || current === 'contracts') && <Market key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'contracts' ? 'contracts' : initialMarketTab(hint)} />}
         {current === 'finance' && <Finance game={game} />}
       </main>
 

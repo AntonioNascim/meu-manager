@@ -89,7 +89,7 @@ describe('tática do adversário', () => {
 
   it('o escudo do adversário abre a página: no painel e na partida (só o dele, não o seu)', () => {
     const g = toDay()
-    expect(renderToStaticMarkup(createElement(Dashboard, { game: g, onNavigate: () => {} }))).toContain('Ver a tática do adversário')
+    expect(renderToStaticMarkup(createElement(Dashboard, { game: g, onNavigate: () => {} }))).toContain('Ver tática e escalação provável')
     const html = renderToStaticMarkup(createElement(MatchScreen, { game: g, onNavigate: () => {} }))
     expect(html.match(/data-testid="opponent-crest"/g)).toHaveLength(1)
   })

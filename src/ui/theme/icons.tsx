@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type IconName = 'home' | 'squad' | 'tactics' | 'market' | 'table' | 'finance' | 'contract' | 'calendar' | 'heart' | 'ball' | 'stadium' | 'trophy' | 'swap' | 'filter' | 'star' | 'boot' | 'card'
+export type IconName = 'home' | 'squad' | 'tactics' | 'market' | 'table' | 'finance' | 'contract' | 'calendar' | 'heart' | 'ball' | 'stadium' | 'trophy' | 'swap' | 'filter' | 'star' | 'boot' | 'card' | 'lineup' | 'sprout' | 'dumbbell' | 'history'
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10M10 20v-6h4v6" />,
@@ -53,6 +53,20 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="6" y="3.5" width="12" height="17" rx="2" />
       <path d="M9 8h6" />
+    </>
+  ),
+  lineup: (
+    <>
+      <rect x="4" y="3.5" width="16" height="17" rx="2" />
+      <path d="M9 8.5h.01M15 8.5h.01M12 12h.01M8.5 15.5h.01M15.5 15.5h.01M4 12h3M17 12h3" />
+    </>
+  ),
+  sprout: <path d="M12 20v-8M12 12c0-3.5-2.5-5.5-6-5.5 0 3.5 2.5 5.5 6 5.5ZM12 14c0-3 2.2-5 5.5-5 0 3-2.2 5-5.5 5ZM8 20h8" />,
+  dumbbell: <path d="M2.5 9.5v5M5.5 7v10M18.5 7v10M21.5 9.5v5M5.5 12h13" />,
+  history: (
+    <>
+      <path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" />
+      <path d="M12 8v4.2l2.8 1.8" />
     </>
   ),
   filter: <path d="M4 7h16M7 12h10M10 17h4" />,

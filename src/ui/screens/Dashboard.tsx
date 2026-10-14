@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { OpponentOverlay } from '../components/OpponentOverlay'
 import { devFlag } from './match/pitchModel'
-import type { DepartedPlayer, MarketNotice, Match, OffseasonReport } from '../../engine/types'
-import { monthlyPayroll } from '../../engine/finance'
-import { pendingIncoming, windowAt } from '../../engine/market'
+import type { DepartedPlayer, Match, OffseasonReport } from '../../engine/types'
+import { cashOutlook, monthlyPayroll } from '../../engine/finance'
+import { pendingIncoming } from '../../engine/market'
 import {
   academyAlert,
   advanceGame,
@@ -27,24 +27,17 @@ import { updateGame } from '../../store/gameStore'
 import { Card } from '../components/ui'
 import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TIER_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS, WINDOW_LABELS } from '../labels'
+import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TIER_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS } from '../labels'
+import { Highlights } from './dashboard/Highlights'
+import { MiniTable } from './dashboard/MiniTable'
+import { NoticeCenter } from './dashboard/NoticeCenter'
+import { dashboardNotices } from './dashboard/notices'
+import { isUnavailable } from '../squadSort'
+import { teamForm } from './standings/data'
 import { Crest, Eyebrow, Icon, Panel, ProgressBar, ResultDot, SegmentedBar, ShortcutTile } from '../theme'
 
 const BOARD_CHIP = { safe: 'border-win/40 bg-win/10 text-win', warning: 'border-amber-300/40 bg-amber-300/10 text-amber-300', danger: 'border-loss/40 bg-loss/10 text-loss' } as const
 const BAR_TONE = { safe: 'accent', warning: 'warning', danger: 'danger' } as const
-
-/** Avisos de propostas (a janela de transferências tem aviso próprio, calculado pela data). */
-function noticeText(n: MarketNotice, game: Game): string | null {
-  switch (n.type) {
-    case 'pre-contract-lost': {
-      const player = game.season.players.find((p) => p.id === n.playerId)
-      return `${player ? (player.nickname ?? player.name) : 'Um jogador seu'} assinou pré-contrato com o ${teamById(game, n.teamId).name} e sai de graça no fim da temporada.`
-    }
-    case 'offer-answered': return 'Uma proposta sua foi respondida.'
-    case 'offer-received': return 'Você recebeu uma proposta por um jogador.'
-    default: return null
-  }
-}
 
 /** Treino atual: intensidade, foco e a vaga individual. */
 function TrainingCard({ game, onOpen }: { game: Game; onOpen: () => void }) {
@@ -94,7 +87,6 @@ function SeasonReport({ game, report }: { game: Game; report: OffseasonReport })
   )
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const inDays = (n: number) => (n <= 0 ? 'hoje' : n === 1 ? 'amanhã' : `em ${n} dias`)
 
 /** Bolinha de resultado do último jogo e placar com as siglas, no ponto de vista do mandante. */
@@ -141,7 +133,7 @@ function LastMatchCard({ game, match }: { game: Game; match: Match }) {
 }
 
 /** Painel principal (aba Clube): situação do time, próximo jogo e o botão de avançar, atalhos, diretoria e orçamento. */
-export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId) => void }) {
+export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId, tab?: string) => void }) {
   const [opponentOpen, setOpponentOpen] = useState(() => devFlag('oponente'))
   const team = userTeam(game)
   const competition = userCompetition(game)
@@ -154,14 +146,16 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const today = state.season.currentDate
   const seasonOver = nextEventOf(game).type === 'season-end'
   const opponent = next ? teamById(game, next.homeTeamId === team.id ? next.awayTeamId : next.homeTeamId) : undefined
+  const opponentPosition = opponent ? table.findIndex((r) => r.teamId === opponent.id) + 1 : 0
+  const opponentRow = table[opponentPosition - 1]
+  const opponentForm = opponent ? teamForm(state.matches.filter((m) => m.competitionId === competition.id), opponent.id, 5) : []
 
   const pending = game.pendingUserMatch
   const academy = academyAlert(game)
   const board = boardOf(game)
   const expiring = lastYearContracts(game)
   const incoming = pendingIncoming(state)
-  const transferWindow = windowAt(state.season, state.matches, today)
-  const offerNotices = game.notices.map((n) => noticeText(n, game)).filter((t): t is string => t !== null)
+  const notices = dashboardNotices(game)
 
   const squad = squadOf(game, team.id)
   const byId = new Map(squad.map((p) => [p.id, p]))
@@ -175,6 +169,12 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const totalRounds = (table.length - 1) * 2
 
   const payroll = monthlyPayroll(squad)
+  const unavailableCount = squad.filter(isUnavailable).length
+  const starterOut = starters.some(isUnavailable)
+  const preContractLost = game.notices.some((n) => n.type === 'pre-contract-lost')
+  const seasonEnd = state.matches[state.matches.length - 1]?.date ?? today
+  const outlook = cashOutlook(team, payroll, today, seasonEnd)
+  const financeAlert = outlook.alerts.length > 0
   const salaryBudget = team.finances.salaryBudget
   const when = dateParts(today)
 
@@ -222,6 +222,8 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
         </span>
       </div>
 
+      <NoticeCenter notices={notices} onOpen={onNavigate} />
+
       {game.lastReport && <SeasonReport game={game} report={game.lastReport} />}
 
       <Panel striped cut className="p-5">
@@ -246,8 +248,19 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
                   <div className="text-sm text-muted">
                     {competition.name} · rodada {next.round} · {next.homeTeamId === team.id ? 'em casa' : 'fora'} · {inDays(daysBetween(today, next.date))}
                   </div>
-                  <div className="mt-0.5 text-xs font-bold text-accent">Ver a tática do adversário ›</div>
                 </div>
+              </button>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="opponent-form">
+                <span className="font-bold">{opponentRow && opponentRow.played > 0 ? `${opponentPosition}º` : '–'} · {opponentRow?.points ?? 0} pts</span>
+                <span className="flex items-center gap-1" aria-label={`Forma de ${opponent.name}`}>
+                  {opponentForm.map((o, i) => (
+                    <ResultDot key={i} outcome={o} />
+                  ))}
+                </span>
+              </div>
+              <button type="button" onClick={() => setOpponentOpen(true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-accent/60 text-sm font-bold text-accent">
+                <Icon name="tactics" size={18} />
+                Ver tática e escalação provável
               </button>
               {opponentOpen && <OpponentOverlay game={game} teamId={opponent.id} onClose={() => setOpponentOpen(false)} />}
               <div className="mt-2 text-xs text-muted">
@@ -273,69 +286,22 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
         </button>
       </Panel>
 
-      <div className="grid grid-cols-3 gap-2">
-        <ShortcutTile icon="squad" label="Elenco" tone="sky" alert={academy.pending > 0 || academy.arrivals > 0} onClick={() => onNavigate('squad')} />
+      <div className="grid grid-cols-5 gap-1.5" data-testid="shortcuts">
+        <ShortcutTile icon="squad" label="Elenco" tone="sky" alert={unavailableCount > 0} onClick={() => onNavigate('squad', 'players')} />
+        <ShortcutTile icon="lineup" label="Escalação" tone="teal" alert={starterOut} onClick={() => onNavigate('squad', 'lineup')} />
         <ShortcutTile icon="tactics" label="Tática" tone="amber" onClick={() => onNavigate('tactics')} />
-        <ShortcutTile icon="market" label="Mercado" tone="rose" alert={incoming.length > 0} onClick={() => onNavigate('market')} />
-        <ShortcutTile icon="finance" label="Finanças" tone="teal" onClick={() => onNavigate('finance')} />
-        <ShortcutTile icon="table" label="Classificação" tone="violet" onClick={() => onNavigate('standings')} />
+        <ShortcutTile icon="sprout" label="Base" tone="teal" alert={academy.pending > 0 || academy.arrivals > 0} onClick={() => onNavigate('academy')} />
+        <ShortcutTile icon="dumbbell" label="Treino" tone="rose" onClick={() => onNavigate('training')} />
+        <ShortcutTile icon="market" label="Mercado" tone="rose" alert={incoming.length > 0 || preContractLost} onClick={() => onNavigate('market', incoming.length > 0 ? 'proposals' : preContractLost ? 'precontract' : undefined)} />
         <ShortcutTile icon="contract" label="Contratos" tone="slate" alert={expiring.length > 0} onClick={() => onNavigate('contracts')} />
+        <ShortcutTile icon="finance" label="Finanças" tone="teal" alert={financeAlert} onClick={() => onNavigate('finance')} />
+        <ShortcutTile icon="table" label="Tabela" tone="violet" onClick={() => onNavigate('standings')} />
+        <ShortcutTile icon="history" label="Histórico" tone="slate" onClick={() => onNavigate('standings', 'history')} />
       </div>
 
-      {transferWindow && (
-        <Panel glow className="p-4">
-          <div className="flex items-center gap-3">
-            <Icon name="swap" size={24} className="text-accent" />
-            <div className="min-w-0 flex-1">
-              <div className="font-bold">Janela de transferências aberta</div>
-              <div className="text-sm text-muted">
-                {WINDOW_LABELS[transferWindow.name]} · {transferWindow.end === today ? 'fecha hoje' : `fecha ${inDays(daysBetween(today, transferWindow.end))}`} ({formatDate(transferWindow.end)})
-              </div>
-            </div>
-          </div>
-        </Panel>
-      )}
+      <MiniTable game={game} competition={competition} onOpen={() => onNavigate('standings')} />
 
-      {(incoming.length > 0 || offerNotices.length > 0) && (
-        <Panel glow className="p-4">
-          <div className="font-bold">Mercado</div>
-          <ul className="mt-1 space-y-1 text-sm">
-            {incoming.length > 0 && <li>Você tem {plural(incoming.length, 'proposta recebida', 'propostas recebidas')} para responder.</li>}
-            {offerNotices.map((t, i) => (
-              <li key={i}>{t}</li>
-            ))}
-          </ul>
-          <button type="button" className="mt-2 min-h-12 text-sm font-bold text-accent" onClick={() => onNavigate('market')}>
-            Abrir o mercado
-          </button>
-        </Panel>
-      )}
-
-      {expiring.length > 0 && (
-        <Panel glow className="p-4">
-          <div className="font-bold">Contratos no último ano</div>
-          <p className="mt-1 text-sm">
-            {expiring.length} {expiring.length === 1 ? 'jogador termina' : 'jogadores terminam'} o contrato neste ano:{' '}
-            {expiring.slice(0, 4).map((p) => p.nickname ?? p.name).join(', ')}{expiring.length > 4 ? ` e mais ${expiring.length - 4}` : ''}.
-          </p>
-          <button type="button" className="mt-2 min-h-12 text-sm font-bold text-accent" onClick={() => onNavigate('contracts')}>
-            Renovar na aba Contratos
-          </button>
-        </Panel>
-      )}
-
-      {(academy.arrivals > 0 || academy.pending > 0) && (
-        <Panel glow className="p-4">
-          <div className="font-bold">Categorias de base</div>
-          <ul className="mt-1 space-y-1 text-sm">
-            {academy.arrivals > 0 && <li>{plural(academy.arrivals, 'jovem chegou', 'jovens chegaram')} à base.</li>}
-            {academy.pending > 0 && <li>{plural(academy.pending, 'jovem fez', 'jovens fizeram')} 20 anos: promova ou dispense para o jogo seguir.</li>}
-          </ul>
-          <button type="button" className="mt-2 min-h-12 text-sm font-bold text-accent" onClick={() => onNavigate('academy')}>
-            Abrir a base
-          </button>
-        </Panel>
-      )}
+      <Highlights game={game} onOpen={() => onNavigate('squad', 'players')} />
 
       <TrainingCard game={game} onOpen={() => onNavigate('training')} />
 

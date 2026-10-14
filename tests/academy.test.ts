@@ -327,10 +327,10 @@ describe('telas da base', () => {
   })
 
   it('a bolinha da aba e o aviso do painel aparecem com jovens esperando decisão', () => {
-    expect(renderToStaticMarkup(createElement(Dashboard, { game, onNavigate: () => {} }))).not.toContain('Categorias de base')
+    expect(renderToStaticMarkup(createElement(Dashboard, { game, onNavigate: () => {} }))).not.toContain('Decisão pendente na base')
     const waiting: Game = { ...game, season: { ...game.season, academy: game.season.academy.map((p, i) => (p.teamId === USER && i % 3 === 0 ? { ...p, age: 20 } : p)) } }
     const dash = renderToStaticMarkup(createElement(Dashboard, { game: waiting, onNavigate: () => {} }))
-    expect(dash).toContain('Categorias de base')
+    expect(dash).toContain('Decisão pendente na base')
     expect(dash).toContain('Decidir sobre a base')
     expect(dash).toContain('promova ou dispense')
     expect(html(waiting)).toContain('Decidir')

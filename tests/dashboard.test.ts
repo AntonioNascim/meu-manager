@@ -57,8 +57,8 @@ describe('painel do clube', () => {
 
   it('mostra só os atalhos que existem, sem inventar funções', () => {
     const out = html(createElement(Dashboard, { game, onNavigate: () => {} }))
-    for (const label of ['Elenco', 'Tática', 'Mercado', 'Finanças', 'Classificação', 'Contratos']) expect(out).toContain(`>${label}<`)
-    expect(out.match(/cut-corner-sm/g)).toHaveLength(6)
+    for (const label of ['Elenco', 'Escalação', 'Tática', 'Base', 'Treino', 'Mercado', 'Contratos', 'Finanças', 'Tabela', 'Histórico']) expect(out).toContain(`>${label}<`)
+    expect(out.match(/cut-corner-sm/g)).toHaveLength(10)
   })
 
   it('mostra data, próximo jogo, condição dos titulares, diretoria e orçamento', () => {
