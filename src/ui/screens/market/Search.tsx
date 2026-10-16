@@ -100,7 +100,7 @@ export function Search({
 
       {showTier && (
         <div className="flex gap-2">
-          {([['all', 'Todas'], [1, 'Série A'], [2, 'Série B']] as const).map(([id, label]) => (
+          {([['all', 'Todas'], [1, 'Série A'], [2, 'Série B'], [3, 'Série C']] as const).map(([id, label]) => (
             <button key={String(id)} type="button" aria-pressed={filters.tier === id} onClick={() => update({ tier: id })} className={chip(filters.tier === id)}>
               {label}
             </button>

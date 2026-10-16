@@ -1,0 +1,270 @@
+/**
+ * Medição de desempenho no próprio aparelho (tela `?diagnostico=1`): gera o mundo de teste, joga a temporada pelo
+ * mesmo caminho do jogo e devolve tempos e memória num texto fácil de copiar. Não toca no jogo salvo.
+ * Sem React nem DOM aqui (o que depende do navegador entra por `readDevice`), para poder ser testado.
+ */
+import { advanceToMatchday, nextEventOf, playPendingAuto } from '../store/game'
+import type { Game } from '../store/game'
+import { makeEnvelope } from '../store/saveFormat'
+import { BRAZIL_ONLY, FULL_WORLD, buildScaleGame } from './scaleWorld'
+import type { LeagueSpec } from './scaleWorld'
+
+/** Metas no aparelho de referência: um Android de entrada (2 a 3 GB de memória, processador de entrada). */
+export const REFERENCE_TARGETS = {
+  device: 'Android de entrada',
+  seasonSeconds: 120,
+  typicalAdvanceMs: 1500,
+  worstAdvanceSeconds: 20,
+  peakMemoryMb: 150,
+  saveGzipMb: 3,
+} as const
+
+export type WorldChoice = 'full' | 'brazil'
+export const WORLD_SPECS: Record<WorldChoice, LeagueSpec[]> = { full: FULL_WORLD, brazil: BRAZIL_ONLY }
+
+export interface DeviceInfo {
+  /** Modelo informado pelo navegador (Chrome no Android informa; Safari e Firefox não). */
+  model: string
+  platform: string
+  browser: string
+  userAgent: string
+  cores: number | null
+  /** Memória do aparelho em GB, arredondada pelo navegador (só Chrome/Edge/Opera). */
+  memoryGb: number | null
+  screen: string
+  gpu: string
+  /** Índice de velocidade do processador (maior = mais rápido); compara aparelhos com este notebook. */
+  speedIndex: number | null
+}
+
+interface NavigatorLike {
+  userAgent?: string
+  platform?: string
+  hardwareConcurrency?: number
+  deviceMemory?: number
+  userAgentData?: {
+    platform?: string
+    brands?: { brand: string; version: string }[]
+    getHighEntropyValues?: (hints: string[]) => Promise<{ model?: string; platformVersion?: string; fullVersionList?: { brand: string; version: string }[] }>
+  }
+}
+
+/** Nome e versão do navegador a partir do texto que ele informa. */
+export function browserFromUserAgent(ua: string): string {
+  const pick = (re: RegExp, name: string) => {
+    const m = re.exec(ua)
+    return m ? `${name} ${m[1]}` : null
+  }
+  return (
+    pick(/SamsungBrowser\/([\d.]+)/, 'Samsung Internet') ??
+    pick(/(?:EdgA?|Edg)\/([\d.]+)/, 'Edge') ??
+    pick(/OPR\/([\d.]+)/, 'Opera') ??
+    pick(/(?:FxiOS|Firefox)\/([\d.]+)/, 'Firefox') ??
+    pick(/(?:CriOS|Chrome)\/([\d.]+)/, 'Chrome') ??
+    pick(/Version\/([\d.]+).*Safari/, 'Safari') ??
+    'navegador desconhecido'
+  )
+}
+
+/** Modelo que aparece no texto do navegador (Android: "...; SM-A135M Build/..."), quando a API moderna não informa. */
+export function modelFromUserAgent(ua: string): string | null {
+  const android = /Android[^;)]*;\s*([^;)]+?)(?:\s+Build|\))/.exec(ua)
+  if (android && android[1] && android[1] !== 'K') return android[1].trim()
+  if (/iPhone/.test(ua)) return 'iPhone'
+  if (/iPad/.test(ua)) return 'iPad'
+  return null
+}
+
+/** Trabalho fixo de ~100 ms de contas parecidas com as do jogo, para comparar a velocidade de aparelhos diferentes. */
+export function speedIndex(): number {
+  const start = performance.now()
+  let acc = 0
+  let rounds = 0
+  while (performance.now() - start < 120) {
+    for (let i = 1; i <= 20_000; i++) acc += Math.sqrt(i) * Math.exp(-((i % 97) / 97)) + (i ^ (i >> 3))
+    rounds++
+  }
+  // Evita que o motor elimine a conta; o índice é o trabalho feito por milissegundo.
+  return Math.round((rounds * 20_000) / (performance.now() - start) + (acc > Infinity ? 1 : 0))
+}
+
+function gpuName(): string {
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = (canvas.getContext('webgl') ?? canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info')
+    return gl && ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'indisponível'
+  } catch {
+    return 'indisponível'
+  }
+}
+
+/** Lê o aparelho e o navegador. Cada campo que o navegador não informa fica marcado como indisponível. */
+export async function readDevice(nav: NavigatorLike = navigator as NavigatorLike): Promise<DeviceInfo> {
+  const ua = nav.userAgent ?? ''
+  let model: string | null = null
+  let platform = nav.userAgentData?.platform ?? nav.platform ?? 'indisponível'
+  try {
+    const high = await nav.userAgentData?.getHighEntropyValues?.(['model', 'platformVersion'])
+    if (high?.model) model = high.model
+    if (high?.platformVersion && platform !== 'indisponível') platform = `${platform} ${high.platformVersion}`
+  } catch {
+    // o navegador recusou: segue com o texto do navegador
+  }
+  model ??= modelFromUserAgent(ua)
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1
+  return {
+    model: model ?? 'não informado pelo navegador',
+    platform,
+    browser: browserFromUserAgent(ua),
+    userAgent: ua,
+    cores: nav.hardwareConcurrency ?? null,
+    memoryGb: nav.deviceMemory ?? null,
+    screen: typeof screen !== 'undefined' ? `${screen.width}x${screen.height} @${dpr}x` : 'indisponível',
+    gpu: typeof document !== 'undefined' ? gpuName() : 'indisponível',
+    speedIndex: typeof performance !== 'undefined' ? speedIndex() : null,
+  }
+}
+
+export interface Measurement {
+  world: WorldChoice
+  clubs: number
+  players: number
+  matches: number
+  genMs: number
+  seasonTableMs: number
+  advances: number
+  /** Soma do tempo de todos os avanços (sem as pausas para a tela respirar). */
+  computeSeconds: number
+  wallSeconds: number
+  medianMs: number
+  p95Ms: number
+  worstMs: number
+  worstDate: string
+  firstMs: number
+  matchesPerAdvanceMedian: number
+  /** Memória do JavaScript (só quando o navegador deixa, como o Chrome). */
+  peakMemoryMb: number | null
+  endMemoryMb: number | null
+  saveJsonKb: number
+  saveStringifyMs: number
+  saveCloneMs: number | null
+  finished: boolean
+}
+
+export interface MeasureOptions {
+  world: WorldChoice
+  /** Número máximo de avanços (padrão: a temporada inteira). */
+  maxAdvances?: number
+  seed?: number
+  /** Dá a vez à tela (para mostrar o progresso); nos testes não faz nada. */
+  yieldToUi?: () => Promise<void>
+  onProgress?: (done: number, date: string) => void
+  /** Leitura da memória usada pelo JavaScript, em bytes (Chrome: `performance.memory`). */
+  readMemory?: () => number | null
+}
+
+const pct = (xs: number[], p: number) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * p))] ?? 0
+const mb = (bytes: number) => Math.round((bytes / 1024 / 1024) * 10) / 10
+
+export function chromeMemory(): number | null {
+  const m = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory
+  return m?.usedJSHeapSize ?? null
+}
+
+export async function measureWorld(options: MeasureOptions): Promise<Measurement> {
+  const specs = WORLD_SPECS[options.world]
+  const readMemory = options.readMemory ?? chromeMemory
+  const yieldToUi = options.yieldToUi ?? (() => Promise.resolve())
+  const wall = performance.now()
+  const built = buildScaleGame(specs, options.seed ?? 7)
+  let game: Game = built.game
+  await yieldToUi()
+  const s = game.season
+  const clicks: number[] = []
+  const dates: string[] = []
+  const perAdvanceMatches: number[] = []
+  let peak: number | null = null
+  const limit = options.maxAdvances ?? 600
+  for (let i = 0; i < limit && nextEventOf(game).type !== 'season-end'; i++) {
+    const t = performance.now()
+    game = playPendingAuto(advanceToMatchday(game))
+    clicks.push(performance.now() - t)
+    dates.push(game.season.season.currentDate)
+    perAdvanceMatches.push(game.lastDay.length)
+    const used = readMemory()
+    if (used !== null) peak = Math.max(peak ?? 0, used)
+    options.onProgress?.(i + 1, game.season.season.currentDate)
+    if (game.dismissal) break
+    await yieldToUi()
+  }
+  const finished = nextEventOf(game).type === 'season-end'
+  const worstIndex = clicks.indexOf(Math.max(...clicks))
+  const t0 = performance.now()
+  const json = JSON.stringify(makeEnvelope(game, 'x'))
+  const saveStringifyMs = performance.now() - t0
+  let saveCloneMs: number | null = null
+  try {
+    const t1 = performance.now()
+    structuredClone(JSON.parse(json))
+    saveCloneMs = performance.now() - t1
+  } catch {
+    saveCloneMs = null
+  }
+  const end = readMemory()
+  return {
+    world: options.world,
+    clubs: s.teams.length,
+    players: s.players.length,
+    matches: s.matches.length,
+    genMs: built.genMs,
+    seasonTableMs: built.seasonMs,
+    advances: clicks.length,
+    computeSeconds: clicks.reduce((a, b) => a + b, 0) / 1000,
+    wallSeconds: (performance.now() - wall) / 1000,
+    medianMs: pct(clicks, 0.5),
+    p95Ms: pct(clicks, 0.95),
+    worstMs: clicks[worstIndex] ?? 0,
+    worstDate: dates[worstIndex] ?? '',
+    firstMs: clicks[0] ?? 0,
+    matchesPerAdvanceMedian: pct(perAdvanceMatches, 0.5),
+    peakMemoryMb: peak === null ? null : mb(peak),
+    endMemoryMb: end === null ? null : mb(end),
+    saveJsonKb: Math.round(json.length / 1024),
+    saveStringifyMs,
+    saveCloneMs,
+    finished,
+  }
+}
+
+const f0 = (n: number) => n.toFixed(0)
+const f1 = (n: number) => n.toFixed(1)
+
+/** Texto para copiar e colar: aparelho, navegador, números e se cada meta foi atingida. */
+export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', now: Date = new Date()): string {
+  const T = REFERENCE_TARGETS
+  const ok = (good: boolean) => (good ? 'ok' : 'ACIMA DA META')
+  const lines = [
+    `Meu Manager - diagnostico de desempenho (${now.toISOString().slice(0, 16).replace('T', ' ')} UTC)`,
+    `Aparelho: ${userNote.trim() || device.model}${userNote.trim() ? ` (navegador informa: ${device.model})` : ''}`,
+    `Sistema: ${device.platform}`,
+    `Navegador: ${device.browser}`,
+    `Nucleos: ${device.cores ?? 'indisponivel'} | Memoria do aparelho: ${device.memoryGb !== null ? `${device.memoryGb} GB (arredondado pelo navegador)` : 'indisponivel'}`,
+    `Tela: ${device.screen} | GPU: ${device.gpu}`,
+    `Indice de velocidade do processador: ${device.speedIndex ?? 'indisponivel'} (maior = mais rapido)`,
+    `Texto do navegador: ${device.userAgent}`,
+    '',
+    `Mundo: ${m.world === 'full' ? 'completo (15 ligas)' : 'Brasil A+B+C'} - ${m.clubs} clubes, ${m.players} jogadores, ${m.matches} partidas`,
+    `Gerar o mundo: ${f0(m.genMs)} ms | Montar a tabela: ${f0(m.seasonTableMs)} ms`,
+    m.finished ? `Temporada inteira: ${f1(m.computeSeconds)} s de calculo (${f1(m.wallSeconds)} s no relogio, ${m.advances} avancos) - meta ${T.seasonSeconds} s: ${ok(m.computeSeconds <= T.seasonSeconds)}` : `Medida parcial: ${m.advances} avancos em ${f1(m.computeSeconds)} s (a temporada nao foi ate o fim)`,
+    `Primeiro avanco: ${f1(m.firstMs / 1000)} s`,
+    `Avanco tipico (mediana): ${f0(m.medianMs)} ms (${m.matchesPerAdvanceMedian} partidas) - meta ${T.typicalAdvanceMs} ms: ${ok(m.medianMs <= T.typicalAdvanceMs)}`,
+    `Avanco lento (p95): ${f0(m.p95Ms)} ms`,
+    `Pior avanco: ${f1(m.worstMs / 1000)} s em ${m.worstDate} - meta ${T.worstAdvanceSeconds} s: ${ok(m.worstMs / 1000 <= T.worstAdvanceSeconds)}`,
+    m.peakMemoryMb !== null ? `Memoria do jogo (pico): ${m.peakMemoryMb} MB - meta ${T.peakMemoryMb} MB: ${ok(m.peakMemoryMb <= T.peakMemoryMb)} | no fim: ${m.endMemoryMb} MB` : 'Memoria do jogo: o navegador nao permite medir (so o Chrome e parecidos deixam)',
+    `Save (JSON): ${m.saveJsonKb} KB | gerar o JSON: ${f0(m.saveStringifyMs)} ms | copia para o IndexedDB: ${m.saveCloneMs === null ? 'indisponivel' : `${f0(m.saveCloneMs)} ms`}`,
+    '',
+    `Referencia: ${T.device}. Metas: temporada ate ${T.seasonSeconds} s, avanco tipico ate ${T.typicalAdvanceMs} ms, pior avanco ate ${T.worstAdvanceSeconds} s, memoria ate ${T.peakMemoryMb} MB.`,
+  ]
+  return lines.join('\n')
+}

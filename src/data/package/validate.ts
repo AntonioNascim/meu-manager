@@ -5,8 +5,8 @@ import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
 import { PACKAGE_FORMAT, PACKAGE_VERSION, TIEBREAKERS } from './types'
 import type { DataPackage, PackageIssue, PackageIssueCode, PackageReport } from './types'
 
-/** O que o jogo aceita nesta fase: um país, duas divisões de 20 times, 4 sobem e 4 caem. */
-export const SUPPORTED = { countries: 1, divisions: 2, teamsPerDivision: 20, promotion: 4 } as const
+/** O que o jogo aceita nesta fase: um país, duas ou três divisões de 20 times, 4 sobem e 4 caem entre divisões vizinhas. */
+export const SUPPORTED = { countries: 1, minDivisions: 2, maxDivisions: 3, teamsPerDivision: 20, promotion: 4 } as const
 
 const MAX_ISSUES = 60
 const FOOTS = ['right', 'left', 'both'] as const
@@ -251,15 +251,15 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
 
   // O que o jogo aceita nesta fase
   const countriesUsed = new Set(leagues.map((l) => l.country))
-  if (leagues.length !== SUPPORTED.divisions || countriesUsed.size > SUPPORTED.countries) {
-    c.error('unsupported-leagues', 'leagues', leagues.length, SUPPORTED.divisions)
+  if (leagues.length < SUPPORTED.minDivisions || leagues.length > SUPPORTED.maxDivisions || countriesUsed.size > SUPPORTED.countries) {
+    c.error('unsupported-leagues', 'leagues', leagues.length, SUPPORTED.maxDivisions)
   } else {
     const levels = leagues.map((l) => l.level).sort()
-    if (levels[0] !== 1 || levels[1] !== 2) c.error('unsupported-leagues', 'leagues', leagues.length, SUPPORTED.divisions)
+    if (levels.some((level, i) => level !== i + 1)) c.error('unsupported-leagues', 'leagues', leagues.length, SUPPORTED.maxDivisions)
     for (const league of leagues) {
       if (league.teams !== undefined && league.teams !== SUPPORTED.teamsPerDivision) c.error('league-size-unsupported', `${league.path}.teams`, league.teams, SUPPORTED.teamsPerDivision)
       const expectedPromotion = league.level === 1 ? 0 : SUPPORTED.promotion
-      const expectedRelegation = league.level === 1 ? SUPPORTED.promotion : 0
+      const expectedRelegation = league.level === leagues.length ? 0 : SUPPORTED.promotion
       if (league.promotion !== undefined && league.promotion !== expectedPromotion) c.error('league-promotion', `${league.path}.promotion`, league.promotion, expectedPromotion)
       if (league.relegation !== undefined && league.relegation !== expectedRelegation) c.error('league-promotion', `${league.path}.relegation`, league.relegation, expectedRelegation)
     }

@@ -59,9 +59,9 @@ const numberOf = (id: string): number => {
  */
 export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World {
   const startYear = pkg.startYear ?? DEFAULT_START_YEAR
-  const tierOfLeague = new Map(pkg.leagues.map((l) => [l.id, l.level as 1 | 2]))
+  const tierOfLeague = new Map(pkg.leagues.map((l) => [l.id, l.level as 1 | 2 | 3]))
   const clubById = new Map(pkg.clubs.map((c) => [c.id, c]))
-  const tierOfClub = (clubId: string): 1 | 2 => tierOfLeague.get((clubById.get(clubId) as PackageClub).league) as 1 | 2
+  const tierOfClub = (clubId: string): 1 | 2 | 3 => tierOfLeague.get((clubById.get(clubId) as PackageClub).league) as 1 | 2 | 3
 
   // Ids dos jogadores: os do pacote valem; os que faltam recebem o próximo `player-N` livre.
   const used = new Set<string>([...pkg.players, ...(pkg.academy ?? [])].flatMap((p) => (p.id ? [p.id] : [])))
@@ -83,7 +83,7 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
 
   // Posição de cada clube na sua divisão por reputação (empate: ordem do pacote).
   const rankOf = new Map<string, number>()
-  for (const tier of [1, 2] as const) {
+  for (const tier of [1, 2, 3] as const) {
     pkg.clubs
       .map((club, index) => ({ club, index }))
       .filter(({ club }) => tierOfClub(club.id) === tier)

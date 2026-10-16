@@ -71,11 +71,10 @@ function SeasonReport({ game, report }: { game: Game; report: OffseasonReport })
   return (
     <Card title={`Temporada ${report.year} encerrada`}>
       <ul className="space-y-1 text-sm">
-        <li>Campeão da Série A: <b>{name(report.champions[0] as string)}</b></li>
-        <li>Campeão da Série B: <b>{name(report.champions[1] as string)}</b></li>
+        {report.champions.map((id, i) => <li key={id}>Campeão da {TIER_LABELS[(i + 1) as 1 | 2 | 3] ?? `Série ${i + 1}`}: <b>{name(id)}</b></li>)}
         <li className="text-win">Subiram: {report.promoted.map(name).join(', ')}</li>
         <li className="text-loss">Caíram: {report.relegated.map(name).join(', ')}</li>
-        {mine && <li>Seu time terminou em {mine.position}º na Série {mine.tier === 1 ? 'A' : 'B'}.</li>}
+        {mine && <li>Seu time terminou em {mine.position}º na {TIER_LABELS[mine.tier as 1 | 2 | 3] ?? `Série ${mine.tier}`}.</li>}
         {reputation && reputation.to !== reputation.from && <li>Reputação do clube: {reputation.from} → {reputation.to}.</li>}
         {gone(report.retired).length > 0 && <li>Aposentaram-se: {gone(report.retired).map((d) => `${d.name} (${d.age})`).join(', ')}.</li>}
         {gone(report.released).length > 0 && <li>Contratos vencidos: {gone(report.released).map((d) => d.name).join(', ')}.</li>}

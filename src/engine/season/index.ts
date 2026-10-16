@@ -1,4 +1,5 @@
 export * from './dates'
+export * from './birthdays'
 export * from './schedule'
 export * from './calendar'
 export * from './standings'

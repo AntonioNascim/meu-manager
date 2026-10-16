@@ -1,6 +1,7 @@
 import { ACADEMY } from '../engine/config'
 import { CORE_COUNTS } from '../engine/offseason/squad'
 import { createRng } from '../engine/rng'
+import { contractEndOn } from '../engine/season/dates'
 import type { Player, Position, Team } from '../engine/types'
 import { createYouth } from './generateYouth'
 
@@ -35,7 +36,7 @@ export function createAcademy(options: AcademyOptions): Player[] {
     const made = createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, positions, ages, academy: true, year: options.year }, rng, taken)
     for (const p of made) {
       taken.add(p.name)
-      out.push({ ...p, id: `player-${number++}`, teamId: team.id, contract: { salary: 0, endDate: `${options.year}-12-31`, releaseClause: 0 } })
+      out.push({ ...p, id: `player-${number++}`, teamId: team.id, contract: { salary: 0, endDate: contractEndOn(options.year), releaseClause: 0 } })
     }
   }
   return out

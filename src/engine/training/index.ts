@@ -14,7 +14,7 @@ import { developmentFactor, stochasticRound, yearlyGain } from '../offseason/evo
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
-import { addDays, daysBetween } from '../season/dates'
+import { addDays, ageAtSeasonStart, daysBetween } from '../season/dates'
 import { GOALKEEPER_ATTRIBUTES, MENTAL_ATTRIBUTES, PHYSICAL_ATTRIBUTES, TECHNICAL_ATTRIBUTES } from '../types'
 import type {
   AttributeName,
@@ -214,7 +214,8 @@ export function trainPlayer(rng: Rng, player: Player, input: TickInput): Player 
   const start = player.seasonStats.startOverall ?? overall
   if (player.seasonStats.startOverall === undefined) player = { ...player, seasonStats: { ...player.seasonStats, startOverall: start } }
   const noise = createRng(`${player.id}:${input.year}:talent`).normal(0, E.playerNoise)
-  const annual = yearlyGain(player.age, start, potential) + noise
+  // O crescimento da temporada segue a idade do começo dela (a curva foi calibrada assim); o aniversário no meio do ano não muda o ritmo do treino.
+  const annual = yearlyGain(ageAtSeasonStart(player.birthDate, input.year), start, potential) + noise
   let gain = annual > 0 ? annual * developmentFactor(player, input.minutesShare) * input.growth * TRAINING.growthScale : annual
   gain *= input.share
   if (gain > 0) gain = Math.min(gain, Math.max(0, potential - overall))

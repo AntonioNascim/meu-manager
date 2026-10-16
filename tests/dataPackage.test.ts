@@ -52,8 +52,8 @@ describe('pacote de dados: ida e volta', () => {
     expect(JSON.stringify(defaultPackage(5))).toBe(JSON.stringify(defaultPackage(5)))
     const pkg = defaultPackage(5)
     expect(pkg.version).toBe(PACKAGE_VERSION)
-    expect(pkg.leagues.map((l) => [l.level, l.teams])).toEqual([[1, 20], [2, 20]])
-    expect(pkg.clubs).toHaveLength(40)
+    expect(pkg.leagues.map((l) => [l.level, l.teams])).toEqual([[1, 20], [2, 20], [3, 20]])
+    expect(pkg.clubs).toHaveLength(60)
   })
 
   it('o jogo novo nasce do pacote padrão e do pacote do usuário', () => {
@@ -63,7 +63,7 @@ describe('pacote de dados: ida e volta', () => {
     const pkg = valid(bare(9))
     const custom = createGame(9, 'team-imp', { dataPackage: pkg, dataPackageId: 'pkg-x' })
     expect(custom.dataPackage).toEqual({ id: 'pkg-x', name: pkg.name })
-    expect(custom.season.teams).toHaveLength(40)
+    expect(custom.season.teams).toHaveLength(60)
     expect(validateGame(custom)).toEqual([])
     let g = custom
     for (let i = 0; i < 3; i++) g = playPendingAuto(advanceToMatchday(g))
@@ -260,7 +260,7 @@ describe('pacote guardado só no navegador', () => {
     expect(b.id).toBe(a.id)
     const list = await listPackages()
     expect(list).toHaveLength(1)
-    expect(list[0]).toMatchObject({ name: pkg.name, clubs: 40 })
+    expect(list[0]).toMatchObject({ name: pkg.name, clubs: 60 })
     expect('data' in list[0]!).toBe(false)
     expect((await loadPackage(a.id))?.data.players).toHaveLength(pkg.players.length)
     await deletePackage(a.id)

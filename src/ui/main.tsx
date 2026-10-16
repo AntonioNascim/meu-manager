@@ -61,11 +61,23 @@ if (import.meta.env.DEV) {
   }
 }
 
-startAutosave()
-initPwa()
+// Tela escondida de diagnóstico (?diagnostico=1): mede o desempenho no aparelho, sem abrir nem salvar jogos.
+const diagnostic = new URLSearchParams(window.location.search).get('diagnostico') === '1'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+if (diagnostic) {
+  void import('./screens/Diagnostics').then(({ Diagnostics }) => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <Diagnostics />
+      </StrictMode>,
+    )
+  })
+} else {
+  startAutosave()
+  initPwa()
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}

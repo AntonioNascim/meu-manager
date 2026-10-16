@@ -11,7 +11,8 @@ import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import { createSeason } from '../season/calendar'
 import type { SeasonState } from '../season/calendar'
-import { makeDate } from '../season/dates'
+import { applyBirthdays } from '../season/birthdays'
+import { contractEndOn, makeDate } from '../season/dates'
 import { computeStandings } from '../season/standings'
 import { SQUAD_MAX, SQUAD_MIN } from '../types'
 import type { DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
@@ -19,9 +20,10 @@ import { turnAcademy } from '../academy/turn'
 import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
 import { desiredSquadSize, positionDeficits, payrollCuts } from './squad'
-import { ageOneYear, retires } from './evolution'
+import { retires, startNewSeason } from './evolution'
 
 export * from './contracts'
+export * from './dueContracts'
 export * from './evolution'
 export * from './renewal'
 export * from './squad'
@@ -83,7 +85,8 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (champions.includes(t.id)) delta += R.champion
     if (promoted.includes(t.id)) delta += R.promoted
     if (relegated.includes(t.id)) delta += R.relegated
-    const tier = promoted.includes(t.id) ? 1 : relegated.includes(t.id) ? 2 : t.tier
+    // Na pirâmide, quem sobe vai uma divisão acima e quem cai, uma abaixo.
+    const tier = t.tier - (promoted.includes(t.id) ? 1 : 0) + (relegated.includes(t.id) ? 1 : 0)
     // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
     const pulled = t.reputation + delta + R.tierPull * ((R.tierMean[tier] ?? t.reputation) - t.reputation)
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
@@ -99,14 +102,14 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     }
   })
 
-  // 3) Envelhecimento e evolução; 4) aposentadorias. Quem ficou o ano inteiro sem clube sai do jogo.
+  // 3) Envelhecimento: a idade já aumentou no aniversário de cada um durante o ano; aqui entram só os aniversários que faltam até o
+  // começo da temporada nova e a condição e as estatísticas voltam ao zero. 4) Aposentadorias. Quem ficou o ano inteiro sem clube sai do jogo.
   const retired: DepartedPlayer[] = []
-  const evolveRng = rng.fork('evolution')
   const retireRng = rng.fork('retirement')
   let players: Player[] = []
-  for (const p of state.players) {
+  for (const p of applyBirthdays(state.players, state.season.currentDate, makeDate(year + 1, 1, 1), state.market.seed)) {
     if (p.teamId === null) continue
-    const next = ageOneYear(evolveRng, p, 0)
+    const next = startNewSeason(p)
     if (retires(retireRng, next)) retired.push(departed(next))
     else players.push(next)
   }
@@ -120,7 +123,15 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   players = contracts.players
   const released = contracts.released
 
-  // 6) Categorias de base (evolução, decisões dos 20 anos, chegada de jovens) e depois a reposição de posições descobertas e o corte do excesso na IA.
+  // 6) Corte de folha da IA (um clube rebaixado para uma série mais pobre libera quem a receita nova não sustenta), categorias de base
+  // (evolução, decisões dos 20 anos, chegada de jovens) e depois a reposição de posições descobertas e o corte do excesso na IA.
+  // O corte vem antes da reposição: os jovens que chegam cobrem as posições que o corte deixou descobertas.
+  const payrollCut = new Set<PlayerId>()
+  for (const team of teams) {
+    if (team.id === options.userTeamId) continue
+    for (const p of payrollCuts(players.filter((x) => x.teamId === team.id), sustainablePayroll(team), team.finances.balance)) payrollCut.add(p.id)
+  }
+  if (payrollCut.size > 0) players = players.map((p) => (payrollCut.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: contractEndOn(year) } } : p))
   const youthRng = rng.fork('youth')
   const taken = new Set([...players, ...state.academy].map((p) => p.name))
   const academyTurn = turnAcademy({ teams, players, academy: state.academy, rng: rng.fork('academy'), year, ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}), createYouth: options.createYouth, taken, counter: state.playerCounter })
@@ -151,11 +162,9 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (team.id === options.userTeamId) continue
     const squad = players.filter((p) => p.teamId === team.id)
     for (const p of trimExcess(squad)) trimmed.add(p.id)
-    const rest = squad.filter((p) => !trimmed.has(p.id))
-    for (const p of payrollCuts(rest, sustainablePayroll(team), team.finances.balance)) trimmed.add(p.id)
   }
   if (trimmed.size > 0) {
-    players = players.map((p) => (trimmed.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: makeDate(year, 12, 31) } } : p))
+    players = players.map((p) => (trimmed.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: contractEndOn(year) } } : p))
   }
 
   // 7) Nova meta da diretoria, finanças do ano e táticas refeitas.

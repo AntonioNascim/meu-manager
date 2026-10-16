@@ -44,10 +44,19 @@ describe('tela de classificação', () => {
     expect(html).toContain('Série B')
   })
 
-  it('a Série B, quando o jogador comanda um time dela, abre nela e marca o acesso', () => {
+  it('a Série B, quando o jogador comanda um time dela, abre nela e marca o acesso e o rebaixamento', () => {
     const bTeam = generateWorld({ seed: 3 }).teams.find((t) => t.tier === 2)?.id as string
     const g = playDays(createGame(3, bTeam), 6)
     expect(userCompetition(g).tier).toBe(2)
+    const html = renderToStaticMarkup(createElement(Standings, { game: g }))
+    expect(html.match(/aria-label="Zona de acesso"/g)).toHaveLength(4)
+    expect(html.match(/aria-label="Zona de rebaixamento"/g)).toHaveLength(4)
+  })
+
+  it('a Série C, quando o jogador comanda um time dela, abre nela e marca só o acesso', () => {
+    const cTeam = generateWorld({ seed: 3 }).teams.find((t) => t.tier === 3)?.id as string
+    const g = playDays(createGame(3, cTeam), 6)
+    expect(userCompetition(g).tier).toBe(3)
     const html = renderToStaticMarkup(createElement(Standings, { game: g }))
     expect(html.match(/aria-label="Zona de acesso"/g)).toHaveLength(4)
     expect(html).not.toContain('Zona de rebaixamento"')

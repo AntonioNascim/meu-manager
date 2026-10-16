@@ -10,7 +10,7 @@ import { overallAt } from '../overall'
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
-import { makeDate } from '../season/dates'
+import { contractEndOn, makeDate } from '../season/dates'
 import { SQUAD_MAX } from '../types'
 import type { IsoDate, OfferReason, Player, PlayerId, PreContract, Team, TeamId } from '../types'
 import { playerDecision } from './decision'
@@ -21,14 +21,24 @@ import { expectedSalary } from './value'
 
 const teamOf = (state: SeasonState, id: TeamId) => state.teams.find((t) => t.id === id) as Team
 
-/** O período de pré-contratos está aberto (a partir de 1º de julho)? */
-export const preContractsOpen = (state: Pick<SeasonState, 'season'>, date: IsoDate = state.season.currentDate): boolean => date >= makeDate(state.season.year, MARKET.preContract.fromMonth, 1)
+/** Primeiro dia em que o jogador pode assinar pré-contrato: `windowMonths` meses antes do fim do contrato dele (ex.: contrato até 31/12, abre em 1º de julho). */
+export function preContractOpensOn(endDate: IsoDate): IsoDate {
+  const [year, month] = endDate.split('-').map(Number) as [number, number]
+  const open = month - (MARKET.preContract.windowMonths - 1)
+  return open >= 1 ? makeDate(year, open, 1) : makeDate(year - 1, open + 12, 1)
+}
+
+/** O jogador está nos últimos meses do contrato (e o contrato ainda não acabou)? */
+export const inPreContractWindow = (player: Pick<Player, 'contract'>, date: IsoDate): boolean => date >= preContractOpensOn(player.contract.endDate) && date <= player.contract.endDate
+
+/** O período de pré-contratos do calendário da liga já abriu (os contratos terminam em `SEASON.contractEnd`)? */
+export const preContractsOpen = (state: Pick<SeasonState, 'season'>, date: IsoDate = state.season.currentDate): boolean => date >= preContractOpensOn(contractEndOn(state.season.year))
 
 export const preContractOf = (state: Pick<SeasonState, 'market'>, playerId: PlayerId): PreContract | undefined => state.market.preContracts.find((c) => c.playerId === playerId)
 
 /** O jogador pode assinar um pré-contrato com outro clube agora? */
 export function canPreContract(state: SeasonState, player: Player, date: IsoDate = state.season.currentDate): boolean {
-  return preContractsOpen(state, date) && player.teamId !== null && !player.contract.loanedFrom && isLastContractYear(player, state.season.year) && !preContractOf(state, player.id)
+  return inPreContractWindow(player, date) && player.teamId !== null && !player.contract.loanedFrom && !preContractOf(state, player.id)
 }
 
 /** Jogadores do clube que continuam no ano que vem (contrato depois do fim desta temporada), mais os que chegam por pré-contrato. */
@@ -135,9 +145,8 @@ function pickTarget(state: SeasonState, buyerId: TeamId, date: IsoDate, rng: Rng
   // Mesmas condições de `canPreContract`, com o que não muda de jogador para jogador calculado uma vez só.
   if (!preContractsOpen(state, date)) return undefined
   const signed = new Set(state.market.preContracts.map((c) => c.playerId))
-  const year = state.season.year
   for (const p of state.players) {
-    if (p.teamId === buyerId || p.teamId === null || p.contract.loanedFrom || !isLastContractYear(p, year) || signed.has(p.id) || p.age > MARKET.ai.maxAge) continue
+    if (p.teamId === buyerId || p.teamId === null || p.contract.loanedFrom || !inPreContractWindow(p, date) || signed.has(p.id) || p.age > MARKET.ai.maxAge) continue
     if ((losses.get(p.teamId as TeamId) ?? 0) >= P.maxLossPerClub) continue
     const need = needs.find((n) => n.position === p.position)
     if (!need) continue
@@ -162,18 +171,18 @@ export interface AppliedPreContract {
  * Na virada: quem assinou pré-contrato muda de clube com o contrato combinado (de graça). O pré-contrato cai se o
  * jogador já saiu do clube, se o contrato dele não vence mais ou se o comprador ficou sem vaga no elenco.
  */
-export function applyPreContracts(players: readonly Player[], preContracts: readonly PreContract[], year: number): { players: Player[]; applied: AppliedPreContract[] } {
+export function applyPreContracts(players: readonly Player[], preContracts: readonly PreContract[], year: number, due: (player: Player) => boolean = (p) => isLastContractYear(p, year)): { players: Player[]; applied: AppliedPreContract[] } {
   const applied: AppliedPreContract[] = []
   const byId = new Map(players.map((p) => [p.id, p]))
   const stays = new Map<TeamId, number>()
-  for (const p of players) if (p.teamId && !isLastContractYear(p, year)) stays.set(p.teamId, (stays.get(p.teamId) ?? 0) + 1)
+  for (const p of players) if (p.teamId && !due(p)) stays.set(p.teamId, (stays.get(p.teamId) ?? 0) + 1)
   const moved = new Map<PlayerId, Player>()
   for (const c of preContracts) {
     const p = byId.get(c.playerId)
-    if (!p || p.teamId !== c.fromTeamId || !isLastContractYear(p, year)) continue
+    if (!p || p.teamId !== c.fromTeamId || !due(p)) continue
     if ((stays.get(c.toTeamId) ?? 0) >= SQUAD_MAX - 1) continue
     stays.set(c.toTeamId, (stays.get(c.toTeamId) ?? 0) + 1)
-    moved.set(p.id, { ...p, teamId: c.toTeamId, contract: { salary: c.salary, endDate: makeDate(year + c.years, 12, 31), releaseClause: Math.round((c.salary * 36) / 1000) * 1000 } })
+    moved.set(p.id, { ...p, teamId: c.toTeamId, contract: { salary: c.salary, endDate: contractEndOn(year + c.years), releaseClause: Math.round((c.salary * 36) / 1000) * 1000 } })
     applied.push({ playerId: p.id, fromTeamId: c.fromTeamId, toTeamId: c.toTeamId })
   }
   return { players: players.map((p) => moved.get(p.id) ?? p), applied }

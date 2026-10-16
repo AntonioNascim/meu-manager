@@ -2,8 +2,9 @@ import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../../engine/config'
 import { salaryForOverall } from '../../engine/market/value'
 import { overallForPosition } from '../../engine/overall'
 import { createRng } from '../../engine/rng'
+import { ageOn, contractEndOn } from '../../engine/season/dates'
 import type { Foot, Nationality, Player, PlayerId, Position, TeamId } from '../../engine/types'
-import { generateAttributes, hiddenAttribute, pickFoot, pickSecondaryPositions, softCap } from '../generatePlayer'
+import { generateAttributes, hiddenAttribute, pickFoot, pickSecondaryPositions, qualityFloorFor, softCap } from '../generatePlayer'
 import { starChance, teamLevelFor } from '../generateTeam'
 import { GENERATION } from '../generationConfig'
 import type { PackagePlayer } from './types'
@@ -13,23 +14,16 @@ const STARTER_SHARE = 0.54
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
-/** Idade completa em `onDate` (AAAA-MM-DD). */
-export function ageOn(birthDate: string, onDate: string): number {
-  const [by, bm, bd] = birthDate.split('-').map(Number) as [number, number, number]
-  const [y, m, d] = onDate.split('-').map(Number) as [number, number, number]
-  return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0)
-}
-
 /** Nível de um clube (ajuste fixo por clube, em torno do nível que a reputação e a divisão dão). */
-export function clubLevel(club: { id: string; reputation: number }, tier: 1 | 2): number {
+export function clubLevel(club: { id: string; reputation: number }, tier: 1 | 2 | 3): number {
   return teamLevelFor({ tier, reputation: club.reputation }) + createRng(`club-level:${club.id}`).normal(0, GENERATION.teamLevelSd)
 }
 
 export interface RealPlayerContext {
   /** Ano da temporada inicial (os contratos são contados a partir dele). */
   startYear: number
-  /** Divisão do clube na pirâmide (1 ou 2 nesta fase). */
-  tier: 1 | 2
+  /** Divisão do clube na pirâmide (1 a 3 nesta fase). */
+  tier: 1 | 2 | 3
   /** `null` = jogador livre: usa o nível de um clube médio da divisão. */
   club: { id: string; reputation: number } | null
 }
@@ -54,7 +48,7 @@ export function generateRealPlayer(spec: PackagePlayer, id: PlayerId, teamId: Te
   const star = rng.chance(starChance({ tier: ctx.tier, reputation }))
   const starBonus = rng.float(GENERATION.star.bonusMin, GENERATION.star.bonusMax)
   if (starter && star) quality += starBonus
-  const drawnAttributes = generateAttributes(rng, spec.position, quality, age)
+  const drawnAttributes = generateAttributes(rng, spec.position, quality, age, qualityFloorFor(ctx.tier))
   const g = GENERATION.growth
   const growth = Math.max(0, g.untilAge - age) * rng.float(g.perYearMin, g.perYearMax) + rng.float(0, g.randomMax)
   const hidden = {
@@ -73,6 +67,7 @@ export function generateRealPlayer(spec: PackagePlayer, id: PlayerId, teamId: Te
   const player: Player = {
     id,
     name: spec.name,
+    birthDate: spec.birthDate,
     age,
     nationality: spec.nationality as Nationality,
     foot: spec.foot ?? drawnFoot,
@@ -86,7 +81,7 @@ export function generateRealPlayer(spec: PackagePlayer, id: PlayerId, teamId: Te
       professionalism: spec.hidden?.professionalism ?? hidden.professionalism,
     },
     condition: { fitness: 100, morale: 70, form: 0, recentRatings: [], injuryDaysLeft: 0, yellowCards: 0, redCards: 0, suspensionGames: 0 },
-    contract: spec.contract ?? { salary, endDate: `${ctx.startYear + contractYears}-12-31`, releaseClause: Math.round((salary * clauseMonths) / 1000) * 1000 },
+    contract: spec.contract ?? { salary, endDate: contractEndOn(ctx.startYear + contractYears), releaseClause: Math.round((salary * clauseMonths) / 1000) * 1000 },
     teamId,
     seasonStats: { appearances: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedGames: 0, homeGoals: 0, awayGoals: 0, passAssists: 0, crossAssists: 0 },
   }

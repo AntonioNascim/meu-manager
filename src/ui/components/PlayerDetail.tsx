@@ -119,7 +119,7 @@ export function PlayerDetail({ player, onClose, academy = false, stars, footer, 
             <Flag nationality={player.nationality} />
             <span className="truncate">
               {player.nickname ? `${player.name} · ` : ''}
-              {player.age} anos · {NATIONALITY_LABELS[player.nationality]} · Pé {FOOT_LABELS[player.foot].toLowerCase()}
+              {player.age} anos (nasc. {player.birthDate.split('-').reverse().join('/')}) · {NATIONALITY_LABELS[player.nationality]} · Pé {FOOT_LABELS[player.foot].toLowerCase()}
             </span>
           </div>
           {stars !== undefined && (

@@ -61,7 +61,7 @@ describe('robustez entre sementes', () => {
     for (let seed = 1; seed <= 15; seed++) {
       const w = generateWorld({ seed })
       const byId = new Map(w.players.map((p) => [p.id, p]))
-      expect(w.teams).toHaveLength(40)
+      expect(w.teams).toHaveLength(60)
       expect(new Set(w.players.map((p) => p.name)).size).toBe(w.players.length)
       for (const t of w.teams) {
         const formation = FORMATIONS[t.tactic.formationId]
@@ -82,15 +82,16 @@ describe('robustez entre sementes', () => {
 })
 
 describe('times', () => {
-  it('tem 20 times na Série A e 20 na Série B', () => {
+  it('tem 20 times em cada uma das Séries A, B e C', () => {
     expect(world.teams.filter((t) => t.tier === 1)).toHaveLength(20)
     expect(world.teams.filter((t) => t.tier === 2)).toHaveLength(20)
+    expect(world.teams.filter((t) => t.tier === 3)).toHaveLength(20)
   })
 
   it('ids, nomes e abreviações são únicos; abreviação tem 3 letras maiúsculas', () => {
-    expect(new Set(world.teams.map((t) => t.id)).size).toBe(40)
-    expect(new Set(world.teams.map((t) => t.name)).size).toBe(40)
-    expect(new Set(world.teams.map((t) => t.abbreviation)).size).toBe(40)
+    expect(new Set(world.teams.map((t) => t.id)).size).toBe(60)
+    expect(new Set(world.teams.map((t) => t.name)).size).toBe(60)
+    expect(new Set(world.teams.map((t) => t.abbreviation)).size).toBe(60)
     for (const t of world.teams) expect(t.abbreviation).toMatch(/^[A-Z]{3}$/)
   })
 
@@ -167,7 +168,7 @@ describe('elencos', () => {
 
   it('elencos têm entre 24 e 30 jogadores e os de maior reputação tendem a ser maiores', () => {
     const sizes = world.teams.map((t) => t.squad.length)
-    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(24)
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(22)
     expect(Math.max(...sizes)).toBeLessThanOrEqual(30)
     expect(new Set(sizes).size).toBeGreaterThanOrEqual(5)
     expect(correlation(world.teams.map((t) => t.reputation), sizes)).toBeGreaterThan(0.6)
@@ -321,6 +322,17 @@ describe('escala de força de 1 a 100', () => {
     expect(Math.max(...xs)).toBeLessThanOrEqual(76)
   })
 
+  it('titulares da Série C ficam entre ~35 e ~55, abaixo da Série B', () => {
+    const xs = starters(3)
+    expect(percentile(xs, 0.05)).toBeGreaterThanOrEqual(34)
+    expect(percentile(xs, 0.95)).toBeLessThanOrEqual(55)
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(25)
+    expect(Math.max(...xs)).toBeLessThanOrEqual(62)
+    const mean = (ys: number[]) => ys.reduce((a, b) => a + b, 0) / ys.length
+    expect(mean(starters(2)) - mean(xs)).toBeGreaterThan(6)
+    expect(mean(starters(2)) - mean(xs)).toBeLessThan(14)
+  })
+
   it('craques são poucos no campeonato inteiro e atributos acima de 90 são raros', () => {
     for (const w of worlds) {
       const overalls = w.players.map(playerOverall)
@@ -343,7 +355,7 @@ describe('escala de força de 1 a 100', () => {
   })
 
   it('força mínima de um profissional é razoável', () => {
-    for (const w of worlds) expect(Math.min(...w.players.map(playerOverall))).toBeGreaterThanOrEqual(30)
+    for (const w of worlds) expect(Math.min(...w.players.map(playerOverall))).toBeGreaterThanOrEqual(22)
   })
 })
 

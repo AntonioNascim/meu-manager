@@ -8,103 +8,14 @@
 import os from 'node:os'
 import { gzipSync } from 'node:zlib'
 import { playerOverall } from '../src/engine/overall'
-import { createAcademy } from '../src/data/generateAcademy'
-import { createGenerationContext, generateTeam } from '../src/data/generateTeam'
-import type { TeamDefinition } from '../src/data/teamDefinitions'
+import { BRAZIL_ONLY, FULL_WORLD, buildScaleGame } from '../src/diagnostics/scaleWorld'
+import type { LeagueSpec } from '../src/diagnostics/scaleWorld'
 import { simulateMatch } from '../src/engine/match'
 import { createRng } from '../src/engine/rng'
-import { createSeason } from '../src/engine/season'
-import type { CompetitionSetup } from '../src/engine/season'
-import { emptyTraining } from '../src/engine/types'
 import type { Player, Team } from '../src/engine/types'
-import { DEFAULT_PLAN } from '../src/engine/training'
 import { advanceToMatchday, createGame, nextEventOf, playPendingAuto, startNextSeason } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { makeEnvelope } from '../src/store/saveFormat'
-
-interface LeagueSpec {
-  id: string
-  name: string
-  region: 'BR' | 'SA' | 'EU'
-  teams: number
-  format: 'double' | 'single'
-  tier: 1 | 2
-  /** Reputação do primeiro e do último colocado por reputação (1 a 20). */
-  repTop: number
-  repBottom: number
-}
-
-export const FULL_WORLD: LeagueSpec[] = [
-  { id: 'br-1', name: 'Brasil A', region: 'BR', teams: 20, format: 'double', tier: 1, repTop: 19, repBottom: 7 },
-  { id: 'br-2', name: 'Brasil B', region: 'BR', teams: 20, format: 'double', tier: 2, repTop: 8, repBottom: 3 },
-  { id: 'br-3', name: 'Brasil C', region: 'BR', teams: 20, format: 'double', tier: 2, repTop: 6, repBottom: 2 },
-  { id: 'ar-1', name: 'Argentina', region: 'SA', teams: 28, format: 'single', tier: 1, repTop: 16, repBottom: 5 },
-  { id: 'uy-1', name: 'Uruguai', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 11, repBottom: 3 },
-  { id: 'py-1', name: 'Paraguai', region: 'SA', teams: 12, format: 'double', tier: 1, repTop: 10, repBottom: 3 },
-  { id: 'cl-1', name: 'Chile', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 11, repBottom: 3 },
-  { id: 'co-1', name: 'Colômbia', region: 'SA', teams: 20, format: 'double', tier: 1, repTop: 12, repBottom: 3 },
-  { id: 'ec-1', name: 'Equador', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 10, repBottom: 3 },
-  { id: 'en-1', name: 'Inglaterra', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 9 },
-  { id: 'es-1', name: 'Espanha', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 8 },
-  { id: 'it-1', name: 'Itália', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 19, repBottom: 7 },
-  { id: 'de-1', name: 'Alemanha', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 19, repBottom: 7 },
-  { id: 'fr-1', name: 'França', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 17, repBottom: 6 },
-  { id: 'pt-1', name: 'Portugal', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4 },
-]
-
-const BRAZIL_ONLY = FULL_WORLD.filter((l) => l.region === 'BR')
-
-function buildWorld(specs: LeagueSpec[], seed: number) {
-  const ctx = createGenerationContext(2026)
-  const rng = createRng(seed)
-  const teams: Team[] = []
-  const players: Player[] = []
-  const competitions: CompetitionSetup[] = []
-  specs.forEach((spec, li) => {
-    const inLeague: Team[] = []
-    for (let i = 0; i < spec.teams; i++) {
-      const reputation = Math.max(1, Math.round(spec.repTop - ((spec.repTop - spec.repBottom) * i) / (spec.teams - 1)))
-      const abbreviation = `${li.toString(36)}${String(i + 1).padStart(2, '0')}`
-      const def: TeamDefinition = { name: `${spec.name} ${i + 1}`, abbreviation, city: spec.name, state: 'XX', colors: ['#111111', '#f2f2f2'], tier: spec.tier, reputation }
-      const made = generateTeam(rng.fork(abbreviation), ctx, def, i + 1)
-      inLeague.push(made.team)
-      teams.push(made.team)
-      players.push(...made.players)
-    }
-    competitions.push({ id: spec.id, name: spec.name, tier: spec.tier, teams: inLeague })
-  })
-  const academy = createAcademy({ teams, seed, year: 2026, firstNumber: ctx.nextPlayerNumber, takenNames: players.map((p) => p.name) })
-  return { teams, players, academy, competitions }
-}
-
-type SeasonStateT = ReturnType<typeof createSeason>
-
-/** Turno único: tira o returno da tabela (rodadas depois da n − 1). */
-function applySingleRound(season: SeasonStateT, specs: LeagueSpec[]): SeasonStateT {
-  const single = new Map(specs.filter((s) => s.format === 'single').map((s) => [s.id, s.teams - 1]))
-  if (single.size === 0) return season
-  const matches = season.matches.filter((m) => {
-    const rounds = single.get(m.competitionId)
-    return rounds === undefined || m.round <= rounds
-  })
-  const competitions = season.season.competitions.map((c) => (single.has(c.id) ? { ...c, roundCount: single.get(c.id) as number } : c))
-  return { ...season, matches, season: { ...season.season, competitions, matchIds: matches.map((m) => m.id) } }
-}
-
-function buildGame(specs: LeagueSpec[], seed: number): { game: Game; genMs: number; seasonMs: number } {
-  let t = performance.now()
-  const w = buildWorld(specs, seed)
-  const genMs = performance.now() - t
-  const userTeamId = (w.competitions[0]?.teams[7] as Team).id
-  t = performance.now()
-  let season = createSeason({ year: 2026, seed, teams: w.teams, players: w.players, academy: w.academy, training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } }, competitions: w.competitions })
-  season = applySingleRound(season, specs)
-  const seasonMs = performance.now() - t
-  // A diretoria não demite: o objetivo é medir custo, não desempenho.
-  season = { ...season, teams: season.teams.map((tm) => (tm.id === userTeamId ? { ...tm, objective: { targetPosition: 20, sackingPosition: 20 } } : tm)) }
-  const game: Game = { seed, userTeamId, season, lastDay: [], notices: [], seasonLog: [], archive: [] }
-  return { game, genMs, seasonMs }
-}
 
 const mb = (n: number) => (n / 1024 / 1024).toFixed(1)
 const gc = () => (globalThis as { gc?: () => void }).gc?.()
@@ -225,7 +136,7 @@ function quickSimBench(game: Game): void {
 
 function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason: boolean) {
   const heapBase = heap()
-  const built = specs ? buildGame(specs, seed) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
+  const built = specs ? buildScaleGame(specs, seed) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
   let game = built.game
   // A diretoria não demite (no mundo sintético isso já foi feito na criação).
   game = { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === game.userTeamId ? { ...t, objective: { targetPosition: 20, sackingPosition: 20 } } : t)) } }

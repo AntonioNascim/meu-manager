@@ -6,7 +6,7 @@ import { OFFSEASON } from '../config'
 import { squadRole } from '../market/value'
 import { playerOverall } from '../overall'
 import type { Rng } from '../rng'
-import { makeDate } from '../season/dates'
+import { contractEndOn } from '../season/dates'
 import { CORE_COUNTS, desiredSquadSize } from './squad'
 import { renewalDecision, renewalDemand } from './renewal'
 import type { DepartedPlayer, Player, PlayerId, Team, TeamId } from '../types'
@@ -34,7 +34,7 @@ export function aiWantsToKeep(player: Player, squad: readonly Player[]): boolean
 export function renewedContract(rng: Rng, player: Player, year: number, salary: number): Player['contract'] {
   return {
     salary,
-    endDate: makeDate(year + contractYearsFor(rng, player.age), 12, 31),
+    endDate: contractEndOn(year + contractYearsFor(rng, player.age)),
     releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000,
   }
 }
@@ -46,6 +46,10 @@ export interface ExpireInput {
   year: number
   rng: Rng
   userTeamId?: TeamId
+  /** Quais contratos vencem agora (padrão: os que terminam até o fim de `year`, a regra da virada). */
+  due?: (player: Player) => boolean
+  /** Os empréstimos acabam e voltam para o clube de origem (padrão: sim, na virada). */
+  returnLoans?: boolean
 }
 
 export interface ExpireResult {
@@ -57,10 +61,11 @@ export interface ExpireResult {
 
 export function expireContracts(input: ExpireInput): ExpireResult {
   const { teams, year, rng, userTeamId } = input
+  const due = input.due ?? ((p: Player) => expiresBy(p, year))
   // Empréstimos acabam: o jogador volta ao clube de origem, com o contrato que tinha lá.
   let players = input.players.map((p) => {
     const origin = p.contract.loanedFrom
-    if (!origin || !teams.some((t) => t.id === origin)) return p
+    if (input.returnLoans === false || !origin || !teams.some((t) => t.id === origin)) return p
     const back = p.contract.loanOriginal ?? { salary: p.contract.salary, endDate: p.contract.endDate, releaseClause: p.contract.releaseClause }
     return { ...p, teamId: origin, contract: { ...back } }
   })
@@ -82,7 +87,7 @@ export function expireContracts(input: ExpireInput): ExpireResult {
   }
   for (const team of teams) {
     const squad = squads.get(team.id) ?? []
-    const expiring = squad.filter((p) => expiresBy(p, year))
+    const expiring = squad.filter(due)
     if (expiring.length === 0) continue
     if (team.id === userTeamId) {
       for (const p of expiring) free(p)

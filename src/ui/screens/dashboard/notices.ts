@@ -62,6 +62,20 @@ export function dashboardNotices(game: Game): DashboardNotice[] {
     })
   }
 
+  for (const n of game.notices) {
+    if (n.type !== 'contract-ended') continue
+    const player = state.players.find((p) => p.id === n.playerId)
+    out.push({
+      id: `ended-${n.playerId}`,
+      tone: 'danger',
+      icon: 'contract',
+      title: `${player ? nameOf(player) : 'Um jogador seu'} terminou o contrato`,
+      detail: 'O contrato acabou no dia combinado e ele saiu do elenco. Dá para contratá-lo de volta entre os jogadores livres.',
+      to: 'market',
+      tab: 'free',
+    })
+  }
+
   const expiring = lastYearContracts(game)
   if (expiring.length > 0) {
     out.push({ id: 'contracts', tone: 'warning', icon: 'contract', title: 'Contratos no último ano', detail: `${plural(expiring.length, 'jogador termina', 'jogadores terminam')} o contrato neste ano: ${list(expiring.map(nameOf))}.`, to: 'contracts' })

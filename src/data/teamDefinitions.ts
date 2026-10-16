@@ -1,6 +1,6 @@
 /**
  * Times fictícios (nomes inventados, cidades e estados reais do Brasil).
- * Série A: ~4 grandes (16–19), ~8 médios (11–15), ~8 pequenos (7–10). Série B: reputação menor (3–8).
+ * Série A: ~4 grandes (16–19), ~8 médios (11–15), ~8 pequenos (7–10). Série B: reputação menor (3–8). Série C: reputação ainda menor (2–6).
  */
 
 export interface TeamDefinition {
@@ -10,8 +10,8 @@ export interface TeamDefinition {
   city: string
   state: string
   colors: [string, string]
-  /** 1 = Série A, 2 = Série B. */
-  tier: 1 | 2
+  /** 1 = Série A, 2 = Série B, 3 = Série C. */
+  tier: 1 | 2 | 3
   reputation: number
 }
 
@@ -60,4 +60,25 @@ export const TEAM_DEFINITIONS: readonly TeamDefinition[] = [
   { name: 'Meio do Mundo Esporte Clube', abbreviation: 'MDM', city: 'Macapá', state: 'AP', colors: ['#ca8a04', '#111111'], tier: 2, reputation: 4 },
   { name: 'Monte Roraima Futebol Clube', abbreviation: 'MRR', city: 'Boa Vista', state: 'RR', colors: ['#c2410c', '#f2f2f2'], tier: 2, reputation: 4 },
   { name: 'Tamanduá Esporte Clube', abbreviation: 'TAM', city: 'São José do Rio Preto', state: 'SP', colors: ['#6b21a8', '#f2f2f2'], tier: 2, reputation: 3 },
+  // ---- Série C ----
+  { name: 'Amazonas Esporte Clube', abbreviation: 'AMZ', city: 'Manaus', state: 'AM', colors: ['#15803d', '#f2f2f2'], tier: 3, reputation: 6 },
+  { name: 'Sertão Atlético Clube', abbreviation: 'SER', city: 'Feira de Santana', state: 'BA', colors: ['#b45309', '#111111'], tier: 3, reputation: 6 },
+  { name: 'Sorocabana Futebol Clube', abbreviation: 'SOR', city: 'Sorocaba', state: 'SP', colors: ['#7f1d1d', '#facc15'], tier: 3, reputation: 6 },
+  { name: 'Anhanguera Esporte Clube', abbreviation: 'ANH', city: 'Anápolis', state: 'GO', colors: ['#1d4ed8', '#facc15'], tier: 3, reputation: 5 },
+  { name: 'Agreste Futebol Clube', abbreviation: 'AGR', city: 'Caruaru', state: 'PE', colors: ['#a16207', '#f2f2f2'], tier: 3, reputation: 5 },
+  { name: 'Cariri Esporte Clube', abbreviation: 'CRI', city: 'Juazeiro do Norte', state: 'CE', colors: ['#be123c', '#f2f2f2'], tier: 3, reputation: 5 },
+  { name: 'Tocantina Futebol Clube', abbreviation: 'TOC', city: 'Imperatriz', state: 'MA', colors: ['#0f766e', '#facc15'], tier: 3, reputation: 5 },
+  { name: 'Salineiros Futebol Clube', abbreviation: 'SAL', city: 'Mossoró', state: 'RN', colors: ['#0c4a6e', '#f2f2f2'], tier: 3, reputation: 5 },
+  { name: 'Vale do São Francisco Futebol Clube', abbreviation: 'VSF', city: 'Petrolina', state: 'PE', colors: ['#047857', '#f2f2f2'], tier: 3, reputation: 4 },
+  { name: 'Norte Mineiro Atlético Clube', abbreviation: 'NMI', city: 'Montes Claros', state: 'MG', colors: ['#9a3412', '#f2f2f2'], tier: 3, reputation: 4 },
+  { name: 'Campos Gerais Futebol Clube', abbreviation: 'CGE', city: 'Ponta Grossa', state: 'PR', colors: ['#4d7c0f', '#111111'], tier: 3, reputation: 4 },
+  { name: 'Oeste Catarinense Esporte Clube', abbreviation: 'OCA', city: 'Chapecó', state: 'SC', colors: ['#15803d', '#fef9c3'], tier: 3, reputation: 4 },
+  { name: 'Planalto Gaúcho Futebol Clube', abbreviation: 'PLA', city: 'Passo Fundo', state: 'RS', colors: ['#1e3a8a', '#dc2626'], tier: 3, reputation: 4 },
+  { name: 'Aço Fluminense Futebol Clube', abbreviation: 'ACO', city: 'Volta Redonda', state: 'RJ', colors: ['#374151', '#facc15'], tier: 3, reputation: 4 },
+  { name: 'Norte Fluminense Esporte Clube', abbreviation: 'NFL', city: 'Campos dos Goytacazes', state: 'RJ', colors: ['#0369a1', '#f2f2f2'], tier: 3, reputation: 3 },
+  { name: 'Carajás Futebol Clube', abbreviation: 'CRJ', city: 'Marabá', state: 'PA', colors: ['#b91c1c', '#facc15'], tier: 3, reputation: 3 },
+  { name: 'Tapajós Esporte Clube', abbreviation: 'TAP', city: 'Santarém', state: 'PA', colors: ['#0e7490', '#facc15'], tier: 3, reputation: 3 },
+  { name: 'Fronteira Sport Club', abbreviation: 'FRO', city: 'Dourados', state: 'MS', colors: ['#166534', '#fde68a'], tier: 3, reputation: 3 },
+  { name: 'Conquista Atlético Clube', abbreviation: 'COT', city: 'Vitória da Conquista', state: 'BA', colors: ['#6d28d9', '#f2f2f2'], tier: 3, reputation: 2 },
+  { name: 'Delta do Parnaíba Esporte Clube', abbreviation: 'DEL', city: 'Parnaíba', state: 'PI', colors: ['#075985', '#f2f2f2'], tier: 3, reputation: 2 },
 ]

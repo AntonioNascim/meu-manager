@@ -117,3 +117,5 @@ export type MarketNotice =
   | { type: 'offer-received'; offerId: string }
   /** Um jogador do time do jogador assinou pré-contrato com outro clube. */
   | { type: 'pre-contract-lost'; playerId: PlayerId; teamId: TeamId }
+  /** O contrato de um jogador do time do jogador acabou no dia da data dele: ele já é jogador livre. */
+  | { type: 'contract-ended'; playerId: PlayerId }

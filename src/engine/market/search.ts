@@ -31,7 +31,7 @@ export interface Range {
 export interface MarketFilters {
   query: string
   /** Série do clube atual (os livres só aparecem em "todas"). */
-  tier: 'all' | 1 | 2
+  tier: 'all' | 1 | 2 | 3
   group: PositionGroup
   position: Position | 'all'
   nationality: Nationality | 'all'

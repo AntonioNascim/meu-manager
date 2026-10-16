@@ -99,11 +99,15 @@ describe('classificação', () => {
     expect(html).toContain('aria-label="Temporada anterior"')
   })
 
-  it('a Série B marca só o acesso, sem campeão nem rebaixamento', () => {
-    const html = renderToStaticMarkup(createElement(Table, { game: played, competition: comp(played, 2), onTeam: noop }))
-    expect(html.match(/aria-label="Zona de acesso"/g)).toHaveLength(4)
-    expect(html).not.toContain('aria-label="Campeão"')
-    expect(html).not.toContain('Zona de rebaixamento"')
+  it('a Série B marca o acesso e o rebaixamento, sem campeão; a Série C só o acesso', () => {
+    const b = renderToStaticMarkup(createElement(Table, { game: played, competition: comp(played, 2), onTeam: noop }))
+    expect(b.match(/aria-label="Zona de acesso"/g)).toHaveLength(4)
+    expect(b.match(/aria-label="Zona de rebaixamento"/g)).toHaveLength(4)
+    expect(b).not.toContain('aria-label="Campeão"')
+    const c = renderToStaticMarkup(createElement(Table, { game: played, competition: comp(played, 3), onTeam: noop }))
+    expect(c.match(/aria-label="Zona de acesso"/g)).toHaveLength(4)
+    expect(c).not.toContain('Zona de rebaixamento"')
+    expect(c).not.toContain('aria-label="Campeão"')
   })
 
   it('a forma mostra os últimos 5 resultados em ordem', () => {
@@ -163,8 +167,8 @@ describe('histórico e página do time', () => {
 
   it('a tela tem as seis seções e nenhuma aba de copas ou torneios', () => {
     const html = renderToStaticMarkup(createElement(Standings, { game: played }))
-    for (const t of ['Classificação', 'Rodadas', 'Artilharia', 'Assistências', 'Cartões', 'Histórico', 'Série A', 'Série B']) expect(html).toContain(t)
-    for (const t of ['Copa', 'Série C', 'Libertadores', 'Torneio']) expect(html).not.toContain(t)
+    for (const t of ['Classificação', 'Rodadas', 'Artilharia', 'Assistências', 'Cartões', 'Histórico', 'Série A', 'Série B', 'Série C']) expect(html).toContain(t)
+    for (const t of ['Copa', 'Libertadores', 'Torneio']) expect(html).not.toContain(t)
     expect(userCompetition(played).tier).toBe(1)
   })
 })

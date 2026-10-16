@@ -15,12 +15,13 @@ interface Option {
   strength: number
 }
 
-/** Tela de novo jogo: escolher um time da Série A ou da Série B. */
+/** Tela de novo jogo: escolher um time de qualquer série da pirâmide (A, B ou C). */
 export function NewGame({ slots, onBack, dataPackage }: { slots: (SaveSummary | null)[] | null; onBack: () => void; dataPackage?: ChosenPackage }) {
   // O mundo é gerado uma vez para mostrar os times; o jogo é criado com a mesma semente.
   const [seed] = useState(() => Math.floor(Math.random() * 1_000_000) + 1)
   const world = useMemo(() => loadWorld(seed, dataPackage?.data), [seed, dataPackage])
-  const [tier, setTier] = useState<1 | 2>(1)
+  const [tier, setTier] = useState<1 | 2 | 3>(1)
+  const tiers = useMemo(() => ([...new Set(world.teams.map((t) => t.tier))].sort((a, b) => a - b) as (1 | 2 | 3)[]), [world])
   const [selected, setSelected] = useState<string | null>(null)
   const [choosingSlot, setChoosingSlot] = useState(false)
 
@@ -49,13 +50,10 @@ export function NewGame({ slots, onBack, dataPackage }: { slots: (SaveSummary | 
         <p className="text-sm text-slate-400">{dataPackage ? `Pacote: ${dataPackage.data.name}. ` : ''}Escolha o time que você vai comandar.</p>
         <div className="mt-4">
           <Tabs
-            value={String(tier) as '1' | '2'}
-            options={[
-              { id: '1', label: TIER_LABELS[1] },
-              { id: '2', label: TIER_LABELS[2] },
-            ]}
+            value={String(tier) as '1' | '2' | '3'}
+            options={tiers.map((t) => ({ id: String(t) as '1' | '2' | '3', label: TIER_LABELS[t] }))}
             onChange={(id) => {
-              setTier(Number(id) as 1 | 2)
+              setTier(Number(id) as 1 | 2 | 3)
               setSelected(null)
             }}
           />

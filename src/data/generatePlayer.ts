@@ -2,6 +2,7 @@ import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../engine/config'
 import { salaryForOverall } from '../engine/market/value'
 import { overallForPosition, POSITION_WEIGHTS } from '../engine/overall'
 import type { Rng } from '../engine/rng'
+import { birthDateFor, contractEndOn } from '../engine/season/dates'
 import { ATTRIBUTE_NAMES } from '../engine/types'
 import type {
   AttributeName,
@@ -71,7 +72,11 @@ export interface PlayerSpec {
   age: number
   /** `null` = jogador livre no mercado. */
   teamId: TeamId | null
+  /** Série do clube (define o piso do nível-base; padrão: o piso geral). */
+  tier?: number
 }
+
+export const qualityFloorFor = (tier: number | undefined): number => (tier === undefined ? GENERATION.qualityFloor : (GENERATION.qualityFloorByTier[tier] ?? GENERATION.qualityFloor))
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
@@ -180,11 +185,11 @@ export function softCap(value: number): number {
   return value > cap ? cap + (value - cap) * softCapFactor : value
 }
 
-export function generateAttributes(rng: Rng, position: Position, quality: number, age: number): Attributes {
+export function generateAttributes(rng: Rng, position: Position, quality: number, age: number, floor: number = GENERATION.qualityFloor): Attributes {
   const a = GENERATION.age
   // Jovens ainda não se desenvolveram; veteranos perdem físico mas ganham leitura de jogo.
   const base = Math.max(
-    GENERATION.qualityFloor,
+    floor,
     quality - Math.max(0, a.fullGrowthAge - age) * a.youthPenaltyPerYear,
   )
   const physicalDecline = Math.max(0, age - a.declineStartAge) * a.physicalDeclinePerYear
@@ -220,7 +225,7 @@ export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpe
   // Apelidos são em português: só jogadores brasileiros têm.
   const nickname = nationality === 'Brazil' && rng.chance(NICKNAME_CHANCE) ? rng.pick(NICKNAMES) : undefined
 
-  const attributes = generateAttributes(rng, spec.position, spec.quality, spec.age)
+  const attributes = generateAttributes(rng, spec.position, spec.quality, spec.age, qualityFloorFor(spec.tier))
   const overall = overallForPosition(attributes, spec.position)
 
   // Jovens têm margem para crescer; quem já passou dos 28 está no teto.
@@ -234,6 +239,7 @@ export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpe
   const player: Player = {
     id,
     name,
+    birthDate: birthDateFor(`${id}|${name}`, spec.age, `${ctx.startYear}-01-01`),
     age: spec.age,
     nationality,
     foot: pickFoot(rng, spec.position),
@@ -258,7 +264,7 @@ export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpe
     },
     contract: {
       salary,
-      endDate: `${ctx.startYear + contractYears}-12-31`,
+      endDate: contractEndOn(ctx.startYear + contractYears),
       releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000,
     },
     teamId: spec.teamId,

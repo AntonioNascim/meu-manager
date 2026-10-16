@@ -16,6 +16,7 @@ export interface YearRow {
   /** Força média dos 11 titulares por série (no início da temporada). */
   strengthA: number
   strengthB: number
+  strengthC: number
   /** Idade média de todos os jogadores com clube e fatias de jovens (≤ 21) e veteranos (≥ 31). */
   meanAge: number
   under22: number
@@ -46,6 +47,7 @@ export interface YearRow {
   /** Reputação média da Série A. */
   reputationA: number
   reputationB: number
+  reputationC: number
   /** Base: jovens por clube (média), jovens com potencial ≥ 75 em todas as bases e maior potencial entre eles. */
   academySize: number
   academyProspects: number
@@ -84,7 +86,7 @@ export function lowestBalance(team: Team): number {
   return lowest
 }
 
-export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'highPotential' | 'youngStars' | 'topOverall' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB' | 'academySize' | 'academyProspects' | 'academyMax' | 'academyOverdue' | 'topMaxInClub' | 'topClubs'> {
+export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'strengthB' | 'strengthC' | 'meanAge' | 'under22' | 'over30' | 'prospects' | 'topPotential' | 'stars' | 'highPotential' | 'youngStars' | 'topOverall' | 'minSquad' | 'maxSquad' | 'freeAgents' | 'reputationA' | 'reputationB' | 'reputationC' | 'academySize' | 'academyProspects' | 'academyMax' | 'academyOverdue' | 'topMaxInClub' | 'topClubs'> {
   const byId = new Map(state.players.map((p) => [p.id, p]))
   const signed = state.players.filter((p) => p.teamId !== null)
   const squads = state.teams.map((t) => state.players.filter((p) => p.teamId === t.id).length)
@@ -97,6 +99,7 @@ export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'stren
     topClubs: perClub.size,
     strengthA: mean(state.teams.filter((t) => t.tier === 1).map((t) => teamStrength(t, byId))),
     strengthB: mean(state.teams.filter((t) => t.tier === 2).map((t) => teamStrength(t, byId))),
+    strengthC: mean(state.teams.filter((t) => t.tier === 3).map((t) => teamStrength(t, byId))),
     meanAge: mean(signed.map((p) => p.age)),
     under22: young.length / signed.length,
     over30: signed.filter((p) => p.age >= 31).length / signed.length,
@@ -111,6 +114,7 @@ export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'stren
     freeAgents: state.players.length - signed.length,
     reputationA: mean(state.teams.filter((t) => t.tier === 1).map((t) => t.reputation)),
     reputationB: mean(state.teams.filter((t) => t.tier === 2).map((t) => t.reputation)),
+    reputationC: mean(state.teams.filter((t) => t.tier === 3).map((t) => t.reputation)),
     academySize: state.academy.length / state.teams.length,
     academyProspects: state.academy.filter((p) => p.hidden.potential >= PROSPECT_POTENTIAL).length,
     academyMax: Math.max(...state.teams.map((t) => state.academy.filter((p) => p.teamId === t.id).length)),
@@ -153,12 +157,13 @@ const pct = (x: number) => `${(100 * x).toFixed(0)}%`
 /** Tabela ano a ano para o terminal. */
 export function formatYears(rows: YearRow[]): string {
   return [
-    'ano   forçaA forçaB  idade <22  >30  promessas potMax craques pot85 topFor  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB  base prBase base→pro base→fora top40(máx/clubes) campeão',
+    'ano   forçaA forçaB forçaC  idade <22  >30  promessas potMax craques pot85 topFor  elenco   livres  saldo mín(fim) mín(ever) máx(fim) neg  reputA reputB reputC  base prBase base→pro base→fora top40(máx/clubes) campeão',
     ...rows.map((r) =>
       [
         String(r.year),
         r.strengthA.toFixed(1).padStart(7),
         r.strengthB.toFixed(1).padStart(6),
+        r.strengthC.toFixed(1).padStart(6),
         r.meanAge.toFixed(1).padStart(6),
         pct(r.under22).padStart(4),
         pct(r.over30).padStart(5),
@@ -175,6 +180,7 @@ export function formatYears(rows: YearRow[]): string {
         `${r.negativeEver}/${r.negativeAtEnd}`.padStart(5),
         r.reputationA.toFixed(1).padStart(7),
         r.reputationB.toFixed(1).padStart(7),
+        r.reputationC.toFixed(1).padStart(7),
         r.academySize.toFixed(1).padStart(6),
         String(r.academyProspects).padStart(6),
         (r.report ? String(Object.values(r.report.academyPromoted).reduce((a, b) => a + b, 0)) : '-').padStart(8),

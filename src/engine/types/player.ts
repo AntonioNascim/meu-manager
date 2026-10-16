@@ -116,6 +116,8 @@ export interface Player {
   id: PlayerId
   /** Nome completo. */
   name: string
+  /** Data de nascimento (AAAA-MM-DD). A idade aumenta no aniversário, não na virada da temporada. */
+  birthDate: IsoDate
   /** Apelido pelo qual o jogador é conhecido, quando tem um. */
   nickname?: string
   age: number

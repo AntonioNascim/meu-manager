@@ -3,11 +3,14 @@ import type { CompetitionId, IsoDate, MatchId, TeamId } from './common'
 /** MVP: só `league`. Depois: `knockout` e `groups+knockout`. */
 export type CompetitionType = 'league'
 
+/** Região da liga: define as janelas de transferência. */
+export type Region = 'BR' | 'SA' | 'EU'
+
 export interface Competition {
   id: CompetitionId
   name: string
   type: CompetitionType
-  /** Nível na pirâmide (1 = Série A, 2 = Série B). */
+  /** Nível na pirâmide (1 = Série A, 2 = Série B, 3 = Série C). */
   tier: number
   teamIds: TeamId[]
   /** Total de rodadas (38 para 20 times). */
@@ -15,6 +18,12 @@ export interface Competition {
   /** Quantos sobem / caem ao fim da temporada. */
   promotionSlots: number
   relegationSlots: number
+  /** Região (janelas de transferência); padrão: Brasil. */
+  region?: Region
+  /** Dia da primeira rodada de referência (mês e dia); padrão: `SEASON.startMonth/startDay`. */
+  start?: [number, number]
+  /** 1 = turno único, 2 = turno e returno (padrão). */
+  rounds?: 1 | 2
 }
 
 /** Linha da classificação, sempre derivada das partidas finalizadas (nunca guardada). */

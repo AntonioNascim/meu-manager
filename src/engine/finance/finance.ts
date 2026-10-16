@@ -28,13 +28,13 @@ export function matchAttendance(home: Team, away: Pick<Team, 'reputation'>, pric
 export const matchTicketRevenue = (home: Team, away: Pick<Team, 'reputation'>, price: number = home.ticketPrice): number =>
   matchAttendance(home, away, price) * price
 
-export const annualSponsorship = (team: Pick<Team, 'reputation'>): number =>
-  roundTo(FINANCE.sponsorship.base + FINANCE.sponsorship.perReputation * team.reputation ** FINANCE.sponsorship.power, 10_000)
+export const annualSponsorship = (team: Pick<Team, 'reputation' | 'tier'>): number =>
+  roundTo((FINANCE.sponsorship.base + FINANCE.sponsorship.perReputation * team.reputation ** FINANCE.sponsorship.power) * (FINANCE.sponsorshipTierScale[team.tier] ?? 1), 10_000)
 
 /** Cota de TV anual da divisão do clube. */
 export const annualTvRights = (team: Pick<Team, 'tier'>): number => FINANCE.tvRights[team.tier] ?? 0
 
-export const monthlyOperations = (team: Pick<Team, 'stadium'>): number => Math.round((team.stadium.capacity * FINANCE.operationsPerSeat) / 12)
+export const monthlyOperations = (team: Pick<Team, 'stadium' | 'tier'>): number => Math.round((team.stadium.capacity * FINANCE.operationsPerSeat * (FINANCE.operationsTierScale[team.tier] ?? 1)) / 12)
 
 /** Folha mensal: salários de quem está no clube (o emprestado é pago por quem o recebeu). */
 export const monthlyPayroll = (players: readonly Pick<Player, 'contract'>[]): number => players.reduce((sum, p) => sum + p.contract.salary, 0)

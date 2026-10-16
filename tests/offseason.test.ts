@@ -4,7 +4,7 @@ import { createYouth } from '../src/data/generateYouth'
 import { advanceSeason, evolvePlayer, positionDeficits, yearlyGain } from '../src/engine/offseason'
 import { playerOverall } from '../src/engine/overall'
 import { createRng } from '../src/engine/rng'
-import { createSeason, simulateToSeasonEnd } from '../src/engine/season'
+import { computeStandings, createSeason, simulateToSeasonEnd } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
 import { SQUAD_MAX, SQUAD_MIN } from '../src/engine/types'
 import type { OffseasonReport } from '../src/engine/types'
@@ -28,24 +28,28 @@ describe('virada de temporada', () => {
     expect(() => advanceSeason(fresh, { createYouth })).toThrow()
   })
 
-  it('troca 4 times entre as séries e as duas continuam com 20', () => {
-    expect(report.promoted).toHaveLength(4)
-    expect(report.relegated).toHaveLength(4)
-    for (const id of report.promoted) expect(next.teams.find((t) => t.id === id)!.tier).toBe(1)
-    for (const id of report.relegated) expect(next.teams.find((t) => t.id === id)!.tier).toBe(2)
-    expect(next.teams.filter((t) => t.tier === 1)).toHaveLength(20)
-    expect(next.teams.filter((t) => t.tier === 2)).toHaveLength(20)
+  it('troca 4 times entre séries vizinhas (A↔B e B↔C) e as três continuam com 20', () => {
+    expect(report.promoted).toHaveLength(8)
+    expect(report.relegated).toHaveLength(8)
+    for (const c of ended.season.competitions) {
+      const rows = computeStandings(c.teamIds, ended.matches.filter((m) => m.competitionId === c.id))
+      for (const r of rows.slice(0, c.promotionSlots)) expect(next.teams.find((t) => t.id === r.teamId)!.tier).toBe(c.tier - 1)
+      for (const r of rows.slice(rows.length - c.relegationSlots)) expect(next.teams.find((t) => t.id === r.teamId)!.tier).toBe(c.tier + 1)
+      // Quem fica no meio da tabela continua na mesma série.
+      for (const r of rows.slice(c.promotionSlots, rows.length - c.relegationSlots)) expect(next.teams.find((t) => t.id === r.teamId)!.tier).toBe(c.tier)
+    }
+    for (const tier of [1, 2, 3]) expect(next.teams.filter((t) => t.tier === tier)).toHaveLength(20)
   })
 
   it('registra campeões e posições no histórico dos times', () => {
-    expect(report.champions).toHaveLength(2)
+    expect(report.champions).toHaveLength(3)
     for (const t of next.teams) {
       const record = t.history[t.history.length - 1]!
       expect(record.year).toBe(2026)
       expect(record.finalPosition).toBe(report.finalPositions[t.id]!.position)
       expect(record.champion).toBe(report.champions.includes(t.id))
     }
-    expect(next.teams.filter((t) => t.history.some((h) => h.champion))).toHaveLength(2)
+    expect(next.teams.filter((t) => t.history.some((h) => h.champion))).toHaveLength(3)
   })
 
   it('cria a temporada seguinte: ano, fase, 380 jogos por série e calendário novo', () => {
@@ -53,6 +57,7 @@ describe('virada de temporada', () => {
     expect(next.season.phase).toBe('pre-season')
     expect(next.matches.filter((m) => m.competitionId === 'serie-a')).toHaveLength(380)
     expect(next.matches.filter((m) => m.competitionId === 'serie-b')).toHaveLength(380)
+    expect(next.matches.filter((m) => m.competitionId === 'serie-c')).toHaveLength(380)
     expect(next.matches.every((m) => m.status === 'scheduled' && m.date.startsWith('2027'))).toBe(true)
     const serieA = next.season.competitions.find((c) => c.id === 'serie-a')!
     expect([...serieA.teamIds].sort()).toEqual(next.teams.filter((t) => t.tier === 1).map((t) => t.id).sort())
@@ -72,8 +77,8 @@ describe('virada de temporada', () => {
     expect(Object.values(report.youth).every((n) => n >= 1)).toBe(true)
   })
 
-  it('envelhece todos, zera estatísticas e condição, e aposenta só veteranos', () => {
-    const before = new Map(ended.players.map((p) => [p.id, p]))
+  it('envelhece todos um ano (no aniversário), zera estatísticas e condição, e aposenta só veteranos', () => {
+    const before = new Map(world.players.map((p) => [p.id, p]))
     for (const p of next.players.filter((x) => before.has(x.id))) {
       expect(p.age).toBe(before.get(p.id)!.age + 1)
       expect(p.seasonStats.appearances).toBe(0)

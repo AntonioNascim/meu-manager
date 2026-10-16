@@ -8,6 +8,7 @@ import { ACADEMY, OFFSEASON } from '../config'
 import { expectedSalary } from '../market/value'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
+import { contractEndOn } from '../season/dates'
 import type { SeasonState } from '../season/calendar'
 import { SQUAD_MAX } from '../types'
 import type { Player, PlayerId, TeamId } from '../types'
@@ -47,7 +48,7 @@ export const youthSalary = (player: Player): number => Math.max(OFFSEASON.renewa
 /** O jovem como jogador do elenco profissional, com contrato de jovem. `year` = ano em que a temporada começa/está em andamento. */
 export function toProfessional(player: Player, year: number): Player {
   const salary = youthSalary(player)
-  return { ...player, contract: { salary, endDate: `${year + ACADEMY.contractYears}-12-31`, releaseClause: salary * 36 } }
+  return { ...player, contract: { salary, endDate: contractEndOn(year + ACADEMY.contractYears), releaseClause: salary * 36 } }
 }
 
 /** Valor do jovem para a IA: força de hoje mais parte da margem até o potencial. */

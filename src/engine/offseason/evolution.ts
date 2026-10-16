@@ -61,11 +61,12 @@ export function annualGain(rng: Rng, player: Player, minutesShare: number): numb
 }
 
 /**
- * Um ano a mais: idade, declínio dos veteranos, ruído dos atributos e zeragem da condição e das estatísticas.
- * `gain` é o ganho de crescimento a aplicar agora em todos os atributos: na virada do jogo é 0, porque o
- * crescimento já veio aos poucos pelo treino da temporada.
+ * Um ano a mais para o jogador: idade, declínio dos veteranos e ruído dos atributos; a condição e as estatísticas
+ * da temporada continuam como estão. É o que acontece no aniversário do jogador (`applyBirthdays`).
+ * `gain` é o ganho de crescimento a aplicar agora em todos os atributos: no jogo é 0, porque o
+ * crescimento já vem aos poucos pelo treino da temporada.
  */
-export function ageOneYear(rng: Rng, player: Player, gain: number): Player {
+export function growOlder(rng: Rng, player: Player, gain = 0): Player {
   const age = player.age
   const potential = player.hidden.potential
   const attributes = { ...player.attributes } as Attributes
@@ -81,15 +82,23 @@ export function ageOneYear(rng: Rng, player: Player, gain: number): Player {
     attributes[name] = clamp(player.attributes[name] + stochasticRound(rng, delta), ATTRIBUTE_MIN, ATTRIBUTE_MAX)
   }
 
-  const evolved: Player = {
+  const evolved: Player = { ...player, age: age + 1, attributes }
+  const now = playerOverall(evolved)
+  return { ...evolved, hidden: { ...player.hidden, potential: clamp(Math.max(potential, Math.round(now)), ATTRIBUTE_MIN, ATTRIBUTE_MAX) } }
+}
+
+/** Começo de temporada: condição física zerada (descansado, moral neutra) e estatísticas da temporada em branco. */
+export function startNewSeason(player: Player): Player {
+  return {
     ...player,
-    age: age + 1,
-    attributes,
     condition: { fitness: 100, morale: 70, form: 0, recentRatings: [], injuryDaysLeft: 0, yellowCards: 0, redCards: 0, suspensionGames: 0 },
     seasonStats: { appearances: 0, minutes: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratedGames: 0, homeGoals: 0, awayGoals: 0, passAssists: 0, crossAssists: 0 },
   }
-  const now = playerOverall(evolved)
-  return { ...evolved, hidden: { ...player.hidden, potential: clamp(Math.max(potential, Math.round(now)), ATTRIBUTE_MIN, ATTRIBUTE_MAX) } }
+}
+
+/** Um ano a mais de uma vez só, com a virada da condição: o que a base faz na virada (os garotos da base envelhecem aí, não no aniversário). */
+export function ageOneYear(rng: Rng, player: Player, gain: number): Player {
+  return startNewSeason(growOlder(rng, player, gain))
 }
 
 /** Evolução do ano inteiro de uma vez (crescimento + envelhecimento). Referência para testes; o jogo reparte o crescimento pelo treino. */

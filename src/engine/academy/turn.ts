@@ -3,6 +3,7 @@ import { ACADEMY } from '../config'
 import { ageOneYear } from '../offseason/evolution'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits } from '../offseason/squad'
 import type { Rng } from '../rng'
+import { contractEndOn } from '../season/dates'
 import { SQUAD_MAX } from '../types'
 import type { Player, Position, Team, TeamId, YouthRequest } from '../types'
 import { toProfessional, worthPromoting, youthValue } from './index'
@@ -35,7 +36,7 @@ export interface AcademyTurn {
 const POSITION_BAG: Position[] = (Object.keys(CORE_COUNTS) as Position[]).flatMap((p) => Array<Position>(CORE_COUNTS[p]).fill(p))
 
 /** O jovem da base não tem salário até ser promovido. */
-const asAcademy = (p: Player, year: number): Player => ({ ...p, contract: { salary: 0, endDate: `${year}-12-31`, releaseClause: 0 } })
+const asAcademy = (p: Player, year: number): Player => ({ ...p, contract: { salary: 0, endDate: contractEndOn(year), releaseClause: 0 } })
 
 export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
   const nextYear = input.year + 1

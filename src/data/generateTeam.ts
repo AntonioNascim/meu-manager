@@ -123,7 +123,7 @@ export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefiniti
     if (isStarter && rng.chance(starChance(def))) {
       quality += rng.float(GENERATION.star.bonusMin, GENERATION.star.bonusMax)
     }
-    return generatePlayer(rng, ctx, { position: slot.position, quality, age: ages[i] ?? 25, teamId: id })
+    return generatePlayer(rng, ctx, { position: slot.position, quality, age: ages[i] ?? 25, teamId: id, tier: def.tier })
   })
 
   // A formação é a que melhor encaixa os melhores jogadores (sorteia entre as quase empatadas).
@@ -151,7 +151,8 @@ export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefiniti
     colors: def.colors,
     stadium: {
       name: def.tier === 1 && def.reputation >= 11 ? `Arena ${def.name.split(' ')[0]}` : `Estádio Municipal de ${def.city}`,
-      capacity: Math.round((9_000 + def.reputation * 3_600 + rng.int(-1_500, 1_500)) / 500) * 500,
+      // Estádios da Série C são menores: o custo de operação é por lugar e a receita desses clubes é pequena.
+      capacity: Math.round((def.tier === 3 ? 5_000 + def.reputation * 1_800 + rng.int(-800, 800) : 9_000 + def.reputation * 3_600 + rng.int(-1_500, 1_500)) / 500) * 500,
     },
     reputation: def.reputation,
     squad: players.map((p) => p.id),

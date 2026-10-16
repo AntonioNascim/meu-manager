@@ -17,14 +17,15 @@ import { NewGame } from '../src/ui/screens/NewGame'
 const world = generateWorld({ seed: 11 })
 const idA = world.teams.find((t) => t.tier === 1)?.id as string
 const idB = world.teams.find((t) => t.tier === 2)?.id as string
+const idC = world.teams.find((t) => t.tier === 3)?.id as string
 
 describe('jogo novo', () => {
-  it('cria a temporada com um time da Série A ou da B', () => {
-    for (const id of [idA, idB]) {
+  it('cria a temporada com um time da Série A, B ou C', () => {
+    for (const id of [idA, idB, idC]) {
       const g = createGame(11, id)
       expect(g.userTeamId).toBe(id)
       expect(userCompetition(g).teamIds).toContain(id)
-      expect(g.season.matches).toHaveLength(760)
+      expect(g.season.matches).toHaveLength(1140)
       expect(nextUserMatch(g)?.status).toBe('scheduled')
       expect(lastUserMatch(g)).toBeUndefined()
     }

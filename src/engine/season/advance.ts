@@ -18,6 +18,8 @@ import type { MatchInput } from '../match'
 import type { IsoDate, MarketNotice, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
 import type { SeasonState } from './calendar'
 import { applyTraining, fitnessProfile } from '../training'
+import { settleDueContracts } from '../offseason/dueContracts'
+import { applyBirthdays } from './birthdays'
 import { applyMatchToPlayers, progressDays } from './condition'
 import { slimResult } from './compact'
 import { daysBetween } from './dates'
@@ -31,6 +33,16 @@ export function nextEvent(state: SeasonState): SeasonEvent {
     if (m.status === 'scheduled' && m.date >= state.season.currentDate && (next === undefined || m.date < next)) next = m.date
   }
   return next === undefined ? { type: 'season-end' } : { type: 'matchday', date: next }
+}
+
+/** Primeiro dia depois de hoje em que termina o contrato de um jogador do time (empréstimos voltam na virada). */
+function nextContractEnd(state: SeasonState, teamId: TeamId): IsoDate | undefined {
+  let next: IsoDate | undefined
+  for (const p of state.players) {
+    if (p.teamId !== teamId || p.contract.loanedFrom || p.contract.endDate <= state.season.currentDate) continue
+    if (next === undefined || p.contract.endDate < next) next = p.contract.endDate
+  }
+  return next
 }
 
 function groupByTeam(players: readonly Player[]): Map<TeamId, Player[]> {
@@ -93,11 +105,15 @@ export interface AdvanceResult {
 /** Passa os dias até `date`: recuperação, fechamento dos meses e, se for dia de negociação, o mercado. */
 function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, marketEvent: MarketEvent | undefined): { state: SeasonState; notices: MarketNotice[] } {
   const days = daysBetween(state.season.currentDate, date)
-  const players = progressDays(state.players, days, (teamId) => fitnessProfile(state.training, teamId, days))
+  // Quem faz anos nesses dias envelhece um ano (idade, declínio e ruído dos atributos).
+  const players = applyBirthdays(progressDays(state.players, days, (teamId) => fitnessProfile(state.training, teamId, days)), state.season.currentDate, date, state.market.seed) as Player[]
   const squads = groupByTeam(players)
   const teams = settleMonths(state.teams, squads, state.season.currentDate, date, options.userTeamId)
   let current: SeasonState = applyTraining({ ...state, players, teams, season: { ...state.season, currentDate: date } }, state.season.currentDate, date, options.userTeamId)
-  const notices: MarketNotice[] = []
+  // Contratos que terminam nestes dias (no meio da temporada) acabam na data deles.
+  const due = settleDueContracts(current, state.season.currentDate, date, options.userTeamId)
+  current = due.state
+  const notices: MarketNotice[] = [...due.notices]
   if (!options.market) return { state: current, notices }
 
   current = expireOffers(current, date)
@@ -139,7 +155,10 @@ export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions =
       return { state: { ...current, season }, event: matchEvent, played: [], notices }
     }
     const marketEvent = options.market ? nextMarketEvent(current) : undefined
-    const date = marketEvent && marketEvent.date < matchEvent.date ? marketEvent.date : matchEvent.date
+    let date = marketEvent && marketEvent.date < matchEvent.date ? marketEvent.date : matchEvent.date
+    // O fim do contrato de um jogador do técnico também é um dia a parar (se cair antes do próximo evento).
+    const contractEnd = options.userTeamId ? nextContractEnd(current, options.userTeamId) : undefined
+    if (contractEnd !== undefined && contractEnd < date) date = contractEnd
     const todayMarket = marketEvent && marketEvent.date === date ? marketEvent : undefined
 
     const passed = passDays(current, date, options, todayMarket)

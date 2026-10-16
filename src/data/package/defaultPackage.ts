@@ -7,14 +7,15 @@ import type { DataPackage, PackagePlayer } from './types'
 
 const FICTIONAL_LEAGUES = [
   { id: 'br-1', name: 'Série A', country: 'Brazil', level: 1, teams: 20, promotion: 0, relegation: 4, tiebreakers: [...TIEBREAKERS] },
-  { id: 'br-2', name: 'Série B', country: 'Brazil', level: 2, teams: 20, promotion: 4, relegation: 0, tiebreakers: [...TIEBREAKERS] },
+  { id: 'br-2', name: 'Série B', country: 'Brazil', level: 2, teams: 20, promotion: 4, relegation: 4, tiebreakers: [...TIEBREAKERS] },
+  { id: 'br-3', name: 'Série C', country: 'Brazil', level: 3, teams: 20, promotion: 4, relegation: 0, tiebreakers: [...TIEBREAKERS] },
 ]
 
-function packagePlayer(p: Player, startYear: number): PackagePlayer {
+function packagePlayer(p: Player): PackagePlayer {
   const out: PackagePlayer = {
     id: p.id,
     name: p.name,
-    birthDate: `${startYear - p.age}-01-01`,
+    birthDate: p.birthDate,
     nationality: p.nationality,
     position: p.position,
     secondaryPositions: [...p.secondaryPositions],
@@ -50,11 +51,11 @@ export function packageFromWorld(world: World, name = 'Mundo fictício'): DataPa
       state: t.state,
       stadium: { ...t.stadium },
       reputation: t.reputation,
-      league: t.tier === 1 ? 'br-1' : 'br-2',
+      league: `br-${t.tier}`,
       game: { tactic: t.tactic, finances: t.finances, fanBase: t.fanBase, ticketPrice: t.ticketPrice, objective: t.objective },
     })),
-    players: world.players.map((p) => packagePlayer(p, world.startYear)),
-    academy: world.academy.map((p) => packagePlayer(p, world.startYear)),
+    players: world.players.map((p) => packagePlayer(p)),
+    academy: world.academy.map((p) => packagePlayer(p)),
   }
 }
 

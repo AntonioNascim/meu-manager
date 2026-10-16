@@ -105,12 +105,15 @@ describe('calendário', () => {
   const world = generateWorld({ seed: 11 })
   const state = createSeason({ year: 2026, seed: 'cal', teams: world.teams, players: world.players })
 
-  it('Série A e Série B na mesma temporada: 380 jogos cada', () => {
-    expect(state.season.competitions.map((c) => c.id)).toEqual(['serie-a', 'serie-b'])
+  it('Série A, B e C na mesma temporada: 380 jogos cada', () => {
+    expect(state.season.competitions.map((c) => c.id)).toEqual(['serie-a', 'serie-b', 'serie-c'])
     expect(state.matches.filter((m) => m.competitionId === 'serie-a')).toHaveLength(380)
     expect(state.matches.filter((m) => m.competitionId === 'serie-b')).toHaveLength(380)
-    expect(state.season.matchIds).toHaveLength(760)
-    expect(new Set(state.matches.map((m) => m.id)).size).toBe(760)
+    expect(state.matches.filter((m) => m.competitionId === 'serie-c')).toHaveLength(380)
+    expect(state.season.matchIds).toHaveLength(1140)
+    expect(new Set(state.matches.map((m) => m.id)).size).toBe(1140)
+    // Pirâmide: a A só rebaixa, a B sobe e rebaixa, a C só sobe.
+    expect(state.season.competitions.map((c) => [c.promotionSlots, c.relegationSlots])).toEqual([[0, 4], [4, 4], [4, 0]])
   })
 
   it('rodadas em ordem cronológica, nos fins de semana, com algumas na quarta', () => {

@@ -324,6 +324,8 @@ export const SEASON = {
   midweekEvery: 5,
   /** A última rodada tem todos os jogos juntos, no domingo. */
   finalRoundSameDay: true,
+  /** Os contratos terminam neste dia (mês e dia): o fim da temporada do calendário brasileiro, que é de ano civil. */
+  contractEnd: { month: 12, day: 31 },
   /** Maior sequência permitida de jogos seguidos em casa ou fora. */
   maxVenueStreak: 2,
 } as const
@@ -392,10 +394,14 @@ export const FINANCE = {
   },
   /** Patrocínio por ano: base + perReputation × reputação^power. Pago por mês. */
   sponsorship: { base: 5_500_000, perReputation: 900_000, power: 1.2 },
+  /** Fator do patrocínio por divisão (o patrocínio de um clube da Série C é bem menor que o de um da A com a mesma reputação). */
+  sponsorshipTierScale: { 1: 1, 2: 1, 3: 0.55 } as Record<number, number>,
   /** Cota de TV por clube e por ano, conforme a divisão (paga por mês): bem maior na Série A. */
-  tvRights: { 1: 20_000_000, 2: 3_000_000 } as Record<number, number>,
+  tvRights: { 1: 20_000_000, 2: 3_000_000, 3: 1_200_000 } as Record<number, number>,
   /** Custo anual de operação (estádio, estrutura, comissão): por lugar da capacidade. Pago por mês. */
   operationsPerSeat: 110,
+  /** Fator do custo de operação por divisão: a estrutura da Série C custa menos por lugar (também vale para o clube rebaixado, que mantém o estádio). */
+  operationsTierScale: { 1: 1, 2: 1, 3: 0.5 } as Record<number, number>,
   /** Parcela do saldo que fica disponível para transferências (recalculada todo mês). */
   transferShare: 0.4,
   /** Saldo acima de (receita anual × isto) é reinvestido em estrutura (clubes da IA): evita acumular sem limite. */
@@ -450,6 +456,24 @@ export const MARKET = {
   windows: {
     /** Janela do meio do ano: mês/dia de abertura e de fechamento. */
     midYear: { start: [7, 1], end: [7, 31] } as { start: [number, number]; end: [number, number] },
+    /**
+     * Janelas de cada região (mês e dia de abertura e de fechamento). `end: null` = até a véspera da primeira rodada.
+     * Brasil: pré-temporada e julho. América do Sul: até meados de março e julho. Europa: janeiro e julho a agosto.
+     */
+    regions: {
+      BR: [
+        { name: 'pre-season', start: [1, 1], end: null },
+        { name: 'mid-year', start: [7, 1], end: [7, 31] },
+      ],
+      SA: [
+        { name: 'pre-season', start: [1, 1], end: [3, 15] },
+        { name: 'mid-year', start: [7, 1], end: [7, 31] },
+      ],
+      EU: [
+        { name: 'mid-year', start: [1, 1], end: [1, 31] },
+        { name: 'pre-season', start: [7, 1], end: [8, 31] },
+      ],
+    } as Record<'BR' | 'SA' | 'EU', readonly { name: 'pre-season' | 'mid-year'; start: readonly [number, number]; end: readonly [number, number] | null }[]>,
     /** A IA negocia a cada tantos dias dentro da janela. */
     tickDays: 7,
     /** Dias até a resposta a uma proposta do jogador. */
@@ -458,8 +482,8 @@ export const MARKET = {
     offerValidDays: 7,
   },
 
-  /** Pré-contrato: abre em 1º do mês `fromMonth`. A IA tenta nos primeiros dias dos meses `months`, com moderação: chance por clube em cada rodada, no máximo `maxPerClub` por clube, ninguém perde mais que `maxLossPerClub` jogadores e só vale a pena com ganho de força maior que o da compra normal. */
-  preContract: { fromMonth: 7, ai: { months: [7, 8, 9, 10, 11] as readonly number[], chance: 0.2, maxPerClub: 1, maxLossPerClub: 2, extraUpgrade: 1 } },
+  /** Pré-contrato: abre para cada jogador `windowMonths` meses antes do fim do contrato dele (1º dia do mês, ex.: contrato até 31/12 abre em 1º de julho). A IA tenta nos primeiros dias dos meses `months`, com moderação: chance por clube em cada rodada, no máximo `maxPerClub` por clube, ninguém perde mais que `maxLossPerClub` jogadores e só vale a pena com ganho de força maior que o da compra normal. */
+  preContract: { windowMonths: 6, ai: { months: [7, 8, 9, 10, 11] as readonly number[], chance: 0.2, maxPerClub: 1, maxLossPerClub: 2, extraUpgrade: 1 } },
   /** Listas: preço anunciado (fração do valor de mercado / da taxa de empréstimo), quantos anúncios cada clube da IA mantém e quando o elenco é curto demais para anunciar. */
   listing: { transferShare: 0.7, loanShare: 0.8, maxPerTeam: 2, minSquad: 22, listChance: 0.5, loanAge: 24, youngLoanShare: 0.7, oldLoanShare: 0.15, userBias: 0.6 },
   /** Busca de jogadores: atalhos "Barganhas" (valor até esta fração do valor pela força sozinha) e "Jovens promessas" (idade e potencial estimado). */
@@ -557,7 +581,7 @@ export const OFFSEASON = {
     positionStep: 5,
     positionMax: 2,
     /** Reputação média de cada divisão e quanto da distância até ela o clube recupera por ano: mantém a distância entre as séries. */
-    tierMean: { 1: 12, 2: 5.5 } as Record<number, number>,
+    tierMean: { 1: 12, 2: 5.5, 3: 4 } as Record<number, number>,
     tierPull: 0.3,
     champion: 0,
     promoted: 1,
@@ -650,10 +674,12 @@ export const OFFSEASON = {
     prospectBonus: [5, 11] as readonly [number, number],
     /** Fenômeno: raríssimo (cerca de 1 por ano no mundo todo); nasce já com qualidade de craque, em qualquer time. */
     wonderkidChance: 0.006,
+    /** Fator da chance de fenômeno por divisão: a Série C é mais clubes sem aumentar o número de craques do campeonato. */
+    wonderkidTierScale: { 1: 1, 2: 1, 3: 0.3 } as Record<number, number>,
     wonderkidQuality: 86,
     wonderkidQualitySd: 2.5,
     /** Jovem de base é reserva: qualidade = nível do time − isto (±talento). */
-    qualityBelowTeam: { 1: 5, 2: 18 } as Record<number, number>,
+    qualityBelowTeam: { 1: 5, 2: 18, 3: 18 } as Record<number, number>,
   },
 } as const
 
@@ -704,9 +730,9 @@ export const ACADEMY = {
   /** Fração dos minutos possíveis que conta na evolução anual: a base evolui um pouco mais devagar que quem joga. */
   evolutionShare: 0.2,
   /** Qualidade dos garotos da base em relação à dos jovens do profissional (pontos): a IA escolhe os melhores entre vários, então o conjunto precisa começar mais fraco. */
-  qualityOffset: { 1: -8, 2: -20 } as Record<number, number>,
+  qualityOffset: { 1: -8, 2: -20, 3: -20 } as Record<number, number>,
   /** Ajuste do potencial dos garotos da base por divisão (pontos): clubes menores formam gente de teto mais baixo. */
-  potentialOffset: { 1: -2, 2: -10 } as Record<number, number>,
+  potentialOffset: { 1: -2, 2: -10, 3: -10 } as Record<number, number>,
   /** Chance de promessa entre os garotos da base (são mais garotos por ano que antes, e a IA escolhe os melhores: sem isso sobram craques demais). */
   prospectChance: 0.04,
   /** Fenômeno que chega à base: raro, mas existe (cerca de 1 a cada poucos anos no mundo todo). */

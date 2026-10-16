@@ -13,7 +13,7 @@ export interface WorldOptions {
 export interface World {
   seed: number | string
   startYear: number
-  /** Séries A e B, na ordem das definições (Série A primeiro). */
+  /** Séries A, B e C, na ordem das definições (Série A primeiro). */
   teams: Team[]
   players: Player[]
   /** Categorias de base de todos os clubes (jovens de 15 a 19 anos; não jogam partidas). */
@@ -29,7 +29,7 @@ export function generateWorld(options: WorldOptions): World {
 
   // Posição de cada time na sua série por reputação (empate: ordem das definições).
   const rankOf = new Map<string, number>()
-  for (const tier of [1, 2] as const) {
+  for (const tier of [1, 2, 3] as const) {
     TEAM_DEFINITIONS.filter((d) => d.tier === tier)
       .map((def, index) => ({ def, index }))
       .sort((a, b) => b.def.reputation - a.def.reputation || a.index - b.index)

@@ -151,9 +151,10 @@ export const MATCH_EVENT_LABELS: Record<MatchEventType, string> = {
 }
 
 /** Nome da série (divisão) pelo nível na pirâmide. */
-export const TIER_LABELS: Record<1 | 2, string> = {
+export const TIER_LABELS: Record<1 | 2 | 3, string> = {
   1: 'Série A',
   2: 'Série B',
+  3: 'Série C',
 }
 
 /** Resultado de uma partida do ponto de vista de um time. */
@@ -389,7 +390,7 @@ export function packageIssueText(issue: PackageIssue): string {
     case 'league-team-count': return `A liga em ${path.replace(/\.teams$/, '')} declara ${expected} times, mas o pacote tem ${detail} clubes nela.`
     case 'league-size-unsupported': return `Nesta versão cada divisão precisa ter ${expected} times (${path} declara ${detail}).`
     case 'league-promotion': return `Acesso e rebaixamento em ${path}: o jogo usa ${expected} (veio ${detail}).`
-    case 'unsupported-leagues': return `Este pacote tem ${detail} ligas. Por enquanto o jogo aceita um país com duas divisões (Série A e Série B); pacotes com mais ligas ainda não são suportados.`
+    case 'unsupported-leagues': return `Este pacote tem ${detail} ligas. Por enquanto o jogo aceita um país com duas ou três divisões (Série A, Série B e Série C); pacotes com mais ligas ainda não são suportados.`
     case 'tiebreakers-unsupported': return `Os critérios de desempate de ${path} são diferentes dos do jogo e serão ignorados: vale a ordem padrão.`
   }
 }

@@ -6,7 +6,7 @@ import { SEASON } from '../config'
 import { refreshListings } from '../market/listings'
 import { createRng, hashSeed } from '../rng'
 import { emptyTraining } from '../types'
-import type { Competition, CompetitionId, IsoDate, MarketState, Match, Player, Season, Team, TrainingState } from '../types'
+import type { Competition, CompetitionId, IsoDate, MarketState, Match, Player, Region, Season, Team, TrainingState } from '../types'
 import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
 import { buildLeagueRounds } from './schedule'
 
@@ -39,9 +39,9 @@ export interface RoundSlot {
 
 export const isMidweekRound = (round: number) => round % SEASON.midweekEvery === 0
 
-/** Datas de cada rodada. Rodadas de meio de semana não avançam o fim de semana seguinte. */
-export function roundSlots(year: number, roundCount: number): RoundSlot[] {
-  let saturday = onOrAfterWeekday(makeDate(year, SEASON.startMonth, SEASON.startDay), SATURDAY)
+/** Datas de cada rodada. Rodadas de meio de semana não avançam o fim de semana seguinte. `start` = mês e dia a partir do qual vale o primeiro sábado (padrão: o do calendário brasileiro). */
+export function roundSlots(year: number, roundCount: number, start: readonly [number, number] = [SEASON.startMonth, SEASON.startDay]): RoundSlot[] {
+  let saturday = onOrAfterWeekday(makeDate(year, start[0], start[1]), SATURDAY)
   let lastSaturday = saturday
   const slots: RoundSlot[] = []
   for (let round = 1; round <= roundCount; round++) {
@@ -64,14 +64,21 @@ export interface CompetitionSetup {
   name: string
   tier: number
   teams: readonly Team[]
+  /** Região (janelas de transferência), início do calendário e turno único; os padrões são os da liga brasileira. */
+  region?: Region
+  start?: [number, number]
+  rounds?: 1 | 2
 }
 
-/** Séries padrão do mundo: todos os times de cada `tier`. */
+const SERIES_LETTERS = ['a', 'b', 'c', 'd'] as const
+
+/** Séries padrão do mundo (a pirâmide do país): uma por `tier` que tem times, com todos os times dela. */
 export function defaultCompetitions(teams: readonly Team[]): CompetitionSetup[] {
-  return [
-    { id: 'serie-a', name: 'Série A', tier: 1, teams: teams.filter((t) => t.tier === 1) },
-    { id: 'serie-b', name: 'Série B', tier: 2, teams: teams.filter((t) => t.tier === 2) },
-  ]
+  const tiers = [...new Set(teams.map((t) => t.tier))].sort((a, b) => a - b)
+  return tiers.map((tier) => {
+    const letter = SERIES_LETTERS[tier - 1] ?? String(tier)
+    return { id: `serie-${letter}`, name: `Série ${letter.toUpperCase()}`, tier, teams: teams.filter((t) => t.tier === tier) }
+  })
 }
 
 export interface SeasonOptions {
@@ -93,10 +100,12 @@ export function createSeason(options: SeasonOptions): SeasonState {
   const rng = createRng(`${options.seed}:${options.year}:calendar`)
   const matches: Match[] = []
   const competitions: Competition[] = []
+  const setups = options.competitions ?? defaultCompetitions(options.teams)
+  const lowestTier = Math.max(...setups.map((s) => s.tier))
 
-  for (const setup of options.competitions ?? defaultCompetitions(options.teams)) {
-    const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id))
-    const slots = roundSlots(options.year, rounds.length)
+  for (const setup of setups) {
+    const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id), setup.rounds ?? 2)
+    const slots = roundSlots(options.year, rounds.length, setup.start)
     rounds.forEach((fixtures, roundIndex) => {
       const slot = slots[roundIndex] as RoundSlot
       fixtures.forEach((fixture, i) => {
@@ -120,8 +129,12 @@ export function createSeason(options: SeasonOptions): SeasonState {
       tier: setup.tier,
       teamIds: setup.teams.map((t) => t.id),
       roundCount: rounds.length,
+      // Pirâmide: 4 sobem de cada divisão (menos a primeira) e 4 caem de cada uma (menos a última).
       promotionSlots: setup.tier === 1 ? 0 : 4,
-      relegationSlots: setup.tier === 1 ? 4 : 0,
+      relegationSlots: setup.tier === lowestTier ? 0 : 4,
+      ...(setup.region ? { region: setup.region } : {}),
+      ...(setup.start ? { start: setup.start } : {}),
+      ...(setup.rounds ? { rounds: setup.rounds } : {}),
     })
   }
 

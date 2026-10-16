@@ -53,12 +53,12 @@ function mirror(firstHalf: readonly (readonly Fixture[])[]): Fixture[][] {
 }
 
 /**
- * Liga em turno e returno: 2 × (n − 1) rodadas. A ordem dos times é sorteada pela seed (tabelas
+ * Liga em turno e returno (`rounds` = 2, o padrão): 2 × (n − 1) rodadas; em turno único (`rounds` = 1): n − 1 rodadas. A ordem dos times é sorteada pela seed (tabelas
  * diferentes a cada temporada). Os mandos seguem a construção canônica do método do círculo (cada time
  * troca de mando a cada rodada, com no máximo uma repetição no turno); depois a ordem das rodadas é
  * girada para que a virada do turno para o returno também não crie sequência longa. Sempre há giro que serve.
  */
-export function buildLeagueRounds(teamIds: readonly TeamId[], rng: Rng): Fixture[][] {
+export function buildLeagueRounds(teamIds: readonly TeamId[], rng: Rng, rounds: 1 | 2 = 2): Fixture[][] {
   const pairs = circleRounds(rng.shuffle(teamIds))
   const flip = rng.chance(0.5)
 
@@ -72,7 +72,8 @@ export function buildLeagueRounds(teamIds: readonly TeamId[], rng: Rng): Fixture
 
   const candidates: Fixture[][][] = []
   for (let shift = 0; shift < canonical.length; shift++) {
-    const full = mirror([...canonical.slice(shift), ...canonical.slice(0, shift)])
+    const turn = [...canonical.slice(shift), ...canonical.slice(0, shift)]
+    const full = rounds === 2 ? mirror(turn) : turn.map((round) => round.map((f) => ({ ...f })))
     if (venueViolations(full) === 0) candidates.push(full)
   }
   if (candidates.length === 0) throw new Error('Não foi possível ajustar os mandos da tabela')
