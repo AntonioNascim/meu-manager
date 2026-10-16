@@ -139,7 +139,12 @@ describe('save versão 10', () => {
 
     // Continua jogando até o fim da temporada e vira o ano: a idade segue a data de nascimento.
     let next = migrated.game
-    while (next.season.season.phase !== 'end-of-season') next = playPendingAuto(advanceToMatchday(next))
+    // O técnico automático pode ser demitido pelo caminho; aqui só interessa a virada, então a demissão é ignorada.
+    for (let guard = 0; next.season.season.phase !== 'end-of-season'; guard++) {
+      expect(guard).toBeLessThan(200)
+      next = playPendingAuto(advanceToMatchday({ ...next, dismissal: undefined }))
+    }
+    next = { ...next, dismissal: undefined }
     next = startNextSeason(next)
     expect(next.season.season.year).toBe(migrated.game.season.season.year + 1)
     for (const p of next.season.players) expect(ageOn(p.birthDate, `${next.season.season.year}-01-01`)).toBe(p.age)
