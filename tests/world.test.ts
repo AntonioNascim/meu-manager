@@ -127,7 +127,8 @@ describe('times', () => {
     for (const t of world.teams) {
       expect(t.finances.balance).toBeGreaterThan(0)
       expect(t.finances.salaryBudget).toBeGreaterThan(0)
-      expect(t.stadium.capacity).toBeGreaterThan(10_000)
+      // A Série C tem estádios menores por desenho (generateTeam).
+      expect(t.stadium.capacity).toBeGreaterThan(t.tier === 3 ? 5_000 : 10_000)
       expect(t.objective.targetPosition).toBeGreaterThanOrEqual(1)
       expect(t.objective.sackingPosition).toBeGreaterThan(t.objective.targetPosition)
       expect(t.objective.sackingPosition).toBeLessThanOrEqual(20)
