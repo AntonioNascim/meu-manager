@@ -24,6 +24,8 @@ export interface Competition {
   start?: [number, number]
   /** 1 = turno único, 2 = turno e returno (padrão). */
   rounds?: 1 | 2
+  /** Pirâmide: as divisões ligadas por acesso e rebaixamento (as de um país). Sem ela, todas as competições formam uma só. */
+  pyramid?: string
 }
 
 /** Linha da classificação, sempre derivada das partidas finalizadas (nunca guardada). */

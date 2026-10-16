@@ -45,6 +45,9 @@ export const FULL_WORLD: LeagueSpec[] = [
   { id: 'pt-1', name: 'Portugal', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4 },
 ]
 
+/** A pirâmide de um país: o prefixo do id da liga (`br-1`, `br-2` e `br-3` são o Brasil). */
+export const pyramidOfLeague = (spec: Pick<LeagueSpec, 'id'>): string => spec.id.split('-')[0] as string
+
 export const BRAZIL_ONLY: LeagueSpec[] = FULL_WORLD.filter((l) => l.region === 'BR')
 
 export function buildScaleWorld(specs: LeagueSpec[], seed: number) {
@@ -64,19 +67,20 @@ export function buildScaleWorld(specs: LeagueSpec[], seed: number) {
       teams.push(made.team)
       players.push(...made.players)
     }
-    competitions.push({ id: spec.id, name: spec.name, tier: spec.tier, teams: inLeague, region: spec.region, rounds: spec.format === 'single' ? 1 : 2 })
+    competitions.push({ id: spec.id, name: spec.name, tier: spec.tier, teams: inLeague, region: spec.region, rounds: spec.format === 'single' ? 1 : 2, pyramid: pyramidOfLeague(spec) })
   })
   const academy = createAcademy({ teams, seed, year: 2026, firstNumber: ctx.nextPlayerNumber, takenNames: players.map((p) => p.name) })
   return { teams, players, academy, competitions }
 }
 
-export function buildScaleGame(specs: LeagueSpec[], seed: number): { game: Game; genMs: number; seasonMs: number } {
+/** `focus`: só a pirâmide do técnico é lance a lance e as outras ligas usam o resultado simplificado; sem ele, todas são lance a lance. */
+export function buildScaleGame(specs: LeagueSpec[], seed: number, options: { focus?: boolean } = {}): { game: Game; genMs: number; seasonMs: number } {
   let t = performance.now()
   const w = buildScaleWorld(specs, seed)
   const genMs = performance.now() - t
   const userTeamId = (w.competitions[0]?.teams[7] as Team).id
   t = performance.now()
-  let season: SeasonState = createSeason({ year: 2026, seed, teams: w.teams, players: w.players, academy: w.academy, training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } }, competitions: w.competitions })
+  let season: SeasonState = createSeason({ year: 2026, seed, teams: w.teams, players: w.players, academy: w.academy, training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } }, competitions: w.competitions, ...(options.focus ? { focus: pyramidOfLeague(specs[0] as LeagueSpec) } : {}) })
   const seasonMs = performance.now() - t
   // A diretoria não demite: o objetivo é medir custo, não desempenho.
   season = { ...season, teams: season.teams.map((tm) => (tm.id === userTeamId ? { ...tm, objective: { targetPosition: 20, sackingPosition: 20 } } : tm)) }

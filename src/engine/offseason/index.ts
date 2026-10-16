@@ -206,7 +206,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   })
 
   // 8) Nova tabela de jogos.
-  const next = createSeason({ year: nextYear, seed: state.market.seed, teams, players })
+  const next = createSeason({ year: nextYear, seed: state.market.seed, teams, players, ...(state.focus !== undefined ? { focus: state.focus } : {}) })
   const report: OffseasonReport = {
     year,
     champions,

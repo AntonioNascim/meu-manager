@@ -425,6 +425,8 @@ export const FINANCE = {
 // ---------------------------------------------------------------------------
 
 export const MARKET = {
+  /** Rodízio das negociações das ligas fora do foco do técnico: só um em cada tantos clubes age por rodada. */
+  rotation: { outOfFocusEvery: 6 },
   /** Valor de mercado: base × e^(perPoint × (força efetiva − referência)), vezes idade e contrato. */
   value: {
     base: 300_000,

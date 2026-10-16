@@ -11,6 +11,7 @@ import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { addDays, contractEndOn } from '../season/dates'
+import { actsThisRound, quickTeamIds } from '../season/fidelity'
 import type { IsoDate, Listing, OfferKind, Player, Position, Team, TeamId, TransferOffer, TransferWindow } from '../types'
 import { buyerCheck, playerDecision, sellerDecision } from './decision'
 import { listingOf } from './listings'
@@ -212,7 +213,8 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
   const rng = createRng(`${state.market.seed}:${date}:market`)
   let current = state
   const incoming: TransferOffer[] = []
-  const aiTeams = rng.shuffle(state.teams.filter((t) => t.id !== userTeamId))
+  const quick = quickTeamIds(state)
+  const aiTeams = rng.shuffle(state.teams.filter((t) => t.id !== userTeamId)).filter((t) => actsThisRound(quick, t.id, date))
 
   // Elenco de cada clube, refeito só quando uma transferência muda a lista de jogadores (antes era refeito a cada clube: custo quadrático).
   let squadsOf: Map<TeamId, Player[]> | undefined

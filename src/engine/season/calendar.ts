@@ -26,6 +26,8 @@ export interface SeasonState {
   market: MarketState
   /** Treino: plano de cada time, vaga individual e histórico mensal da força. */
   training: TrainingState
+  /** Pirâmide do técnico: só as competições dela são jogadas lance a lance, as outras usam o resultado simplificado (`fidelity.ts`). Sem ela (padrão), todas são lance a lance. */
+  focus?: string
   /** Último número usado nos ids dos jogadores (`player-N`): jovens novos continuam daqui. */
   playerCounter: number
 }
@@ -68,6 +70,8 @@ export interface CompetitionSetup {
   region?: Region
   start?: [number, number]
   rounds?: 1 | 2
+  /** Pirâmide do país (divisões ligadas por acesso e rebaixamento). */
+  pyramid?: string
 }
 
 const SERIES_LETTERS = ['a', 'b', 'c', 'd'] as const
@@ -93,6 +97,8 @@ export interface SeasonOptions {
   training?: TrainingState
   /** Padrão: Série A e Série B com os times de cada `tier`. */
   competitions?: readonly CompetitionSetup[]
+  /** Pirâmide jogada lance a lance (as outras são simplificadas); sem ela todas são lance a lance. */
+  focus?: string
 }
 
 /** Cria a temporada: todas as partidas (com data e seed) de todas as ligas, ainda por jogar. */
@@ -135,6 +141,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
       ...(setup.region ? { region: setup.region } : {}),
       ...(setup.start ? { start: setup.start } : {}),
       ...(setup.rounds ? { rounds: setup.rounds } : {}),
+      ...(setup.pyramid ? { pyramid: setup.pyramid } : {}),
     })
   }
 
@@ -152,6 +159,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
     players: [...options.players],
     academy: [...(options.academy ?? [])],
     training: options.training ?? emptyTraining(),
+    ...(options.focus !== undefined ? { focus: options.focus } : {}),
     playerCounter: [...options.players, ...(options.academy ?? [])].reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
     market: { seed: options.seed, offers: [], history: [], listings: [], preContracts: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }

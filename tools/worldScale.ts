@@ -3,7 +3,8 @@
  * Sul, seis da Europa) jogado lance a lance pelo mesmo caminho do jogo (`advanceToMatchday` + `playPendingAuto`).
  * Mede tempo por avanço e por temporada, memória, tamanho e tempo do save. Não altera o jogo.
  *
- * Uso: node --expose-gc tools/run.mjs worldScale [--world full|base|brazil] [--seed 7] [--offseason]
+ * Uso: node --expose-gc tools/run.mjs worldScale [--world full|base|brazil] [--seed 7] [--offseason] [--focus]
+ * Com --focus só a pirâmide do técnico (Brasil) é lance a lance; as outras ligas usam o resultado simplificado e o rodízio do mercado.
  */
 import os from 'node:os'
 import { gzipSync } from 'node:zlib'
@@ -134,9 +135,9 @@ function quickSimBench(game: Game): void {
   console.log(`resultado simplificado: ${(ms * 1000).toFixed(0)} µs por partida (com a força recalculada a cada jogo), ${(goals / matches.length).toFixed(2)} gols por jogo`)
 }
 
-function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason: boolean) {
+function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason: boolean, focus: boolean) {
   const heapBase = heap()
-  const built = specs ? buildScaleGame(specs, seed) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
+  const built = specs ? buildScaleGame(specs, seed, { focus }) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
   let game = built.game
   // A diretoria não demite (no mundo sintético isso já foi feito na criação).
   game = { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === game.userTeamId ? { ...t, objective: { targetPosition: 20, sackingPosition: 20 } } : t)) } }
@@ -213,6 +214,7 @@ const seed = Number(opt('seed', '7'))
 const which = opt('world', 'full')
 console.log(`Máquina de medição: ${os.cpus()[0]?.model}, ${os.cpus().length} núcleos, ${(os.totalmem() / 1e9).toFixed(1)} GB, Node ${process.version}`)
 const offseason = args.includes('--offseason')
-if (which === 'base') run('Mundo atual (Série A + B, 40 clubes)', null, seed, offseason)
-else if (which === 'brazil') run('Brasil A + B + C (60 clubes)', BRAZIL_ONLY, seed, offseason)
-else run('Mundo do plano (15 ligas)', FULL_WORLD, seed, offseason)
+const focus = args.includes('--focus')
+if (which === 'base') run('Mundo atual (Série A + B, 40 clubes)', null, seed, offseason, false)
+else if (which === 'brazil') run('Brasil A + B + C (60 clubes)', BRAZIL_ONLY, seed, offseason, focus)
+else run('Mundo do plano (15 ligas)', FULL_WORLD, seed, offseason, focus)

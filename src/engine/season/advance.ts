@@ -23,6 +23,7 @@ import { applyBirthdays } from './birthdays'
 import { applyMatchToPlayers, progressDays } from './condition'
 import { slimResult } from './compact'
 import { daysBetween } from './dates'
+import { playQuickMatch, quickCompetitionIds } from './fidelity'
 
 export type SeasonEvent = { type: 'matchday'; date: IsoDate } | { type: 'market'; date: IsoDate } | { type: 'season-end' }
 
@@ -173,10 +174,14 @@ export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions =
   }
 }
 
-/** Simula as partidas do dia (menos a do jogador, que fica pendente) e atualiza os jogadores. */
-function playMatchday(state: SeasonState, date: IsoDate, options: AdvanceOptions, notices: MarketNotice[]): AdvanceResult {
+/**
+ * Simula as partidas do dia (menos a do jogador, que fica pendente) e atualiza os jogadores. As competições fora do foco do técnico
+ * (`quickCompetitionIds`) usam o resultado simplificado, sem escalação da IA e sem lances; `allQuick` faz o mesmo com todas (pré-aquecimento).
+ */
+export function playMatchday(state: SeasonState, date: IsoDate, options: AdvanceOptions, notices: MarketNotice[], allQuick = false): AdvanceResult {
   const squads = groupByTeam(state.players)
   const teams = new Map(state.teams.map((t) => [t.id, t]))
+  const quickIds = quickCompetitionIds(state)
 
   const { userTeamId } = options
   let pendingUserMatch: Match | undefined
@@ -193,11 +198,10 @@ function playMatchday(state: SeasonState, date: IsoDate, options: AdvanceOptions
       pendingUserMatch = m
       return m
     }
-    const finished = playMatch(
-      m,
-      { team: { ...home, tactic: aiTactic(home, homeSquad) }, players: homeSquad },
-      { team: { ...away, tactic: aiTactic(away, awaySquad) }, players: awaySquad },
-    )
+    const finished =
+      allQuick || quickIds.has(m.competitionId)
+        ? playQuickMatch(m, { team: home, players: homeSquad }, { team: away, players: awaySquad })
+        : playMatch(m, { team: { ...home, tactic: aiTactic(home, homeSquad) }, players: homeSquad }, { team: { ...away, tactic: aiTactic(away, awaySquad) }, players: awaySquad })
     for (const p of applyMatchToPlayers(new Map([[home.id, homeSquad], [away.id, awaySquad]]), finished)) changed.set(p.id, p)
     teams.set(home.id, collectGate(home, away, m.date).team)
     played.push(finished)

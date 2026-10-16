@@ -11,6 +11,7 @@ import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { contractEndOn, makeDate } from '../season/dates'
+import { actsThisRound, quickTeamIds } from '../season/fidelity'
 import { SQUAD_MAX } from '../types'
 import type { IsoDate, OfferReason, Player, PlayerId, PreContract, Team, TeamId } from '../types'
 import { playerDecision } from './decision'
@@ -121,8 +122,9 @@ export function runPreContractTick(state: SeasonState, date: IsoDate, userTeamId
   let current = state
   const lost: PreContract[] = []
   if (!preContractsOpen(state, date)) return { state, lost }
+  const quick = quickTeamIds(state)
   for (const base of rng.shuffle(state.teams)) {
-    if (base.id === userTeamId || !rng.chance(P.chance)) continue
+    if (base.id === userTeamId || !actsThisRound(quick, base.id, date) || !rng.chance(P.chance)) continue
     if (current.market.preContracts.filter((c) => c.toTeamId === base.id).length >= P.maxPerClub) continue
     const made = pickTarget(current, base.id, date, rng)
     if (!made) continue
