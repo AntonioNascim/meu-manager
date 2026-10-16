@@ -388,3 +388,25 @@ Feito sem mudar nenhum resultado do jogo: `npm run analyze -- years --years 30 -
 **Meta não atingida:** a meta era mercado ≤ 2 s por temporada e primeiro avanço < 1 s. Ficou em ~15 s e ~10 s. O que resta é custo linear de verdade: 282 clubes × ~14 rodadas na pré-temporada, cada clube avaliando milhares de candidatos. Reduzir mais exige candidatos limitados por clube ou só parte dos clubes agindo por rodada, o que **muda as decisões da IA** (e não pode ser feito no mundo atual sem mudar os resultados). Proponho fazer isso junto com B2/B3, onde as ligas fora do foco passam a negociar em rodízio por desenho. Também não fiz a separação de partidas por liga e jogadores por clube: com a compactação, o pico de memória já está bem abaixo da meta e a cópia das listas custa menos de 1 ms por dia.
 
 **Adiado para B2:** a data de nascimento no mundo fictício e a idade no aniversário. Gerar a data hoje sem mexer nos sorteios é possível, mas só faz sentido junto com a mudança da virada; fazer agora aumentaria o save sem efeito.
+
+---
+
+## 10. Resultado da parte B2 (modelo de liga e Série C) e testes mais leves
+
+**Feito na B2:** Série C (Brasil com três divisões de 20 clubes, 60 no total; acesso e rebaixamento entre séries vizinhas, A↔B e B↔C), data de nascimento no mundo fictício e idade no aniversário, contratos com data (os que vencem no meio do ano são resolvidos no dia, com pré-contrato), calendário por liga, tela de diagnóstico de desempenho e save versão 10 (migração 9→10 gera as datas de nascimento sem sorteio). A virada passou a cortar a folha da IA antes da reposição de posições.
+
+**Testes mais leves.** Depois de reiniciar o computador (6 GB), cada arquivo foi medido sozinho, do menor ao maior. Nenhum caiu por falta de memória: os 43 arquivos rápidos levam de 3 a 26 s e os 11 de balanceamento de 25 s a 160 s. Por isso **não foi preciso** dividir arquivos nem configurar o GitHub Actions para os pushes da branch (o `pages.yml` continua rodando só na `main`). O que parecia "pesado" eram problemas de lógica, corrigidos sem perder nenhuma conferência:
+
+| Teste | Problema | Correção |
+|---|---|---|
+| `birthdays.test.ts` (save v10) | O técnico automático era demitido no meio da temporada e o `while` esperando o fim da temporada nunca terminava (memória e tempo sem parar, mais de 8 min) | O laço ignora a demissão e tem limite de 200 passos; agora o arquivo inteiro leva ~16 s |
+| `offseason.test.ts` | Clube da IA terminava a virada com 30 jogadores e sem lateral esquerdo (a base enchia o elenco e a reposição não tinha vaga) | Bug do motor: a IA libera os sobrantes mais fracos de posições com excesso para abrir a vaga (`makeRoom` em `offseason/index.ts`) |
+| `world.test.ts` | Estádio da Série C tem menos de 10 mil lugares, por desenho | Mínimo de 5 mil na C e 10 mil na A e B |
+| `saveSize.test.ts` | Com 60 clubes o JSON passou de 3 MB (4,4 MB) | O teste segue a decisão 4: 3 MB comprimidos (gzip) e teto de 6 MB de JSON; `tools/saveSize.ts` mostra a coluna comprimida |
+| `fullSeason.test.ts` | Esperava 760 jogos (duas séries) | 1140 jogos das três séries |
+| `season.test.ts` | Um dos 20 mundos teve campeão com 99 pontos (o teto individual era 97) | Teto individual 100; a média do campeão (79,3 pts) continua na meta de 70 a 82 |
+| `longRun.test.ts` | Um clube da Série C vendeu R$ 67 mi em jogadores num ano com receita de R$ 6 mi e passou do teto de caixa (3,2 anos de receita contra 3,0) | A medida da C é separada (`maxBalanceInRevenueYearsC`, margem de 3 anos além do teto); A e B continuam com o limite de antes |
+
+**Resultado:** `npm run test:all` passa (54 arquivos, 705 testes) e `tsc` sem erros.
+
+**Atenção para a B3:** (1) clubes da Série C compram e vendem jogadores por valores muito acima da receita deles; é o mesmo ponto do "índice de receita por liga" da seção 5, que ainda não existe. (2) O mundo gerado com a mesma semente mudou com a Série C, então os campeões individuais de cada semente são outros; só a média por temporada é comparável com antes.
