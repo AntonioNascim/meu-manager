@@ -1,4 +1,6 @@
 export { simulateMatch, startMatch } from './simulateMatch'
 export type { LiveMatch, MatchSide, MatchSnapshot, SideSnapshot } from './simulateMatch'
 export { duelChance } from './duel'
+export { simulateQuick, quickLineup, quickLines } from './quick'
+export type { QuickInput, QuickSide } from './quick'
 export type { MatchInput, MatchSideInput, PlayTrace } from './state'

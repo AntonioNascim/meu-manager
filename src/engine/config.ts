@@ -745,3 +745,50 @@ export const ACADEMY = {
   /** Estrelas do potencial (1 a 5): limites mínimos de potencial para 2, 3, 4 e 5 estrelas, e a incerteza (desvio, em pontos) aos 15 e aos 19 anos. */
   stars: { thresholds: [58, 66, 74, 82] as readonly number[], uncertaintyAt15: 5, uncertaintyAt19: 2 },
 } as const
+
+// ---------------------------------------------------------------------------
+// Resultado simplificado (ligas fora do foco do técnico)
+// ---------------------------------------------------------------------------
+
+/**
+ * Partida simplificada (`match/quick.ts`): sem lances, só o necessário para as ligas fora do foco do técnico. Os coeficientes
+ * vêm de um ajuste contra o motor completo (`npm run analyze -- quick`, `tools/quickCompare.ts`); refazer o ajuste depois de
+ * mexer no motor de partida ou na geração. Linhas na ordem goleiro, defesa, meio, ataque.
+ */
+export const QUICK = {
+  /** Jogadores por linha na escalação simplificada (goleiro, defesa, meio, ataque). */
+  quotas: [1, 4, 3, 3] as readonly number[],
+  /** Força de referência: as linhas entram nos coeficientes como diferença para este valor. */
+  reference: 65,
+  /** log do número esperado de gols = intercepto + coeficientes × (linha − referência) + casa. */
+  goals: {
+    intercept: -0.1174,
+    own: [-0.0003, 0.0039, 0.0204, 0.0266] as readonly number[],
+    opponent: [-0.0151, -0.0179, -0.0157, 0.0002] as readonly number[],
+    /** Tentativas do sorteio de gols (binomial): quanto menor, mais disperso o placar. */
+    /** Variação do dia de cada time (log-normal sobre o número esperado de gols): o motor completo tem mais variação que Poisson puro. */
+    dayNoise: 0.2,
+    trials: 40,
+    /** Multiplica os coeficientes das linhas (1 = o ajuste puro; maior deixa o time mais forte mais decisivo). */
+    scale: 1,
+    home: 0.4493,
+    /** A vantagem de jogar em casa cresce com o nível dos times (mesma unidade de `level`). */
+    homeLevel: 0.0571,
+    occupancy: -0.0329,
+    /** Nível médio dos dois times (em dezenas de pontos acima da referência): termo quadrático do log dos gols. */
+    level: 0.0186,
+  },
+  /** Substituições por time e minuto em que acontecem. */
+  subs: { count: 3, from: 55, to: 85 },
+  /** Gols, assistências e cartões: peso de cada posição e do atributo que a define. */
+  scorer: { weights: { GK: 0, RB: 0.5, LB: 0.5, CB: 0.58, DM: 0.5, CM: 1.24, AM: 0.71, RW: 0.98, LW: 0.92, ST: 1.3 }, attribute: 'finishing', power: 2.5 },
+  assist: { share: 0.54, crossShare: { RB: 0.73, LB: 0.73, RW: 0.64, LW: 0.64, AM: 0.15, ST: 0.15, CM: 0.1, DM: 0.1, CB: 0.1, GK: 0 }, weights: { GK: 0, RB: 0.42, LB: 0.31, CB: 0.15, DM: 0.255, CM: 0.77, AM: 0.96, RW: 1, LW: 1, ST: 0.85 }, power: 1.5 },
+  ownGoalPerGoal: 0.042,
+  cards: { yellowPerTeam: 2.1, redPerTeam: 0.052, weights: { GK: 0.15, RB: 0.8, LB: 0.8, CB: 1, DM: 1.3, CM: 1, AM: 0.7, RW: 0.6, LW: 0.6, ST: 0.7 } },
+  /** Chance de lesão por jogador em campo na partida (propensão 50), mesma gravidade do motor completo. */
+  injury: { perPlayer: 0.0148, lowFitnessFactor: 1.5 },
+  /** Condição perdida em 90 minutos (resistência 60) e quanto cada ponto de resistência acima disso alivia. */
+  fitness: { dropPer90: 24.8, staminaSlope: 0.25 },
+  rating: { sd: [0.38, 0.2, 0.18, 0.28] as readonly number[], skill: 0.003, shift: [1.21, 0.3, 0.13, 0.13] as readonly number[] },
+  stats: { shotsPerGoal: 10.5, possessionSlope: 0.6 },
+}

@@ -12,6 +12,7 @@
     "test:watch": "vitest --project unit",
     "analyze": "node tools/run.mjs analyze",
     "analyze:grid": "node tools/run.mjs gridSearch",
+    "analyze:quick": "node tools/run.mjs quickCompare",
     "typecheck": "tsc -b --noEmit"
   },
   "type": "module",
