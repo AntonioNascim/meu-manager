@@ -410,3 +410,58 @@ Feito sem mudar nenhum resultado do jogo: `npm run analyze -- years --years 30 -
 **Resultado:** `npm run test:all` passa (54 arquivos, 705 testes) e `tsc` sem erros.
 
 **Atenção para a B3:** (1) clubes da Série C compram e vendem jogadores por valores muito acima da receita deles; é o mesmo ponto do "índice de receita por liga" da seção 5, que ainda não existe. (2) O mundo gerado com a mesma semente mudou com a Série C, então os campeões individuais de cada semente são outros; só a média por temporada é comparável com antes.
+
+
+---
+
+## 11. Resultado da parte B3 (resultado simplificado, foco do técnico e rodízio do mercado)
+
+**Feito na B3**
+
+1. **Partida simplificada** (`src/engine/match/quick.ts`, `simulateQuick`). Mesmo formato de `MatchResult` do motor completo, sem narração: placar, gols com assistência (passe ou cruzamento), gols contra, cartões (segundo amarelo vira vermelho), minutos dos titulares e dos 3 reservas que entram, nota, condição final e lesões (mesma gravidade do motor completo). A classificação, a artilharia, a forma, a moral, as suspensões e a evolução dos jogadores usam o resultado como usam o do motor completo (`applyMatchToPlayers` não mudou). O que o sorteio usa: escalação por linha (goleiro, defesa, meio, ataque) nas cotas da formação do time, força com a condição física, gols por Poisson com o número esperado vindo das quatro linhas dos dois times, do nível dos times e da vantagem de casa (que cresce com o nível), mais uma variação do dia por time. Custo: bem abaixo de 0,5 ms por partida (teste), contra ~4,6 ms do motor completo.
+2. **Calibragem contra o motor completo** (`tools/quickMeasure.ts`, `tools/quickCompare.ts`, `npm run analyze:quick [-- --fit] [-- --tiers]`). As mesmas duplas de times, jogadas pelos dois motores (24 mil duplas em 16 mundos para o ajuste dos coeficientes de gols, por regressão de Poisson). `QUICK` em `config.ts` guarda os coeficientes; refazer o ajuste depois de mexer no motor completo ou na geração.
+3. **Foco do técnico** (`src/engine/season/fidelity.ts`). `SeasonState.focus` é a pirâmide do técnico (campo opcional; `Competition.pyramid` e `CompetitionSetup.pyramid` dizem a que pirâmide cada divisão pertence). Sem foco, tudo é lance a lance (o jogo de hoje não muda: `matchGolden` e `fullSeason` seguem iguais). Com foco, as competições das outras pirâmides usam `simulateQuick`, sem escalação da IA (`aiTactic`) e sem lances. `refocus(state, teamId)` é o que será chamado quando o técnico for para um clube de outra liga: a liga nova vira lance a lance a partir daquele dia, a antiga (se não for da mesma pirâmide) vira simplificada, e as rodadas já jogadas ficam como estão. A virada de temporada leva o foco para a temporada nova (a virada por pirâmide é da B6).
+4. **Pré-aquecimento** (`src/engine/season/warmup.ts`, `warmUp(state, data)`). Joga, pelo simplificado, as partidas marcadas antes da data de início (tabela e artilharia prontas), com recuperação física dos dias. Não roda mercado, treino nem fechamento financeiro dos meses anteriores ao início do jogo.
+5. **Rodízio das negociações fora do foco** (`actsThisRound`, `MARKET.rotation.outOfFocusEvery = 6`). Nas rodadas de negociação e no pré-contrato da IA, só um em cada 6 clubes das ligas simplificadas age (a vez de cada clube anda uma casa por semana). Os clubes do foco agem sempre, então um mundo de uma pirâmide só não muda.
+6. **Mundo de escala** (`src/diagnostics/scaleWorld.ts`): cada liga ganhou a pirâmide do país (Brasil A/B/C ligadas) e `tools/worldScale.ts --focus` joga só o Brasil lance a lance.
+
+**Calibragem: o que ficou parecido** (`tests/balance/quick.test.ts`: 3 mundos × 4.500 duplas jogadas pelos dois motores, mais 6 temporadas inteiras da Série A de cada)
+
+| | Completo | Simplificado |
+|---|---|---|
+| Gols por jogo | 2,31 a 2,45 | 2,33 a 2,40 |
+| Mandante vence | 48% | 46 a 47% |
+| Empates | 25 a 26% | 26 a 27% |
+| Time mais forte vence (diferença > 5 pontos) | 58 a 60% | 58 a 62% |
+| Gols dos atacantes | 61% | 59 a 62% |
+| Gols com assistência | 53% | 54% |
+| Amarelos por jogo | 4,2 | 4,2 |
+| Lesões por jogo / dias por lesão | 0,31 a 0,33 / 12 | 0,31 a 0,33 / 12 |
+| Condição perdida em 90 min (resistência baixa, média, alta) | 27 / 25 / 21 | 29 / 24 / 22 |
+
+Temporada inteira da Série A (6 mundos): pontos do campeão 82,7 contra 81,7; empates 26% nos dois; colocação média dos 4 elencos mais fortes 5,0 nos dois; correlação força × posição 0,77 contra 0,70. Concentração de gols e assistências (9 mundos): artilheiro 29 contra 25 gols, 5º 17,7 contra 17,6, 10º 14,0 contra 14,7, 20º 10,8 contra 11,4; líder de assistências 14,2 contra 12,1; nota média da temporada 6,20 contra 6,26.
+
+**Diferenças conhecidas (aceitas, com tolerância no teste)**
+- **Série A, mandante:** o motor completo dá ~50% de vitórias em casa na A e o simplificado ~46% (empates ~3 pontos acima). Nas séries B e C bate dentro de 1 ponto. O termo de vantagem de casa por nível reduziu, mas não eliminou; sobra uma vantagem de casa na A que as quatro linhas não explicam.
+- O elenco mais forte do simplificado termina um pouco mais em cima (2,7º contra 4,2º em média), mas os 4 mais fortes terminam no mesmo lugar médio que no completo. É variação do extremo numa amostra de 6 mundos.
+- O artilheiro e o líder de assistências da liga são um pouco menos extremos no simplificado (a cauda), e do 5º para baixo a lista fica um pouco mais achatada.
+- A nota do simplificado depende mais do resultado e dos gols e menos das ações do jogo; a média por posição bate dentro de 0,15.
+- **Treino das ligas simplificadas** continua dia a dia, como no motor completo. Aplicar o ganho do ano de uma vez só ficou fora da B3.
+
+**Custo, mundo de 282 clubes** (mesma máquina, `node --expose-gc tools/run.mjs worldScale --world full --live [--focus]`)
+
+| | Tudo lance a lance | Foco no Brasil (A+B+C) |
+|---|---|---|
+| Temporada inteira | 41,6 s | **20,2 s** |
+| Avanço típico (mediana) | 372 ms | **145 ms** |
+| p95 | 1,4 s | **0,57 s** |
+| Pior avanço (pré-temporada) | 8,2 s | **4,7 s** |
+| Pico de memória viva | ~37 MB | 37 MB |
+
+Rodízio do mercado, temporada inteira com foco no Brasil: sem rodízio 25,9 s; a cada 4 clubes 21,4 s; a cada 6 clubes ~20 s; a cada 8 clubes 15,8 s. Escolhi 6 (cada clube de fora ainda age várias vezes por janela). No iPhone 11 (estimativa de 1× a 1,5×, não medida) a temporada fica em ~20 a 30 s e o avanço típico em ~0,15 a 0,22 s. **Meta da seção 4.1 (mercado ≤ 2 s por temporada e primeiro avanço < 1 s): não atingida.** O primeiro avanço caiu de 8,2 para 4,7 s; o que resta é o mercado dos 60 clubes do foco ao longo de ~14 rodadas de pré-temporada e as 1.140 partidas do Brasil. Reduzir mais exige limitar candidatos por clube, o que muda as decisões da IA, e fica para a B6, junto com o teste das 15 ligas.
+
+**Pendências registradas para a B5 e a B6**
+1. **Economia da Série C (B5, junto com o índice de receita por liga).** Clubes da Série C compram e vendem jogadores por valores muito acima da receita deles (um clube vendeu R$ 67 mi num ano com receita de R$ 6 mi). Hoje isso só é coberto por uma margem de caixa própria da C no `longRun.test.ts` (`maxBalanceInRevenueYearsC`). A B5 precisa de: preço de mercado e orçamento de compras ligados à receita da liga (o `R` por liga), freio de compra e venda acima de uma proporção da receita, e a margem própria da C sair do teste.
+2. **Campeões acima de uns 92 pontos (B6).** Em algumas sementes o campeão passa de 92 pontos (o teto individual do `season.test.ts` está em 100 só para não quebrar; a média do campeão segue em 79 a 82). Investigar se vem de elencos desequilibrados demais (reputação de topo muito acima do resto) e ajustar a geração ou a reputação, em vez de subir o teto do teste.
+3. **Checagem de dinastias (B6).** No teste de longo prazo das 15 ligas, medir quantas temporadas seguidas o mesmo clube é campeão e quantos clubes diferentes ganham o título em 30 temporadas, em cada liga (o `longRun` de hoje só confere que os campeões variam). Rodar com o simplificado nas ligas fora do foco e com o completo, para saber se o simplificado deixa as ligas mais ou menos previsíveis (hoje o elenco mais forte termina um pouco mais em cima no simplificado).
+4. **Outras pendências da B3 para a B6:** virada por pirâmide (hoje `advanceSeason` só conhece uma pirâmide e carrega o foco), tela de troca de clube (chamar `refocus`) e treino das ligas simplificadas de uma vez só, se ainda for preciso.
