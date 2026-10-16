@@ -2,6 +2,7 @@
  * Tamanho do save ao longo de várias temporadas jogadas pelo store (time do jogador sempre no automático).
  * Usado por `npm run analyze -- save` e pelos testes de balanceamento.
  */
+import { gzipSync } from 'node:zlib'
 import { advanceToMatchday, createGame, nextEventOf, playPendingAuto, startNextSeason } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { makeEnvelope } from '../src/store/saveFormat'
@@ -11,6 +12,8 @@ export interface SizeRow {
   /** Save (JSON) no começo da temporada, no fim dela e o jogo sem compactar no fim. */
   startBytes: number
   endBytes: number
+  /** O mesmo save comprimido (gzip): é o que a meta de 3 MB mede. */
+  endGzipBytes: number
   rawEndBytes: number
   archiveBytes: number
   /** Soma dos arquivos de resultados das temporadas passadas. */
@@ -38,6 +41,7 @@ export function measureSaveSizes(years: number, seed = 12, teamId = 'team-imp'):
       year: game.season.season.year,
       startBytes: start,
       endBytes: bytes(makeEnvelope(game, 'x')),
+      endGzipBytes: gzipSync(JSON.stringify(makeEnvelope(game, 'x'))).length,
       rawEndBytes: bytes(game),
       archiveBytes: bytes(game.archive),
       seasonsArchived: game.archive.length,
@@ -53,6 +57,6 @@ const kb = (n: number) => `${(n / 1024).toFixed(0)} KB`
 export function formatSizes(rows: SizeRow[]): string {
   return [
     'ano   início     fim   (sem compactar)  resumos das temporadas passadas',
-    ...rows.map((r) => `${r.year}  ${kb(r.startBytes).padStart(7)} ${kb(r.endBytes).padStart(7)}  ${kb(r.rawEndBytes).padStart(14)}  ${kb(r.archiveBytes).padStart(10)} (${r.seasonsArchived})`),
+    ...rows.map((r) => `${r.year}  ${kb(r.startBytes).padStart(7)} ${kb(r.endBytes).padStart(7)} ${kb(r.endGzipBytes).padStart(10)}  ${kb(r.rawEndBytes).padStart(14)}  ${kb(r.archiveBytes).padStart(10)} (${r.seasonsArchived})`),
   ].join('\n')
 }

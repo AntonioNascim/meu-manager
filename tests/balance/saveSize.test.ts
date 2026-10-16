@@ -16,10 +16,12 @@ describe('tamanho do save', () => {
     expect(last.seasonsArchived).toBe(9)
   })
 
-  it('depois de 10 temporadas o save tem praticamente o mesmo tamanho (e fica abaixo de 3 MB)', () => {
+  it('depois de 10 temporadas o save tem praticamente o mesmo tamanho (3 MB comprimidos, 6 MB de JSON)', () => {
     // Nos primeiros anos o save cresce um pouco porque as bases dos clubes se enchem (de ~9 para ~13 jovens); daí em diante fica plano.
     expect(last.endBytes).toBeLessThan(first.endBytes * 1.25)
-    expect(last.endBytes).toBeLessThan(3 * 1024 * 1024)
+    // Meta da proposta da fase 2 (decisão 4): 3 MB sobre os bytes gravados (comprimidos) e um teto de ~6 MB de JSON.
+    expect(last.endGzipBytes).toBeLessThan(3 * 1024 * 1024)
+    expect(last.endBytes).toBeLessThan(6 * 1024 * 1024)
     const settled = rows[5]!
     expect(last.endBytes).toBeLessThan(settled.endBytes * 1.05)
     expect(last.startBytes).toBeLessThan(settled.startBytes * 1.05)
