@@ -19,7 +19,7 @@ import type { DepartedPlayer, OffseasonReport, Player, PlayerId, Position, Stand
 import { turnAcademy } from '../academy/turn'
 import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
-import { desiredSquadSize, positionDeficits, payrollCuts } from './squad'
+import { CORE_COUNTS, desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { retires, startNewSeason } from './evolution'
 
 export * from './contracts'
@@ -141,9 +141,15 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   const youth: OffseasonReport['youth'] = {}
   const nextYear = year + 1
   for (const team of teams) {
-    const squad = players.filter((p) => p.teamId === team.id)
+    let squad = players.filter((p) => p.teamId === team.id)
     const isUser = team.id === options.userTeamId
     const deficits = positionDeficits(squad)
+    // Elenco cheio com posição descoberta (a base promoveu gente demais): a IA libera os sobrantes mais fracos para abrir as vagas.
+    if (!isUser && deficits.length > SQUAD_MAX - squad.length) {
+      const out = new Set(makeRoom(squad, deficits.length - (SQUAD_MAX - squad.length)).map((p) => p.id))
+      players = players.map((p) => (out.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: contractEndOn(year) } } : p))
+      squad = squad.filter((p) => !out.has(p.id))
+    }
     const target = isUser ? Math.max(OFFSEASON.youth.userMinSquad, desiredSquadSize(team.reputation)) : desiredSquadSize(team.reputation)
     let count = Math.max(deficits.length, Math.min(target - squad.length, isUser ? SQUAD_MAX : OFFSEASON.youth.maxFill), OFFSEASON.youth.minPerTeam)
     count = Math.min(count, SQUAD_MAX - squad.length)
@@ -231,6 +237,22 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
 }
 
 /** Reservas que a IA corta para voltar ao tamanho máximo (os de menor valor, sem deixar posição descoberta). */
+/** Os n sobrantes mais fracos: só de posições com mais jogadores do que o núcleo pede, para não abrir outro buraco. */
+function makeRoom(squad: readonly Player[], n: number): Player[] {
+  const out: Player[] = []
+  const remaining = [...squad]
+  const keepScore = (p: Player) => playerOverall(p) + 0.5 * Math.max(0, p.hidden.potential - playerOverall(p)) + (p.age <= 21 ? 4 : 0)
+  while (out.length < n) {
+    const counts = new Map<Position, number>()
+    for (const p of remaining) counts.set(p.position, (counts.get(p.position) ?? 0) + 1)
+    const candidate = remaining.filter((p) => (counts.get(p.position) ?? 0) > CORE_COUNTS[p.position]).sort((a, b) => keepScore(a) - keepScore(b))[0]
+    if (!candidate) break
+    out.push(candidate)
+    remaining.splice(remaining.indexOf(candidate), 1)
+  }
+  return out
+}
+
 function trimExcess(squad: readonly Player[]): Player[] {
   const out: Player[] = []
   const remaining = [...squad]
