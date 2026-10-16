@@ -783,8 +783,8 @@ export const QUICK = {
   /** Substituições por time e minuto em que acontecem. */
   subs: { count: 3, from: 55, to: 85 },
   /** Gols, assistências e cartões: peso de cada posição e do atributo que a define. */
-  scorer: { weights: { GK: 0, RB: 0.5, LB: 0.5, CB: 0.58, DM: 0.5, CM: 1.24, AM: 0.71, RW: 0.98, LW: 0.92, ST: 1.3 }, attribute: 'finishing', power: 2.5 },
-  assist: { share: 0.54, crossShare: { RB: 0.73, LB: 0.73, RW: 0.64, LW: 0.64, AM: 0.15, ST: 0.15, CM: 0.1, DM: 0.1, CB: 0.1, GK: 0 }, weights: { GK: 0, RB: 0.42, LB: 0.31, CB: 0.15, DM: 0.255, CM: 0.77, AM: 0.96, RW: 1, LW: 1, ST: 0.85 }, power: 1.5 },
+  scorer: { weights: { GK: 0, RB: 0.5, LB: 0.5, CB: 0.58, DM: 0.5, CM: 1.24, AM: 0.71, RW: 0.98, LW: 0.92, ST: 1.3 }, attribute: 'finishing', power: 2.8 },
+  assist: { share: 0.54, crossShare: { RB: 0.73, LB: 0.73, RW: 0.64, LW: 0.64, AM: 0.15, ST: 0.15, CM: 0.1, DM: 0.1, CB: 0.1, GK: 0 }, weights: { GK: 0, RB: 0.42, LB: 0.31, CB: 0.15, DM: 0.255, CM: 0.77, AM: 0.96, RW: 1, LW: 1, ST: 0.85 }, power: 3.2 },
   ownGoalPerGoal: 0.042,
   cards: { yellowPerTeam: 2.1, redPerTeam: 0.052, weights: { GK: 0.15, RB: 0.8, LB: 0.8, CB: 1, DM: 1.3, CM: 1, AM: 0.7, RW: 0.6, LW: 0.6, ST: 0.7 } },
   /** Chance de lesão por jogador em campo na partida (propensão 50), mesma gravidade do motor completo. */

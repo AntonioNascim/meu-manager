@@ -186,7 +186,13 @@ function pickWeighted(rng: Rng, list: readonly Participant[], weight: (p: Partic
   return rng.weighted(list, weight)
 }
 
-const attr = (p: Participant, name: 'finishing' | 'passing', power: number) => (p.player.attributes[name] / 60) ** power
+/** Quem finaliza pesa pela finalização; quem dá o passe, por passe e visão, ou pelo cruzamento nas posições que mais cruzam. */
+const finishingSkill = (p: Participant, power: number) => (p.player.attributes.finishing / 60) ** power
+const passingSkill = (p: Participant, power: number) => {
+  const { passing, vision, crossing } = p.player.attributes
+  const cross = QUICK.assist.crossShare[p.player.position]
+  return (((1 - cross) * (passing + vision)) / 2 / 60 + (cross * crossing) / 60) ** power
+}
 
 function addGoals(events: MatchEvent[], rng: Rng, scoring: SideState, conceding: SideState): void {
   for (let i = 0; i < scoring.goals; i++) {
@@ -199,12 +205,12 @@ function addGoals(events: MatchEvent[], rng: Rng, scoring: SideState, conceding:
       }
     }
     const on = playing(scoring.all, minute)
-    const scorer = pickWeighted(rng, on, (p) => QUICK.scorer.weights[p.player.position] * attr(p, 'finishing', QUICK.scorer.power))
+    const scorer = pickWeighted(rng, on, (p) => QUICK.scorer.weights[p.player.position] * finishingSkill(p, QUICK.scorer.power))
     if (!scorer) continue
     scorer.goals++
     const event: MatchEvent = { minute, type: 'goal', teamId: scoring.side.team.id, playerId: scorer.player.id, text: '' }
     if (rng.chance(QUICK.assist.share)) {
-      const helper = pickWeighted(rng, on.filter((p) => p !== scorer), (p) => QUICK.assist.weights[p.player.position] * attr(p, 'passing', QUICK.assist.power))
+      const helper = pickWeighted(rng, on.filter((p) => p !== scorer), (p) => QUICK.assist.weights[p.player.position] * passingSkill(p, QUICK.assist.power))
       if (helper) {
         helper.assists++
         event.relatedPlayerId = helper.player.id
