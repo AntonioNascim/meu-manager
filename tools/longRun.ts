@@ -44,6 +44,8 @@ export interface YearRow {
   negativeAtEnd: number
   /** Maior saldo final em anos de receita esperada (o teto é `FINANCE.ceilingYears`). */
   maxBalanceInRevenueYears: number
+  /** O mesmo só para a Série C, cuja receita é pequena: uma venda grande de jogador pesa muito mais no caixa dela. */
+  maxBalanceInRevenueYearsC: number
   /** Reputação média da Série A. */
   reputationA: number
   reputationB: number
@@ -139,7 +141,8 @@ export function simulateYears(world: World, years: number, seed: string | number
       maxEndBalance: Math.max(...balances),
       negativeEver: lows.filter((b) => b < 0).length,
       negativeAtEnd: balances.filter((b) => b < 0).length,
-      maxBalanceInRevenueYears: Math.max(...ended.teams.map((t) => t.finances.balance / Math.max(1, revenue(t)))),
+      maxBalanceInRevenueYears: Math.max(...ended.teams.filter((t) => t.tier < 3).map((t) => t.finances.balance / Math.max(1, revenue(t)))),
+      maxBalanceInRevenueYearsC: Math.max(0, ...ended.teams.filter((t) => t.tier === 3).map((t) => t.finances.balance / Math.max(1, revenue(t)))),
     }
     if (i < years - 1) {
       const turned = advanceSeason(ended, { createYouth })

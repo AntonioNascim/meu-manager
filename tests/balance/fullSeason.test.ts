@@ -1,5 +1,5 @@
 /**
- * Temporada inteira das duas séries pelo calendário (760 partidas, alguns segundos).
+ * Temporada inteira das três séries pelo calendário (1140 partidas das 3 séries, alguns segundos).
  * Fica no projeto de balanceamento para manter o npm test rápido.
  */
 import { describe, expect, it } from 'vitest'
@@ -14,7 +14,7 @@ import {
   progressDays,
   simulateToSeasonEnd,
 } from '../../src/engine/season'
-describe('temporada inteira pelo calendário (Série A e Série B)', () => {
+describe('temporada inteira pelo calendário (Série A, B e C)', () => {
   const world = generateWorld({ seed: 31 })
   const start = createSeason({ year: 2026, seed: 'full', teams: world.teams, players: world.players })
   const t0 = performance.now()
@@ -39,8 +39,8 @@ describe('temporada inteira pelo calendário (Série A e Série B)', () => {
     )
   }
 
-  it('todas as 760 partidas são jogadas e a temporada termina', () => {
-    expect(end.matches).toHaveLength(760)
+  it('todas as 1140 partidas são jogadas e a temporada termina', () => {
+    expect(end.matches).toHaveLength(1140)
     expect(end.matches.every((m) => m.status === 'finished' && m.result)).toBe(true)
     expect(end.season.phase).toBe('end-of-season')
     expect(nextEvent(end).type).toBe('season-end')
@@ -172,7 +172,7 @@ describe('condição dos jogadores durante a temporada inteira', () => {
     expect(mean(fitnessAtKickoff)).toBeLessThan(99)
   })
 
-  it('terminada a temporada, todos os 760 jogos foram jogados', () => {
+  it('terminada a temporada, todos os 1140 jogos foram jogados', () => {
     expect(state.matches.every((m) => m.status === 'finished')).toBe(true)
   })
 })

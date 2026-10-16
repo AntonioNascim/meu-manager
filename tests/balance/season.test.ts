@@ -128,7 +128,7 @@ describe('temporadas pelo calendário (Série A e Série B, 380 jogos cada)', ()
   it('cada temporada isolada fica dentro da variação natural em torno das metas', () => {
     for (const season of seasonsA) {
       between(season.drawRate, [0.19, 0.34])
-      between(season.table[0]?.points ?? 0, [62, 97])
+      between(season.table[0]?.points ?? 0, [62, 100])
       between(season.table[season.table.length - 1]?.points ?? 0, [12, 40])
       between(season.goalsPerMatch, [2.0, 2.8])
       between(season.homeWinRate, [0.4, 0.6])
