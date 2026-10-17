@@ -12,7 +12,7 @@ import { advanceSeason } from '../src/engine/offseason'
 import { playerOverall } from '../src/engine/overall'
 import { createSeason, simulateToSeasonEnd } from '../src/engine/season'
 import type { CompetitionSetup, SeasonState } from '../src/engine/season'
-import type { Player, Team } from '../src/engine/types'
+import type { CupSpec, Player, Team } from '../src/engine/types'
 import { lowestBalance } from './longRun'
 
 export interface LeagueInit {
@@ -23,6 +23,7 @@ export interface LeagueInit {
   academy: Player[]
   competitions?: CompetitionSetup[]
   focus?: string
+  cupSpecs?: CupSpec[]
 }
 
 export interface LeagueYear {
@@ -79,7 +80,7 @@ function revenueOf(t: Team): number {
 const sumOf = (t: Team, category: string, sign: 1 | -1) => t.finances.ledger.filter((e) => e.category === category && e.amount * sign > 0).reduce((s, e) => s + e.amount * sign, 0)
 
 export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[] {
-  let state: SeasonState = createSeason({ year: init.year, seed: init.seed, teams: init.teams, players: init.players, academy: init.academy, ...(init.competitions ? { competitions: init.competitions } : {}), ...(init.focus !== undefined ? { focus: init.focus } : {}) })
+  let state: SeasonState = createSeason({ year: init.year, seed: init.seed, teams: init.teams, players: init.players, academy: init.academy, ...(init.competitions ? { competitions: init.competitions } : {}), ...(init.focus !== undefined ? { focus: init.focus } : {}), ...(init.cupSpecs ? { cupSpecs: init.cupSpecs } : {}) })
   const runs: LeagueRun[] = []
   for (let i = 0; i < years; i++) {
     const byId = new Map(state.players.map((p) => [p.id, p]))

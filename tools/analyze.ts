@@ -225,7 +225,7 @@ ${formatLeagueSummary(runs)}`)
 Temporadas seguidas (mundo ${seed}, ${years} anos; força = média dos 11 titulares; saldos em R$)
 ${formatYears(rows)}`)
     console.log(`variação ${first.year}-${last.year}: Série A ${f(last.strengthA - first.strengthA)} | Série B ${f(last.strengthB - first.strengthB)} | idade média ${f(last.meanAge - first.meanAge)} | promessas ${last.prospects - first.prospects}`)
-    const leagues = simulateLeagueYears({ year: world.startYear, seed: `years-${seed}`, teams: world.teams, players: world.players, academy: world.academy }, years)
+    const leagues = simulateLeagueYears({ year: world.startYear, seed: `years-${seed}`, teams: world.teams, players: world.players, academy: world.academy, ...(world.cups && !process.env.NO_CUPS ? { cupSpecs: world.cups } : {}) }, years)
     console.log(`
 Por liga (primeiros 3 anos → últimos 3)
 ${formatLeagueSummary(leagues)}`)

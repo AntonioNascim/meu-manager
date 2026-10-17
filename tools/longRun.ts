@@ -125,7 +125,9 @@ export function snapshot(state: SeasonState): Pick<YearRow, 'strengthA' | 'stren
 }
 
 export function simulateYears(world: World, years: number, seed: string | number = 'years', options: { market?: boolean } = {}): YearRow[] {
-  let state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy })
+  // As copas do mundo entram por padrão; `NO_CUPS=1` mede só as ligas (para comparar).
+  const cupSpecs = process.env.NO_CUPS ? undefined : world.cups
+  let state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, ...(cupSpecs ? { cupSpecs } : {}) })
   const rows: YearRow[] = []
   for (let i = 0; i < years; i++) {
     const start = snapshot(state)

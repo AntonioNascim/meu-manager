@@ -5,6 +5,7 @@
  * e pela tela `?diagnostico=1`.
  */
 import { BRAZILIAN_FIRST_NAMES, BRAZILIAN_SURNAMES, SPANISH_FIRST_NAMES, SPANISH_SURNAMES } from '../data/names'
+import { DEFAULT_CUPS } from '../data/package/cups'
 import { PACKAGE_FORMAT, PACKAGE_VERSION } from '../data/package/types'
 import type { DataPackage, PackageClub, PackageLeague, PackagePlayer } from '../data/package/types'
 import { createRng } from '../engine/rng'
@@ -124,5 +125,7 @@ export function buildScalePackage(seed = 7): DataPackage {
     leagues,
     clubs,
     players,
+    // A copa e a supercopa do Brasil (as outras copas entram na parte 3B).
+    cups: DEFAULT_CUPS.map((c) => JSON.parse(JSON.stringify(c)) as (typeof DEFAULT_CUPS)[number]),
   }
 }

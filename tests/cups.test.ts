@@ -4,7 +4,7 @@ import { defaultCupSpecs, normalizeCup } from '../src/data/package/cups'
 import { defaultPackage, loadWorld } from '../src/data/package/defaultPackage'
 import type { PackageCup } from '../src/data/package/types'
 import { validatePackage } from '../src/data/package/validate'
-import { checkBracket, cupStatus, groupTables, knockoutShape, leaguePhaseTable, stageList, tiesOfStage } from '../src/engine/cups'
+import { checkBracket, cupMatches, cupStatus, groupTables, knockoutShape, leaguePhaseTable, stageList, tiesOfStage } from '../src/engine/cups'
 import { drawGroups, drawKnockout, drawLeaguePhase } from '../src/engine/cups/draw'
 import { createRng } from '../src/engine/rng'
 import { applyMatchToPlayers, cupView, createSeason, simulateToSeasonEnd, weekday } from '../src/engine/season'
@@ -116,7 +116,7 @@ describe('a copa nacional do mundo padrão, uma temporada inteira', () => {
     expect(cup.log.map((l) => l.stage)).toEqual([0, 1, 2, 3, 4, 5])
     const sizes = [28, 16, 8, 4, 2, 1]
     cup.log.forEach((_, i) => {
-      const ties = tiesOfStage(ended.matches, cup.spec, i)
+      const ties = tiesOfStage(cupMatches(ended.matches, cup.id), cup.spec, i)
       expect(ties).toHaveLength(sizes[i]!)
       for (const t of ties) expect(t.winnerId).toBeDefined()
     })
