@@ -39,9 +39,17 @@ Fase nova do Meu Manager: sair do mundo fictício de duas divisões e chegar a u
 - Equilíbrio: nível médio por liga (`teamLevel` por liga) e testes de longo prazo com várias ligas.
 
 ### Fase 3 — Copas nacionais e continentais
-- Competições `mata-mata` e `grupos+mata-mata` (o campo `tipo` da competição já foi pensado para isso).
-- Copas nacionais por país e continentais (Europa e América do Sul), com vagas vindas da classificação das ligas.
+- Competições de mata-mata, de grupos com mata-mata e de fase de liga com mata-mata, **definidas no pacote de dados** (o nome, o formato e as vagas vêm do pacote; o jogo publicado usa nomes genéricos, porque os nomes oficiais são marcas).
+- Copas nacionais por país e continentais (Europa e América do Sul), com vagas vindas da classificação das ligas e do título de outras competições.
 - Calendário unificado (ligas + copas) e fadiga/rodízio.
+
+Dividida em partes, cada uma entregue e testada antes da seguinte:
+
+- **3A — Motor de copas e Copa do Brasil.** Competições no pacote (nome, país ou região, formato, desempate, regra do gol fora desligada por padrão, prorrogação e pênaltis, sorteio com ou sem cabeças de chave, vagas por posição na liga ou por título de outra competição, datas); mata-mata em jogo único ou ida e volta, fase de grupos e fase de liga seguidas de mata-mata; prorrogação e pênaltis decididos pelos atributos; premiação por fase; cartões e suspensões próprios de cada copa; calendário encaixando os jogos no meio de semana sem conflito com a liga; telas (chaveamento, jogos, artilharia, painel, tabela e partida). A **Copa do Brasil e a Supercopa do Brasil** entram no mundo padrão.
+- **3B — Copas e supercopas nacionais** da Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina.
+- **3C — Competições continentais:** Libertadores, Sul-Americana, Champions League, Europa League e Conference League (vagas pelas ligas e pelas copas, fase de liga e grupos, calendário de meio de semana compartilhado com as ligas e copas nacionais).
+- **3D — Ampliar o mundo:** México, Estados Unidos, Holanda e clubes de África, Ásia e Oceania, para a CONCACAF, a Copa Intercontinental, o Mundial de Clubes e a Supercopa dos Países Baixos.
+- **Fase futura — Seleções:** Copa do Mundo, Eliminatórias, Eurocopa, Copa América, Copa das Nações Africanas e Copa Asiática (calendário de datas FIFA, convocação e a liberação dos jogadores pelos clubes). Fica depois das fases 4 a 6 ou entre elas, a decidir.
 
 ### Fase 4 — Editor
 - Editor dentro do jogo para ajustar atributos, potencial, posições e dados de jogadores e clubes, salvo junto com o pacote no navegador.
