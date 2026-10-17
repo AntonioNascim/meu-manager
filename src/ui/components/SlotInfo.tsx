@@ -13,7 +13,7 @@ export function SlotInfo({ summary }: { summary: SaveSummary }) {
       <div className="min-w-0 flex-1">
         <div className="truncate font-semibold">{summary.teamName}</div>
         <div className="truncate text-xs text-slate-400">
-          Temporada {summary.year} · {TIER_LABELS[summary.tier as 1 | 2]} · {summary.seasonsPlayed} {summary.seasonsPlayed === 1 ? 'temporada' : 'temporadas'} completas
+          Temporada {summary.year} · {summary.league ?? TIER_LABELS[summary.tier as 1 | 2]} · {summary.seasonsPlayed} {summary.seasonsPlayed === 1 ? 'temporada' : 'temporadas'} completas
         </div>
         <div className="truncate text-[11px] text-slate-500">Salvo em {formatSavedAt(summary.savedAt)}</div>
       </div>

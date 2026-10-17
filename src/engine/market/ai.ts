@@ -6,6 +6,7 @@
 import { MARKET } from '../config'
 import { salaryScale } from '../economy'
 import { formationOf } from '../formations'
+import { squadForeignBlocked } from '../foreign'
 import { expectedAnnualRevenue, monthlyOperations, monthlyPayroll } from '../finance'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
@@ -178,6 +179,7 @@ function bestTarget(rng: Rng, team: Team, squad: readonly Player[], pool: readon
   for (const player of pool) {
     const need = needs.find((n) => n.position === player.position)
     if (!need || player.age > MARKET.ai.maxAge) continue
+    if (squadForeignBlocked(team, squad, player)) continue
     const gain = playerOverall(player) - need.weakest
     if (gain < MARKET.ai.minUpgrade) continue
     // O salário é barato de calcular e o preço não: quem não cabe na folha sai antes de o preço ser calculado (os dois cortes não sorteiam nada, a ordem não muda o resultado).
@@ -276,7 +278,7 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
     const verdict = playerDecision({ player: target.player, buyer: team, buyerSquad: squad, from: seller, fromSquad: sellerSquad, salary: baseSalary, kind: 'purchase' })
     const salary = verdict.accepted ? baseSalary : verdict.minimumSalary === null ? null : Math.max(baseSalary, Math.ceil(verdict.minimumSalary * 1.02))
     if (salary === null) continue
-    if (buyerCheck({ buyer: team, buyerSquad: squad, payroll: monthlyPayroll(squad), fee: target.fee, salary })) continue
+    if (buyerCheck({ buyer: team, buyerSquad: squad, payroll: monthlyPayroll(squad), fee: target.fee, salary, player: target.player })) continue
     const [minYears, maxYears] = MARKET.ai.contractYears
     current = executeTransfer(current, {
       playerId: target.player.id,
@@ -336,7 +338,7 @@ function proposeToUser(
   const salary = kind === 'loan' ? target.player.contract.salary : Math.max(expectedSalary(target.player, team), Math.round(target.player.contract.salary * 1.1))
   const verdict = playerDecision({ player: target.player, buyer: team, buyerSquad: squad, from: user, fromSquad: userSquad, salary, kind })
   if (!verdict.accepted) return undefined
-  if (buyerCheck({ buyer: team, buyerSquad: squad, payroll: monthlyPayroll(squad), fee, salary })) return undefined
+  if (buyerCheck({ buyer: team, buyerSquad: squad, payroll: monthlyPayroll(squad), fee, salary, player: target.player })) return undefined
   const lastDay = addDays(date, MARKET.windows.offerValidDays)
   return {
     id: `offer-${state.market.counter + 1}`,

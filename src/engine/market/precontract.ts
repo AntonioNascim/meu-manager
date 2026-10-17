@@ -5,6 +5,7 @@
  * passa a valer na virada de temporada (`applyPreContracts`).
  */
 import { MARKET } from '../config'
+import { squadForeignBlocked } from '../foreign'
 import { monthlyPayroll } from '../finance'
 import { overallAt } from '../overall'
 import { createRng } from '../rng'
@@ -59,7 +60,8 @@ function committedPayroll(state: SeasonState, teamId: TeamId): number {
 }
 
 /** O clube comprador pode assumir o pré-contrato (vaga no elenco do ano que vem e orçamento de salários)? */
-export function preContractBuyerCheck(state: SeasonState, buyerId: TeamId, salary: number): OfferReason | null {
+export function preContractBuyerCheck(state: SeasonState, buyerId: TeamId, salary: number, player?: Player): OfferReason | null {
+  if (player && squadForeignBlocked(teamOf(state, buyerId), nextSeasonSquad(state, buyerId), player)) return 'foreign-limit'
   if (nextSeasonSquad(state, buyerId).length >= Math.min(SQUAD_MAX - 1, MARKET.maxSquadBeforeSigning)) return 'squad-full'
   if (committedPayroll(state, buyerId) + salary > teamOf(state, buyerId).finances.salaryBudget) return 'salary-budget'
   return null
@@ -92,7 +94,7 @@ export function offerPreContract(state: SeasonState, buyerId: TeamId, playerId: 
   if (!player || !Number.isFinite(offer.salary) || offer.salary <= 0 || !PRE_CONTRACT_YEARS.includes(offer.years as 1)) throw new OfferError('invalid')
   if (player.teamId === buyerId) throw new OfferError('own-player')
   if (!canPreContract(state, player, date)) throw new OfferError('not-eligible')
-  const problem = preContractBuyerCheck(state, buyerId, offer.salary)
+  const problem = preContractBuyerCheck(state, buyerId, offer.salary, player)
   if (problem) return { state, accepted: false, reason: problem }
   const buyer = teamOf(state, buyerId)
   const from = teamOf(state, player.teamId as TeamId)
@@ -151,7 +153,7 @@ function pickTarget(state: SeasonState, buyerId: TeamId, date: IsoDate, rng: Rng
     if (p.teamId === buyerId || p.teamId === null || p.contract.loanedFrom || !inPreContractWindow(p, date) || signed.has(p.id) || p.age > MARKET.ai.maxAge) continue
     if ((losses.get(p.teamId as TeamId) ?? 0) >= P.maxLossPerClub) continue
     const need = needs.find((n) => n.position === p.position)
-    if (!need) continue
+    if (!need || squadForeignBlocked(buyer, squad, p)) continue
     const gain = overallAt(p, p.position) - need.weakest
     if (gain < MARKET.ai.minUpgrade + P.extraUpgrade) continue
     const salary = Math.ceil(expectedSalary(p, buyer) / 500) * 500

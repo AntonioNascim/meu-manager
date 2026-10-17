@@ -21,6 +21,7 @@ export type OfferReason =
   | 'invalid'
   | 'no-interest'
   | 'not-eligible'
+  | 'foreign-limit'
 
 export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired'
 

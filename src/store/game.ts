@@ -9,6 +9,7 @@ import type { DataPackage } from '../data/package/types'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
 import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
+import { lineupForeignCount } from '../engine/foreign'
 import { dismissedReputation, jobOpenings, moveCoach, seasonReputation, startingCoach } from '../engine/career'
 import type { Coach, JobOpening } from '../engine/career'
 import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth } from '../engine/academy'
@@ -44,8 +45,10 @@ export type ArchivedMatch = [round: number, opponentId: string, home: 0 | 1, goa
 /** O que se guarda de uma temporada encerrada (os jogos completos, com lances e notas, não ficam). */
 export interface SeasonArchive {
   year: number
-  /** Classificação final de cada série (índice = série − 1). */
+  /** Classificação final de cada liga (sem `competitions`: índice = série − 1, o jogo de uma pirâmide só). */
   tables: ArchivedRow[][]
+  /** Ids das ligas na ordem de `tables` (mundos com mais de uma pirâmide). */
+  competitions?: string[]
   /** Todos os jogos do time do jogador na temporada, resumidos. */
   userMatches: ArchivedMatch[]
 }
@@ -162,8 +165,8 @@ export function startNextSeason(game: Game): Game {
 /** Resume a temporada que acabou: classificação final das séries e os jogos do time do jogador. */
 export function archiveSeason(game: Game): SeasonArchive {
   const { season } = game.season
-  const tables = [...season.competitions]
-    .sort((a, b) => a.tier - b.tier)
+  const ordered = [...season.competitions].sort((a, b) => a.tier - b.tier)
+  const tables = ordered
     .map((c) => standingsOf(game, c).map((r): ArchivedRow => [r.teamId, r.played, r.wins, r.draws, r.losses, r.goalsFor, r.goalsAgainst, r.points]))
   const userMatches = game.season.matches
     .filter((m) => m.status === 'finished' && m.result && (m.homeTeamId === game.userTeamId || m.awayTeamId === game.userTeamId))
@@ -173,7 +176,8 @@ export function archiveSeason(game: Game): SeasonArchive {
       const r = m.result as MatchResult
       return [m.round, home ? m.awayTeamId : m.homeTeamId, home ? 1 : 0, home ? r.homeGoals : r.awayGoals, home ? r.awayGoals : r.homeGoals]
     })
-  return { year: season.year, tables, userMatches }
+  const pyramids = new Set(season.competitions.map((c) => c.pyramid))
+  return { year: season.year, tables, userMatches, ...(pyramids.size > 1 ? { competitions: ordered.map((c) => c.id) } : {}) }
 }
 
 /** Registra o resultado da partida pendente (jogada ao vivo ou automaticamente). */
@@ -216,6 +220,14 @@ export function requestUserFunds(game: Game): { game: Game; result: FundsResult 
 }
 
 export function setUserTactic(game: Game, tactic: Tactic): Game {
+  // Limite de estrangeiros da liga: a escalação não pode ter mais estrangeiros que o máximo (nem mais que a de hoje, se ela já passava).
+  const team = userTeam(game)
+  const max = team.foreignLimit?.lineup
+  if (max !== undefined) {
+    const squad = squadOf(game, game.userTeamId)
+    const now = lineupForeignCount(tactic, squad, team)
+    if (now > max && now > lineupForeignCount(team.tactic, squad, team)) throw new Error(`Limite de estrangeiros da liga: no máximo ${max} entre os titulares.`)
+  }
   return { ...game, season: setTeamTactic(game.season, game.userTeamId, tactic) }
 }
 
@@ -404,6 +416,13 @@ export const nextEventOf = (game: Game): SeasonEvent => nextEvent(game.season)
 
 export function userCompetition(game: Game): Competition {
   return game.season.season.competitions.find((c) => c.teamIds.includes(game.userTeamId)) as Competition
+}
+
+/** Nome da liga da divisão `tier` na pirâmide do técnico ("Série A", "Liga Inglaterra"...). */
+export function tierName(game: Game, tier: number): string {
+  const mine = userCompetition(game)
+  const found = game.season.season.competitions.find((c) => c.tier === tier && c.pyramid === mine.pyramid)
+  return found?.name ?? `Divisão ${tier}`
 }
 
 export function competitionMatches(game: Game, competitionId: string): Match[] {

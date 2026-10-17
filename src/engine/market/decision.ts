@@ -4,6 +4,7 @@
  * As decisões são determinísticas, para o jogador poder entender e negociar.
  */
 import { MARKET } from '../config'
+import { squadForeignBlocked } from '../foreign'
 import { clubLevel, exportPremium } from '../economy'
 import { formationOf } from '../formations'
 import { playerOverall } from '../overall'
@@ -122,8 +123,9 @@ export const premiumPrice = (price: number, seller: Partial<Pick<Team, 'tier' | 
   buyer ? Math.round((price * exportPremium(seller, buyer)) / 10_000) * 10_000 : price
 
 /** O comprador pode pagar? Orçamento de transferências, caixa e folha. */
-export function buyerCheck(args: { buyer: Team; buyerSquad: readonly Player[]; payroll: number; fee: number; salary: number }): OfferReason | null {
-  const { buyer, buyerSquad, payroll, fee, salary } = args
+export function buyerCheck(args: { buyer: Team; buyerSquad: readonly Player[]; payroll: number; fee: number; salary: number; player: Pick<Player, 'id' | 'nationality'> }): OfferReason | null {
+  const { buyer, buyerSquad, payroll, fee, salary, player } = args
+  if (squadForeignBlocked(buyer, buyerSquad, player)) return 'foreign-limit'
   if (buyerSquad.length > Math.min(SQUAD_MAX - 1, MARKET.maxSquadBeforeSigning)) return 'squad-full'
   if (fee > buyer.finances.transferBudget || fee > buyer.finances.balance) return 'budget'
   if (payroll + salary > buyer.finances.salaryBudget) return 'salary-budget'

@@ -1,5 +1,6 @@
 /** Efeitos de uma transferência no estado da temporada: jogador, elencos, caixa e histórico. */
 import { repairTactic } from '../lineup'
+import { lineupForeign } from '../foreign'
 import { recordEntry } from '../finance'
 import type { SeasonState } from '../season/calendar'
 import type { IsoDate, OfferKind, Player, PlayerId, Team, TeamId } from '../types'
@@ -23,7 +24,7 @@ const roundClause = (salary: number) => Math.round((salary * 36) / 1000) * 1000
 function withoutPlayer(team: Team, squadAfter: readonly Player[], playerId: PlayerId): Team {
   const squad = team.squad.filter((id) => id !== playerId)
   const ids = new Set(squad)
-  const tactic = repairTactic(team.tactic, squadAfter.filter((p) => ids.has(p.id)))
+  const tactic = repairTactic(team.tactic, squadAfter.filter((p) => ids.has(p.id)), lineupForeign(team))
   return { ...team, squad, tactic }
 }
 

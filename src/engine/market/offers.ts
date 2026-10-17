@@ -55,7 +55,7 @@ export function makeOffer(state: SeasonState, buyerId: TeamId, request: OfferReq
   if (state.market.offers.some((o) => o.status === 'pending' && o.direction === 'outgoing' && o.playerId === player.id)) throw new OfferError('duplicate')
 
   const buyer = teamOf(state, buyerId)
-  const problem = buyerCheck({ buyer, buyerSquad: playersOf(state, buyerId), payroll: monthlyPayroll(playersOf(state, buyerId)), fee: request.fee, salary: request.salary })
+  const problem = buyerCheck({ buyer, buyerSquad: playersOf(state, buyerId), payroll: monthlyPayroll(playersOf(state, buyerId)), fee: request.fee, salary: request.salary, player })
   if (problem) throw new OfferError(problem)
 
   return withOffer(state, {
@@ -83,7 +83,7 @@ function decide(state: SeasonState, offer: TransferOffer, date: IsoDate): Season
 
   const buyer = teamOf(state, offer.buyerId)
   const buyerSquad = playersOf(state, offer.buyerId)
-  const problem = buyerCheck({ buyer, buyerSquad, payroll: monthlyPayroll(buyerSquad), fee: offer.fee, salary: offer.salary })
+  const problem = buyerCheck({ buyer, buyerSquad, payroll: monthlyPayroll(buyerSquad), fee: offer.fee, salary: offer.salary, player })
   if (problem) return reject(problem)
 
   const seller = offer.sellerId ? teamOf(state, offer.sellerId) : null
@@ -137,7 +137,7 @@ export function respondToOffer(state: SeasonState, offerId: string, accept: bool
   if (!player || player.teamId !== offer.sellerId) return updateOffer(state, offerId, { status: 'withdrawn', reason: 'unavailable', decidedOn: date })
   const buyerSquad = playersOf(state, offer.buyerId)
   const buyer = teamOf(state, offer.buyerId)
-  const problem = buyerCheck({ buyer, buyerSquad, payroll: monthlyPayroll(buyerSquad), fee: offer.fee, salary: offer.salary })
+  const problem = buyerCheck({ buyer, buyerSquad, payroll: monthlyPayroll(buyerSquad), fee: offer.fee, salary: offer.salary, player })
   if (problem) return updateOffer(state, offerId, { status: 'withdrawn', reason: problem, decidedOn: date })
   if (playersOf(state, offer.sellerId as TeamId).length - 1 < SQUAD_MIN) throw new OfferError('squad-size')
   const done = executeTransfer(state, { playerId: player.id, toTeamId: offer.buyerId, fee: offer.fee, salary: offer.salary, contractEnd: offer.contractEnd, kind: offer.kind, date })

@@ -1,7 +1,7 @@
 import { ATTRIBUTE_MAX, BENCH_SIZE, LINEUP, MATCH } from './config'
 import { formationOf } from './formations'
 import { overallAt, playerOverall } from './overall'
-import type { Formation, GridPoint, Mentality, Player, PlayerId, PlayStyle, Position, Tactic } from './types'
+import type { Formation, GridPoint, Mentality, Nationality, Player, PlayerId, PlayStyle, Position, Tactic } from './types'
 
 export function isAvailable(player: Player): boolean {
   return player.condition.injuryDaysLeft === 0 && player.condition.suspensionGames === 0
@@ -29,6 +29,8 @@ export interface LineupOptions {
   rested?: boolean
   /** Valores de encaixe já calculados (usado ao comparar formações do mesmo elenco). */
   cache?: FitCache
+  /** Limite de estrangeiros entre os titulares (país da liga e máximo); sem ele, sem limite. */
+  foreign?: { country: Nationality; max: number }
 }
 
 /**
@@ -111,6 +113,29 @@ export function evaluateFormation(players: readonly Player[], formation: Formati
     }
   }
 
+  // 3) limite de estrangeiros: troca o estrangeiro que menos perde pela vaga por um jogador da casa que ainda não joga
+  if (options.foreign) {
+    const { country, max } = options.foreign
+    const foreign = (c: number) => (pool[c] as Player).nationality !== country
+    for (;;) {
+      const slots = slotPlayer.map((_, s) => s).filter((s) => foreign(slotPlayer[s] as number))
+      if (slots.length <= max) break
+      let best: { s: number; c: number; loss: number } | undefined
+      for (const s of slots) {
+        const current = slotPlayer[s] as number
+        for (let c = 0; c < pool.length; c++) {
+          if (used.has(c) || foreign(c)) continue
+          const loss = at(current, s) - at(c, s)
+          if (!best || loss < best.loss) best = { s, c, loss }
+        }
+      }
+      if (!best) break
+      used.delete(slotPlayer[best.s] as number)
+      used.add(best.c)
+      slotPlayer[best.s] = best.c
+    }
+  }
+
   const startingXI = slotPlayer.map((p) => (pool[p] as Player).id)
   const total = slotPlayer.reduce((sum, p, s) => sum + at(p, s), 0)
   return { formationId: formation.id, startingXI, score: total }
@@ -180,14 +205,15 @@ export function buildTactic(
  * melhor reserva disponível para a vaga, sem mexer no resto (formação, estilo e quem está bem).
  * Devolve a própria tática quando nada precisa mudar.
  */
-export function repairTactic(tactic: Tactic, squad: readonly Player[]): Tactic {
+export function repairTactic(tactic: Tactic, squad: readonly Player[], foreign?: LineupOptions['foreign']): Tactic {
   const byId = new Map(squad.map((p) => [p.id, p]))
   const formation = formationOf(tactic)
   const ok = (id: PlayerId) => {
     const p = byId.get(id)
     return p !== undefined && isAvailable(p)
   }
-  if (tactic.startingXI.every(ok) && tactic.bench.every(ok) && ok(tactic.captainId)) return tactic
+  const overLimit = foreign !== undefined && tactic.startingXI.filter((id) => byId.get(id)?.nationality !== foreign.country).length > foreign.max
+  if (!overLimit && tactic.startingXI.every(ok) && tactic.bench.every(ok) && ok(tactic.captainId)) return tactic
 
   const taken = new Set(tactic.startingXI.filter(ok))
   const startingXI = tactic.startingXI.map((id, i) => {
@@ -198,6 +224,26 @@ export function repairTactic(tactic: Tactic, squad: readonly Player[]): Tactic {
     taken.add(best.id)
     return best.id
   })
+  // Limite de estrangeiros: quem passa do máximo dá a vaga ao jogador da casa disponível que menos faz falta.
+  if (foreign) {
+    const isForeignId = (id: PlayerId) => byId.get(id)?.nationality !== foreign.country
+    for (;;) {
+      const slots = startingXI.map((_, i) => i).filter((i) => isForeignId(startingXI[i] as PlayerId))
+      if (slots.length <= foreign.max) break
+      let best: { i: number; id: PlayerId; loss: number } | undefined
+      for (const i of slots) {
+        const slot = formation.slots[i]?.position as Position
+        const current = byId.get(startingXI[i] as PlayerId) as Player
+        for (const p of squad) {
+          if (!isAvailable(p) || startingXI.includes(p.id) || p.nationality !== foreign.country) continue
+          const loss = overallAt(current, slot) - overallAt(p, slot)
+          if (!best || loss < best.loss) best = { i, id: p.id, loss }
+        }
+      }
+      if (!best) break
+      startingXI[best.i] = best.id
+    }
+  }
   const kept = tactic.bench.filter((id) => ok(id) && !startingXI.includes(id))
   const rest = pickBench(squad, [...startingXI, ...kept], BENCH_SIZE - kept.length)
   const xi = startingXI.map((id) => byId.get(id) as Player)

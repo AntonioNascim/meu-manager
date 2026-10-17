@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { Competition } from '../../engine/types'
 import type { Game } from '../../store/game'
-import { TIER_LABELS } from '../labels'
 import { TopTabs } from '../theme'
 import { History } from './standings/History'
 import { Leaders } from './standings/Leaders'
@@ -38,18 +37,18 @@ export function Standings({ game, initialSection = 'table' }: { game: Game; init
     <div className="space-y-3">
       <TopTabs scroll value={section} onChange={setSection} options={SECTIONS} />
       {section !== 'history' && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[...competitions]
-            .sort((a, b) => a.tier - b.tier)
+            .sort((a, b) => Number(b.pyramid === mine.pyramid) - Number(a.pyramid === mine.pyramid) || a.tier - b.tier)
             .map((c) => (
               <button
                 key={c.id}
                 type="button"
                 aria-pressed={c.id === competitionId}
                 onClick={() => setCompetitionId(c.id)}
-                className={`min-h-11 flex-1 rounded-full border text-sm font-bold ${c.id === competitionId ? 'border-amber-300 bg-gradient-to-b from-amber-200 to-amber-400 text-bg' : 'border-line bg-surface text-slate-200'}`}
+                className={`min-h-11 ${competitions.length > 3 ? 'shrink-0 px-4' : 'flex-1'} rounded-full border text-sm font-bold ${c.id === competitionId ? 'border-amber-300 bg-gradient-to-b from-amber-200 to-amber-400 text-bg' : 'border-line bg-surface text-slate-200'}`}
               >
-                {TIER_LABELS[c.tier as 1 | 2] ?? c.name}
+                {c.name}
               </button>
             ))}
         </div>

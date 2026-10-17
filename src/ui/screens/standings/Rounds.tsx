@@ -5,7 +5,6 @@ import type { Game } from '../../../store/game'
 import { formatDate, playerName } from '../../format'
 import { Icon, Sheet } from '../../theme'
 import { SectionHeader, TeamLink } from './parts'
-import { TIER_LABELS } from '../../labels'
 
 /** Rodada mostrada ao abrir: a primeira que ainda tem jogo por disputar (a última, se a temporada acabou). */
 export function currentRound(matches: readonly Match[], roundCount: number): number {
@@ -81,7 +80,7 @@ export function Rounds({ game, competition, onTeam }: { game: Game; competition:
 
   return (
     <div className="space-y-3">
-      <SectionHeader icon="calendar" title="Rodadas" subtitle={`${TIER_LABELS[competition.tier as 1 | 2] ?? competition.name} · temporada ${game.season.season.year}`} tone="violet" />
+      <SectionHeader icon="calendar" title="Rodadas" subtitle={`${competition.name} · temporada ${game.season.season.year}`} tone="violet" />
       <div className="flex items-center justify-between rounded-2xl border border-line bg-surface p-2">
         <button type="button" className="min-h-12 min-w-12 rounded-xl border border-line bg-surface-2 text-xl font-bold disabled:opacity-30" disabled={round <= 1} onClick={() => setChosen(round - 1)} aria-label="Rodada anterior">
           ‹

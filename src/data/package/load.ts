@@ -2,6 +2,7 @@ import { FORMATION_TIE_TOLERANCE } from '../../engine/config'
 import { defaultTicketPrice } from '../../engine/finance'
 import { FORMATION_IDS, getFormation } from '../../engine/formations'
 import { buildTactic, rankFormations } from '../../engine/lineup'
+import { lineupForeign } from '../../engine/foreign'
 import { createRng } from '../../engine/rng'
 import { leagueRevenue } from '../../engine/economy'
 import type { CompetitionSetup } from '../../engine/season'
@@ -23,13 +24,13 @@ export interface LoadOptions {
  * Tática, finanças, torcida e meta da diretoria de um clube que o pacote não detalha, derivadas de forma estável
  * (o sorteio vem só do `id` do clube): a mesma lógica da geração do mundo fictício, a partir da reputação e da divisão.
  */
-export function deriveClubGame(club: PackageClub, rank: number, players: readonly Player[], economy?: LeagueEconomy): PackageClubGame {
+export function deriveClubGame(club: PackageClub, rank: number, players: readonly Player[], economy?: LeagueEconomy, rules: Pick<Team, 'country' | 'foreignLimit'> = {}): PackageClubGame {
   const rng = createRng(`club-game:${club.id}`)
   const ranking = rankFormations(players, FORMATION_IDS.map(getFormation))
   const best = ranking[0]?.score ?? 0
   const nearBest = ranking.filter((r) => r.score >= best * (1 - FORMATION_TIE_TOLERANCE))
   const formationId = rng.pick(nearBest).formationId
-  const tactic = buildTactic(players, { formationId, style: pickStyle(rng, club.reputation), mentality: pickMentality(rng, club.reputation) })
+  const tactic = buildTactic(players, { formationId, style: pickStyle(rng, club.reputation), mentality: pickMentality(rng, club.reputation) }, { ...(lineupForeign(rules) ? { foreign: lineupForeign(rules) } : {}) })
   const monthlyPayroll = players.reduce((sum, p) => sum + p.contract.salary, 0)
   const balance = Math.round((club.reputation ** 2 * 400_000 * leagueRevenue({ economy }) * rng.float(0.85, 1.15)) / 10_000) * 10_000
   const target = Math.min(rank, 16)
@@ -120,7 +121,7 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
     const league = leagueOf(club.id)
     const { country, economy } = leagueSetup(league)
     const squad = squads.get(club.id) ?? []
-    const game = club.game ?? deriveClubGame(club, rankOf.get(club.id) ?? 20, squad, economy)
+    const game = club.game ?? deriveClubGame(club, rankOf.get(club.id) ?? 20, squad, economy, { country, ...(league.foreignLimit ? { foreignLimit: league.foreignLimit } : {}) })
     return {
       id: club.id,
       name: club.name,

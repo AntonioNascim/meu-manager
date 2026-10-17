@@ -17,6 +17,7 @@ import {
   standingsOf,
   teamById,
   teamStrength,
+  tierName,
   userCompetition,
   userIndividualTraining,
   userTeam,
@@ -27,7 +28,7 @@ import { updateGame } from '../../store/gameStore'
 import { Card } from '../components/ui'
 import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TIER_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS } from '../labels'
+import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS } from '../labels'
 import { Highlights } from './dashboard/Highlights'
 import { MiniTable } from './dashboard/MiniTable'
 import { NoticeCenter } from './dashboard/NoticeCenter'
@@ -71,10 +72,10 @@ function SeasonReport({ game, report }: { game: Game; report: OffseasonReport })
   return (
     <Card title={`Temporada ${report.year} encerrada`}>
       <ul className="space-y-1 text-sm">
-        {report.champions.map((id, i) => <li key={id}>Campeão da {TIER_LABELS[(i + 1) as 1 | 2 | 3] ?? `Série ${i + 1}`}: <b>{name(id)}</b></li>)}
+        {report.champions.map((id, i) => <li key={id}>Campeão da {tierName(game, i + 1)}: <b>{name(id)}</b></li>)}
         <li className="text-win">Subiram: {report.promoted.map(name).join(', ')}</li>
         <li className="text-loss">Caíram: {report.relegated.map(name).join(', ')}</li>
-        {mine && <li>Seu time terminou em {mine.position}º na {TIER_LABELS[mine.tier as 1 | 2 | 3] ?? `Série ${mine.tier}`}.</li>}
+        {mine && <li>Seu time terminou em {mine.position}º na {tierName(game, mine.tier)}.</li>}
         {reputation && reputation.to !== reputation.from && <li>Reputação do clube: {reputation.from} → {reputation.to}.</li>}
         {gone(report.retired).length > 0 && <li>Aposentaram-se: {gone(report.retired).map((d) => `${d.name} (${d.age})`).join(', ')}.</li>}
         {gone(report.released).length > 0 && <li>Contratos vencidos: {gone(report.released).map((d) => d.name).join(', ')}.</li>}
@@ -196,7 +197,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
         <Crest team={team} size="xl" />
         <div className="min-w-0 flex-1">
           <h1 className="title line-clamp-2 text-4xl sm:text-5xl">{team.name}</h1>
-          <p className="text-sm text-muted">{TIER_LABELS[team.tier as 1 | 2] ?? competition.name} · {team.stadium.name}</p>
+          <p className="text-sm text-muted">{competition.name} · {team.stadium.name}</p>
         </div>
       </header>
 

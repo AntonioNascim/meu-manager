@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { ForeignNote } from '../components/ForeignNote'
+import { lineupForeign } from '../../engine/foreign'
 import { FORMATION_IDS, formationOf } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
 import { buildTactic } from '../../engine/lineup'
@@ -212,6 +214,7 @@ export function Tactics({ game }: { game: Game }) {
       </p>
       <Pitch tactic={tactic} players={byId} selectedId={selectedId} onTap={tap} onMove={move} />
       <p className="text-[11px] text-slate-500">Número = força na vaga · borda laranja = improvisado · C capitão · P pênaltis · F faltas</p>
+      <ForeignNote team={team} tactic={tactic} squad={squad} />
       {error && <p className="rounded-lg bg-rose-900/60 p-2 text-sm text-rose-100">{error}</p>}
 
       <Card title="Estilo de jogo">
@@ -262,7 +265,7 @@ export function Tactics({ game }: { game: Game }) {
         variant="secondary"
         className="w-full"
         onClick={() => {
-          apply((t) => buildTactic(squad, { formationId: t.formationId, grid: t.grid, style: t.style, mentality: t.mentality }, { rested: true }))
+          apply((t) => buildTactic(squad, { formationId: t.formationId, grid: t.grid, style: t.style, mentality: t.mentality }, { rested: true, ...(lineupForeign(team) ? { foreign: lineupForeign(team) } : {}) }))
           setSelectedId(null)
         }}
       >

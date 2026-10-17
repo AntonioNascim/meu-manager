@@ -1,6 +1,5 @@
 import type { Game } from '../../../store/game'
-import { teamById } from '../../../store/game'
-import { TIER_LABELS } from '../../labels'
+import { teamById, tierName } from '../../../store/game'
 import { Icon, Panel } from '../../theme'
 import { SectionHeader, TeamLink, shortName } from './parts'
 
@@ -17,7 +16,7 @@ export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => 
           <div className="flex items-baseline justify-between">
             <h3 className="title text-3xl">{s.year}</h3>
             <span className="text-xs font-bold text-accent">
-              Seu time: {s.userPosition}º na {TIER_LABELS[s.userTier as 1 | 2] ?? `Série ${s.userTier}`}
+              Seu time: {s.userPosition}º na {tierName(game, s.userTier)}
             </span>
           </div>
           <ul className="mt-3 space-y-2 text-sm">
@@ -26,7 +25,7 @@ export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => 
                 <span className="text-amber-300">
                   <Icon name="trophy" size={18} />
                 </span>
-                <span className="w-16 shrink-0 text-xs text-muted">{TIER_LABELS[(i + 1) as 1 | 2] ?? `Série ${i + 1}`}</span>
+                <span className="w-16 shrink-0 text-xs text-muted">{tierName(game, i + 1)}</span>
                 <TeamLink team={name(id)} onOpen={onTeam} className="font-bold" />
               </li>
             ))}

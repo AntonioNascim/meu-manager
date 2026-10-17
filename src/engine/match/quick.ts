@@ -8,6 +8,7 @@
  * contra o motor completo por `tools/quickCompare.ts` e conferidos em `tests/balance/quick.test.ts`.
  */
 import { MATCH, QUICK } from '../config'
+import { lineupForeign } from '../foreign'
 import { FORMATIONS } from '../formations'
 import { restedFactor } from '../lineup'
 import { playerOverall } from '../overall'
@@ -17,7 +18,7 @@ import type { MatchEvent, MatchResult, Player, PlayerMatchResult, Position, Team
 
 export interface QuickSide {
   /** A formação do time define quantos jogadores de cada linha entram (opcional). */
-  team: Pick<Team, 'id' | 'name'> & { tactic?: Pick<Team['tactic'], 'formationId'> }
+  team: Pick<Team, 'id' | 'name'> & Partial<Pick<Team, 'country' | 'foreignLimit'>> & { tactic?: Pick<Team['tactic'], 'formationId'> }
   players: readonly Player[]
 }
 
@@ -84,18 +85,25 @@ function quotasOf(formationId: string | undefined): readonly number[] {
 }
 
 /** Os 11 melhores disponíveis por linha, nas cotas da formação do time; a falta de jogador numa linha é coberta pelos melhores que sobram. */
-export function quickLineup(players: readonly Player[], formationId?: string): { xi: Player[]; bench: Player[] } {
+export function quickLineup(players: readonly Player[], formationId?: string, foreign?: { country: string; max: number }): { xi: Player[]; bench: Player[] } {
   const available = players.filter((p) => p.condition.injuryDaysLeft === 0 && p.condition.suspensionGames === 0)
   const ranked = available.map((p) => ({ p, s: effectiveStrength(p) })).sort((a, b) => b.s - a.s)
   const xi: Player[] = []
   const used = new Set<Player>()
+  // Limite de estrangeiros da liga: depois do máximo, só entra jogador da casa.
+  let foreigners = 0
+  const blocked = (p: Player) => foreign !== undefined && p.nationality !== foreign.country && foreigners >= foreign.max
+  const take = (p: Player) => {
+    if (foreign !== undefined && p.nationality !== foreign.country) foreigners++
+    xi.push(p)
+    used.add(p)
+  }
   quotasOf(formationId).forEach((quota, group) => {
     let taken = 0
     for (const { p } of ranked) {
       if (taken >= quota) break
-      if (GROUP_OF[p.position] === group && !used.has(p)) {
-        xi.push(p)
-        used.add(p)
+      if (GROUP_OF[p.position] === group && !used.has(p) && !blocked(p)) {
+        take(p)
         taken++
       }
     }
@@ -103,10 +111,7 @@ export function quickLineup(players: readonly Player[], formationId?: string): {
   for (const { p } of ranked) {
     if (xi.length >= 11) break
     // Sem goleiro disponível, ninguém de linha vai ao gol: o time joga sem ele (raro).
-    if (!used.has(p) && p.position !== 'GK') {
-      xi.push(p)
-      used.add(p)
-    }
+    if (!used.has(p) && p.position !== 'GK' && !blocked(p)) take(p)
   }
   const bench = ranked.filter(({ p }) => !used.has(p)).map(({ p }) => p)
   return { xi, bench }
@@ -163,7 +168,7 @@ function expectedGoals(attack: SideState, defense: SideState, isHome: boolean, f
 }
 
 function buildSide(side: QuickSide, rng: Rng): SideState {
-  const { xi, bench } = quickLineup(side.players, side.team.tactic?.formationId)
+  const { xi, bench } = quickLineup(side.players, side.team.tactic?.formationId, lineupForeign(side.team))
   const starters = xi.map((p) => participant(p, 0, 90))
   const all = [...starters]
   // Trocas: o mais cansado de linha sai e o melhor reserva entra, uma vez cada.

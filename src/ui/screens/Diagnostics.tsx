@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { REFERENCE_TARGETS, formatReport, measureWorld, readDevice } from '../../diagnostics/measure'
+import { REFERENCE_TARGETS, formatImportReport, formatReport, measureImport, measureWorld, readDevice } from '../../diagnostics/measure'
+import { buildScalePackage } from '../../diagnostics/scalePackage'
 import type { DeviceInfo, Measurement, WorldChoice } from '../../diagnostics/measure'
 
 /** Tela escondida (`?diagnostico=1`): mede o desempenho no próprio aparelho e mostra um texto para copiar. Não usa nem altera o jogo salvo. */
@@ -11,6 +12,7 @@ export function Diagnostics() {
   const [progress, setProgress] = useState('')
   const [report, setReport] = useState('')
   const [copied, setCopied] = useState(false)
+  const [importReport, setImportReport] = useState('')
 
   useEffect(() => {
     void readDevice().then(setDevice)
@@ -35,6 +37,38 @@ export function Diagnostics() {
     }
     setReport(formatReport(device, result, note))
     setProgress('Pronto.')
+    setRunning(false)
+  }
+
+  /** Mede importar um pacote (gerado aqui ou escolhido do aparelho) e começar um jogo com ele. */
+  const runImport = async (source: 'generated' | File) => {
+    if (running) return
+    setRunning(true)
+    setImportReport('')
+    setCopied(false)
+    setProgress(source === 'generated' ? 'Gerando o pacote de 15 ligas...' : 'Lendo o arquivo...')
+    const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+    await tick()
+    try {
+      let text: string
+      let readMs: number | undefined
+      let label = 'gerado na tela (15 ligas, exemplo)'
+      if (source === 'generated') {
+        text = JSON.stringify(buildScalePackage(7))
+      } else {
+        const t = performance.now()
+        text = await source.text()
+        readMs = performance.now() - t
+        label = source.name
+      }
+      setProgress('Importando e começando um jogo...')
+      await tick()
+      const m = await measureImport(text, { label, ...(readMs !== undefined ? { readMs } : {}) })
+      setImportReport(formatImportReport(m))
+      setProgress('Pronto.')
+    } catch (e) {
+      setProgress(`Erro: ${(e as Error).message}`)
+    }
     setRunning(false)
   }
 
@@ -98,6 +132,26 @@ export function Diagnostics() {
         <p className="min-h-5 text-sm text-muted" aria-live="polite">
           {progress}
         </p>
+      </section>
+
+      <section className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3" data-testid="import-section">
+        <h2 className="title text-base">Importar um pacote de dados</h2>
+        <p className="text-sm text-muted">Mede ler, validar, guardar e montar o mundo de um pacote e começar um jogo com ele. Não mexe nos pacotes nem nos jogos guardados.</p>
+        <button type="button" disabled={running} onClick={() => void runImport('generated')} className="min-h-12 rounded-lg border border-line px-4 disabled:opacity-50">
+          Medir com o pacote de exemplo (15 ligas)
+        </button>
+        <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-line px-4 text-center text-sm">
+          Medir com um arquivo do aparelho (.json)
+          <input type="file" accept=".json,application/json" className="hidden" disabled={running} onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void runImport(file) }} />
+        </label>
+        {importReport && (
+          <>
+            <textarea readOnly value={importReport} rows={9} className="w-full rounded-lg border border-line bg-bg p-2 font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+            <button type="button" onClick={() => void navigator.clipboard?.writeText(importReport).then(() => setCopied(true))} className="min-h-12 rounded-lg bg-accent px-4 font-semibold text-accent-ink">
+              {copied ? 'Copiado!' : 'Copiar resultado da importação'}
+            </button>
+          </>
+        )}
       </section>
 
       {report && (

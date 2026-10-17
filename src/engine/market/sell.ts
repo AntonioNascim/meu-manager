@@ -34,7 +34,7 @@ export function buyerInterest(state: SeasonState, buyerId: TeamId, player: Playe
   const ceiling = kind === 'loan' ? loanFee(player, date, userClub) * MARKET.userSale.loanWillingness : marketValue(player, date, userClub) * MARKET.userSale.purchaseWillingness
   const maxFee = Math.round(ceiling / 10_000) * 10_000
   const salary = kind === 'loan' ? player.contract.salary : Math.max(expectedSalary(player, buyer), player.contract.salary)
-  const problem = buyerCheck({ buyer, buyerSquad: squad, payroll: monthlyPayroll(squad), fee: 0, salary })
+  const problem = buyerCheck({ buyer, buyerSquad: squad, payroll: monthlyPayroll(squad), fee: 0, salary, player })
   if (problem) return { teamId: buyerId, maxFee: null, reason: problem }
   return { teamId: buyerId, maxFee: Math.min(maxFee, buyer.finances.transferBudget, buyer.finances.balance) }
 }

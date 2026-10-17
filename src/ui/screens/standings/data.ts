@@ -46,7 +46,7 @@ export function standingsFor(game: Game, competition: Competition, year: number)
     )
   }
   const archive = game.archive.find((a) => a.year === year)
-  return archivedStandings(archive?.tables[competition.tier - 1] ?? [])
+  return archivedStandings(archive?.tables[archive.competitions ? archive.competitions.indexOf(competition.id) : competition.tier - 1] ?? [])
 }
 
 export type LeaderKind = 'goals' | 'home-goals' | 'away-goals' | 'brazilians' | 'under-23' | 'assists' | 'pass-assists' | 'cross-assists' | 'yellow' | 'red'

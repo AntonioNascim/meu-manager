@@ -4,6 +4,7 @@
  * Funções puras: recebem a temporada encerrada e devolvem a nova, mais um relatório do que aconteceu.
  */
 import { ACADEMY, FINANCE, MARKET, OFFSEASON } from '../config'
+import { lineupForeign } from '../foreign'
 import { defaultTicketPrice, monthlyPayroll, summarizeLedger, sustainablePayroll } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
 import { playerOverall } from '../overall'
@@ -216,7 +217,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     const summary = summarizeLedger(t.finances.ledger)
     const payroll = monthlyPayroll(squad)
     const isUser = t.id === options.userTeamId
-    const tactic = isUser ? repairTactic(t.tactic, squad) : buildTactic(squad, { formationId: t.tactic.formationId, style: t.tactic.style, mentality: t.tactic.mentality })
+    const tactic = isUser ? repairTactic(t.tactic, squad, lineupForeign(t)) : buildTactic(squad, { formationId: t.tactic.formationId, style: t.tactic.style, mentality: t.tactic.mentality }, { ...(lineupForeign(t) ? { foreign: lineupForeign(t) } : {}) })
     return {
       ...t,
       squad: squad.map((p) => p.id),

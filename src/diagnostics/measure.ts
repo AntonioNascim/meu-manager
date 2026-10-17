@@ -3,7 +3,9 @@
  * mesmo caminho do jogo e devolve tempos e memória num texto fácil de copiar. Não toca no jogo salvo.
  * Sem React nem DOM aqui (o que depende do navegador entra por `readDevice`), para poder ser testado.
  */
-import { advanceToMatchday, nextEventOf, playPendingAuto } from '../store/game'
+import { loadWorld } from '../data/package/defaultPackage'
+import { validatePackage } from '../data/package/validate'
+import { advanceToMatchday, createGame, nextEventOf, playPendingAuto } from '../store/game'
 import type { Game } from '../store/game'
 import { makeEnvelope } from '../store/saveFormat'
 import { canCompress } from '../store/compress'
@@ -347,5 +349,114 @@ export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', 
     '',
     `Referencia: ${T.device}. Metas: temporada ate ${T.seasonSeconds} s, avanco tipico ate ${T.typicalAdvanceMs} ms, pior avanco ate ${T.worstAdvanceSeconds} s, memoria ate ${T.peakMemoryMb} MB.`,
   ]
+  return lines.join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// Importar um pacote de dados e começar um jogo (B7)
+// ---------------------------------------------------------------------------
+
+/** Metas no aparelho de referência para importar um pacote do tamanho do plano (15 ligas, 282 clubes) e começar o jogo. */
+export const IMPORT_TARGETS = { importSeconds: 5, startSeconds: 8 } as const
+
+export interface ImportMeasurement {
+  label: string
+  sizeMb: number
+  clubs: number
+  players: number
+  leagues: number
+  countries: number
+  /** Ler o arquivo do aparelho (só quando veio de um arquivo). */
+  readMs: number | null
+  /** `JSON.parse` e validação do pacote. */
+  parseMs: number
+  validateMs: number
+  /** Copiar o pacote para o IndexedDB (cópia estruturada, que é o grosso do custo de guardá-lo). */
+  cloneMs: number | null
+  /** Montar o mundo: atributos dos jogadores, táticas, finanças e base. */
+  worldMs: number
+  /** Montar a temporada (calendário de todas as ligas) e o jogo. */
+  gameMs: number
+  /** Primeiro avanço do jogo novo. */
+  firstAdvanceMs: number
+  /** Primeiro save do jogo novo (grava tudo); `null` sem IndexedDB. */
+  firstSaveMs: number | null
+  /** Importar (ler + validar + guardar + montar o mundo) e começar (criar o jogo + primeiro avanço). */
+  importMs: number
+  startMs: number
+  errors: number
+  warnings: number
+}
+
+/**
+ * Mede o caminho do jogador: ler o arquivo, validar, guardar no navegador, montar o mundo e criar o jogo com o primeiro clube
+ * (e dar o primeiro avanço). Não toca nos saves nem nos pacotes guardados (o save de teste vai para o banco do diagnóstico).
+ */
+export async function measureImport(text: string, options: { label: string; readMs?: number; saveStore?: SaveStore | null } = { label: 'pacote' }): Promise<ImportMeasurement> {
+  const sizeMb = Math.round((text.length / 1024 / 1024) * 100) / 100
+  const t0 = performance.now()
+  let data: unknown
+  try {
+    data = JSON.parse(text)
+  } catch {
+    data = null
+  }
+  const parseMs = performance.now() - t0
+  const t1 = performance.now()
+  const { pkg, report } = validatePackage(data)
+  const validateMs = performance.now() - t1
+  const empty: ImportMeasurement = { label: options.label, sizeMb, clubs: 0, players: 0, leagues: 0, countries: 0, readMs: options.readMs ?? null, parseMs, validateMs, cloneMs: null, worldMs: 0, gameMs: 0, firstAdvanceMs: 0, firstSaveMs: null, importMs: parseMs + validateMs, startMs: 0, errors: report.errors.length, warnings: report.warnings.length }
+  if (!pkg) return empty
+
+  let cloneMs: number | null = null
+  try {
+    const t = performance.now()
+    structuredClone(pkg)
+    cloneMs = performance.now() - t
+  } catch {
+    cloneMs = null
+  }
+  const t2 = performance.now()
+  const world = loadWorld(1, pkg)
+  const worldMs = performance.now() - t2
+  const firstClub = world.competitions?.[0]?.teams[0] ?? world.teams[0]
+  const t3 = performance.now()
+  let game = createGame(1, (firstClub as { id: string }).id, { world, dataPackage: pkg })
+  const gameMs = performance.now() - t3
+  const t4 = performance.now()
+  game = playPendingAuto(advanceToMatchday(game))
+  const firstAdvanceMs = performance.now() - t4
+  let firstSaveMs: number | null = null
+  const store = options.saveStore === undefined ? (typeof indexedDB !== 'undefined' ? new SaveStore('meu-manager-diagnostico') : null) : options.saveStore
+  if (store) {
+    try {
+      firstSaveMs = (await store.saveDetailed(1, game)).stats.ms
+    } catch {
+      firstSaveMs = null
+    }
+    if (options.saveStore === undefined) await store.destroy().catch(() => undefined)
+  }
+  const importMs = (options.readMs ?? 0) + parseMs + validateMs + (cloneMs ?? 0) + worldMs
+  return { ...empty, clubs: pkg.clubs.length, players: pkg.players.length, leagues: pkg.leagues.length, countries: pkg.countries.length, cloneMs, worldMs, gameMs, firstAdvanceMs, firstSaveMs, importMs, startMs: gameMs + firstAdvanceMs }
+}
+
+/** Texto das medidas de importação, para juntar ao relatório do aparelho. */
+export function formatImportReport(m: ImportMeasurement): string {
+  const T = IMPORT_TARGETS
+  const ok = (good: boolean) => (good ? 'ok' : 'ACIMA DA META')
+  const f0 = (n: number) => n.toFixed(0)
+  const lines = [
+    `Pacote: ${m.label} - ${m.sizeMb} MB, ${m.countries} paises, ${m.leagues} ligas, ${m.clubs} clubes, ${m.players} jogadores`,
+    m.errors > 0 ? `O pacote tem ${m.errors} erro(s) de validacao: nada foi montado.` : `Validacao: ${m.errors} erros, ${m.warnings} avisos`,
+    `Ler o arquivo: ${m.readMs === null ? 'nao se aplica (pacote gerado na tela)' : `${f0(m.readMs)} ms`} | JSON.parse: ${f0(m.parseMs)} ms | validar: ${f0(m.validateMs)} ms | guardar no navegador (copia): ${m.cloneMs === null ? 'indisponivel' : `${f0(m.cloneMs)} ms`}`,
+  ]
+  if (m.errors === 0) {
+    lines.push(
+      `Montar o mundo (atributos, taticas, financas, base): ${f0(m.worldMs)} ms`,
+      `Importar (tudo acima): ${(m.importMs / 1000).toFixed(1)} s - meta ${T.importSeconds} s: ${ok(m.importMs / 1000 <= T.importSeconds)}`,
+      `Criar o jogo (calendario das ligas): ${f0(m.gameMs)} ms | primeiro avanco: ${f0(m.firstAdvanceMs)} ms | primeiro save: ${m.firstSaveMs === null ? 'indisponivel' : `${f0(m.firstSaveMs)} ms`}`,
+      `Comecar o jogo (criar + primeiro avanco): ${(m.startMs / 1000).toFixed(1)} s - meta ${T.startSeconds} s: ${ok(m.startMs / 1000 <= T.startSeconds)}`,
+    )
+  }
   return lines.join('\n')
 }

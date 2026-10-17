@@ -3,7 +3,7 @@ import type { Match, StandingRow } from '../../../engine/types'
 import { competitionMatches, squadOf, standingsOf, teamById, teamStrength } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { formatDate, playerName } from '../../format'
-import { POSITION_SHORT_LABELS, TIER_LABELS } from '../../labels'
+import { POSITION_SHORT_LABELS } from '../../labels'
 import { playerOverall } from '../../../engine/overall'
 import { shortName } from './parts'
 import { Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
@@ -39,7 +39,7 @@ export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; t
         <div className="min-w-0">
           <h2 className="title text-4xl">{team.name}</h2>
           <p className="text-xs text-muted">
-            {competition ? (TIER_LABELS[competition.tier as 1 | 2] ?? competition.name) : ''} · {team.city}/{team.state}
+            {competition?.name ?? ''} · {team.city}/{team.state}
           </p>
           <p className="text-xs text-muted">{team.stadium.name}</p>
           {mine && <span className="mt-1 inline-block rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-ink">Seu time</span>}

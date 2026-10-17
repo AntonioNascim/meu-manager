@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ForeignNote } from '../../components/ForeignNote'
 import { FORMATION_IDS, formationOf } from '../../../engine/formations'
 import { shapeOf } from '../../../engine/grid'
 import { overallAt, playerOverall } from '../../../engine/overall'
@@ -251,6 +252,7 @@ export function Lineup({ game }: { game: Game }) {
       </p>
       <Pitch tactic={tactic} players={byId} colors={team.colors} selectedId={selectedId} onTap={tap} onMove={move} />
       <p className="text-[11px] text-muted">Selo = posição da vaga e força nela · selo roxo = fora da posição natural · C capitão · barra = condição · carinha = moral</p>
+      <ForeignNote team={team} tactic={tactic} squad={squad} />
       {error && <p className="rounded-xl border border-loss/40 bg-loss/10 p-2 text-sm text-loss">{error}</p>}
 
       <Panel className="overflow-hidden">

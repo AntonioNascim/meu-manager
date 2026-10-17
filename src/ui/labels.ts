@@ -230,6 +230,7 @@ export const OFFER_REASON_LABELS: Record<OfferReason, string> = {
   budget: 'Orçamento de transferências insuficiente',
   'salary-budget': 'Orçamento de salários insuficiente: ajuste a divisão em Finanças',
   'squad-full': 'Elenco cheio',
+  'foreign-limit': 'Limite de estrangeiros da liga: o clube não pode ter mais um',
   'window-closed': 'Janela de transferências fechada',
   'own-player': 'O jogador já é do seu time',
   duplicate: 'Já existe uma proposta pendente por ele',

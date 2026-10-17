@@ -8,6 +8,7 @@
  * suspensões, forma e moral).
  */
 import { collectGate, matchAttendance, monthStartsBetween, settleMonth } from '../finance'
+import { lineupForeign } from '../foreign'
 import { buildTactic, repairTactic } from '../lineup'
 import { expireOffers, nextMarketEvent, refreshListings, resolveDueOffers, runMarketTick, runPreContractTick } from '../market'
 import type { MarketEvent } from '../market'
@@ -61,8 +62,13 @@ function groupByTeam(players: readonly Player[]): Map<TeamId, Player[]> {
  * Escalação da IA para o jogo: mesma formação, estilo e mentalidade do time, mas com os
  * jogadores disponíveis (sem lesão nem suspensão) e descansados.
  */
+const foreignOpt = (team: Team) => {
+  const foreign = lineupForeign(team)
+  return foreign ? { foreign } : {}
+}
+
 export function aiTactic(team: Team, squad: readonly Player[]) {
-  return buildTactic(squad, { formationId: team.tactic.formationId, style: team.tactic.style, mentality: team.tactic.mentality }, { rested: true })
+  return buildTactic(squad, { formationId: team.tactic.formationId, style: team.tactic.style, mentality: team.tactic.mentality }, { rested: true, ...foreignOpt(team) })
 }
 
 /** Simula uma partida agendada com a seed dela (mesma seed = mesmo resultado). */
@@ -237,7 +243,7 @@ export function userMatchInput(state: SeasonState, match: Match, userTeamId: Tea
   const side = (id: TeamId) => {
     const team = teamOf(id)
     const squad = squads.get(id) ?? []
-    const tactic = id === userTeamId ? repairTactic(team.tactic, squad) : aiTactic(team, squad)
+    const tactic = id === userTeamId ? repairTactic(team.tactic, squad, lineupForeign(team)) : aiTactic(team, squad)
     return { team: { ...team, tactic }, players: squad }
   }
   return {

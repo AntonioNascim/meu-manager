@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Competition } from '../../../engine/types'
 import { teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { TIER_LABELS, ZONE_LABELS } from '../../labels'
+import { ZONE_LABELS } from '../../labels'
 import type { Zone } from '../../labels'
 import { Icon } from '../../theme'
 import { seasonYears, standingsFor, teamForm } from './data'
@@ -45,7 +45,7 @@ export function Table({ game, competition, onTeam }: { game: Game; competition: 
 
   return (
     <div className="space-y-3">
-      <SectionHeader icon="trophy" title="Campeonato" subtitle={`${TIER_LABELS[competition.tier as 1 | 2] ?? competition.name} · temporada ${year}`} tone="gold" />
+      <SectionHeader icon="trophy" title="Campeonato" subtitle={`${competition.name} · temporada ${year}`} tone="gold" />
       <div className="flex items-center justify-between rounded-2xl border border-line bg-surface p-1">
         <button type="button" className="min-h-11 min-w-12 rounded-xl text-xl font-bold disabled:opacity-30" disabled={index <= 0} onClick={() => setYear(years[index - 1] as number)} aria-label="Temporada anterior">
           ‹
