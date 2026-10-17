@@ -1,4 +1,4 @@
-import { pendingIncoming, windowAt } from '../../../engine/market'
+import { pendingIncoming, windowOfTeam } from '../../../engine/market'
 import { academyAlert, lastYearContracts, squadOf, teamById, userJobOpenings, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { daysBetween, formatDate } from '../../format'
@@ -105,7 +105,7 @@ export function dashboardNotices(game: Game): DashboardNotice[] {
     out.push({ id: 'jobs', tone: 'info', icon: 'swap', title: plural(jobs.length, 'clube quer você', 'clubes querem você'), detail: `${list(jobs.map((j) => teamById(game, j.teamId).name), 2)}: veja as propostas de técnico.`, to: 'career' })
   }
 
-  const window = windowAt(state.season, state.matches, today)
+  const window = windowOfTeam(state, today, game.userTeamId)
   if (window) {
     out.push({ id: 'window', tone: 'accent', icon: 'swap', title: 'Janela de transferências aberta', detail: `${WINDOW_LABELS[window.name]} · ${window.end === today ? 'fecha hoje' : `fecha ${inDays(daysBetween(today, window.end))}`} (${formatDate(window.end)})`, to: 'market' })
   }

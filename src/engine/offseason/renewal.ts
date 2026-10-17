@@ -42,10 +42,11 @@ export function renewalDecision(args: { player: Player; team: Pick<Team, 'reputa
   return { accepted: true }
 }
 
-/** Contratos que terminam até o fim de `lastYear`, dos que vencem primeiro aos últimos. */
-export function expiringContracts(state: Pick<SeasonState, 'players'>, teamId: TeamId, lastYear: number): Player[] {
+/** Contratos que terminam até o último dia da temporada do clube (ou de `seasonsAhead` temporadas depois), dos que vencem primeiro aos últimos. */
+export function expiringContracts(state: Pick<SeasonState, 'players' | 'cycles' | 'season' | 'focus'>, teamId: TeamId, seasonsAhead = 0): Player[] {
+  const end = contractEndAfter(cycleOfTeam(state, teamId), seasonsAhead)
   return state.players
-    .filter((p) => p.teamId === teamId && !p.contract.loanedFrom && Number(p.contract.endDate.slice(0, 4)) <= lastYear)
+    .filter((p) => p.teamId === teamId && !p.contract.loanedFrom && p.contract.endDate <= end)
     .sort((a, b) => a.contract.endDate.localeCompare(b.contract.endDate) || playerOverall(b) - playerOverall(a))
 }
 

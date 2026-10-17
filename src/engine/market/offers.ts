@@ -12,7 +12,7 @@ import type { IsoDate, OfferKind, OfferReason, Team, TeamId, TransferOffer } fro
 import { buyerCheck, playerDecision, sellerDecision } from './decision'
 import { listingOf } from './listings'
 import { executeTransfer, playersOf } from './transfer'
-import { windowAt } from './windows'
+import { focusRegion, windowOf, windowOfTeam } from './windows'
 
 /** Erro de uma proposta inválida; `code` é o motivo (rótulo em `labels.ts`). */
 export class OfferError extends Error {
@@ -31,8 +31,14 @@ export interface OfferRequest {
 
 const teamOf = (state: SeasonState, id: TeamId) => state.teams.find((t) => t.id === id) as Team
 
-export const isWindowOpen = (state: SeasonState, date: IsoDate = state.season.currentDate): boolean =>
-  windowAt(state.season, state.matches, date) !== null
+/**
+ * A janela de transferências está aberta? Com `teams`, a de todos esses clubes (cada um segue a janela da região da liga dele); sem,
+ * a da região do foco (a do técnico).
+ */
+export const isWindowOpen = (state: SeasonState, date: IsoDate = state.season.currentDate, teams?: readonly (TeamId | null | undefined)[]): boolean => {
+  const ids = (teams ?? []).filter((t): t is TeamId => typeof t === 'string')
+  return ids.length > 0 ? ids.every((id) => windowOfTeam(state, date, id) !== null) : windowOf(state, date, focusRegion(state)) !== null
+}
 
 const nextOfferId = (state: SeasonState) => `offer-${state.market.counter + 1}`
 
@@ -46,7 +52,7 @@ function updateOffer(state: SeasonState, id: string, change: Partial<TransferOff
 
 /** O jogador (time `buyerId`) faz uma proposta de compra, empréstimo ou contratação de jogador livre. */
 export function makeOffer(state: SeasonState, buyerId: TeamId, request: OfferRequest, date: IsoDate = state.season.currentDate): SeasonState {
-  if (!isWindowOpen(state, date)) throw new OfferError('window-closed')
+  if (!isWindowOpen(state, date, [buyerId])) throw new OfferError('window-closed')
   const player = state.players.find((p) => p.id === request.playerId)
   if (!player || request.salary <= 0 || request.fee < 0 || !Number.isFinite(request.fee + request.salary) || request.contractEnd <= date) throw new OfferError('invalid')
   if (player.teamId === buyerId) throw new OfferError('own-player')
@@ -115,11 +121,10 @@ export function resolveDueOffers(state: SeasonState, date: IsoDate): { state: Se
 
 /** Propostas recebidas que passaram da validade (ou cuja janela fechou) deixam de valer. */
 export function expireOffers(state: SeasonState, date: IsoDate): SeasonState {
-  const windowOpen = isWindowOpen(state, date)
   let changed = false
   const offers = state.market.offers.map((o) => {
     if (o.status !== 'pending' || o.direction !== 'incoming') return o
-    if (o.dueOn >= date && windowOpen) return o
+    if (o.dueOn >= date && isWindowOpen(state, date, [o.buyerId, o.sellerId])) return o
     changed = true
     return { ...o, status: 'expired' as const, decidedOn: date }
   })
@@ -131,7 +136,7 @@ export function respondToOffer(state: SeasonState, offerId: string, accept: bool
   const offer = state.market.offers.find((o) => o.id === offerId)
   if (!offer || offer.direction !== 'incoming' || offer.status !== 'pending') throw new OfferError('invalid')
   if (!accept) return updateOffer(state, offerId, { status: 'rejected', decidedOn: date })
-  if (!isWindowOpen(state, date)) throw new OfferError('window-closed')
+  if (!isWindowOpen(state, date, [offer.buyerId, offer.sellerId])) throw new OfferError('window-closed')
 
   const player = state.players.find((p) => p.id === offer.playerId)
   if (!player || player.teamId !== offer.sellerId) return updateOffer(state, offerId, { status: 'withdrawn', reason: 'unavailable', decidedOn: date })

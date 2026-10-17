@@ -3,7 +3,7 @@
  * de 1º de janeiro a 31 de dezembro) ou atravessando o ano (Europa: de 1º de julho a 30 de junho, jogada de agosto a maio). A virada
  * de temporada, os contratos, as metas e as copas de um país seguem o ciclo dele (`SeasonState.cycles`).
  */
-import type { Competition, Cycle, IsoDate, Match, SeasonPhase, TeamId } from '../types'
+import type { Competition, Cycle, IsoDate, Match, Region, SeasonPhase, TeamId } from '../types'
 import { DEFAULT_PYRAMID, pyramidOf } from './fidelity'
 import { makeDate } from './dates'
 import type { SeasonState } from './calendar'
@@ -50,18 +50,29 @@ export function cycleOfPyramid(state: Pick<SeasonState, 'cycles' | 'season'>, py
   return state.cycles[pyramid] ?? makeCycle(state.season.year, false)
 }
 
-const TEAM_PYRAMID = new WeakMap<readonly Competition[], Map<TeamId, string>>()
+const TEAM_COMPETITION = new WeakMap<readonly Competition[], Map<TeamId, Competition>>()
+
+/** A divisão em que o clube joga. */
+export function competitionOfTeamId(state: Pick<SeasonState, 'season'>, teamId: TeamId): Competition | undefined {
+  const competitions = state.season.competitions
+  let map = TEAM_COMPETITION.get(competitions)
+  if (!map) {
+    map = new Map()
+    for (const c of competitions) for (const id of c.teamIds) map.set(id, c)
+    TEAM_COMPETITION.set(competitions, map)
+  }
+  return map.get(teamId)
+}
 
 /** A pirâmide de um clube (pelas competições em que está). */
 export function pyramidOfTeamId(state: Pick<SeasonState, 'season'>, teamId: TeamId): string | undefined {
-  const competitions = state.season.competitions
-  let map = TEAM_PYRAMID.get(competitions)
-  if (!map) {
-    map = new Map()
-    for (const c of competitions) for (const id of c.teamIds) map.set(id, pyramidOf(c))
-    TEAM_PYRAMID.set(competitions, map)
-  }
-  return map.get(teamId)
+  const competition = competitionOfTeamId(state, teamId)
+  return competition ? pyramidOf(competition) : undefined
+}
+
+/** A região do clube (as janelas de transferência seguem a liga dele); padrão: Brasil. */
+export function regionOfTeam(state: Pick<SeasonState, 'season'>, teamId: TeamId): Region {
+  return competitionOfTeamId(state, teamId)?.region ?? 'BR'
 }
 
 /** A temporada do clube (a do país dele); clube sem competição usa a do foco. */

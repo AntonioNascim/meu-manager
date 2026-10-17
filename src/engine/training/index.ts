@@ -14,7 +14,8 @@ import { developmentFactor, stochasticRound, yearlyGain } from '../offseason/evo
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
-import { addDays, ageAtSeasonStart, daysBetween } from '../season/dates'
+import { addDays, ageAtSeasonStart, ageOn, daysBetween } from '../season/dates'
+import { competitionsOf, cycleOfPyramid, focusPyramid, pyramidOfTeamId } from '../season/cycles'
 import { GOALKEEPER_ATTRIBUTES, MENTAL_ATTRIBUTES, PHYSICAL_ATTRIBUTES, TECHNICAL_ATTRIBUTES } from '../types'
 import type {
   AttributeName,
@@ -90,18 +91,25 @@ export function planFor(training: Pick<TrainingState, 'plans'>, teamId: TeamId, 
   return training.plans[teamId] ?? { intensity: days >= TRAINING.ai.shortWeek[0] && days <= TRAINING.ai.shortWeek[1] ? 'light' : 'normal', focus: 'balanced' }
 }
 
-/** Primeira e última data de jogos da temporada (as partidas são criadas ordenadas por data). */
-function competitionSpan(state: SeasonState): { first: IsoDate; last: IsoDate; rounds: number } | null {
+/** Primeira e última data de jogos de liga da temporada de uma pirâmide (cada país tem a sua). */
+function competitionSpan(state: SeasonState, pyramid: string): { first: IsoDate; last: IsoDate; rounds: number } | null {
   // O treino se reparte pelos jogos de liga: as copas (que entram em outras datas) não mexem no ritmo.
-  const first = state.matches.find((m) => m.cup === undefined)
-  const last = [...state.matches].reverse().find((m) => m.cup === undefined)
+  const comps = competitionsOf(state, pyramid)
+  const ids = new Set(comps.map((c) => c.id))
+  let first: IsoDate | undefined
+  let last: IsoDate | undefined
+  for (const m of state.matches) {
+    if (m.cup !== undefined || !ids.has(m.competitionId)) continue
+    if (first === undefined || m.date < first) first = m.date
+    if (last === undefined || m.date > last) last = m.date
+  }
   if (!first || !last) return null
-  return { first: first.date, last: last.date, rounds: state.season.competitions[0]?.roundCount ?? 38 }
+  return { first, last, rounds: comps[0]?.roundCount ?? 38 }
 }
 
-/** Fração do ganho da temporada que cabe nos dias de `from` a `to` (a soma de todos os avanços dá 1). */
-export function seasonShare(state: SeasonState, from: IsoDate, to: IsoDate): number {
-  const span = competitionSpan(state)
+/** Fração do ganho da temporada que cabe nos dias de `from` a `to` (a soma de todos os avanços dá 1), na temporada da pirâmide (padrão: a do foco). */
+export function seasonShare(state: SeasonState, from: IsoDate, to: IsoDate, pyramid: string = focusPyramid(state)): number {
+  const span = competitionSpan(state, pyramid)
   if (!span) return 0
   const total = daysBetween(span.first, span.last)
   if (total <= 0) return 0
@@ -111,8 +119,8 @@ export function seasonShare(state: SeasonState, from: IsoDate, to: IsoDate): num
 }
 
 /** Quantas rodadas já se passaram na data (mínimo 3, para o começo da temporada não zerar a fração de minutos). */
-function gamesElapsed(state: SeasonState, date: IsoDate): number {
-  const span = competitionSpan(state)
+function gamesElapsed(state: SeasonState, date: IsoDate, pyramid: string = focusPyramid(state)): number {
+  const span = competitionSpan(state, pyramid)
   if (!span) return 3
   const total = Math.max(1, daysBetween(span.first, span.last))
   return Math.max(3, clamp(daysBetween(span.first, date) / total, 0, 1) * span.rounds)
@@ -120,7 +128,8 @@ function gamesElapsed(state: SeasonState, date: IsoDate): number {
 
 /** Fração dos minutos possíveis que o jogador já jogou nesta temporada (cai no ritmo de quem joga a rodada toda). */
 export function minutesShareSoFar(state: SeasonState, player: Player, date: IsoDate): number {
-  return clamp(player.seasonStats.minutes / (90 * gamesElapsed(state, date)), 0, 1)
+  const pyramid = (player.teamId ? pyramidOfTeamId(state, player.teamId) : undefined) ?? focusPyramid(state)
+  return clamp(player.seasonStats.minutes / (90 * gamesElapsed(state, date, pyramid)), 0, 1)
 }
 
 /** Ritmo de evolução: pontos de força por temporada que o jogador deve ganhar com o plano dado (sem ruído). */
@@ -198,6 +207,8 @@ export function cancelIndividualTraining(state: SeasonState, teamId: TeamId): Se
 
 interface TickInput {
   year: number
+  /** Primeiro dia da temporada do país (a curva de crescimento segue a idade nesse dia); padrão: 1º de janeiro de `year`. */
+  seasonStart?: IsoDate
   /** Fração do ganho da temporada deste avanço. */
   share: number
   minutesShare: number
@@ -216,7 +227,7 @@ export function trainPlayer(rng: Rng, player: Player, input: TickInput): Player 
   if (player.seasonStats.startOverall === undefined) player = { ...player, seasonStats: { ...player.seasonStats, startOverall: start } }
   const noise = createRng(`${player.id}:${input.year}:talent`).normal(0, E.playerNoise)
   // O crescimento da temporada segue a idade do começo dela (a curva foi calibrada assim); o aniversário no meio do ano não muda o ritmo do treino.
-  const annual = yearlyGain(ageAtSeasonStart(player.birthDate, input.year), start, potential) + noise
+  const annual = yearlyGain(input.seasonStart ? ageOn(player.birthDate, input.seasonStart) : ageAtSeasonStart(player.birthDate, input.year), start, potential) + noise
   let gain = annual > 0 ? annual * developmentFactor(player, input.minutesShare) * input.growth * TRAINING.growthScale : annual
   gain *= input.share
   if (gain > 0) gain = Math.min(gain, Math.max(0, potential - overall))
@@ -258,10 +269,18 @@ function trainingInjury(rng: Rng, player: Player, intensity: TrainingPlan['inten
 export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, userTeamId?: TeamId): SeasonState {
   const days = daysBetween(from, to)
   if (days <= 0) return state
-  const year = state.season.year
-  const share = seasonShare(state, from, to)
+  // Cada país tem a sua temporada: o ganho do ano, o ritmo e os minutos possíveis seguem a pirâmide do clube.
+  const infos = new Map<string, { year: number; seasonStart: IsoDate; share: number; minutesBase: number }>()
+  const infoOf = (teamId: TeamId) => {
+    const pyramid = pyramidOfTeamId(state, teamId) ?? focusPyramid(state)
+    let info = infos.get(pyramid)
+    if (!info) {
+      const cycle = cycleOfPyramid(state, pyramid)
+      infos.set(pyramid, (info = { year: cycle.year, seasonStart: cycle.start, share: seasonShare(state, from, to, pyramid), minutesBase: 90 * gamesElapsed(state, to, pyramid) }))
+    }
+    return info
+  }
   const rng = createRng(`${state.market.seed}:${to}:training`)
-  const minutesBase = 90 * gamesElapsed(state, to)
   const training = state.training
   const individual = { ...training.individual }
   const finished = { ...training.finished }
@@ -299,10 +318,12 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
     if (p.teamId === null) return p
     const plan = planOf(p.teamId)
     const e = extras.get(p.id)
+    const info = infoOf(p.teamId)
     let next = trainPlayer(rng, p, {
-      year,
-      share,
-      minutesShare: clamp(p.seasonStats.minutes / minutesBase, 0, 1),
+      year: info.year,
+      seasonStart: info.seasonStart,
+      share: info.share,
+      minutesShare: clamp(p.seasonStats.minutes / info.minutesBase, 0, 1),
       growth: TRAINING.intensity[plan.intensity].growth,
       weights: weightsFor(plan.focus, p.position === 'GK'),
       ...(e ? { extra: { attributes: e.attributes, points: e.points } } : {}),
@@ -317,7 +338,8 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
   const academy = state.academy.map((p) => {
     if (p.teamId === null) return p
     const plan = planOf(p.teamId)
-    return trainPlayer(rng, p, { year, share, minutesShare: ACADEMY.evolutionShare, growth: 1, weights: weightsFor(plan.focus, p.position === 'GK') })
+    const info = infoOf(p.teamId)
+    return trainPlayer(rng, p, { year: info.year, seasonStart: info.seasonStart, share: info.share, minutesShare: ACADEMY.evolutionShare, growth: 1, weights: weightsFor(plan.focus, p.position === 'GK') })
   })
 
   if (userTeamId !== undefined) {

@@ -79,6 +79,8 @@ export interface YouthRequest {
 
 export interface SeasonSummary {
   year: number
+  /** Nome da temporada ("2026" ou "2026/27"). */
+  label?: string
   champions: TeamId[]
   promoted: TeamId[]
   relegated: TeamId[]

@@ -13,14 +13,14 @@ import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { addDays } from '../season/dates'
-import { contractEndIn } from '../season/cycles'
+import { contractEndIn, regionOfTeam } from '../season/cycles'
 import { actsThisRound, quickTeamIds } from '../season/fidelity'
-import type { IsoDate, Listing, OfferKind, Player, Position, Team, TeamId, TransferOffer, TransferWindow } from '../types'
+import type { IsoDate, Listing, OfferKind, Player, Position, Region, Team, TeamId, TransferOffer, TransferWindow } from '../types'
 import { buyerCheck, playerDecision, premiumPrice, sellerDecision } from './decision'
 import { listingOf } from './listings'
 import { executeTransfer, playersOf, releasePlayer } from './transfer'
 import { askingPrice, askingPriceAs, expectedSalary, loanFee, marketValue, salaryForOverall, squadRole, squadRoleIn } from './value'
-import { windowAt } from './windows'
+import { regionsOf, windowOf } from './windows'
 
 export interface MarketTickResult {
   state: SeasonState
@@ -213,8 +213,13 @@ function trimSquad(state: SeasonState, teamId: TeamId, date: IsoDate): SeasonSta
 
 /** Uma rodada de negociações da IA. Só age dentro de uma janela aberta. */
 export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: TeamId): MarketTickResult {
-  const window = windowAt(state.season, state.matches, date)
-  if (!window) return { state, incoming: [] }
+  // Cada clube negocia na janela da região da liga dele: a europeia pode estar aberta com a brasileira fechada.
+  const windows = new Map<Region, TransferWindow | null>()
+  const windowOfRegion = (region: Region) => {
+    if (!windows.has(region)) windows.set(region, windowOf(state, date, region))
+    return windows.get(region) as TransferWindow | null
+  }
+  if (regionsOf(state).every((r) => windowOfRegion(r) === null)) return { state, incoming: [] }
   const rng = createRng(`${state.market.seed}:${date}:market`)
   let current = state
   const incoming: TransferOffer[] = []
@@ -250,6 +255,8 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
   let poolIndex: PoolIndex | undefined
 
   for (const base of aiTeams) {
+    const window = windowOfRegion(regionOfTeam(state, base.id))
+    if (!window) continue
     const team = current.teams.find((t) => t.id === base.id) as Team
     const sellers = squadsNow()
     const squad = sellers.get(team.id) ?? []

@@ -102,6 +102,7 @@ describe('pré-contratos da IA', () => {
     for (let i = 0; i < 40; i++) {
       const e = nextMarketEvent(state)
       if (!e) break
+      if (e.date > '2026-12-31') break
       if (e.preContract) dates.push(e.date)
       state = { ...state, market: { ...state.market, handled: e.date } }
     }

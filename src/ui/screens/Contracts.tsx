@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { OfferError } from '../../engine/market'
+import { cycleOfTeam } from '../../engine/season'
 import { expiringContracts, renewalDemand } from '../../engine/offseason'
 import { playerOverall } from '../../engine/overall'
 import type { Player } from '../../engine/types'
@@ -13,8 +14,8 @@ import { OFFER_REASON_LABELS, POSITION_SHORT_LABELS } from '../labels'
 /** Renovação de contratos: quem vence neste ano e no próximo, com o pedido de cada jogador. */
 export function Contracts({ game }: { game: Game }) {
   const [pickedId, setPickedId] = useState<string | null>(null)
-  const year = game.season.season.year
-  const list = expiringContracts(game.season, game.userTeamId, year + 1)
+  const cycle = cycleOfTeam(game.season, game.userTeamId)
+  const list = expiringContracts(game.season, game.userTeamId, 1)
   const picked = list.find((p) => p.id === pickedId)
   if (picked) return <RenewForm game={game} player={picked} onClose={() => setPickedId(null)} />
 
@@ -22,7 +23,7 @@ export function Contracts({ game }: { game: Game }) {
     <Card flush>
       <ul className="divide-y divide-slate-700">
         {list.map((p) => {
-          const lastYear = Number(p.contract.endDate.slice(0, 4)) <= year
+          const lastYear = p.contract.endDate <= cycle.end
           return (
             <li key={p.id}>
               <button type="button" className="flex min-h-14 w-full items-center gap-2 px-3 text-left" onClick={() => setPickedId(p.id)}>

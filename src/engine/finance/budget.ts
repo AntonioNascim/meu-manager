@@ -8,7 +8,7 @@
  */
 import { FINANCE } from '../config'
 import type { SeasonState } from '../season/calendar'
-import { windowAt } from '../market/windows'
+import { focusRegion, windowOf, windowOfTeam } from '../market/windows'
 import type { Finances, Team, TeamId } from '../types'
 import { monthlyOperations, monthlyPayroll } from './finance'
 
@@ -61,9 +61,9 @@ export interface FundsResult {
 }
 
 /** Chave da janela de transferências aberta (uma verba por janela). */
-export function fundsWindowKey(state: Pick<SeasonState, 'season' | 'matches'>): string | null {
-  const w = windowAt(state.season, state.matches, state.season.currentDate)
-  return w ? `${state.season.year}:${w.name}` : null
+export function fundsWindowKey(state: Pick<SeasonState, 'season' | 'matches' | 'focus' | 'cycles'>, teamId?: TeamId): string | null {
+  const w = teamId ? windowOfTeam(state, state.season.currentDate, teamId) : windowOf(state, state.season.currentDate, focusRegion(state))
+  return w ? `${w.start}:${w.name}` : null
 }
 
 /** Pedir verba: quanto a diretoria libera agora, ou por que recusa. Não altera nada (ver `requestFunds`). */
@@ -75,7 +75,7 @@ export function fundsDecision(state: SeasonState, teamId: TeamId, confidence: nu
   const balance = team.finances.balance
   const headroom = Math.max(0, balance - reserve - team.finances.transferBudget)
   const detail = { confidence, balance, reserve, headroom }
-  const key = fundsWindowKey(state)
+  const key = fundsWindowKey(state, teamId)
   if (!key) return { granted: false, amount: 0, reason: 'window-closed', detail }
   if (team.finances.fundsRequests.includes(key)) return { granted: false, amount: 0, reason: 'already-asked', detail }
   if (confidence < F.minConfidence) return { granted: false, amount: 0, reason: 'low-confidence', detail }

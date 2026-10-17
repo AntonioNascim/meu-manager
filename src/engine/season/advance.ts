@@ -25,7 +25,7 @@ import { applyBirthdays } from './birthdays'
 import { applyMatchToPlayers, cupView, progressDays } from './condition'
 import { slimResult } from './compact'
 import { daysBetween } from './dates'
-import { competitionsOf, cycleOfPyramid, focusPyramid, phaseOfPyramid, pyramidFinished, pyramidOfTeamId, seasonLabel } from './cycles'
+import { competitionsOf, regionOfTeam, cycleOfPyramid, focusPyramid, phaseOfPyramid, pyramidFinished, pyramidOfTeamId, seasonLabel } from './cycles'
 import { computeStandings } from './standings'
 import { cupMatchIsQuick, playQuickMatch, quickCompetitionIds } from './fidelity'
 
@@ -253,7 +253,7 @@ function stepWorld(state: SeasonState, options: AdvanceOptions, limit?: IsoDate)
       return { state: { ...current, season: mine === focusPyramid(current) ? season : current.season }, event: { type: 'season-end' }, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
     }
     const matchEvent = nextEvent(current)
-    const marketEvent = options.market ? nextMarketEvent(current) : undefined
+    const marketEvent = options.market ? nextMarketEvent(current, options.userTeamId ? regionOfTeam(current, options.userTeamId) : undefined) : undefined
     // O fim do contrato de um jogador do técnico também é um dia a parar (se cair antes do próximo evento).
     const contractEnd = options.userTeamId ? nextContractEnd(current, options.userTeamId) : undefined
     const candidates = [matchEvent.type === 'matchday' ? matchEvent.date : undefined, marketEvent?.date, contractEnd, nextTurnDate(current, options), limit].filter((d): d is IsoDate => d !== undefined && d >= current.season.currentDate)

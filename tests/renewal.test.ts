@@ -57,7 +57,7 @@ describe('pedido de renovação', () => {
 describe('renovar pelo jogador', () => {
   it('aceita: novo contrato a partir do fim do atual; recusa: nada muda; erros de regra', () => {
     const s = season()
-    const player = expiringContracts(s, team.id, 2027)[0]!
+    const player = expiringContracts(s, team.id, 1)[0]!
     const demand = renewalDemand(player, team)
     const budget = { ...s, teams: s.teams.map((t) => (t.id === team.id ? { ...t, finances: { ...t.finances, salaryBudget: 1_000_000_000 } } : t)) }
     const refused = renewUserContract(budget, team.id, { playerId: player.id, salary: Math.round(demand * 0.3), years: 3 })

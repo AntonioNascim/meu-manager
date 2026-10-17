@@ -33,12 +33,12 @@ import {
   refocus,
   setTeamTactic,
 } from '../engine/season'
-import type { SeasonEvent, SeasonState } from '../engine/season'
+import { advanceUntil, cycleOfPyramid, focusPyramid, makeCycle, pyramidFinished, pyramidOfTeamId, seasonLabel } from '../engine/season'
+import type { SeasonEvent, SeasonState, TurnRunner } from '../engine/season'
 import { emptyTraining } from '../engine/types'
-import type { BoardEvaluation, Competition, ListingKind, IndividualGoal, IndividualTraining, FinishedTraining, TrainingPlan, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
+import type { ArchivedRow, TurnRecord, BoardEvaluation, Competition, ListingKind, IndividualGoal, IndividualTraining, FinishedTraining, TrainingPlan, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
 
-/** Linha resumida da classificação final: time, jogos, vitórias, empates, derrotas, gols pró, gols contra, pontos. */
-export type ArchivedRow = [teamId: string, played: number, wins: number, draws: number, losses: number, goalsFor: number, goalsAgainst: number, points: number]
+export type { ArchivedRow }
 
 /** Jogo do time do jogador resumido: rodada, adversário, 1 se foi em casa, gols pró, gols contra. */
 export type ArchivedMatch = [round: number, opponentId: string, home: 0 | 1, goalsFor: number, goalsAgainst: number]
@@ -46,6 +46,9 @@ export type ArchivedMatch = [round: number, opponentId: string, home: 0 | 1, goa
 /** O que se guarda de uma temporada encerrada (os jogos completos, com lances e notas, não ficam). */
 export interface SeasonArchive {
   year: number
+  /** País (pirâmide) e nome da temporada ("2026" ou "2026/27"); saves antigos não têm e valem a pirâmide do técnico. */
+  pyramid?: string
+  label?: string
   /** Classificação final de cada liga (sem `competitions`: índice = série − 1, o jogo de uma pirâmide só). */
   tables: ArchivedRow[][]
   /** Ids das ligas na ordem de `tables` (mundos com mais de uma pirâmide). */
@@ -101,8 +104,12 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
   // Mundo com mais de um país: só a pirâmide do técnico é jogada lance a lance (as outras usam a partida simplificada).
   const pyramids = new Set(world.competitions?.map((c) => c.pyramid))
   const focus = pyramids.size > 1 ? world.competitions?.find((c) => c.teams.some((t) => t.id === userTeamId))?.pyramid : undefined
+  // O relógio começa na abertura da temporada do país do técnico (1º de janeiro, ou 1º de julho na temporada que atravessa o ano).
+  const userLeague = world.competitions?.find((c) => c.teams.some((t) => t.id === userTeamId))
+  const startDate = makeCycle(world.startYear, userLeague?.split === true).start
   const season = createSeason({
     year: world.startYear,
+    startDate,
     seed,
     teams: world.teams,
     players: world.players,
@@ -127,14 +134,24 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
   }
 }
 
+/** Vira a temporada de um país da IA (gera os jovens com o gerador de dados e traz as copas padrão a saves antigos). */
+const turnRunner: TurnRunner = (state, pyramid) => advanceSeason(state, { createYouth, defaultCupSpecs: defaultCupSpecsForCompetitions, pyramid })
+
+/** Guarda a classificação final dos países da IA que viraram a temporada. */
+function archiveTurns(archive: SeasonArchive[], turned: readonly TurnRecord[] | undefined): SeasonArchive[] {
+  if (!turned || turned.length === 0) return archive
+  return [...archive, ...turned.map((t): SeasonArchive => ({ year: t.year, pyramid: t.pyramid, label: t.label, tables: t.tables.map((x) => x.rows), competitions: t.tables.map((x) => x.competitionId), userMatches: [] }))]
+}
+
 /** Avança até o próximo dia de jogos. A partida do jogador fica pendente em `pendingUserMatch`. */
 export function advanceGame(game: Game): Game {
   if (game.pendingUserMatch || game.dismissal) return game
   const { lastReport: _seen, ...kept } = game
   game = kept
-  const step = advanceToNextEvent(game.season, { userTeamId: game.userTeamId, market: true })
+  const step = advanceToNextEvent(game.season, { userTeamId: game.userTeamId, market: true, turn: turnRunner })
   return checkDismissal({
     ...game,
+    archive: archiveTurns(game.archive, step.turned),
     season: step.state,
     lastDay: step.played,
     notices: step.notices,
@@ -158,10 +175,16 @@ export function advanceToMatchday(game: Game): Game {
 
 /** A temporada acabou e o técnico segue no cargo: vira o ano (acesso, evolução, contratos, base, tabela nova). */
 export function startNextSeason(game: Game): Game {
-  if (game.season.season.phase !== 'end-of-season' || game.dismissal || game.pendingUserMatch) return game
-  const { state, report } = advanceSeason(game.season, { createYouth, userTeamId: game.userTeamId, defaultCupSpecs: defaultCupSpecsForCompetitions })
+  const pyramid = pyramidOfTeamId(game.season, game.userTeamId) ?? focusPyramid(game.season)
+  if (!pyramidFinished(game.season, pyramid) || game.dismissal || game.pendingUserMatch) return game
+  // Os outros países seguem jogando até o último dia da temporada do técnico; os da IA que acabam nesse meio-tempo viram sozinhos.
+  const end = cycleOfPyramid(game.season, pyramid).end
+  const waited = game.season.season.currentDate < end ? advanceUntil(game.season, end, { userTeamId: game.userTeamId, market: true, turn: turnRunner }) : undefined
+  const archive = archiveTurns(game.archive, waited?.turned)
+  game = { ...game, season: waited?.state ?? game.season, archive }
+  const { state, report } = advanceSeason(game.season, { createYouth, userTeamId: game.userTeamId, defaultCupSpecs: defaultCupSpecsForCompetitions, pyramid })
   const mine = report.finalPositions[game.userTeamId] as { tier: number; position: number }
-  const summary: SeasonSummary = { year: report.year, champions: report.champions, promoted: report.promoted, relegated: report.relegated, userTeamId: game.userTeamId, userTier: mine.tier, userPosition: mine.position }
+  const summary: SeasonSummary = { year: report.year, ...(report.label ? { label: report.label } : {}), champions: report.champions, promoted: report.promoted, relegated: report.relegated, userTeamId: game.userTeamId, userTier: mine.tier, userPosition: mine.position }
   const size = userCompetition(game).teamIds.length
   const coach: Coach = { ...coachOf(game), reputation: seasonReputation(coachOf(game), { position: mine.position, targetPosition: userTeam(game).objective.targetPosition, teamCount: size }) }
   return { ...game, season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], archive: [...game.archive, archiveSeason(game)], lastReport: report, coach }
@@ -170,7 +193,9 @@ export function startNextSeason(game: Game): Game {
 /** Resume a temporada que acabou: classificação final das séries e os jogos do time do jogador. */
 export function archiveSeason(game: Game): SeasonArchive {
   const { season } = game.season
-  const ordered = [...season.competitions].sort((a, b) => a.tier - b.tier)
+  const pyramid = pyramidOfTeamId(game.season, game.userTeamId) ?? focusPyramid(game.season)
+  const cycle = cycleOfPyramid(game.season, pyramid)
+  const ordered = season.competitions.filter((c) => (c.pyramid ?? 'default') === pyramid).sort((a, b) => a.tier - b.tier)
   const tables = ordered
     .map((c) => standingsOf(game, c).map((r): ArchivedRow => [r.teamId, r.played, r.wins, r.draws, r.losses, r.goalsFor, r.goalsAgainst, r.points]))
   const userMatches = game.season.matches
@@ -181,8 +206,7 @@ export function archiveSeason(game: Game): SeasonArchive {
       const r = m.result as MatchResult
       return [m.round, home ? m.awayTeamId : m.homeTeamId, home ? 1 : 0, home ? r.homeGoals : r.awayGoals, home ? r.awayGoals : r.homeGoals]
     })
-  const pyramids = new Set(season.competitions.map((c) => c.pyramid))
-  return { year: season.year, tables, userMatches, ...(pyramids.size > 1 ? { competitions: ordered.map((c) => c.id) } : {}) }
+  return { year: cycle.year, pyramid, label: seasonLabel(cycle), tables, userMatches, competitions: ordered.map((c) => c.id) }
 }
 
 /** Registra o resultado da partida pendente (jogada ao vivo ou automaticamente). */
@@ -361,7 +385,7 @@ export function renewUserPlayer(game: Game, request: { playerId: string; salary:
 }
 
 /** Jogadores do time com contrato no último ano (vencem no fim desta temporada). */
-export const lastYearContracts = (game: Game): Player[] => expiringContracts(game.season, game.userTeamId, game.season.season.year)
+export const lastYearContracts = (game: Game): Player[] => expiringContracts(game.season, game.userTeamId)
 
 /** Libera um jogador do time (paga a rescisão). */
 export function releaseUserSquadPlayer(game: Game, playerId: string): Game {
@@ -417,7 +441,8 @@ export function takeUserJob(game: Game, teamId: TeamId): Game {
 export const teamById = (game: Game, id: TeamId) => game.season.teams.find((t) => t.id === id) as Team
 export const userTeam = (game: Game) => teamById(game, game.userTeamId)
 export const squadOf = (game: Game, teamId: TeamId): Player[] => game.season.players.filter((p) => p.teamId === teamId)
-export const nextEventOf = (game: Game): SeasonEvent => nextEvent(game.season)
+/** Próximo evento do mundo; `season-end` quando todos os jogos do país do técnico terminaram (os outros países seguem jogando por baixo). */
+export const nextEventOf = (game: Game): SeasonEvent => (pyramidFinished(game.season, pyramidOfTeamId(game.season, game.userTeamId) ?? focusPyramid(game.season)) ? { type: 'season-end' } : nextEvent(game.season))
 
 export function userCompetition(game: Game): Competition {
   return game.season.season.competitions.find((c) => c.teamIds.includes(game.userTeamId)) as Competition

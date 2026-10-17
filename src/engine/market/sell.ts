@@ -40,10 +40,10 @@ export function buyerInterest(state: SeasonState, buyerId: TeamId, player: Playe
 }
 
 /** O jogador pode sair do elenco (janela, elenco mínimo e cobertura da posição)? Lança `OfferError` se não. */
-function assertCanLose(state: SeasonState, userTeamId: TeamId, playerId: PlayerId, needsWindow: boolean): Player {
+function assertCanLose(state: SeasonState, userTeamId: TeamId, playerId: PlayerId, needsWindow: boolean, buyerId?: TeamId): Player {
   const player = state.players.find((p) => p.id === playerId)
   if (!player || player.teamId !== userTeamId || player.contract.loanedFrom) throw new OfferError('unavailable')
-  if (needsWindow && !isWindowOpen(state)) throw new OfferError('window-closed')
+  if (needsWindow && !isWindowOpen(state, state.season.currentDate, [userTeamId, buyerId])) throw new OfferError('window-closed')
   const squad = playersOf(state, userTeamId)
   if (squad.length - 1 < SQUAD_MIN) throw new OfferError('squad-size')
   if (squad.filter((p) => p.position === player.position).length - 1 < (MARKET.minByPosition[player.position] ?? 1)) throw new OfferError('position-cover')
@@ -61,7 +61,7 @@ export interface SaleResult {
 /** Vende ou empresta o jogador para um clube da IA, que responde na hora. */
 export function sellPlayer(state: SeasonState, userTeamId: TeamId, request: { playerId: PlayerId; buyerId: TeamId; kind: OfferKind; fee: number; contractEnd: IsoDate }): SaleResult {
   const date = state.season.currentDate
-  const player = assertCanLose(state, userTeamId, request.playerId, true)
+  const player = assertCanLose(state, userTeamId, request.playerId, true, request.buyerId)
   if (request.buyerId === userTeamId || request.fee < 0 || !Number.isFinite(request.fee) || request.contractEnd <= date) throw new OfferError('invalid')
   const interest = buyerInterest(state, request.buyerId, player, request.kind, date)
   if (interest.maxFee === null) return { state, accepted: false, ...(interest.reason ? { reason: interest.reason } : {}) }

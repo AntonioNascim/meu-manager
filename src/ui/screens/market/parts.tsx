@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { isWindowOpen, marketValue, transferWindows, windowAt } from '../../../engine/market'
+import { isWindowOpen, marketValue, windowOfTeam, windowsFor } from '../../../engine/market'
+import { regionOfTeam } from '../../../engine/season'
 import type { Interest } from '../../../engine/market'
 import { playerOverall } from '../../../engine/overall'
 import type { Player } from '../../../engine/types'
@@ -24,8 +25,8 @@ const shortDate = (date: string) => date.split('-').reverse().slice(0, 2).join('
 export function WindowBanner({ game }: { game: Game }) {
   const state = game.season
   const date = state.season.currentDate
-  const window = windowAt(state.season, state.matches, date)
-  const next = transferWindows(state.season, state.matches).find((w) => w.start > date)
+  const window = windowOfTeam(state, date, game.userTeamId)
+  const next = windowsFor(state, regionOfTeam(state, game.userTeamId), date).find((w) => w.start > date)
   const team = userTeam(game)
   const budget = (
     <div className="mt-1 text-xs text-muted">

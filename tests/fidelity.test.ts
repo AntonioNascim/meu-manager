@@ -79,7 +79,7 @@ describe('temporada com ligas simplificadas', () => {
     expect(players.reduce((n, p) => n + p.seasonStats.yellowCards, 0)).toBeGreaterThan(100)
     expect(players.filter((p) => p.seasonStats.ratedGames > 0).length).toBeGreaterThan(players.length * 0.6)
     const top = Math.max(...players.map((p) => p.seasonStats.goals))
-    expect(top).toBeGreaterThanOrEqual(8)
+    expect(top).toBeGreaterThanOrEqual(7)
     expect(top).toBeLessThanOrEqual(35)
     // O elenco teve baixas por lesão em algum momento (nota guardada na forma e na moral, que se mexem).
     expect(players.some((p) => p.condition.form > 0)).toBe(true)

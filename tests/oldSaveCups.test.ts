@@ -26,7 +26,8 @@ function playToEnd(game: Game): Game {
 describe('saves de antes das copas ganham as copas na próxima virada', () => {
   const start = oldSave(createGame(5, 'team-imp'))
   // O técnico não é demitido na prova: a meta é a mais folgada possível.
-  const lenient: Game = { ...start, season: { ...start.season, teams: start.season.teams.map((t) => (t.id === 'team-imp' ? { ...t, objective: { targetPosition: 20, sackingPosition: 20 } } : t)) } }
+  const easy = (g: Game): Game => ({ ...g, season: { ...g.season, teams: g.season.teams.map((t) => (t.id === 'team-imp' ? { ...t, objective: { targetPosition: 20, sackingPosition: 20 } } : t)) } })
+  const lenient: Game = easy(start)
 
   it('a temporada em andamento não muda: continua sem copas até a virada', () => {
     expect(start.season.cups).toBeUndefined()
@@ -47,7 +48,7 @@ describe('saves de antes das copas ganham as copas na próxima virada', () => {
     expect(next.season.cups?.[0]?.entrants).toHaveLength(60)
     expect(next.season.matches.filter((m) => m.cup).length).toBeGreaterThan(20)
     // E a partir daí as copas se repetem a cada temporada com o campeão no histórico.
-    const afterCups = playToEnd(next)
+    const afterCups = playToEnd(easy(next))
     expect(afterCups.season.cupHistory?.['cup-br']).toHaveLength(1)
     expect(startNextSeason(afterCups).season.cups?.[0]?.year).toBe(afterCups.season.season.year + 1)
   }, 120_000)
