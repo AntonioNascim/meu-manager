@@ -1,4 +1,5 @@
 import type { CompetitionId, IsoDate, MatchId, PlayerId, TeamId } from './common'
+import type { MatchCupInfo } from './cup'
 
 export type MatchStatus = 'scheduled' | 'finished'
 
@@ -58,6 +59,12 @@ export interface MatchResult {
   homeStats: TeamMatchStats
   awayStats: TeamMatchStats
   playerResults: PlayerMatchResult[]
+  /** Houve prorrogação (os gols dela já estão no placar e nos lances, com minutos de 91 a 120). */
+  extraTime?: boolean
+  /** Disputa de pênaltis (jogo de mata-mata empatado depois da prorrogação): cobranças convertidas por lado. */
+  penalties?: { home: number; away: number }
+  /** As cobranças da disputa de pênaltis, na ordem. */
+  shootout?: { teamId: TeamId; playerId: PlayerId; scored: boolean }[]
 }
 
 export interface Match {
@@ -72,6 +79,8 @@ export interface Match {
   seed: number
   /** Público presente (preenchido quando a partida é jogada). */
   attendance?: number
+  /** Só nas partidas de copa: fase, confronto e perna. Ausente = jogo de liga. */
+  cup?: MatchCupInfo
   /** Preenchido apenas quando `status === 'finished'`. */
   result?: MatchResult
 }

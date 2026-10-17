@@ -8,6 +8,8 @@
  * contra o motor completo por `tools/quickCompare.ts` e conferidos em `tests/balance/quick.test.ts`.
  */
 import { MATCH, QUICK } from '../config'
+import { knockoutLeader, runShootout } from './knockout'
+import type { KnockoutRules, ShootoutSide } from './knockout'
 import { lineupForeign } from '../foreign'
 import { FORMATIONS } from '../formations'
 import { restedFactor } from '../lineup'
@@ -18,7 +20,7 @@ import type { MatchEvent, MatchResult, Player, PlayerMatchResult, Position, Team
 
 export interface QuickSide {
   /** A formação do time define quantos jogadores de cada linha entram (opcional). */
-  team: Pick<Team, 'id' | 'name'> & Partial<Pick<Team, 'country' | 'foreignLimit'>> & { tactic?: Pick<Team['tactic'], 'formationId'> }
+  team: Pick<Team, 'id' | 'name'> & Partial<Pick<Team, 'country' | 'foreignLimit'>> & { tactic?: Pick<Team['tactic'], 'formationId'> & Partial<Pick<Team['tactic'], 'penaltyTakerIds'>> }
   players: readonly Player[]
 }
 
@@ -31,6 +33,9 @@ export interface QuickInput {
   attendance?: number
   /** Lotação do estádio do mandante, de 0 a 1, usada com o público. */
   capacity?: number
+  /** Jogo de mata-mata (prorrogação e pênaltis) e estádio neutro. */
+  knockout?: KnockoutRules
+  neutral?: boolean
 }
 
 const GROUP_OF: Record<Position, 0 | 1 | 2 | 3> = { GK: 0, RB: 1, LB: 1, CB: 1, DM: 2, CM: 2, AM: 2, RW: 3, LW: 3, ST: 3 }
@@ -199,9 +204,9 @@ const passingSkill = (p: Participant, power: number) => {
   return (((1 - cross) * (passing + vision)) / 2 / 60 + (cross * crossing) / 60) ** power
 }
 
-function addGoals(events: MatchEvent[], rng: Rng, scoring: SideState, conceding: SideState): void {
-  for (let i = 0; i < scoring.goals; i++) {
-    const minute = rng.int(1, 90)
+function addGoals(events: MatchEvent[], rng: Rng, scoring: SideState, conceding: SideState, count = scoring.goals, from = 1, to = 90): void {
+  for (let i = 0; i < count; i++) {
+    const minute = rng.int(from, to)
     if (rng.chance(QUICK.ownGoalPerGoal)) {
       const unlucky = pickWeighted(rng, playing(conceding.all, minute).filter((p) => p.group !== 0), () => 1)
       if (unlucky) {
@@ -322,26 +327,55 @@ function stats(rng: Rng, side: SideState, other: SideState, events: readonly Mat
   }
 }
 
+/** Quem está em campo no fim (sem os expulsos) e o goleiro: os cobradores da disputa de pênaltis. */
+function shootoutSide(side: SideState): ShootoutSide {
+  const on = side.all.filter((p) => p.to >= (side.all.some((q) => q.to === 120) ? 120 : 90) && !p.red)
+  return { teamId: side.side.team.id, onPitch: on.map((p) => p.player), preferred: side.side.team.tactic?.penaltyTakerIds ?? [], keeper: on.find((p) => p.group === 0)?.player }
+}
+
 /** Resultado simplificado de uma partida: mesmo formato do motor completo, sem narração. */
 export function simulateQuick(input: QuickInput): MatchResult {
   const rng = createRng(input.seed)
   const home = buildSide(input.home, rng)
   const away = buildSide(input.away, rng)
   const fill = input.attendance !== undefined && input.capacity ? Math.min(1, input.attendance / input.capacity) : 0.5
-  const lambdaHome = expectedGoals(home, away, true, fill)
+  const lambdaHome = expectedGoals(home, away, !input.neutral, fill)
   const lambdaAway = expectedGoals(away, home, false, fill)
   home.goals = away.goalsAgainst = goalCount(rng, lambdaHome * dayFactor(rng))
   away.goals = home.goalsAgainst = goalCount(rng, lambdaAway * dayFactor(rng))
+  const regular = { home: home.goals, away: away.goals }
+
+  // Mata-mata empatado nos 90 minutos: prorrogação (um terço dos gols esperados de uma partida) e, se preciso, pênaltis.
+  const knockout = input.knockout
+  let extra = false
+  let extraGoals = { home: 0, away: 0 }
+  if (knockout?.extraTime && knockoutLeader(knockout, home.goals, away.goals) === null) {
+    extra = true
+    const share = MATCH.extraMoments / MATCH.moments
+    extraGoals = { home: goalCount(rng, lambdaHome * share), away: goalCount(rng, lambdaAway * share) }
+    home.goals += extraGoals.home
+    away.goals += extraGoals.away
+    home.goalsAgainst = away.goals
+    away.goalsAgainst = home.goals
+    for (const side of [home, away]) for (const p of side.all) if (p.to === 90) p.to = 120
+  }
 
   const events: MatchEvent[] = []
-  addGoals(events, rng, home, away)
-  addGoals(events, rng, away, home)
+  addGoals(events, rng, home, away, regular.home)
+  addGoals(events, rng, away, home, regular.away)
+  if (extra) {
+    addGoals(events, rng, home, away, extraGoals.home, 91, 120)
+    addGoals(events, rng, away, home, extraGoals.away, 91, 120)
+  }
   addCards(events, rng, home)
   addCards(events, rng, away)
   events.sort((a, b) => a.minute - b.minute)
+  const shootout = knockout?.penalties && knockoutLeader(knockout, home.goals, away.goals) === null ? runShootout(rng.fork('shootout'), shootoutSide(home), shootoutSide(away)) : undefined
   return {
     homeGoals: home.goals,
     awayGoals: away.goals,
+    ...(extra ? { extraTime: true } : {}),
+    ...(shootout ? { penalties: { home: shootout.home, away: shootout.away }, shootout: shootout.kicks } : {}),
     events,
     homeStats: stats(rng, home, away, events, lambdaHome),
     awayStats: stats(rng, away, home, events, lambdaAway),

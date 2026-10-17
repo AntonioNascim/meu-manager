@@ -114,6 +114,7 @@ export const FINANCE_CATEGORY_LABELS: Record<FinanceCategory, string> = {
   'player-purchases': 'Compra de jogadores',
   severance: 'Rescisões de contrato',
   operations: 'Operação e estrutura',
+  'cup-prize': 'Premiação das copas',
 }
 
 export const COMPETITION_TYPE_LABELS: Record<CompetitionType, string> = {

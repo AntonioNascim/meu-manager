@@ -3,6 +3,7 @@
  * é criado do zero a cada partida e nunca altera os jogadores/times recebidos.
  */
 import { MATCH } from '../config'
+import type { KnockoutRules } from './knockout'
 import { formationOf } from '../formations'
 import { positionFit } from '../overall'
 import type { Rng } from '../rng'
@@ -43,6 +44,10 @@ export interface MatchInput {
    * avança) e o técnico escolhe quem entra (`resolveInjury`). Sem isso (padrão), o melhor reserva entra na hora.
    */
   holdInjurySubs?: boolean
+  /** Jogo de mata-mata: prorrogação e pênaltis se o confronto está empatado depois dos 90 minutos. */
+  knockout?: KnockoutRules
+  /** Estádio neutro: sem vantagem de casa. */
+  neutral?: boolean
   /** Só para medir e testar: jogadores que já começam fora de campo (como se tivessem sido expulsos no minuto 0). */
   startedOff?: { home?: string[]; away?: string[] }
 }
@@ -161,6 +166,8 @@ export interface MatchContext {
   trace: PlayTrace[]
   /** Momento em andamento. */
   current?: PlayTrace
+  /** A partida foi para a prorrogação. */
+  extra?: boolean
   /** Lesão de um time do jogador à espera da troca (o jogo fica parado até `resolveInjury`). */
   pendingInjury?: { side: 'home' | 'away'; playerId: string }
 }

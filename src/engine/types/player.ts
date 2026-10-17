@@ -282,6 +282,8 @@ export interface PlayerCondition {
   redCards: number
   /** Jogos restantes de suspensão. */
   suspensionGames: number
+  /** Amarelos e suspensão próprios de cada copa (id da copa); a liga usa os campos acima. */
+  cups?: Record<string, { yellowCards: number; suspensionGames: number }>
 }
 
 export interface Contract {
@@ -311,6 +313,11 @@ export interface PlayerSeasonStats {
   awayGoals: number
   passAssists: number
   crossAssists: number
+  /** O que veio de jogos de copa (já somado nos totais acima): a artilharia e as listas da liga descontam isto. */
+  cupGoals?: number
+  cupAssists?: number
+  cupYellowCards?: number
+  cupRedCards?: number
   /** Força geral no começo da temporada, guardada pelo treino na primeira vez que passa: o ritmo de evolução da temporada parte dela. */
   startOverall?: number
 }

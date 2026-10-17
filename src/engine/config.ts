@@ -37,6 +37,10 @@ export type ShotType = 'longShot' | 'inBox' | 'header' | 'oneOnOne' | 'penalty' 
 export const MATCH = {
   /** Momentos de posse por partida (cada um pode terminar em qualquer etapa). */
   moments: 96,
+  /** Momentos da prorrogação (30 minutos: um terço de uma partida). */
+  extraMoments: 32,
+  /** Disputa de pênaltis: chance de converter = base + slope × (cobrador − goleiro), entre min e max. Cobrador = 60% finalização + 40% frieza (determinação e decisão); goleiro = reflexos, posicionamento e decisão. */
+  shootout: { kicks: 5, base: 0.76, slope: 0.006, min: 0.3, max: 0.95, noKeeper: 30, suddenDeathMax: 30 },
   /**
    * k da fórmula do duelo: chance = 1 / (1 + e^(−k × (ataque − defesa))).
    * Calibrado para a escala 1–100: 10 pontos de vantagem ≈ 59%, 30 pontos ≈ 75%.

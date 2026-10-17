@@ -19,6 +19,7 @@ const ICONS: Record<FinanceCategory, IconName> = {
   'player-purchases': 'market',
   severance: 'squad',
   operations: 'home',
+  'cup-prize': 'trophy',
 }
 
 const STATUS_COLOR = { safe: 'text-win', warning: 'text-amber-300', danger: 'text-loss' } as const

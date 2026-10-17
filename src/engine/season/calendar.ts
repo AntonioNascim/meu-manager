@@ -6,7 +6,7 @@ import { SEASON } from '../config'
 import { refreshListings } from '../market/listings'
 import { createRng, hashSeed } from '../rng'
 import { emptyTraining } from '../types'
-import type { Competition, CompetitionId, ForeignLimit, IsoDate, LeagueEconomy, Nationality, MarketState, Match, Player, Region, Season, Team, TrainingState } from '../types'
+import type { Competition, CompetitionId, Cup, CupHistory, CupSpec, ForeignLimit, IsoDate, LeagueEconomy, Nationality, MarketState, Match, Player, Region, Season, Team, TrainingState } from '../types'
 import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
 import { buildLeagueRounds } from './schedule'
 
@@ -28,6 +28,12 @@ export interface SeasonState {
   training: TrainingState
   /** Pirâmide do técnico: só as competições dela são jogadas lance a lance, as outras usam o resultado simplificado (`fidelity.ts`). Sem ela (padrão), todas são lance a lance. */
   focus?: string
+  /** Copas da temporada (sem elas, o mundo só tem ligas). Os jogos delas ficam em `matches` com `cup`. */
+  cups?: Cup[]
+  /** Definição das copas do mundo: refeita a cada temporada, com as vagas da temporada passada. */
+  cupSpecs?: CupSpec[]
+  /** Campeão e vice de cada edição das copas. */
+  cupHistory?: CupHistory
   /** Último número usado nos ids dos jogadores (`player-N`): jovens novos continuam daqui. */
   playerCounter: number
 }

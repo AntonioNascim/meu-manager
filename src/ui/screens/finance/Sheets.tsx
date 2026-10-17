@@ -9,7 +9,7 @@ import { formatCompactMoney, formatDate, formatMoney } from '../../format'
 import { FINANCE_CATEGORY_LABELS } from '../../labels'
 import { Sheet } from '../../theme'
 
-export const INCOME_CATEGORIES: FinanceCategory[] = ['ticket-sales', 'sponsorship', 'tv-rights', 'player-sales']
+export const INCOME_CATEGORIES: FinanceCategory[] = ['ticket-sales', 'sponsorship', 'tv-rights', 'cup-prize', 'player-sales']
 export const EXPENSE_CATEGORIES: FinanceCategory[] = ['salaries', 'player-purchases', 'severance', 'operations']
 
 export const signedMoney = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${formatMoney(Math.abs(value))}`

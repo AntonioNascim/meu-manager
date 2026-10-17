@@ -19,6 +19,7 @@ export type FinanceCategory =
   | 'player-purchases'
   | 'severance'
   | 'operations'
+  | 'cup-prize'
 
 export interface FinanceEntry {
   date: IsoDate

@@ -8,6 +8,8 @@
  * Em paralelo: faltas, cartões, pênaltis, escanteios e lesões.
  */
 import { MATCH } from '../config'
+import { knockoutLeader, runShootout } from './knockout'
+import type { KnockoutRules, ShootoutSide } from './knockout'
 import { isForeign } from '../foreign'
 import type { PlayType, ShotType } from '../config'
 import { overallAt, playerOverall } from '../overall'
@@ -34,6 +36,7 @@ import {
 import type { MatchContext, MatchInput, PitchPlayer, PlayTrace, SideState } from './state'
 
 const MATCH_MINUTES = 90
+const EXTRA_END = 120
 
 /** Força geral média dos titulares (referência do fator casa). */
 function startersLevel({ team, players }: MatchInput['home']): number {
@@ -48,7 +51,7 @@ function startersLevel({ team, players }: MatchInput['home']): number {
 /** Simula a partida inteira de uma vez. */
 export function simulateMatch(input: MatchInput): MatchResult {
   const match = startMatch(input)
-  match.playUntil(MATCH_MINUTES)
+  match.playUntil(EXTRA_END)
   return match.result()
 }
 
@@ -75,7 +78,7 @@ export interface SideSnapshot {
 }
 
 export interface MatchSnapshot {
-  /** Último minuto simulado (0 antes do apito inicial, 90 no fim). */
+  /** Último minuto simulado (0 antes do apito inicial, 90 no fim; até 120 se houve prorrogação). */
   minute: number
   finished: boolean
   homeGoals: number
@@ -181,14 +184,15 @@ function syncShortHanded(side: SideState, forced = false): void {
   if (forced || !side.userControlled) reorganizeShortHanded(side)
 }
 
-const minuteOfMoment = (i: number) => Math.min(MATCH_MINUTES, 1 + Math.floor((i * MATCH_MINUTES) / MATCH.moments))
+const minuteOfMoment = (i: number) =>
+  i < MATCH.moments ? Math.min(MATCH_MINUTES, 1 + Math.floor((i * MATCH_MINUTES) / MATCH.moments)) : Math.min(EXTRA_END, MATCH_MINUTES + 1 + Math.floor(((i - MATCH.moments) * (EXTRA_END - MATCH_MINUTES)) / MATCH.extraMoments))
 
 export function startMatch(input: MatchInput): LiveMatch {
   const rng = createRng(input.seed)
   const ctx: MatchContext = {
     rng,
     textRng: rng.fork('narration'),
-    home: buildSide(input.home, homeFactor(input.home.team, input.attendance, startersLevel(input.home)), rng, input.userControlled?.home),
+    home: buildSide(input.home, input.neutral ? 1 : homeFactor(input.home.team, input.attendance, startersLevel(input.home)), rng, input.userControlled?.home),
     away: buildSide(input.away, 1, rng, input.userControlled?.away),
     minute: 0,
     events: [],
@@ -204,6 +208,18 @@ export function startMatch(input: MatchInput): LiveMatch {
   applyUnderdogPosture(ctx.home, ctx.away)
   applyUnderdogPosture(ctx.away, ctx.home)
   let moment = 0
+  // Mata-mata: ao fim dos 90 minutos, se o confronto está empatado, a partida continua por mais 30 (prorrogação).
+  let totalMoments = MATCH.moments
+  let finalResult: MatchResult | undefined
+  let settled = !input.knockout?.extraTime
+  const settle = () => {
+    if (settled || moment < MATCH.moments) return
+    settled = true
+    if (knockoutLeader(input.knockout as KnockoutRules, ctx.home.goals, ctx.away.goals) === null) {
+      totalMoments = MATCH.moments + MATCH.extraMoments
+      ctx.extra = true
+    }
+  }
   const sideOf = (side: MatchSide) => (side === 'home' ? ctx.home : ctx.away)
 
   const stepMoment = () => {
@@ -241,10 +257,15 @@ export function startMatch(input: MatchInput): LiveMatch {
       return moment === 0 ? 0 : minuteOfMoment(moment - 1)
     },
     get finished() {
-      return moment >= MATCH.moments
+      settle()
+      return moment >= totalMoments
     },
     playUntil(minute) {
-      while (moment < MATCH.moments && minuteOfMoment(moment) <= minute && !ctx.pendingInjury) stepMoment()
+      for (;;) {
+        settle()
+        if (moment >= totalMoments || minuteOfMoment(moment) > minute || ctx.pendingInjury) break
+        stepMoment()
+      }
     },
     snapshot() {
       const total = ctx.home.tally.possession + ctx.away.tally.possession
@@ -254,6 +275,7 @@ export function startMatch(input: MatchInput): LiveMatch {
         finished: this.finished,
         homeGoals: ctx.home.goals,
         awayGoals: ctx.away.goals,
+        ...(ctx.extra ? { extraTime: true } : {}),
         events: [...ctx.events],
         trace: [...ctx.trace],
         ...(ctx.pendingInjury ? { injuryPending: ctx.pendingInjury } : {}),
@@ -341,8 +363,10 @@ export function startMatch(input: MatchInput): LiveMatch {
       ctx.pendingInjury = undefined
     },
     result() {
-      if (moment < MATCH.moments) throw new Error('A partida ainda não terminou')
-      return buildResult(ctx)
+      settle()
+      if (moment < totalMoments) throw new Error('A partida ainda não terminou')
+      // A disputa de pênaltis sorteia uma vez só: pedir o resultado de novo devolve o mesmo.
+      return (finalResult ??= buildResult(ctx, input.knockout))
     },
   }
 }
@@ -997,9 +1021,9 @@ function teamStats(side: SideState, possessionShare: number): TeamMatchStats {
   }
 }
 
-function playerResults(side: SideState, opponent: SideState): PlayerMatchResult[] {
+function playerResults(side: SideState, opponent: SideState, end: number): PlayerMatchResult[] {
   return side.players.map((p) => {
-    const minutesPlayed = (p.minuteOff ?? MATCH_MINUTES) - p.minuteOn
+    const minutesPlayed = (p.minuteOff ?? end) - p.minuteOn
     const result: PlayerMatchResult = {
       playerId: p.player.id,
       teamId: side.team.id,
@@ -1012,8 +1036,17 @@ function playerResults(side: SideState, opponent: SideState): PlayerMatchResult[
   })
 }
 
-function buildResult(ctx: MatchContext): MatchResult {
+/** Quem está em campo no fim e o goleiro dele: os cobradores da disputa de pênaltis. */
+function shootoutSide(side: SideState): ShootoutSide {
+  const on = activePlayers(side)
+  return { teamId: side.team.id, onPitch: on.map((p) => p.player), preferred: side.team.tactic.penaltyTakerIds, keeper: on.find((p) => p.slot === 'GK')?.player }
+}
+
+function buildResult(ctx: MatchContext, knockout?: KnockoutRules): MatchResult {
   const { home, away } = ctx
+  const end = ctx.extra ? EXTRA_END : MATCH_MINUTES
+  // Prorrogação acabada e confronto ainda empatado: pênaltis (sorteio separado, que não mexe nos outros).
+  const shootout = knockout?.penalties && knockoutLeader(knockout, home.goals, away.goals) === null ? runShootout(ctx.rng.fork('shootout'), shootoutSide(home), shootoutSide(away)) : undefined
   const totalPossession = home.tally.possession + away.tally.possession
   const homeShare = totalPossession === 0 ? 50 : Math.round((100 * home.tally.possession) / totalPossession)
   return {
@@ -1022,6 +1055,8 @@ function buildResult(ctx: MatchContext): MatchResult {
     events: ctx.events,
     homeStats: teamStats(home, homeShare),
     awayStats: teamStats(away, 100 - homeShare),
-    playerResults: [...playerResults(home, away), ...playerResults(away, home)],
+    playerResults: [...playerResults(home, away, end), ...playerResults(away, home, end)],
+    ...(ctx.extra ? { extraTime: true } : {}),
+    ...(shootout ? { penalties: { home: shootout.home, away: shootout.away }, shootout: shootout.kicks } : {}),
   }
 }
