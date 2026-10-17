@@ -52,7 +52,7 @@ export function Diagnostics() {
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-bg p-4">
       <h1 className="title text-2xl">Diagnóstico de desempenho</h1>
       <p className="text-sm text-muted">
-        Gera um mundo de teste do tamanho do plano (282 clubes) e mede neste aparelho. Não mexe nos seus jogos salvos. Aparelho de referência: {REFERENCE_TARGETS.device}.
+        Gera um mundo de teste do tamanho do plano (282 clubes) e mede neste aparelho. Também mede o tempo de salvar a cada avanço e o tamanho do save, num banco temporário: não mexe nos seus jogos salvos. Aparelho de referência: {REFERENCE_TARGETS.device}.
       </p>
 
       <section className="rounded-xl border border-line bg-surface p-3 text-sm">

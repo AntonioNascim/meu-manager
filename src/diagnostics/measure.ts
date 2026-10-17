@@ -6,6 +6,9 @@
 import { advanceToMatchday, nextEventOf, playPendingAuto } from '../store/game'
 import type { Game } from '../store/game'
 import { makeEnvelope } from '../store/saveFormat'
+import { canCompress } from '../store/compress'
+import { SaveStore } from '../store/saves'
+import type { SaveStats } from '../store/saves'
 import { BRAZIL_ONLY, FULL_WORLD, buildScaleGame } from './scaleWorld'
 import type { LeagueSpec } from './scaleWorld'
 
@@ -17,6 +20,9 @@ export const REFERENCE_TARGETS = {
   worstAdvanceSeconds: 20,
   peakMemoryMb: 150,
   saveGzipMb: 3,
+  /** Gravar o jogo depois de um avanço (dividir, comprimir e escrever no IndexedDB); roda em segundo plano, mas num aparelho simples compete com a tela. */
+  saveTypicalMs: 1000,
+  saveWorstMs: 4000,
 } as const
 
 export type WorldChoice = 'full' | 'brazil'
@@ -126,6 +132,29 @@ export async function readDevice(nav: NavigatorLike = navigator as NavigatorLike
   }
 }
 
+/** Custo de gravar o jogo depois de cada avanço (o mesmo caminho do salvamento automático, num banco só do diagnóstico). */
+export interface SaveMeasurement {
+  /** Bytes gravados (comprimidos) com a temporada recém-criada e no fim da medida. */
+  startKb: number
+  endKb: number
+  /** Pedaços do save. */
+  parts: number
+  /** O primeiro save (grava tudo), a mediana, o p95 e o pior dos seguintes, em ms. */
+  firstMs: number
+  medianMs: number
+  p95Ms: number
+  worstMs: number
+  /** Mediana, por avanço, dos pedaços regravados e dos KB escritos. */
+  writtenPartsMedian: number
+  writtenKbMedian: number
+  /** Tempo da mediana repartido em preparar, comprimir e escrever (ms). */
+  planMs: number
+  packMs: number
+  writeMs: number
+  /** O navegador comprime o save (CompressionStream)? */
+  compressed: boolean
+}
+
 export interface Measurement {
   world: WorldChoice
   clubs: number
@@ -150,6 +179,8 @@ export interface Measurement {
   saveStringifyMs: number
   saveCloneMs: number | null
   finished: boolean
+  /** Custo do salvamento; `null` quando o navegador não tem IndexedDB. */
+  save: SaveMeasurement | null
 }
 
 export interface MeasureOptions {
@@ -162,6 +193,8 @@ export interface MeasureOptions {
   onProgress?: (done: number, date: string) => void
   /** Leitura da memória usada pelo JavaScript, em bytes (Chrome: `performance.memory`). */
   readMemory?: () => number | null
+  /** Onde medir o salvamento (padrão: um banco só do diagnóstico, apagado no fim; sem IndexedDB, não mede). `null` = não medir. */
+  saveStore?: SaveStore | null
 }
 
 const pct = (xs: number[], p: number) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * p))] ?? 0
@@ -186,6 +219,15 @@ export async function measureWorld(options: MeasureOptions): Promise<Measurement
   const perAdvanceMatches: number[] = []
   let peak: number | null = null
   const limit = options.maxAdvances ?? 600
+  const store = options.saveStore === undefined ? (typeof indexedDB !== 'undefined' ? new SaveStore('meu-manager-diagnostico') : null) : options.saveStore
+  const saves: SaveStats[] = []
+  let saveFirst: SaveStats | null = null
+  try {
+    saveFirst = store ? (await store.saveDetailed(1, game)).stats : null
+  } catch {
+    saveFirst = null
+  }
+  const saveOk = store !== null && saveFirst !== null
   for (let i = 0; i < limit && nextEventOf(game).type !== 'season-end'; i++) {
     const t = performance.now()
     game = playPendingAuto(advanceToMatchday(game))
@@ -194,6 +236,13 @@ export async function measureWorld(options: MeasureOptions): Promise<Measurement
     perAdvanceMatches.push(game.lastDay.length)
     const used = readMemory()
     if (used !== null) peak = Math.max(peak ?? 0, used)
+    if (saveOk) {
+      try {
+        saves.push((await store.saveDetailed(1, game)).stats)
+      } catch {
+        // sem espaço no aparelho: o resto da medida segue sem o salvamento
+      }
+    }
     options.onProgress?.(i + 1, game.season.season.currentDate)
     if (game.dismissal) break
     await yieldToUi()
@@ -212,6 +261,26 @@ export async function measureWorld(options: MeasureOptions): Promise<Measurement
     saveCloneMs = null
   }
   const end = readMemory()
+  const lastSave = saves[saves.length - 1]
+  const save: SaveMeasurement | null =
+    saveOk && saveFirst && lastSave
+      ? {
+          startKb: Math.round(saveFirst.totalBytes / 1024),
+          endKb: Math.round(lastSave.totalBytes / 1024),
+          parts: lastSave.parts,
+          firstMs: saveFirst.ms,
+          medianMs: pct(saves.map((s) => s.ms), 0.5),
+          p95Ms: pct(saves.map((s) => s.ms), 0.95),
+          worstMs: Math.max(...saves.map((s) => s.ms)),
+          writtenPartsMedian: pct(saves.map((s) => s.written), 0.5),
+          writtenKbMedian: Math.round(pct(saves.map((s) => s.writtenBytes), 0.5) / 1024),
+          planMs: pct(saves.map((s) => s.planMs), 0.5),
+          packMs: pct(saves.map((s) => s.packMs), 0.5),
+          writeMs: pct(saves.map((s) => s.writeMs), 0.5),
+          compressed: canCompress(),
+        }
+      : null
+  if (store && options.saveStore === undefined) await store.destroy().catch(() => undefined)
   return {
     world: options.world,
     clubs: s.teams.length,
@@ -234,11 +303,22 @@ export async function measureWorld(options: MeasureOptions): Promise<Measurement
     saveStringifyMs,
     saveCloneMs,
     finished,
+    save,
   }
 }
 
 const f0 = (n: number) => n.toFixed(0)
 const f1 = (n: number) => n.toFixed(1)
+
+function saveLines(s: SaveMeasurement): string[] {
+  const T = REFERENCE_TARGETS
+  const ok = (good: boolean) => (good ? 'ok' : 'ACIMA DA META')
+  return [
+    `Save gravado (${s.compressed ? 'comprimido' : 'SEM compressao: o navegador nao tem CompressionStream'}): inicio ${s.startKb} KB, fim ${s.endKb} KB em ${s.parts} pedacos - meta ${T.saveGzipMb} MB: ${ok(s.endKb <= T.saveGzipMb * 1024 && s.startKb <= T.saveGzipMb * 1024)}`,
+    `Tempo de salvar a cada avanco: mediana ${f0(s.medianMs)} ms - meta ${T.saveTypicalMs} ms: ${ok(s.medianMs <= T.saveTypicalMs)} | p95 ${f0(s.p95Ms)} ms | pior ${f0(s.worstMs)} ms - meta ${T.saveWorstMs} ms: ${ok(s.worstMs <= T.saveWorstMs)} | primeiro save (grava tudo) ${f0(s.firstMs)} ms`,
+    `Cada save grava (mediana): ${s.writtenPartsMedian} de ${s.parts} pedacos, ${s.writtenKbMedian} KB | preparar ${f0(s.planMs)} ms, comprimir ${f0(s.packMs)} ms, escrever ${f0(s.writeMs)} ms`,
+  ]
+}
 
 /** Texto para copiar e colar: aparelho, navegador, números e se cada meta foi atingida. */
 export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', now: Date = new Date()): string {
@@ -263,6 +343,7 @@ export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', 
     `Pior avanco: ${f1(m.worstMs / 1000)} s em ${m.worstDate} - meta ${T.worstAdvanceSeconds} s: ${ok(m.worstMs / 1000 <= T.worstAdvanceSeconds)}`,
     m.peakMemoryMb !== null ? `Memoria do jogo (pico): ${m.peakMemoryMb} MB - meta ${T.peakMemoryMb} MB: ${ok(m.peakMemoryMb <= T.peakMemoryMb)} | no fim: ${m.endMemoryMb} MB` : 'Memoria do jogo: o navegador nao permite medir (so o Chrome e parecidos deixam)',
     `Save (JSON): ${m.saveJsonKb} KB | gerar o JSON: ${f0(m.saveStringifyMs)} ms | copia para o IndexedDB: ${m.saveCloneMs === null ? 'indisponivel' : `${f0(m.saveCloneMs)} ms`}`,
+    ...(m.save ? saveLines(m.save) : ['Salvamento: este navegador nao tem IndexedDB, nao foi possivel medir.']),
     '',
     `Referencia: ${T.device}. Metas: temporada ate ${T.seasonSeconds} s, avanco tipico ate ${T.typicalAdvanceMs} ms, pior avanco ate ${T.worstAdvanceSeconds} s, memoria ate ${T.peakMemoryMb} MB.`,
   ]

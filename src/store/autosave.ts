@@ -6,9 +6,10 @@
 import { useSyncExternalStore } from 'react'
 import { getActiveSlot, getGame, subscribeGame } from './gameStore'
 import type { Game } from './game'
-import { saveToSlot } from './saves'
+import { saveDetailed } from './saves'
+import type { SaveStats } from './saves'
 
-export type SaveStatus = { state: 'idle' } | { state: 'saving' } | { state: 'saved'; at: string } | { state: 'error'; message: string }
+export type SaveStatus = { state: 'idle' } | { state: 'saving' } | { state: 'saved'; at: string; stats: SaveStats } | { state: 'error'; message: string }
 
 let status: SaveStatus = { state: 'idle' }
 const statusListeners = new Set<() => void>()
@@ -16,6 +17,13 @@ function setStatus(next: SaveStatus) {
   status = next
   statusListeners.forEach((l) => l())
 }
+
+/** Teto da espera extra entre duas gravações (o tempo de cada uma entra na espera da seguinte). */
+const MAX_DELAY_MS = 4000
+/** Quantas vezes o tempo da última gravação o jogo espera antes da próxima: gravação lenta (celular simples, mundo grande) não pode ocupar o aparelho a cada toque. */
+const DUTY = 3
+
+let lastSaveMs = 0
 
 let timer: ReturnType<typeof setTimeout> | undefined
 let lastSaved: Game | null = null
@@ -29,8 +37,11 @@ function writeNow(): Promise<void> {
   lastSaved = game
   setStatus({ state: 'saving' })
   inFlight = inFlight
-    .then(() => saveToSlot(slot, game))
-    .then((summary) => setStatus({ state: 'saved', at: summary.savedAt }))
+    .then(() => saveDetailed(slot, game))
+    .then(({ summary, stats }) => {
+      lastSaveMs = stats.ms
+      setStatus({ state: 'saved', at: summary.savedAt, stats })
+    })
     .catch((error: unknown) => {
       lastSaved = null
       setStatus({ state: 'error', message: error instanceof Error ? error.message : 'Não foi possível salvar.' })
@@ -44,7 +55,7 @@ export function startAutosave(delayMs = 300): () => void {
     const game = getGame()
     if (!game || getActiveSlot() === null || game === lastSaved) return
     if (timer !== undefined) clearTimeout(timer)
-    timer = setTimeout(() => void writeNow(), delayMs)
+    timer = setTimeout(() => void writeNow(), Math.max(delayMs, Math.min(MAX_DELAY_MS, Math.round(lastSaveMs * DUTY))))
   })
   return () => {
     off()
