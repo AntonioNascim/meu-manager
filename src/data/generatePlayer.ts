@@ -74,6 +74,8 @@ export interface PlayerSpec {
   teamId: TeamId | null
   /** Série do clube (define o piso do nível-base; padrão: o piso geral). */
   tier?: number
+  /** País da liga do clube (padrão: Brasil): a nacionalidade da maioria dos jogadores. */
+  country?: Nationality
 }
 
 export const qualityFloorFor = (tier: number | undefined): number => (tier === undefined ? GENERATION.qualityFloor : (GENERATION.qualityFloorByTier[tier] ?? GENERATION.qualityFloor))
@@ -95,9 +97,12 @@ export function pickAge(rng: Rng): number {
   return rng.int(band.min, band.max)
 }
 
-function pickNationality(rng: Rng): Nationality {
-  if (!rng.chance(FOREIGN_CHANCE)) return 'Brazil'
-  return rng.weighted(FOREIGN_NATIONALITIES, (n) => n.weight).nationality
+/** Nacionalidade de um jogador gerado: a do país do clube, e uns 6% de estrangeiros (no Brasil, sul-americanos; nos outros países, brasileiros e sul-americanos). */
+function pickNationality(rng: Rng, home: Nationality = 'Brazil'): Nationality {
+  if (!rng.chance(FOREIGN_CHANCE)) return home
+  if (home === 'Brazil') return rng.weighted(FOREIGN_NATIONALITIES, (n) => n.weight).nationality
+  const abroad = [{ nationality: 'Brazil' as Nationality, weight: 5 }, ...FOREIGN_NATIONALITIES].filter((n) => n.nationality !== home)
+  return rng.weighted(abroad, (n) => n.weight).nationality
 }
 
 export function pickFoot(rng: Rng, position: Position): Foot {
@@ -220,7 +225,7 @@ export function hiddenAttribute(rng: Rng, dist: { mean: number; sd: number }): n
 
 export function generatePlayer(rng: Rng, ctx: GenerationContext, spec: PlayerSpec): Player {
   const id: PlayerId = `player-${ctx.nextPlayerNumber++}`
-  const nationality = pickNationality(rng)
+  const nationality = pickNationality(rng, spec.country)
   const name = pickUniqueName(rng, ctx, nationality)
   // Apelidos são em português: só jogadores brasileiros têm.
   const nickname = nationality === 'Brazil' && rng.chance(NICKNAME_CHANCE) ? rng.pick(NICKNAMES) : undefined

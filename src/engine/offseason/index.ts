@@ -186,7 +186,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (count <= 0) continue
     const positions = deficits.slice(0, count)
     while (positions.length < count) positions.push(youthRng.pick(EXTRA_POSITIONS))
-    const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), positions, year: nextYear }, youthRng, taken)
+    const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), ...(team.country ? { country: team.country } : {}), positions, year: nextYear }, youthRng, taken)
     for (const p of made) {
       taken.add(p.name)
       players.push({ ...p, id: `player-${++counter}`, teamId: team.id })

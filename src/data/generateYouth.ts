@@ -25,7 +25,7 @@ export const createYouth: YouthFactory = (request, rng, taken) => {
     if (wonderkid) quality = rng.normal(Y.wonderkidQuality, Y.wonderkidQualitySd)
     else if (rng.chance(request.academy ? ACADEMY.prospectChance : Y.prospectChance)) quality += rng.float(Y.prospectBonus[0], Y.prospectBonus[1])
     const age = request.ages?.[i] ?? rng.int(Y.ageRange[0], Y.ageRange[1])
-    const generated = generatePlayer(rng, ctx, { position, quality, age, teamId: request.teamId, tier: request.tier })
+    const generated = generatePlayer(rng, ctx, { position, quality, age, teamId: request.teamId, tier: request.tier, ...(request.country ? { country: request.country } : {}) })
     const player = withLeagueSalary(request.academy && !wonderkid ? { ...generated, hidden: { ...generated.hidden, potential: Math.max(Math.round(playerOverall(generated)), generated.hidden.potential + (ACADEMY.potentialOffset[request.tier] ?? 0)) } } : generated, club)
     const salary = player.contract.salary
     return { ...player, contract: { ...player.contract, endDate: contractEndOn(request.year + rng.int(2, 4)), releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000 } }

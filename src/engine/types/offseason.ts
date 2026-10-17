@@ -1,5 +1,5 @@
 import type { PlayerId, TeamId } from './common'
-import type { Position } from './player'
+import type { Nationality, Position } from './player'
 import type { LeagueEconomy } from './team'
 
 /** Jogador que saiu do jogo ou do clube na virada de temporada (para o resumo na tela). */
@@ -48,6 +48,8 @@ export interface YouthRequest {
   reputation: number
   /** Economia da liga do clube (nível dos jogadores e salários); sem ela, a do Brasil. */
   economy?: LeagueEconomy
+  /** País da liga do clube (a base nasce com a nacionalidade dele); sem ele, o Brasil. */
+  country?: Nationality
   positions: Position[]
   /** Idade de cada jovem (mesma ordem de `positions`); sem isso o gerador usa a faixa padrão dos jovens do profissional. */
   ages?: number[]
