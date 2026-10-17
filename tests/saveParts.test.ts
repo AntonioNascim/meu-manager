@@ -52,7 +52,7 @@ describe('save em partes: dividir e juntar', () => {
     const b = planParts(compactGame(next))
     const before = new Map(a.map((p) => [p.name, p.refs]))
     const changed = b.filter((p) => !sameRefs(before.get(p.name), p.refs))
-    expect(b.length).toBeGreaterThan(100)
+    expect(b.length).toBeGreaterThan(20)
     expect(changed.length).toBeGreaterThan(0)
     expect(changed.length).toBeLessThan(b.length)
     // As partidas de rodadas que não foram jogadas não entram.

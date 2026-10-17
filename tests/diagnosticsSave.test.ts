@@ -18,7 +18,7 @@ describe('diagnóstico: salvamento', () => {
     const s = m.save!
     expect(s).not.toBeNull()
     expect(s.compressed).toBe(true)
-    expect(s.parts).toBeGreaterThan(100)
+    expect(s.parts).toBeGreaterThan(20)
     expect(s.startKb).toBeGreaterThan(50)
     expect(s.endKb).toBeGreaterThan(50)
     expect(s.endKb).toBeLessThan(REFERENCE_TARGETS.saveGzipMb * 1024)

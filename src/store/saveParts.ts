@@ -1,6 +1,6 @@
 /**
  * O jogo em partes: em vez de um objeto só, o save é um conjunto de pedaços pequenos (o resto do jogo, o calendário, o
- * mercado, o treino e, para as listas grandes, um pedaço por clube ou por grupo de rodadas). Cada pedaço traz as
+ * mercado, o treino e, para as listas grandes, um pedaço por liga ou por grupo de rodadas). Cada pedaço traz as
  * referências dos objetos que o formam: como o motor é imutável, o que não mudou entre dois saves tem as mesmas
  * referências e não precisa ser serializado, comprimido nem gravado de novo. Puro: nada aqui toca o navegador.
  */
@@ -64,8 +64,8 @@ export function planParts(game: Game): PartPlan[] {
     { name: TRAINING, refs: [training], build: () => training },
     ...chunked('m', matches, (m) => `${m.competitionId}:${Math.floor((m.round - 1) / MATCH_ROUNDS_PER_PART)}`),
     ...chunked('t', teams, (t) => clubLeague.get(t.id) ?? 'none'),
-    ...chunked('p', players, (p) => p.teamId ?? 'free'),
-    ...chunked('a', academy, (p) => p.teamId ?? 'free'),
+    ...chunked('p', players, (p) => (p.teamId ? (clubLeague.get(p.teamId) ?? 'none') : 'free')),
+    ...chunked('a', academy, (p) => (p.teamId ? (clubLeague.get(p.teamId) ?? 'none') : 'free')),
   ]
 }
 
