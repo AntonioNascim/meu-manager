@@ -309,7 +309,7 @@ Cada etapa termina com os testes de hoje passando e os resultados do mundo atual
 | **B3** | Resultado simplificado + pré-aquecimento + testes comparando com o completo | Só depois de B2 há "outras ligas" para simplificar |
 | **B4** | Salvamento em partes + compressão + versão 10 | Pode andar junto com B3 |
 | **B5** | Economia por liga (`R`), termo de liga no interesse, limite de estrangeiros, freio de exportação | Precisa das ligas todas existindo |
-| **B6** | Teste de longo prazo das 15 ligas, ajuste fino, pacote do usuário com várias ligas (tirar `unsupported-leagues` aos poucos) | Fecha a fase |
+| **B6** | Teste de longo prazo das 15 ligas, ajuste fino, pacote do usuário com várias ligas (tirar `unsupported-leagues` aos poucos) | Fecha a fase. Feito (seção 14), menos o pacote com várias ligas |
 
 ---
 
@@ -546,3 +546,73 @@ Antes da B5, no mesmo mundo, todas as ligas de uma divisão só tinham a economi
 - **Vendas altas de fenômenos da base ainda acontecem** (um menino de 18 anos com força 87 e potencial 100 saiu da Série C por R$ 45 mi, 7 vezes a receita do clube, e o teste aceita no máximo um ano assim na Série C). É um jogador raro, que vale isso em qualquer liga; o preço dele já está 8 vezes abaixo do valor pela força.
 - **A Série A brasileira troca muito dinheiro** (compra e venda de ~1,9 vez a receita por clube por ano, no mundo de 60 clubes, e de 0,2 a 0,6 no mundo grande, onde há mais onde gastar). Isso já era assim antes da B5, o caixa não passa do teto e não foi mexido; vale olhar na B6 se o rodízio das ligas simplificadas mudar o volume.
 - **Campeões acima de uns 92 pontos e a checagem de dinastias** continuam para a B6, como combinado, junto com a tela de troca de clube e o treino das ligas simplificadas de uma vez só.
+
+---
+
+## 14. Resultado da parte B6 (longo prazo das 15 ligas, campeões, dinheiro e troca de clube)
+
+**Feito na B6**
+
+1. **Medição de longo prazo por liga** (`tools/leagueYears.ts`, `node tools/run.mjs leagueRun --clubs 282 --years 30`). Além do que a B5 já media, cada liga ganhou: pontos do campeão (convertidos para 38 jogos, porque a Argentina joga turno único e Alemanha, França e Portugal têm 18 clubes), campeões diferentes, mais títulos de um clube e maior sequência por bloco de 10 temporadas, idade média, craques (força geral ≥ 85), saldo final contra o teto de caixa, receita real contra a esperada, negócios por clube por ano e valor do elenco contra a receita. `--ids br-1,en-1,...` monta um mundo menor, como nos testes. O teste `tests/long/world282.test.ts` (`npm run test:long`, ~17 minutos, fora do `test:all`) joga as 30 temporadas das 15 ligas e confere tudo abaixo.
+2. **Gasto da IA com teto por janela** (`MARKET.ai.windowSpendShare` = 0,3 da receita anual esperada por janela). Antes cada clube podia gastar 40% do caixa por mês, e o caixa era reposto pelas vendas dos outros: a Série A comprava e vendia ~1,5 vez a receita por ano (o elenco vale 2,2 a 2,5 vezes a receita, então 60% dele trocava de dono todo ano). Agora ficam em ~0,3 a 0,4 vez (o máximo de um clube num ano é 0,7). O número de negócios por clube quase não muda (5 a 6 por ano na Série A, 3 na B): a IA passa a comprar mais barato, não menos. Força, idades e craques das séries ficaram como antes.
+3. **Reputação dos clubes grandes** (`OFFSEASON.reputation.tierPullAbove` = 0,1). A reputação de quem fica na primeira divisão e está acima da média dela voltava para a média em 30% da distância por ano; um clube de reputação 17 perdia 1,5 ponto por ano mesmo cumprindo a meta. As ligas ficavam sem clubes grandes que se mantêm (7 a 8 campeões diferentes em 10 temporadas na Série A, quando a meta é 4 a 6). Agora o puxão para baixo é 0,1 para quem está na primeira divisão acima da média; nas séries de acesso (B, C) o puxão continua simétrico, porque a média delas andava 1,2 ponto.
+4. **Ligas do mundo de teste com poucos grandes** (`LeagueSpec.repCurve` em `scaleWorld.ts`). A escada de reputação do mundo de 282 clubes era uma reta (cada clube 0,5 a 0,7 ponto acima do seguinte); nas ligas europeias e pequenas agora os primeiros ficam juntos no alto e o meio cai (expoente 1,3 a 1,7). Só muda o mundo de teste (a Argentina e o Brasil continuam retos).
+5. **Teto de caixa gasta metade do excesso por mês** (`FINANCE.ceilingSpendPerMonth` de 0,3 para 0,5).
+6. **Carreira do técnico** (`src/engine/career`, `CAREER` em `config.ts`, `Game.coach`, telas Carreira e Demissão). Ver abaixo.
+
+**Dinheiro acima do teto: de onde vinha o 2,1 contra 1,5**
+
+O número da B5 era o saldo final dividido pela receita *real* do ano (bilheteria, patrocínio e TV lançados no extrato). O teto da IA é 1,5 vez a receita *esperada* (19 jogos em casa com o público de um adversário médio). A receita real fica em 79% a 91% da esperada (Brasil A 89%, B 86%, C 84%, Argentina 80%, Inglaterra 90%), então um clube exatamente no teto já tem 1,5 / 0,89 = 1,7 ano de receita real. O resto era pico: a venda de um jogador caro entra de uma vez e o excesso só era gasto em 30% por mês. Medido contra o próprio teto (agora no relatório: `saldo/teto`): média dos clubes de 0,9 a 1,06 e máximo de 1,06 a 1,35 (era 1,3 a 2,4 antes). Não é vazamento: o caixa não cresce sem limite, nenhum clube ficou no vermelho em 30 temporadas, e o teste longo exige que o maior saldo fique abaixo de 1,5 vez o teto.
+
+**Série A trocando ~2 vezes a receita por ano**
+
+Não era realista: o elenco da Série A vale 2,2 a 2,5 vezes a receita (razoável), mas a IA comprava os melhores jogadores (ganho mínimo de 4 pontos) com 40% do caixa por mês e vendia a outros clubes que faziam o mesmo, então o dinheiro girava. Com o teto por janela, Série A compra 0,3 a 0,4 vez a receita por ano (venda 0,3 a 0,4, máximo de 0,7 e 1,2), Série B 0,2 a 0,3, Série C 0,02. Inglaterra, Espanha e Alemanha ficam em 0,5 a 0,6 no mundo grande (clubes com mais caixa por jogador). O teste `tests/balance/leagues.test.ts` confere que nenhum clube gasta mais de duas janelas de teto por ano (`maxPurchaseShare`) e `tests/market.test.ts`, que nenhum clube passa do teto da janela.
+
+**Resultado, 30 temporadas, mundo de 282 clubes (semente 7; médias das temporadas 1–3, 14–16 e 28–30)**
+
+| Liga | Força dos titulares | 40 melhores | Craques (≥ 85) | Idade média | Folha / receita | Campeão (pts em 38 jogos) | Campeões por 10 temporadas |
+|---|---|---|---|---|---|---|---|
+| Inglaterra | 74,3 → 77,6 → 75,8 | 11 → 23 → 19 | 6 → 42 → 28 | 25,9 → 25,6 → 25,3 | 33 → 37 → 33% | 75,4 | 4 / 6 / 7 |
+| Espanha | 72,3 → 73,6 → 72,4 | 7 → 8 → 5 | 4 → 15 → 7 | 26,0 → 25,1 → 24,7 | 35 → 34 → 32% | 73,0 | 5 / 7 / 7 |
+| Itália | 71,1 → 71,5 → 71,3 | 8 → 4 → 3 | 7 → 5 → 4 | 25,7 → 25,0 → 25,3 | 37 → 36 → 35% | 74,5 | 3 / 9 / 7 |
+| Alemanha | 71,4 → 72,5 → 71,3 | 8 → 2 → 3 | 6 → 5 → 6 | 25,8 → 25,2 → 24,9 | 39 → 38 → 36% | 74,6 | 4 / 7 / 6 |
+| França | 66,7 → 68,2 → 68,1 | 1 → 2 → 2 | 1 → 5 → 3 | 25,9 → 25,1 → 24,7 | 38 → 41 → 40% | 74,2 | 7 / 5 / 6 |
+| Brasil A | 65,7 → 66,4 → 67,2 | 4 → 0 → 4 | 2 → 1 → 4 | 25,9 → 25,4 → 25,4 | 32 → 34 → 37% | 80,0 | 4 / 8 / 3 |
+| Portugal | 64,6 → 65,4 → 65,8 | 0 → 0 → 1 | 0 → 0 → 1 | 25,7 → 25,1 → 24,8 | 50 → 51 → 52% | 72,8 | 6 / 6 / 8 |
+| Argentina | 62,3 → 63,1 → 63,2 | 0 → 1 → 1 | 0 → 1 → 1 | 25,6 → 24,9 → 24,9 | 38 → 40 → 40% | 75,3 | 8 / 10 / 5 |
+| Colômbia | 59,5 → 60,7 → 61,4 | 0 → 1 → 1 | 0 → 1 → 2 | 25,8 → 25,0 → 25,0 | 47 → 53 → 51% | 71,6 | 7 / 5 / 6 |
+| Chile | 58,3 → 59,7 → 59,5 | 0 → 0 → 0 | 0 → 0 → 0 | 25,6 → 24,9 → 24,9 | 50 → 57 → 55% | 71,0 | 7 / 8 / 6 |
+| Uruguai | 57,4 → 58,5 → 58,1 | 0 → 0 → 0 | 0 → 0 → 0 | 25,6 → 24,8 → 24,8 | 51 → 55 → 56% | 72,0 | 7 / 7 / 6 |
+| Equador | 56,6 → 58,7 → 59,7 | 0 → 0 → 0 | 0 → 0 → 0 | 25,6 → 25,1 → 24,9 | 51 → 59 → 62% | 72,5 | 5 / 7 / 9 |
+| Paraguai | 56,2 → 58,1 → 57,6 | 0 → 0 → 0 | 0 → 0 → 0 | 25,6 → 24,6 → 25,0 | 52 → 63 → 61% | 73,4 | 4 / 8 / 6 |
+| Brasil B | 55,4 → 57,4 → 56,9 | 0 → 0 → 0 | 0 → 0 → 0 | 25,7 → 25,0 → 25,2 | 64 → 65 → 59% | 81,7 | 8 / 10 / 10 |
+| Brasil C | 44,7 → 48,7 → 48,2 | 0 → 0 → 0 | 0 → 0 → 0 | 25,9 → 24,9 → 24,8 | 64 → 82 → 79% | 78,5 | 8 / 9 / 7 |
+
+- **Finanças:** nenhum clube no vermelho em nenhuma das 30 temporadas; saldo médio entre 0,9 e 1,06 do teto e máximo de 1,35 (Chile).
+- **Força:** a variação de cada liga entre o começo e o fim fica dentro de ±3,5 (Brasil C +3,5 e Equador +3,1 são as maiores; a C sobe na primeira década e fica em 48 na seguinte). A última década é parecida com a anterior em todas (menos de 2,5 pontos).
+- **Idade:** 24,6 a 26,0 em todas as ligas e décadas. **Craques:** a Inglaterra tem de 6 a 42 jogadores de força ≥ 85 (o nível dela é +8 sobre o Brasil); no mundo todo são ~27 nos três primeiros anos, ~75 no meio e ~57 nos três últimos: sobe enquanto os melhores se concentram na liga rica e depois recua.
+- **Concentração dos melhores jogadores:** a Inglaterra passa de 11 dos 40 melhores (28%) para 23 (57%) na primeira década e **recua para 19 (47%)** na última; a fatia parou de crescer. Espanha, Alemanha e Itália mantêm a força dos titulares e algum craque.
+- **Campeões:** média de pontos do campeão (em 38 jogos) entre 71,0 e 81,7 em todas as ligas; campeões acima de 92 pontos foram 2 em 450 temporadas (uma na Argentina e uma na França), nenhum no Brasil A. Nas divisões de acesso (Brasil B e C) o campeão sobe e sai da divisão, então quase todo ano é um clube novo (7 a 10 por bloco), como esperado.
+- **Dinastias:** nas 13 primeiras divisões, 6,3 campeões diferentes por 10 temporadas em média (3 a 10 em cada bloco) e 3 dos 39 blocos com um clube de mais de 5 títulos (Brasil A com 6 e 7 títulos e 5 seguidos; Inglaterra com 7). Nas outras sementes do mundo de 60 clubes (`npm run analyze -- years --years 30 --seed 41|43`, Série A): 4, 5, 4 e 5, 6, 6 campeões, no máximo 5 títulos.
+
+**O que a calibragem corrigiu em campeões (e o que ficou)**
+
+- Antes das mudanças 3 e 4 a Série A do mundo de 60 clubes tinha 7,2 campeões por bloco de 10 temporadas em média (duas sementes, 30 anos) e as ligas europeias do mundo grande de 6 a 8; agora a Série A está em 5,0 (4 a 6) e a Europa em 5,7 a 6,3. **Completo contra simplificado:** o Brasil A (lance a lance) fica em 5,0 campeões por bloco e as ligas jogadas pelo simplificado em 6,3 na média, então o simplificado **não** deixou as ligas mais previsíveis; a comparação não é limpa (a estrutura das ligas é outra: turno único, 16 a 18 clubes, escada de reputação própria) e a diferença vem mais dela que do motor. Os pontos do campeão são parecidos (80,0 no Brasil A, 71,0 a 75,4 nas outras).
+- **Campeão acima de 92 pontos:** é a cauda da variação normal, não um defeito de geração: a média do campeão da Série A é 79 a 81 com desvio de ~6 pontos, então ~2% das temporadas passam de 92 (1 a 2 em 30 na Série A do mundo de 60 clubes, 2 em 450 no mundo grande). Não precisou de ajuste de geração ou de reputação; o teste longo exige no máximo 3 em 30 por liga. O teto individual do `season.test.ts` continua em 100.
+- Em semente isolada o Brasil A ainda pode ter dinastia de 6 a 7 títulos num bloco (a semente 7 teve duas); é o preço de segurar os grandes. O teste longo cobra a taxa (menos de 20% dos blocos) e a média, não a semente.
+
+**Carreira do técnico: propostas, demissão e troca de clube**
+
+- **Reputação do técnico** (`Game.coach`, `{ reputation, arrivedOn? }`, escala 1 a 20 dos clubes; saves antigos não têm o campo e valem o prestígio do clube). O prestígio de um clube é a reputação dele mais o nível da liga × 0,25 (`CAREER.levelWeight`), para comparar um clube inglês com um paraguaio. O técnico começa com o prestígio do clube. No fim de cada temporada a reputação muda até ±1,5 conforme a posição final contra a meta da diretoria, mais 1 ponto pelo título; ser demitido custa 1,5 ponto.
+- **Propostas a quem está empregado** (`jobOpenings`, `CAREER.offer`): clubes **com vaga** de prestígio até 1,5 ponto acima da reputação que os outros enxergam (a reputação guardada mais ou menos 1 ponto conforme a confiança da diretoria hoje) e não abaixo do clube atual menos 0,5; no máximo 3, as maiores primeiro. A vaga de um clube num mês sai de um sorteio com a semente do mercado, o mês e o clube (não é guardada: a mesma consulta dá sempre a mesma lista, que muda a cada mês); a chance é 4% e sobe para 16% se o clube está abaixo da meta e 39% se está perto da demissão. O painel mostra o aviso "N clubes querem você", que abre a nova tela **Carreira** (reputação e lista; "Assumir" pede confirmação).
+- **Procura de emprego depois da demissão** (`CAREER.search`): a tela de demissão lista as vagas abertas que a reputação alcança (prestígio até 0,5 acima dela, sem piso); se houver menos de 5, completa com clubes ao alcance na ordem do sorteio do mês; com reputação baixíssima, os 5 clubes mais modestos do mundo sempre aceitam. "Começar um novo jogo" virou botão secundário.
+- **Assumir o clube** (`takeUserJob`, `moveCoach`): só clubes da lista e nunca com partida por jogar; o time do jogador passa a ser o novo, o plano de treino vai junto, as propostas pendentes dos dois clubes e os anúncios do técnico saem do mercado, as escalações guardadas são esquecidas e `refocus` põe a liga nova lance a lance e a antiga (se for de outra pirâmide) no simplificado. A diretoria nova só julga a campanha depois da chegada (`sinceArrival`: jogos e pontos desde `arrivedOn`).
+- **Testes:** `tests/career.test.ts` (reputação, vagas determinísticas e dentro do alcance, vagas sempre existem, troca de clube, diretoria nova não herda a campanha, telas e a troca para a Inglaterra com `refocus`).
+
+**Testes:** `npm test` 685 testes passando; `npm run test:balance` passando (`leagues.test.ts` ganhou o teto de compras; `longRun.test.ts` não mudou); `npm run test:long` passando (17 minutos). **Save:** `Game.coach` é opcional; a versão do save continua 10 e o campo vai no pedaço `core` sem mexer em `saveParts.ts`.
+
+**O que ficou para depois**
+- **Limite de estrangeiros (`foreignLimit`):** continua dependendo de nacionalidades por país (pacote multi-liga).
+- **Pacote do usuário com várias ligas** (tirar o `unsupported-leagues` do importador): não foi pedido nesta parte e fica para a B7. A carreira já funciona num mundo com várias ligas (testada no mundo de escala), mas o jogo de hoje só cria mundos de uma pirâmide.
+- **Treino das ligas simplificadas de uma vez só** e **meta de tempo do mercado do mundo grande** (primeiro avanço < 1 s): sem mudança; o teste longo mostra que o mercado das 15 ligas custa ~17 minutos em 30 temporadas (~34 s por temporada).
+- **Equador (+3,1) e Brasil C (+3,5)** sobem mais que as outras ligas em 30 anos, dentro do limite do teste (3,5 e 4,5). O puxão assimétrico da reputação (item 3) empurra um pouco a média das ligas pequenas para cima; se for preciso, o próximo passo é puxar mais forte quem está abaixo da média.
