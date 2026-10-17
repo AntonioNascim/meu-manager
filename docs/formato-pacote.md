@@ -51,11 +51,12 @@ O código está em `src/data/package/` (`types.ts` com os tipos, `validate.ts` c
 { "id": "England", "name": "Inglaterra" }
 ```
 
-- `id`: **uma nacionalidade do jogo** (a mesma usada em `players[].nationality`): `Brazil`, `Argentina`, `Uruguay`,
-  `Paraguay`, `Chile`, `Colombia`, `Peru`, `Ecuador`, `England`, `Spain`, `Italy`, `Germany`, `France`, `Portugal`.
-  Um país fora dessa lista é recusado (`unknown-value`); nacionalidade nova exige código no jogo (rótulo em `labels.ts` e
-  bandeira).
+- `id`: **um país da lista do fim deste arquivo** (209 países, a mesma lista de `players[].nationality`), escrito como lá
+  (nome em inglês: `Brazil`, `England`, `Ivory Coast`...). Um país fora da lista é recusado (`unknown-value`).
 - `name`: nome mostrado (português).
+- `countries` só precisa ter os países **que têm liga no pacote** (cada `leagues[].country` precisa estar aqui). A nacionalidade
+  de um **jogador** pode ser **qualquer país da lista**, tenha ou não liga no pacote: um jogador japonês num clube inglês não
+  exige o Japão em `countries`.
 - O país da liga é o que define quem é **estrangeiro** no clube (ver `foreignLimit`).
 
 ## Ligas (`leagues`)
@@ -112,7 +113,7 @@ Exemplo de país com três divisões (Brasil): `br-1` (`promotion: 0`, `relegati
 - `level` (−15 a 15): quantos **pontos de força** os titulares da liga têm a mais (ou a menos) que os do Brasil. Usado ao gerar
   jogadores sem atributos e a base. O jogador sem atributos de um clube inglês nasce mais forte que o de um paraguaio.
 
-Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leagueDefaults.ts`):
+Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leagueDefaults.ts`). Um país que **não está nesta tabela** (México, Estados Unidos, Japão...) não tem padrão: a liga usa a economia do Brasil e as janelas da Europa, e a validação dá o aviso "Não há economia padrão para o país"; preencha `economy` e `region` da liga para tratar disso:
 
 | País (`id`) | Região | `revenue` | `level` |
 |---|---|---|---|
@@ -149,7 +150,9 @@ Todas as divisões de um país usam o mesmo `economy` (se divergirem, cada clube
 - `lineup` (0 a 11): no máximo tantos estrangeiros **entre os 11 titulares**. A escalação automática da IA e a sugestão do
   jogador respeitam o limite; o técnico que tenta escalar mais é impedido com uma mensagem, e uma escalação que passou a
   violar o limite (lesões, venda, troca de clube) é consertada antes do jogo. Nas ligas simuladas de forma simplificada
-  (fora da pirâmide do técnico) o limite também vale. As substituições durante a partida não são limitadas.
+  (fora da pirâmide do técnico) o limite também vale.
+- **Durante a partida** o limite `lineup` vale para os estrangeiros **em campo**: a IA escolhe o reserva que não estoura o limite (sem reserva possível, o time segue com um a menos) e o técnico que tenta uma troca que passa do limite recebe "Limite de estrangeiros da liga: no máximo N em campo ao mesmo tempo". Trocar um estrangeiro por outro estrangeiro vale. A única exceção é o reserva de goleiro que entra no lugar de um goleiro expulso.
+- **Promoção da base:** o técnico que promove um jovem estrangeiro com o elenco já no limite `squad` recebe a mensagem "Limite de estrangeiros da liga: o elenco já tem N..."; a IA não promove (e, aos 20 anos, dispensa) o jovem estrangeiro que não cabe.
 
 Sem `foreignLimit` (ou sem o campo), nada é limitado. As regras reais variam muito: use o campo só quando a liga tiver uma regra
 que dê para descrever assim.
@@ -212,7 +215,7 @@ a torcida e a meta da diretoria a partir da reputação e da posição do clube 
 | `name` | sim | Nome completo |
 | `nickname` | não | Apelido mostrado no lugar do nome |
 | `birthDate` | sim | `AAAA-MM-DD`, data válida. A idade vem dela |
-| `nationality` | sim | Uma das nacionalidades da lista de países acima |
+| `nationality` | sim | Qualquer país da lista do fim deste arquivo (não precisa estar em `countries`) |
 | `position` | sim | `GK`, `RB`, `LB`, `CB`, `DM`, `CM`, `AM`, `RW`, `LW` ou `ST` |
 | `secondaryPositions` | não | Até 2 das mesmas posições. Sem o campo o jogo sorteia, de forma estável |
 | `foot` | não | `right`, `left` ou `both` |
@@ -281,7 +284,8 @@ não precisa deles. Pacotes com mais de um país nunca precisam: o jogo deriva t
 | "declara N times, mas o pacote tem M clubes nela" | `teams` diferente do número de clubes com `league` igual ao `id` |
 | "número par de times, de 4 a 40" | `teams` ímpar |
 | "elenco precisa ter de 18 a 30" / "não tem goleiro" | Jogadores a mais, a menos, ou sem `GK` |
-| "Valor desconhecido em countries[i].id" | País que não é uma das nacionalidades do jogo |
+| "Valor desconhecido em countries[i].id" ou "players[i].nationality" | País que não está na lista do fim deste arquivo (confira a grafia em inglês) |
+| "Não há economia padrão para o país" | Aviso, não erro: país de liga sem padrão calibrado (preencha `economy` e `region`) |
 | "Repetido ... já existe no pacote" | `id` ou `abbreviation` repetidos |
 
 ## Como testar uma importação
@@ -291,3 +295,222 @@ não precisa deles. Pacotes com mais de um país nunca precisam: o jogo deriva t
 2. No celular: **Menu › Novo jogo com pacote de dados**, escolha o arquivo, depois o país, a liga e o clube.
 3. `?diagnostico=1` tem a seção **Importar um pacote de dados**: mede ler, validar, guardar, montar o mundo e começar um jogo, com
    o pacote gerado na tela ou com um arquivo do aparelho, e mostra se cada meta foi atingida.
+
+## Lista de países (`countries[].id` e `players[].nationality`)
+
+209 países: as seleções da FIFA mais Inglaterra, Escócia, País de Gales e Irlanda do Norte. O `id` é o nome em inglês da
+primeira coluna. O jogo mostra o nome em português e uma bandeira simplificada (desenhada pelo jogo, sem imagens oficiais; a lista
+e as bandeiras estão em `src/ui/countries.ts`, gerado de `tools/countries.txt`). Países com padrão calibrado de economia: os 14
+primeiros.
+
+| `id` | Nome |
+|---|---|
+| `Brazil` | Brasil |
+| `Argentina` | Argentina |
+| `Uruguay` | Uruguai |
+| `Paraguay` | Paraguai |
+| `Chile` | Chile |
+| `Colombia` | Colômbia |
+| `Peru` | Peru |
+| `Ecuador` | Equador |
+| `England` | Inglaterra |
+| `Spain` | Espanha |
+| `Italy` | Itália |
+| `Germany` | Alemanha |
+| `France` | França |
+| `Portugal` | Portugal |
+| `Afghanistan` | Afeganistão |
+| `Albania` | Albânia |
+| `Algeria` | Argélia |
+| `American Samoa` | Samoa Americana |
+| `Andorra` | Andorra |
+| `Angola` | Angola |
+| `Anguilla` | Anguilla |
+| `Antigua and Barbuda` | Antígua e Barbuda |
+| `Armenia` | Armênia |
+| `Aruba` | Aruba |
+| `Australia` | Austrália |
+| `Austria` | Áustria |
+| `Azerbaijan` | Azerbaijão |
+| `Bahamas` | Bahamas |
+| `Bahrain` | Bahrein |
+| `Bangladesh` | Bangladesh |
+| `Barbados` | Barbados |
+| `Belarus` | Belarus |
+| `Belgium` | Bélgica |
+| `Belize` | Belize |
+| `Benin` | Benin |
+| `Bermuda` | Bermudas |
+| `Bhutan` | Butão |
+| `Bolivia` | Bolívia |
+| `Bosnia and Herzegovina` | Bósnia e Herzegovina |
+| `Botswana` | Botsuana |
+| `British Virgin Islands` | Ilhas Virgens Britânicas |
+| `Brunei` | Brunei |
+| `Bulgaria` | Bulgária |
+| `Burkina Faso` | Burkina Faso |
+| `Burundi` | Burundi |
+| `Cambodia` | Camboja |
+| `Cameroon` | Camarões |
+| `Canada` | Canadá |
+| `Cape Verde` | Cabo Verde |
+| `Cayman Islands` | Ilhas Cayman |
+| `Central African Republic` | República Centro-Africana |
+| `Chad` | Chade |
+| `China` | China |
+| `Comoros` | Comores |
+| `Congo` | Congo |
+| `Costa Rica` | Costa Rica |
+| `Croatia` | Croácia |
+| `Cuba` | Cuba |
+| `Curaçao` | Curaçao |
+| `Cyprus` | Chipre |
+| `Czech Republic` | República Tcheca |
+| `Denmark` | Dinamarca |
+| `Djibouti` | Djibuti |
+| `Dominica` | Dominica |
+| `Dominican Republic` | República Dominicana |
+| `DR Congo` | RD Congo |
+| `Egypt` | Egito |
+| `El Salvador` | El Salvador |
+| `Equatorial Guinea` | Guiné Equatorial |
+| `Eritrea` | Eritreia |
+| `Estonia` | Estônia |
+| `Eswatini` | Essuatíni |
+| `Ethiopia` | Etiópia |
+| `Faroe Islands` | Ilhas Faroé |
+| `Fiji` | Fiji |
+| `Finland` | Finlândia |
+| `Gabon` | Gabão |
+| `Gambia` | Gâmbia |
+| `Georgia` | Geórgia |
+| `Ghana` | Gana |
+| `Gibraltar` | Gibraltar |
+| `Greece` | Grécia |
+| `Grenada` | Granada |
+| `Guam` | Guam |
+| `Guatemala` | Guatemala |
+| `Guinea` | Guiné |
+| `Guinea-Bissau` | Guiné-Bissau |
+| `Guyana` | Guiana |
+| `Haiti` | Haiti |
+| `Honduras` | Honduras |
+| `Hong Kong` | Hong Kong |
+| `Hungary` | Hungria |
+| `Iceland` | Islândia |
+| `India` | Índia |
+| `Indonesia` | Indonésia |
+| `Iran` | Irã |
+| `Iraq` | Iraque |
+| `Ireland` | Irlanda |
+| `Israel` | Israel |
+| `Ivory Coast` | Costa do Marfim |
+| `Jamaica` | Jamaica |
+| `Japan` | Japão |
+| `Jordan` | Jordânia |
+| `Kazakhstan` | Cazaquistão |
+| `Kenya` | Quênia |
+| `Kosovo` | Kosovo |
+| `Kuwait` | Kuwait |
+| `Kyrgyzstan` | Quirguistão |
+| `Laos` | Laos |
+| `Latvia` | Letônia |
+| `Lebanon` | Líbano |
+| `Lesotho` | Lesoto |
+| `Liberia` | Libéria |
+| `Libya` | Líbia |
+| `Liechtenstein` | Liechtenstein |
+| `Lithuania` | Lituânia |
+| `Luxembourg` | Luxemburgo |
+| `Macau` | Macau |
+| `Madagascar` | Madagascar |
+| `Malawi` | Malawi |
+| `Malaysia` | Malásia |
+| `Maldives` | Maldivas |
+| `Mali` | Mali |
+| `Malta` | Malta |
+| `Mauritania` | Mauritânia |
+| `Mauritius` | Maurício |
+| `Mexico` | México |
+| `Moldova` | Moldávia |
+| `Mongolia` | Mongólia |
+| `Montenegro` | Montenegro |
+| `Montserrat` | Montserrat |
+| `Morocco` | Marrocos |
+| `Mozambique` | Moçambique |
+| `Myanmar` | Mianmar |
+| `Namibia` | Namíbia |
+| `Nepal` | Nepal |
+| `Netherlands` | Países Baixos |
+| `New Caledonia` | Nova Caledônia |
+| `New Zealand` | Nova Zelândia |
+| `Nicaragua` | Nicarágua |
+| `Niger` | Níger |
+| `Nigeria` | Nigéria |
+| `North Korea` | Coreia do Norte |
+| `North Macedonia` | Macedônia do Norte |
+| `Northern Ireland` | Irlanda do Norte |
+| `Norway` | Noruega |
+| `Oman` | Omã |
+| `Pakistan` | Paquistão |
+| `Palestine` | Palestina |
+| `Panama` | Panamá |
+| `Papua New Guinea` | Papua-Nova Guiné |
+| `Philippines` | Filipinas |
+| `Poland` | Polônia |
+| `Puerto Rico` | Porto Rico |
+| `Qatar` | Catar |
+| `Romania` | Romênia |
+| `Russia` | Rússia |
+| `Rwanda` | Ruanda |
+| `Saint Kitts and Nevis` | São Cristóvão e Nevis |
+| `Saint Lucia` | Santa Lúcia |
+| `Saint Vincent and the Grenadines` | São Vicente e Granadinas |
+| `Samoa` | Samoa |
+| `San Marino` | San Marino |
+| `Sao Tome and Principe` | São Tomé e Príncipe |
+| `Saudi Arabia` | Arábia Saudita |
+| `Scotland` | Escócia |
+| `Senegal` | Senegal |
+| `Serbia` | Sérvia |
+| `Seychelles` | Seicheles |
+| `Sierra Leone` | Serra Leoa |
+| `Singapore` | Singapura |
+| `Slovakia` | Eslováquia |
+| `Slovenia` | Eslovênia |
+| `Solomon Islands` | Ilhas Salomão |
+| `Somalia` | Somália |
+| `South Africa` | África do Sul |
+| `South Korea` | Coreia do Sul |
+| `South Sudan` | Sudão do Sul |
+| `Sri Lanka` | Sri Lanka |
+| `Sudan` | Sudão |
+| `Suriname` | Suriname |
+| `Sweden` | Suécia |
+| `Switzerland` | Suíça |
+| `Syria` | Síria |
+| `Taiwan` | Taiwan |
+| `Tajikistan` | Tajiquistão |
+| `Tanzania` | Tanzânia |
+| `Thailand` | Tailândia |
+| `Timor-Leste` | Timor-Leste |
+| `Togo` | Togo |
+| `Tonga` | Tonga |
+| `Trinidad and Tobago` | Trinidad e Tobago |
+| `Tunisia` | Tunísia |
+| `Turkey` | Turquia |
+| `Turkmenistan` | Turcomenistão |
+| `Turks and Caicos` | Ilhas Turcas e Caicos |
+| `Uganda` | Uganda |
+| `Ukraine` | Ucrânia |
+| `United Arab Emirates` | Emirados Árabes Unidos |
+| `United States` | Estados Unidos |
+| `US Virgin Islands` | Ilhas Virgens Americanas |
+| `Uzbekistan` | Uzbequistão |
+| `Vanuatu` | Vanuatu |
+| `Venezuela` | Venezuela |
+| `Vietnam` | Vietnã |
+| `Wales` | País de Gales |
+| `Yemen` | Iêmen |
+| `Zambia` | Zâmbia |
+| `Zimbabwe` | Zimbábue |
