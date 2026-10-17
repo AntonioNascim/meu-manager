@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildScaleWorld } from '../src/diagnostics/scaleWorld'
 import type { LeagueSpec } from '../src/diagnostics/scaleWorld'
 import { createYouth } from '../src/data/generateYouth'
+import { OFFSEASON } from '../src/engine/config'
 import { advanceSeason } from '../src/engine/offseason'
 import { createSeason, simulateToSeasonEnd } from '../src/engine/season'
 
@@ -46,5 +47,18 @@ describe('virada com várias ligas', () => {
     expect(next.map((c) => c.id)).toEqual(['br-1', 'br-2', 'uy-1'])
     expect(next[2]).toMatchObject({ region: 'SA', rounds: 1, pyramid: 'uy' })
     expect(turn.state.matches.filter((m) => m.competitionId === 'uy-1')).toHaveLength(12 * 11 * 0.5)
+  })
+})
+
+describe('reputação dos clubes grandes', () => {
+  it('quem fica na divisão e está acima da média dela perde reputação devagar (tierPullAbove), em vez da puxada inteira', () => {
+    const marked = { ...ended, teams: ended.teams.map((t) => (t.id === ended.season.competitions[0]?.teamIds[0] ? { ...t, reputation: 19 } : t.tier === 1 ? { ...t, reputation: 12 } : t)) }
+    const id = ended.season.competitions[0]?.teamIds[0] as string
+    const { report } = advanceSeason(marked, { createYouth })
+    const position = report.finalPositions[id]?.position as number
+    const stayed = !report.relegated.includes(id)
+    const delta = Math.max(-OFFSEASON.reputation.positionMax, Math.min(OFFSEASON.reputation.positionMax, Math.round((1 - position) / OFFSEASON.reputation.positionStep)))
+    if (stayed) expect(report.reputationChanges[id]?.to).toBeGreaterThanOrEqual(Math.floor(19 + delta + OFFSEASON.reputation.tierPullAbove * (12 - 19)) + (report.champions.includes(id) ? OFFSEASON.reputation.champion : 0))
+    expect(OFFSEASON.reputation.tierPullAbove).toBeLessThan(OFFSEASON.reputation.tierPull)
   })
 })

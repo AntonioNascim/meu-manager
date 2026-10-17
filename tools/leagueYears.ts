@@ -5,6 +5,9 @@
  */
 import { createYouth } from '../src/data/generateYouth'
 import { computeStandings } from '../src/engine/season/standings'
+import { FINANCE } from '../src/engine/config'
+import { marketValue } from '../src/engine/market/value'
+import { expectedAnnualRevenue } from '../src/engine/finance'
 import { advanceSeason } from '../src/engine/offseason'
 import { playerOverall } from '../src/engine/overall'
 import { createSeason, simulateToSeasonEnd } from '../src/engine/season'
@@ -53,6 +56,14 @@ export interface LeagueYear {
   /** Idade média dos jogadores dos clubes e quantos têm força geral de 85 ou mais (começo da temporada). */
   meanAge: number
   stars: number
+  /** Saldo final / teto de caixa (`FINANCE.ceilingYears` × receita esperada): maior e média dos clubes. */
+  maxCeilingShare: number
+  meanCeilingShare: number
+  /** Receita que o clube realmente teve / receita esperada (a que define o teto). */
+  revenueVsExpected: number
+  /** Compras e empréstimos feitos por clube da liga neste ano, e o valor de mercado do elenco / receita (começo da temporada). */
+  dealsPerClub: number
+  squadValueShare: number
 }
 
 export interface LeagueRun {
@@ -127,6 +138,11 @@ export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[
         championPoints: (table[0] as { points: number }).points,
         championGames: (table[0] as { played: number }).played,
         meanAge: mean(squad.map((p) => p.age)),
+        maxCeilingShare: Math.max(...teams.map((t) => t.finances.balance / (FINANCE.ceilingYears * expectedAnnualRevenue(t)))),
+        meanCeilingShare: mean(teams.map((t) => t.finances.balance / (FINANCE.ceilingYears * expectedAnnualRevenue(t)))),
+        revenueVsExpected: mean(teams.map((t, k) => (revenue[k] as number) / expectedAnnualRevenue(t))),
+        dealsPerClub: ended.market.history.filter((h) => h.kind === 'purchase' && h.fromTeamId !== null && c.teamIds.includes(h.toTeamId)).length / teams.length,
+        squadValueShare: mean(c.teamIds.map((id) => state.players.filter((p) => p.teamId === id).reduce((sum, p) => sum + marketValue(p, state.season.currentDate, teamOf.get(id) as Team), 0) / Math.max(1, (revenue[c.teamIds.indexOf(id)] as number)))),
         stars: squad.filter((p) => playerOverall(p) >= 85).length,
       }
     })
@@ -178,6 +194,9 @@ export interface Dynasty {
   blocks: { distinct: number; maxTitles: number; maxStreak: number }[]
 }
 
+/** Pontos do campeão como seriam em 38 jogos (ligas com menos clubes ou turno único comparam pelos pontos por jogo). */
+export const championPoints38 = (l: Pick<LeagueYear, 'championPoints' | 'championGames'>): number => (38 * l.championPoints) / Math.max(1, l.championGames)
+
 /** Campeões de cada liga: pontos, e dinastias em blocos de `block` temporadas. */
 export function dynastiesOf(runs: LeagueRun[], highPoints = 92, block = 10): Dynasty[] {
   const ids = runs[0]?.leagues.map((l) => l.id) ?? []
@@ -196,7 +215,7 @@ export function dynastiesOf(runs: LeagueRun[], highPoints = 92, block = 10): Dyn
       })
       blocks.push({ distinct: counts.size, maxTitles: Math.max(...counts.values()), maxStreak })
     }
-    return { id, name: rows[0]?.name ?? id, championPoints: mean(rows.map((l) => l.championPoints)), highCount: rows.filter((l) => l.championPoints > highPoints).length, blocks }
+    return { id, name: rows[0]?.name ?? id, championPoints: mean(rows.map(championPoints38)), highCount: rows.filter((l) => championPoints38(l) > highPoints).length, blocks }
   })
 }
 
@@ -211,13 +230,13 @@ export function formatTrend(runs: LeagueRun[]): string {
   return ids
     .map((id) => {
       const name = runs[0]?.leagues.find((l) => l.id === id)?.name ?? id
-      return `${name.padEnd(12)} força ${trio(id, (l) => l.strength)} | top40 ${trio(id, (l) => l.top40)} | craques ${trio(id, (l) => l.stars)} | idade ${trio(id, (l) => l.meanAge)} | folha/rec ${trio(id, (l) => 100 * l.payrollShare, 0)}% | saldo/rec máx ${Math.max(...runs.map((r) => (r.leagues.find((x) => x.id === id) as LeagueYear).maxBalanceYears)).toFixed(2)} | vermelho ${runs.reduce((s, r) => s + (r.leagues.find((x) => x.id === id) as LeagueYear).negativeEver, 0)}`
+      return `${name.padEnd(12)} força ${trio(id, (l) => l.strength)} | top40 ${trio(id, (l) => l.top40)} | craques ${trio(id, (l) => l.stars)} | idade ${trio(id, (l) => l.meanAge)} | folha/rec ${trio(id, (l) => 100 * l.payrollShare, 0)}% | negócios/clube ${trio(id, (l) => l.dealsPerClub)} | valor do elenco/rec ${trio(id, (l) => l.squadValueShare)} | saldo/teto méd ${trio(id, (l) => l.meanCeilingShare, 2)} máx ${Math.max(...runs.map((r) => (r.leagues.find((x) => x.id === id) as LeagueYear).maxCeilingShare)).toFixed(2)} | receita real/esperada ${trio(id, (l) => l.revenueVsExpected, 2)} | saldo/rec máx ${Math.max(...runs.map((r) => (r.leagues.find((x) => x.id === id) as LeagueYear).maxBalanceYears)).toFixed(2)} | vermelho ${runs.reduce((s, r) => s + (r.leagues.find((x) => x.id === id) as LeagueYear).negativeEver, 0)}`
     })
     .join('\n')
 }
 
 export function formatDynasties(runs: LeagueRun[]): string {
   return dynastiesOf(runs)
-    .map((d) => `${d.name.padEnd(12)} pontos do campeão ${d.championPoints.toFixed(1)} (acima de 92: ${d.highCount}) | por bloco de 10: ${d.blocks.map((b) => `${b.distinct} campeões, máx ${b.maxTitles} títulos, ${b.maxStreak} seguidos`).join(' / ')}`)
+    .map((d) => `${d.name.padEnd(12)} pontos do campeão (em 38 jogos) ${d.championPoints.toFixed(1)} (acima de 92: ${d.highCount}) | por bloco de 10: ${d.blocks.map((b) => `${b.distinct} campeões, máx ${b.maxTitles} títulos, ${b.maxStreak} seguidos`).join(' / ')}`)
     .join('\n')
 }

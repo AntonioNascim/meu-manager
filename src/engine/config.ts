@@ -407,7 +407,7 @@ export const FINANCE = {
   /** Saldo acima de (receita anual × isto) é reinvestido em estrutura (clubes da IA): evita acumular sem limite. */
   ceilingYears: 1.5,
   /** Parcela do excesso acima do teto investida por mês. */
-  ceilingSpendPerMonth: 0.3,
+  ceilingSpendPerMonth: 0.5,
   /** Orçamento de salários do jogador depois da virada: folha × isto (o da IA é folha × 1,1). */
   salaryBudgetMargin: 1.1,
   /** Folha sustentável da IA: (receita esperada − operação) × isto, por ano. Acima disso a IA não aumenta a folha e corta. */
@@ -573,6 +573,8 @@ export const MARKET = {
     userLoanShare: 0.25,
     /** Máximo de contratações por clube por janela. */
     maxSigningsPerWindow: 5,
+    /** Teto do que um clube da IA gasta em compras por janela, em fração da receita anual esperada (o resto do orçamento fica para a outra janela). */
+    windowSpendShare: 0.3,
     /** Elenco acima disto: o clube libera o pior reserva depois de contratar. */
     releaseAbove: 27,
     /** Anos de contrato novo (mín., máx.). */
@@ -631,6 +633,8 @@ export const OFFSEASON = {
     /** Reputação média de cada divisão e quanto da distância até ela o clube recupera por ano: mantém a distância entre as séries. */
     tierMean: { 1: 12, 2: 5.5, 3: 4 } as Record<number, number>,
     tierPull: 0.3,
+    /** Na primeira divisão, quem fica nela e está acima da média perde reputação mais devagar (nas séries de acesso o puxão é simétrico, para a média delas não andar): os clubes grandes se mantêm grandes (sem isso o topo encolhia 0,3 da distância por ano e as ligas ficavam sem dinastias). */
+    tierPullAbove: 0.1,
     champion: 0,
     promoted: 1,
     relegated: -1,

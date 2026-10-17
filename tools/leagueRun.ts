@@ -1,6 +1,7 @@
 /**
  * Economia por liga ano a ano: tabelas completas de cada liga (a versão curta sai em `npm run analyze -- years`).
- * Uso: node tools/run.mjs leagueRun [--clubs 60|282] [--years 10] [--seed 7] [--league br-3]
+ * Uso: node tools/run.mjs leagueRun [--clubs 60|282] [--years 10] [--seed 7] [--league br-3] [--ids br-1,br-2,en-1]
+ * (--ids monta um mundo só com essas ligas, como nos testes de balanceamento)
  */
 import { generateWorld } from '../src/data/generateWorld'
 import { FULL_WORLD, buildScaleWorld } from '../src/diagnostics/scaleWorld'
@@ -15,10 +16,11 @@ const clubs = Number(flag('clubs', '60'))
 const years = Number(flag('years', '10'))
 const seed = Number(flag('seed', '7'))
 const only = flag('league', '')
+const ids = flag('ids', '').split(',').filter(Boolean)
 const init =
-  clubs > 60
+  clubs > 60 || ids.length > 0
     ? (() => {
-        const w = buildScaleWorld(FULL_WORLD, seed)
+        const w = buildScaleWorld(ids.length > 0 ? FULL_WORLD.filter((l) => ids.includes(l.id)) : FULL_WORLD, seed)
         return { year: 2026, seed: `years-${seed}`, teams: w.teams, players: w.players, academy: w.academy, competitions: w.competitions, focus: 'br' }
       })()
     : (() => {
