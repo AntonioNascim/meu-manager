@@ -165,10 +165,10 @@ describe('histórico e página do time', () => {
     expect(html.match(/<li/g)!.length).toBeGreaterThan(20)
   })
 
-  it('a tela tem as seis seções e nenhuma aba de copas ou torneios', () => {
+  it('a tela tem as seções da liga e a de Copas, e nenhum torneio continental ainda (3C)', () => {
     const html = renderToStaticMarkup(createElement(Standings, { game: played }))
-    for (const t of ['Classificação', 'Rodadas', 'Artilharia', 'Assistências', 'Cartões', 'Histórico', 'Série A', 'Série B', 'Série C']) expect(html).toContain(t)
-    for (const t of ['Copa', 'Libertadores', 'Torneio']) expect(html).not.toContain(t)
+    for (const t of ['Classificação', 'Rodadas', 'Artilharia', 'Assistências', 'Cartões', 'Copas', 'Histórico', 'Série A', 'Série B', 'Série C']) expect(html).toContain(t)
+    for (const t of ['Libertadores', 'Torneio']) expect(html).not.toContain(t)
     expect(userCompetition(played).tier).toBe(1)
   })
 })
