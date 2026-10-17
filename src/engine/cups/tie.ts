@@ -56,8 +56,12 @@ export function tieOutcome(legs: readonly Match[], spec: Pick<CupSpec, 'awayGoal
 /** Confrontos de uma fase de mata-mata, na ordem do sorteio. */
 export function tiesOfStage(matches: readonly Match[], spec: Pick<CupSpec, 'awayGoals'>, stage: number): TieView[] {
   const byTie = new Map<number, Match[]>()
+  let cupId: string | undefined
   for (const m of matches) {
     if (!m.cup || m.cup.kind !== 'knockout' || m.cup.stage !== stage) continue
+    // Confrontos de copas diferentes têm o mesmo número de fase e de confronto: quem chama passa só os jogos de uma copa (`cupMatches`).
+    if (cupId !== undefined && cupId !== m.competitionId) throw new Error('tiesOfStage precisa dos jogos de uma copa só')
+    cupId = m.competitionId
     byTie.set(m.cup.tie ?? 0, [...(byTie.get(m.cup.tie ?? 0) ?? []), m])
   }
   return [...byTie.entries()]

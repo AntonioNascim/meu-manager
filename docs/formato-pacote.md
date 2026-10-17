@@ -93,6 +93,7 @@ divisão só é uma liga **fechada** (ninguém sobe nem cai).
 | `promotion` | sim | Quantos sobem desta divisão para a de cima. **0 na divisão 1** |
 | `relegation` | sim | Quantos caem desta divisão para a de baixo. **0 na última divisão do país** |
 | `rounds` | não | `1` = turno único, `2` = turno e returno (padrão) |
+| `start` | não | `[mês, dia]` de referência da primeira rodada da liga (cai no primeiro sábado a partir daí). Padrão: 11 de abril, o calendário da liga brasileira |
 | `region` | não | Janelas de transferência: `BR` (janeiro até a véspera da 1ª rodada e julho), `SA` (janeiro a 15/3 e julho), `EU` (janeiro e julho a agosto). Padrão: a do país (ver tabela) |
 | `economy` | não | Economia da liga (ver abaixo). Padrão: a do país |
 | `foreignLimit` | não | Limite de estrangeiros (ver abaixo). Padrão: sem limite |
@@ -307,7 +308,7 @@ Opcional. Cada item é uma copa ou supercopa. O **nome vem do pacote**: o jogo p
 | `groups` | só em `groups-knockout` | A fase de grupos |
 | `leaguePhase` | só em `league-knockout` | A fase de liga |
 | `seeding` | não | `random` (padrão) ou `seeded` (cabeças de chave) |
-| `homeOfSingleLeg` | não | Quem manda o jogo único: `draw` (padrão: quem o sorteio põe primeiro; com cabeças de chave, o cabeça de chave) ou `lower-reputation` (o clube de menor reputação) |
+| `homeOfSingleLeg` | não | Quem manda o jogo único: `draw` (padrão: quem o sorteio põe primeiro; com cabeças de chave, o cabeça de chave), `lower-reputation` ou `higher-reputation` (o clube de menor ou de maior reputação), `lower-division` (o clube da divisão inferior joga em casa, como nas copas da Inglaterra, Espanha, Alemanha, França e Portugal; entre clubes da mesma divisão vale o sorteio) ou `first-listed` (o primeiro das vagas, para supercopas) |
 | `awayGoals` | não | Regra do gol fora na ida e volta. **Desligada por padrão** (`false`) |
 | `extraTime` | não | Prorrogação de 30 minutos se o confronto está empatado (padrão `true`) |
 | `penalties` | não | Disputa de pênaltis se continua empatado (padrão `true`) |
@@ -396,6 +397,25 @@ dos jogos em casa também entra (menos em campo neutro).
 Um jogo de copa é jogado lance a lance se um dos clubes é da pirâmide do técnico; senão usa a partida simplificada (que também faz
 prorrogação e pênaltis). O jogador joga os jogos de copa do seu time como os de liga (tática, escalação, trocas), com a prorrogação
 e os pênaltis na tela.
+
+### Copas padrão por país
+
+Quando um pacote tem um país com liga e **nenhuma copa dele** em `cups`, o jogo usa as copas padrão do país (`src/data/package/countryCups.ts`). Um pacote com `"cups": []` não quer copa nenhuma, nem as padrão. Se a copa padrão não cabe nas ligas do país (poucos clubes para o chaveamento), ela fica de fora e a importação mostra o aviso `cup-defaults-skipped`. Os nomes são genéricos; renomeie no pacote se quiser outros.
+
+| País | Copas padrão |
+|---|---|
+| Brasil | `cup-br` (as 3 divisões, 6 fases, jogo único com o clube de menor reputação em casa até a segunda fase, depois ida e volta; final em duas partidas), `supercup-br` (campeão da liga × campeão da copa, neutro) |
+| Inglaterra | `cup-en` (jogo único, a divisão inferior em casa, semifinais e final neutras, sem jogo de volta) |
+| Espanha | `cup-es` (jogo único com a divisão inferior em casa, semifinais em ida e volta, final neutra), `supercup-es` (4 clubes: 1º e 2º da liga, campeão e finalista da copa; semifinais e final neutras em janeiro) |
+| Itália | `cup-it` (o clube de maior reputação em casa, semifinais em ida e volta, final neutra), `supercup-it` (4 clubes, como a Espanha) |
+| Alemanha | `cup-de` (sempre jogo único, divisão inferior em casa, final neutra), `supercup-de` (campeão da liga recebe o da copa) |
+| França | `cup-fr` (jogo único, divisão inferior em casa, final neutra) |
+| Portugal | `cup-pt` (como a Espanha), `league-cup-pt` (16 primeiros da liga, 4 grupos de 4, semifinais e final neutras) |
+| Argentina | `cup-ar` (jogos únicos em campo neutro, sem prorrogação: empate vai direto aos pênaltis), `supercup-ar` (campeão da liga × campeão da copa, neutro, sem prorrogação) |
+
+Simplificações: onde a copa real inclui divisões que o pacote não tem, entram só os clubes que existem, e os melhores (cabeças de chave) folgam na primeira fase para o chaveamento fechar. Na supercopa, se o campeão ou o finalista da copa já está entre os primeiros da liga, entra o próximo da liga.
+
+**Calendário.** A temporada do jogo é o ano civil, então a temporada europeia real (agosto a maio) não existe: as ligas de todos os países começam pelo calendário da liga brasileira (abril a novembro) e as copas ficam entre janeiro e outubro, cada fase na primeira quarta-feira livre. A supercopa é jogada no começo do ano. Use `start` na liga para mudar o início de uma liga.
 
 ### Validação
 

@@ -246,7 +246,7 @@ export function progressCups(state: SeasonState): SeasonState {
       if (stageMatches.some((m) => m.status !== 'finished')) break
       if (last === list.length - 1) {
         // A final acabou.
-        const tie = tiesOfStage(matches, cup.spec, last)[0]
+        const tie = tiesOfStage(stageMatches, cup.spec, last)[0]
         if (!tie?.winnerId) break
         const runnerUpId = tie.teams.find((id) => id !== tie.winnerId)
         payFinal(ctx, tie.winnerId, runnerUpId, state.season.currentDate)
