@@ -39,6 +39,9 @@ export interface LeagueYear {
   /** Maior venda de jogador de um clube / receita do clube e maior compra / receita. */
   maxSaleShare: number
   maxPurchaseShare: number
+  /** O mesmo na média dos clubes. */
+  meanSaleShare: number
+  meanPurchaseShare: number
   /** Compras entre ligas: jogadores que chegaram de outra liga e que saíram para outra liga neste ano. */
   signedFromOutside: number
   soldToOutside: number
@@ -102,6 +105,8 @@ export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[
         meanRevenue: mean(revenue),
         maxSaleShare: Math.max(...teams.map((t, k) => sumOf(t, 'player-sales', 1) / Math.max(1, revenue[k] as number))),
         maxPurchaseShare: Math.max(...teams.map((t, k) => sumOf(t, 'player-purchases', -1) / Math.max(1, revenue[k] as number))),
+        meanSaleShare: mean(teams.map((t, k) => sumOf(t, 'player-sales', 1) / Math.max(1, revenue[k] as number))),
+        meanPurchaseShare: mean(teams.map((t, k) => sumOf(t, 'player-purchases', -1) / Math.max(1, revenue[k] as number))),
         signedFromOutside: signed.get(c.id) ?? 0,
         soldToOutside: sold.get(c.id) ?? 0,
       }
@@ -120,10 +125,10 @@ export function formatLeagueYears(runs: LeagueRun[]): string {
   const out: string[] = []
   for (const id of ids) {
     const rows = runs.map((r) => ({ year: r.year, l: r.leagues.find((x) => x.id === id) as LeagueYear }))
-    out.push(`\n${rows[0]?.l.name} (${rows[0]?.l.clubs} clubes)`, 'ano   força  reput  top40  saldo/rec(máx) vermelho  folha/rec  receita  venda/rec(máx) compra/rec(máx)  chegam  saem')
+    out.push(`\n${rows[0]?.l.name} (${rows[0]?.l.clubs} clubes)`, 'ano   força  reput  top40  saldo/rec(máx) vermelho  folha/rec  receita  venda/rec(méd/máx) compra/rec(méd/máx)  chegam  saem')
     for (const { year, l } of rows) {
       out.push(
-        [String(year), l.strength.toFixed(1).padStart(7), l.reputation.toFixed(1).padStart(6), String(l.top40).padStart(6), l.maxBalanceYears.toFixed(2).padStart(15), String(l.negativeEver).padStart(8), `${(100 * l.payrollShare).toFixed(0)}%`.padStart(10), money(l.meanRevenue).padStart(8), l.maxSaleShare.toFixed(2).padStart(15), l.maxPurchaseShare.toFixed(2).padStart(16), String(l.signedFromOutside).padStart(7), String(l.soldToOutside).padStart(5)].join(' '),
+        [String(year), l.strength.toFixed(1).padStart(7), l.reputation.toFixed(1).padStart(6), String(l.top40).padStart(6), l.maxBalanceYears.toFixed(2).padStart(15), String(l.negativeEver).padStart(8), `${(100 * l.payrollShare).toFixed(0)}%`.padStart(10), money(l.meanRevenue).padStart(8), `${l.meanSaleShare.toFixed(2)}/${l.maxSaleShare.toFixed(1)}`.padStart(18), `${l.meanPurchaseShare.toFixed(2)}/${l.maxPurchaseShare.toFixed(1)}`.padStart(19), String(l.signedFromOutside).padStart(7), String(l.soldToOutside).padStart(5)].join(' '),
       )
     }
   }
@@ -139,7 +144,7 @@ export function formatLeagueSummary(runs: LeagueRun[]): string {
       const early = take(id, 0, 3)
       const late = take(id, -3, runs.length)
       const name = early[0]?.name ?? id
-      return `${name.padEnd(12)} força ${mean(early.map((l) => l.strength)).toFixed(1)} → ${mean(late.map((l) => l.strength)).toFixed(1)} | top40 ${mean(early.map((l) => l.top40)).toFixed(1)} → ${mean(late.map((l) => l.top40)).toFixed(1)} | receita ${money(mean(early.map((l) => l.meanRevenue)))} | folha/rec ${(100 * mean(late.map((l) => l.payrollShare))).toFixed(0)}% | saldo/rec máx ${Math.max(...late.map((l) => l.maxBalanceYears)).toFixed(2)} | vermelho ${late.reduce((s, l) => s + l.negativeEver, 0)} | chegam ${mean(late.map((l) => l.signedFromOutside)).toFixed(1)} saem ${mean(late.map((l) => l.soldToOutside)).toFixed(1)} por ano`
+      return `${name.padEnd(12)} força ${mean(early.map((l) => l.strength)).toFixed(1)} → ${mean(late.map((l) => l.strength)).toFixed(1)} | top40 ${mean(early.map((l) => l.top40)).toFixed(1)} → ${mean(late.map((l) => l.top40)).toFixed(1)} | receita ${money(mean(early.map((l) => l.meanRevenue)))} | folha/rec ${(100 * mean(late.map((l) => l.payrollShare))).toFixed(0)}% | compra/rec ${mean(late.map((l) => l.meanPurchaseShare)).toFixed(2)} (máx ${Math.max(...late.map((l) => l.maxPurchaseShare)).toFixed(1)}) venda/rec ${mean(late.map((l) => l.meanSaleShare)).toFixed(2)} (máx ${Math.max(...late.map((l) => l.maxSaleShare)).toFixed(1)}) | saldo/rec máx ${Math.max(...late.map((l) => l.maxBalanceYears)).toFixed(2)} | vermelho ${late.reduce((s, l) => s + l.negativeEver, 0)} | chegam ${mean(late.map((l) => l.signedFromOutside)).toFixed(1)} saem ${mean(late.map((l) => l.soldToOutside)).toFixed(1)} por ano`
     })
     .join('\n')
 }

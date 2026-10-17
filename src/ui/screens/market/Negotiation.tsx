@@ -34,7 +34,7 @@ export function Negotiation({ game, player, open, onClose, extra, initialKind = 
   const interest = useMemo(() => interestIn(interestContext(state, game.userTeamId), player, kind), [state, game.userTeamId, player, kind])
   const value = free ? 0 : marketValue(player, date, holder)
   const listing = free ? undefined : listingOf(state, player.id, kind)
-  const price = free ? 0 : salePrice(state, player, squadOf(game, player.teamId as string), kind, date, holder)
+  const price = free ? 0 : salePrice(state, player, squadOf(game, player.teamId as string), kind, date, holder, buyer)
   const amount = fee ?? price
 
   const submit = () => {

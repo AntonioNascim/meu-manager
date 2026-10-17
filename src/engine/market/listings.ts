@@ -9,6 +9,7 @@ import type { SeasonState } from '../season/calendar'
 import type { IsoDate, Listing, ListingKind, OfferKind, Player, PlayerId, TeamId } from '../types'
 import { askingPrice, loanFee, marketValue, squadRole } from './value'
 import type { PricingClub } from './value'
+import { premiumPrice } from './decision'
 
 const round10k = (v: number) => Math.max(10_000, Math.round(v / 10_000) * 10_000)
 
@@ -23,8 +24,8 @@ export function listingOf(state: Pick<SeasonState, 'market'>, playerId: PlayerId
 }
 
 /** Preço pelo qual o clube vende (ou empresta): o pedido normal ou o anunciado, o que for menor. */
-export function salePrice(state: Pick<SeasonState, 'market'>, player: Player, squad: readonly Player[], kind: OfferKind, date: IsoDate, club?: PricingClub): number {
-  const base = kind === 'loan' ? loanFee(player, date, club) : askingPrice(player, squad, date, club)
+export function salePrice(state: Pick<SeasonState, 'market'>, player: Player, squad: readonly Player[], kind: OfferKind, date: IsoDate, club?: PricingClub, buyer?: PricingClub): number {
+  const base = kind === 'loan' ? loanFee(player, date, club) : premiumPrice(askingPrice(player, squad, date, club), club ?? {}, buyer)
   const listed = listingOf(state, player.id, kind)
   return listed ? Math.min(base, listed.price) : base
 }

@@ -14,7 +14,7 @@ import type { SeasonState } from '../season/calendar'
 import { addDays, contractEndOn } from '../season/dates'
 import { actsThisRound, quickTeamIds } from '../season/fidelity'
 import type { IsoDate, Listing, OfferKind, Player, Position, Team, TeamId, TransferOffer, TransferWindow } from '../types'
-import { buyerCheck, playerDecision, sellerDecision } from './decision'
+import { buyerCheck, playerDecision, premiumPrice, sellerDecision } from './decision'
 import { listingOf } from './listings'
 import { executeTransfer, playersOf, releasePlayer } from './transfer'
 import { askingPrice, askingPriceAs, expectedSalary, loanFee, marketValue, salaryForOverall, squadRole, squadRoleIn } from './value'
@@ -164,8 +164,8 @@ function listingFor(market: SeasonState['market'], playerId: string, kind: Offer
   return index.get(`${playerId}:${kind === 'loan' ? 'loan' : 'transfer'}`)
 }
 
-function priceOf(market: SeasonState['market'], player: Player, sellerSquad: readonly Player[], kind: OfferKind, date: IsoDate, seller: Team | undefined): number {
-  const base = kind === 'loan' ? loanFee(player, date, seller) : askingPriceAs(player, squadRoleIn(playerOverall(player), strengthsOf(sellerSquad)), date, seller)
+function priceOf(market: SeasonState['market'], player: Player, sellerSquad: readonly Player[], kind: OfferKind, date: IsoDate, seller: Team | undefined, buyer: Team): number {
+  const base = kind === 'loan' ? loanFee(player, date, seller) : premiumPrice(askingPriceAs(player, squadRoleIn(playerOverall(player), strengthsOf(sellerSquad)), date, seller), seller ?? {}, buyer)
   const listed = listingFor(market, player.id, kind)
   return listed ? Math.min(base, listed.price) : base
 }
@@ -184,7 +184,7 @@ function bestTarget(rng: Rng, team: Team, squad: readonly Player[], pool: readon
     const salary = kind === 'loan' ? player.contract.salary : expectedSalary(player, team)
     if (salary > roomForSalary) continue
     const sellerSquad = player.teamId ? sellers.get(player.teamId) ?? [] : []
-    const fee = player.teamId === null ? 0 : priceOf(market, player, sellerSquad, kind, date, player.teamId ? clubs.get(player.teamId) : undefined)
+    const fee = player.teamId === null ? 0 : priceOf(market, player, sellerSquad, kind, date, player.teamId ? clubs.get(player.teamId) : undefined, team)
     if (fee > spendable) continue
     const utility = gain - (spendable > 0 ? (3 * fee) / spendable : 0) + rng.float(-1, 1)
     if (!best || utility > best.utility) best = { player, fee, utility }
@@ -270,7 +270,7 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
     const seller = target.player.teamId ? (current.teams.find((t) => t.id === target.player.teamId) as Team) : null
     const sellerSquad = seller ? (sellers.get(seller.id) ?? []) : []
     const listed = listingOf(current, target.player.id, 'purchase')
-    if (seller && !sellerDecision({ seller, sellerSquad, player: target.player, fee: target.fee, kind: 'purchase', date, ...(listed ? { listedPrice: listed.price } : {}) }).accepted) continue
+    if (seller && !sellerDecision({ seller, sellerSquad, player: target.player, fee: target.fee, kind: 'purchase', date, buyer: team, ...(listed ? { listedPrice: listed.price } : {}) }).accepted) continue
 
     const baseSalary = expectedSalary(target.player, team)
     const verdict = playerDecision({ player: target.player, buyer: team, buyerSquad: squad, from: seller, fromSquad: sellerSquad, salary: baseSalary, kind: 'purchase' })

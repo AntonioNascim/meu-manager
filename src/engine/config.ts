@@ -434,9 +434,13 @@ export const LEAGUE = {
   /** A estrutura da Série C paga menos (também vale para quem desceu para ela). */
   salaryTierScale: { 1: 1, 2: 1, 3: 0.6 } as Record<number, number>,
   /** Preço de transferência = valor pela força × (receita da divisão)^valueExponent. */
-  valueExponent: 0.5,
+  valueExponent: 0.75,
   /** O ingresso acompanha a receita da liga com este expoente (a procura e o estádio não mudam). */
   ticketExponent: 1,
+  /** Nível dos jogadores de cada divisão em relação à Série A do mesmo país (pontos de força dos titulares): o jogador pesa a liga para onde vai. */
+  tierLevel: { 1: 0, 2: -10.5, 3: -21 } as Record<number, number>,
+  /** Quem vende para uma liga mais rica pede mais: +este tanto por cada dobro do índice de receita do comprador sobre o do vendedor (a mesma liga e ligas mais pobres não pagam extra). */
+  exportPremium: 0.2,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -529,6 +533,10 @@ export const MARKET = {
       min: 3,
       max: 19,
     },
+    /** Liga: cada `leagueStep` pontos de nível da liga do comprador sobre a do clube atual valem 1 ponto (limitado a ±1,5); o peso cai para quem tem 31 anos ou mais. */
+    leagueWeight: 0.6,
+    leagueStep: 8,
+    leagueOldShare: 0.5,
     /** Viés contra mudar de clube. */
     inertia: 0.2,
     /** Tempo de jogo pesa mais para quem é bom: 0,6 + ambition × força/100. */

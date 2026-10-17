@@ -4,6 +4,7 @@
  * As decisões são determinísticas, para o jogador poder entender e negociar.
  */
 import { MARKET } from '../config'
+import { clubLevel, exportPremium } from '../economy'
 import { formationOf } from '../formations'
 import { playerOverall } from '../overall'
 import { SQUAD_MAX } from '../types'
@@ -52,18 +53,21 @@ export function playerDecision(input: PlayerDecisionInput): PlayerDecision {
   const fromReputation = from?.reputation ?? expectedClubReputation(player)
   const reputation = clamp((buyer.reputation - fromReputation) / cfg.reputationStep, -1.5, 1.5) * cfg.reputationWeight * reputationShare
 
+  // A liga para onde ele vai: subir de nível atrai, descer exige mais (quem tem 31 anos ou mais liga menos para isso). Livre: sem termo.
+  const league = from ? clamp((clubLevel(buyer) - clubLevel(from)) / cfg.leagueStep, -1.5, 1.5) * cfg.leagueWeight * (player.age >= 31 ? cfg.leagueOldShare : 1) * reputationShare : 0
+  const prestige = reputation + league
   const now = playingTimeIn(player, buyerSquad, buyer)
   const before = from && input.fromSquad ? playingTimeIn(player, input.fromSquad, from) : 0
   const ambition = cfg.ambitionBase + (cfg.ambition * playerOverall(player)) / 100
   const playing = ambition * (0.6 * now + 0.4 * (now - before)) * cfg.playingTimeWeight
 
   const inertia = from ? cfg.inertia : 0
-  const total = salaryPoints * cfg.salaryWeight + reputation + playing - inertia
-  const minimumSalary = minimumFor(reference, reputation + playing - inertia)
+  const total = salaryPoints * cfg.salaryWeight + prestige + playing - inertia
+  const minimumSalary = minimumFor(reference, prestige + playing - inertia)
   if (total >= 0) return { accepted: true, minimumSalary }
 
-  const worst = Math.min(salaryPoints * cfg.salaryWeight, reputation, playing)
-  const reason: OfferReason = worst === playing ? 'playing-time' : worst === reputation ? 'club-reputation' : 'salary'
+  const worst = Math.min(salaryPoints * cfg.salaryWeight, prestige, playing)
+  const reason: OfferReason = worst === playing ? 'playing-time' : worst === prestige ? 'club-reputation' : 'salary'
   return { accepted: false, reason, minimumSalary }
 }
 
@@ -96,8 +100,8 @@ export interface ClubDecision {
 }
 
 /** O clube dono aceita vender (ou emprestar) o jogador por esse valor? */
-export function sellerDecision(args: { seller: Team; sellerSquad: readonly Player[]; player: Player; fee: number; kind: OfferKind; date: IsoDate; listedPrice?: number }): ClubDecision {
-  const { seller, sellerSquad, player, fee, kind, date, listedPrice } = args
+export function sellerDecision(args: { seller: Team; sellerSquad: readonly Player[]; player: Player; fee: number; kind: OfferKind; date: IsoDate; listedPrice?: number; buyer?: Pick<Team, 'tier' | 'economy'> }): ClubDecision {
+  const { seller, sellerSquad, player, fee, kind, date, listedPrice, buyer } = args
   const cheaper = (price: number) => (listedPrice === undefined ? price : Math.min(price, listedPrice))
   if (player.contract.loanedFrom) return { accepted: false, reason: 'unavailable' }
   if (sellerSquad.length - 1 < MARKET.minSquadAfterSale) return { accepted: false, reason: 'squad-size' }
@@ -109,9 +113,13 @@ export function sellerDecision(args: { seller: Team; sellerSquad: readonly Playe
     const price = cheaper(loanFee(player, date, seller))
     return fee >= price ? { accepted: true } : { accepted: false, reason: 'fee', counter: price }
   }
-  const price = cheaper(askingPrice(player, sellerSquad, date, seller))
+  const price = cheaper(premiumPrice(askingPrice(player, sellerSquad, date, seller), seller, buyer))
   return fee >= price ? { accepted: true } : { accepted: false, reason: 'fee', counter: price }
 }
+
+/** O preço pedido a um comprador de liga mais rica (o vendedor sabe quanto o outro pode pagar). */
+export const premiumPrice = (price: number, seller: Partial<Pick<Team, 'tier' | 'economy'>>, buyer?: Partial<Pick<Team, 'tier' | 'economy'>>): number =>
+  buyer ? Math.round((price * exportPremium(seller, buyer)) / 10_000) * 10_000 : price
 
 /** O comprador pode pagar? Orçamento de transferências, caixa e folha. */
 export function buyerCheck(args: { buyer: Team; buyerSquad: readonly Player[]; payroll: number; fee: number; salary: number }): OfferReason | null {

@@ -16,6 +16,15 @@ export const leagueRevenue = (team: Pick<Team, 'economy'>): number => team.econo
 /** Pontos de força que os jogadores da liga têm a mais (ou a menos) que os do Brasil. */
 export const leagueLevel = (team: Pick<Team, 'economy'>): number => team.economy?.level ?? 0
 
+/** Nível dos jogadores da divisão do clube em relação à Série A brasileira (liga + divisão). */
+export const clubLevel = (team: EconomyTeam): number => leagueLevel(team) + (LEAGUE.tierLevel[team.tier ?? 1] ?? 0)
+
+/** Quanto a mais o vendedor pede de um comprador de liga mais rica (1 = nada). */
+export function exportPremium(seller: EconomyTeam, buyer: EconomyTeam): number {
+  const ratio = leagueRevenue(buyer) / leagueRevenue(seller)
+  return ratio > 1 ? 1 + LEAGUE.exportPremium * Math.log2(ratio) : 1
+}
+
 /** Receita da divisão do clube em relação à Série A brasileira: índice da liga × razão da divisão. */
 export const divisionRevenue = (team: EconomyTeam): number => leagueRevenue(team) * (LEAGUE.tierRevenue[team.tier ?? 1] ?? 1)
 

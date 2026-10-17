@@ -91,7 +91,7 @@ function decide(state: SeasonState, offer: TransferOffer, date: IsoDate): Season
   // A venda proposta pela IA ao time do jogador só depende dele (a resposta é dele); nas demais o dono decide.
   if (seller && offer.direction === 'outgoing') {
     const listed = listingOf(state, player.id, offer.kind)
-    const club = sellerDecision({ seller, sellerSquad, player, fee: offer.fee, kind: offer.kind, date, ...(listed ? { listedPrice: listed.price } : {}) })
+    const club = sellerDecision({ seller, sellerSquad, player, fee: offer.fee, kind: offer.kind, date, buyer, ...(listed ? { listedPrice: listed.price } : {}) })
     if (!club.accepted) return reject(club.reason as OfferReason, club.counter)
   }
   const verdict = playerDecision({ player, buyer, buyerSquad, from: seller, fromSquad: sellerSquad, salary: offer.salary, kind: offer.kind })
