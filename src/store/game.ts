@@ -4,6 +4,7 @@
  */
 import { createYouth } from '../data/generateYouth'
 import { loadWorld } from '../data/package/defaultPackage'
+import { defaultCupSpecsForCompetitions } from '../data/package/packageCups'
 import type { World } from '../data/generateWorld'
 import type { DataPackage } from '../data/package/types'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
@@ -109,7 +110,8 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
     training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } },
     ...(world.competitions ? { competitions: world.competitions } : {}),
     ...(focus !== undefined ? { focus } : {}),
-    ...(options.cups !== false && world.cups && world.cups.length > 0 ? { cupSpecs: world.cups } : {}),
+    // `cups: false` guarda `cupSpecs: []`: o jogo fica só com ligas, e a virada de temporada não traz as copas padrão.
+    ...(options.cups === false ? { cupSpecs: [] } : world.cups && world.cups.length > 0 ? { cupSpecs: world.cups } : {}),
   })
   const market = { ...season.market, listings: season.market.listings.filter((l) => l.teamId !== userTeamId) }
   return {
@@ -157,7 +159,7 @@ export function advanceToMatchday(game: Game): Game {
 /** A temporada acabou e o técnico segue no cargo: vira o ano (acesso, evolução, contratos, base, tabela nova). */
 export function startNextSeason(game: Game): Game {
   if (game.season.season.phase !== 'end-of-season' || game.dismissal || game.pendingUserMatch) return game
-  const { state, report } = advanceSeason(game.season, { createYouth, userTeamId: game.userTeamId })
+  const { state, report } = advanceSeason(game.season, { createYouth, userTeamId: game.userTeamId, defaultCupSpecs: defaultCupSpecsForCompetitions })
   const mine = report.finalPositions[game.userTeamId] as { tier: number; position: number }
   const summary: SeasonSummary = { year: report.year, champions: report.champions, promoted: report.promoted, relegated: report.relegated, userTeamId: game.userTeamId, userTier: mine.tier, userPosition: mine.position }
   const size = userCompetition(game).teamIds.length

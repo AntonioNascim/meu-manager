@@ -12,7 +12,7 @@ import { createSeason } from '../engine/season'
 import type { CompetitionSetup, SeasonState } from '../engine/season'
 import { DEFAULT_PLAN } from '../engine/training'
 import { emptyTraining } from '../engine/types'
-import type { LeagueEconomy, Player, Team } from '../engine/types'
+import type { LeagueEconomy, Nationality, Player, Team } from '../engine/types'
 import type { Game } from '../store/game'
 
 export interface LeagueSpec {
@@ -49,6 +49,9 @@ export const FULL_WORLD: LeagueSpec[] = [
   { id: 'pt-1', name: 'Portugal', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4, repCurve: 1.7, economy: { revenue: 0.9, level: 2 } },
 ]
 
+/** País de cada pirâmide do mundo de teste (o prefixo do id da liga). */
+export const COUNTRY_OF_PYRAMID: Record<string, Nationality> = { br: 'Brazil', ar: 'Argentina', uy: 'Uruguay', py: 'Paraguay', cl: 'Chile', co: 'Colombia', ec: 'Ecuador', en: 'England', es: 'Spain', it: 'Italy', de: 'Germany', fr: 'France', pt: 'Portugal' }
+
 /** A pirâmide de um país: o prefixo do id da liga (`br-1`, `br-2` e `br-3` são o Brasil). */
 export const pyramidOfLeague = (spec: Pick<LeagueSpec, 'id'>): string => spec.id.split('-')[0] as string
 
@@ -71,7 +74,7 @@ export function buildScaleWorld(specs: LeagueSpec[], seed: number) {
       teams.push(made.team)
       players.push(...made.players)
     }
-    competitions.push({ id: spec.id, name: spec.name, tier: spec.tier, teams: inLeague, region: spec.region, rounds: spec.format === 'single' ? 1 : 2, pyramid: pyramidOfLeague(spec), ...(spec.economy ? { economy: spec.economy, reputationMean: Math.round((inLeague.reduce((sum, t) => sum + t.reputation, 0) / inLeague.length) * 10) / 10 } : {}) })
+    competitions.push({ id: spec.id, name: spec.name, tier: spec.tier, teams: inLeague, region: spec.region, rounds: spec.format === 'single' ? 1 : 2, pyramid: pyramidOfLeague(spec), ...(COUNTRY_OF_PYRAMID[pyramidOfLeague(spec)] && COUNTRY_OF_PYRAMID[pyramidOfLeague(spec)] !== 'Brazil' ? { country: COUNTRY_OF_PYRAMID[pyramidOfLeague(spec)] } : {}), ...(spec.economy ? { economy: spec.economy, reputationMean: Math.round((inLeague.reduce((sum, t) => sum + t.reputation, 0) / inLeague.length) * 10) / 10 } : {}) })
   })
   const academy = createAcademy({ teams, seed, year: 2026, firstNumber: ctx.nextPlayerNumber, takenNames: players.map((p) => p.name) })
   return { teams, players, academy, competitions }

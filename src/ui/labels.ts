@@ -387,6 +387,7 @@ export function packageIssueText(issue: PackageIssue): string {
     case 'league-promotion': return `Acesso e rebaixamento em ${path}: o número precisa ser ${expected} (veio ${detail}); quem cai de uma divisão é quem sobe para a de baixo.`
     case 'unsupported-leagues': return `O país "${expected}" tem ${detail} divisões em ${path}. Cada país precisa ter de 1 a 3 divisões em sequência (nível 1, 2 e 3).`
     case 'league-defaults-missing': return `Não há economia padrão para o país "${detail}" (${path}): a liga usa a do Brasil e as janelas da Europa. Preencha "economy" e "region" da liga se quiser outra coisa.`
+    case 'cup-defaults-skipped': return `As copas padrão de "${detail}" não cabem nas ligas dele (poucos clubes para o chaveamento) e ficam de fora; defina as copas do país em "cups" se quiser.`
     case 'cup-bracket': return `A copa em ${path} não fecha o chaveamento: ${detail}.`
     case 'cup-groups': return `Fase de grupos ou de liga da copa em ${path}: ${detail}.`
     case 'tiebreakers-unsupported': return `Os critérios de desempate de ${path} são diferentes dos do jogo e serão ignorados: vale a ordem padrão.`

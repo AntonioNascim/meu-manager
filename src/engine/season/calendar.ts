@@ -206,7 +206,8 @@ export function createSeason(options: SeasonOptions): SeasonState {
     market: { seed: options.seed, offers: [], history: [], listings: [], preContracts: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }
   // As copas entram depois das ligas: o sorteio da primeira fase já escolhe os dias livres de jogo.
-  const withCups = options.cupSpecs && options.cupSpecs.length > 0 ? createCups({ ...state, ...(options.cupHistory ? { cupHistory: options.cupHistory } : {}) }, options.cupSpecs) : state
+  // `cupSpecs: []` guarda que o mundo não quer copas (um save de antes das copas não tem o campo e ganha as padrão na virada).
+  const withCups = options.cupSpecs && options.cupSpecs.length > 0 ? createCups({ ...state, ...(options.cupHistory ? { cupHistory: options.cupHistory } : {}) }, options.cupSpecs) : options.cupSpecs ? { ...state, cupSpecs: [] } : state
   // A janela de janeiro já abre com os anúncios dos clubes da IA (o jogador, se houver, anuncia depois).
   return refreshListings(withCups, makeDate(options.year, 1, 1))
 }

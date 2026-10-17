@@ -3,6 +3,7 @@ import { ATTRIBUTE_NAMES, NATIONALITIES, POSITIONS } from '../../engine/types'
 import type { Attributes } from '../../engine/types'
 import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
 import { COUNTRY_DEFAULTS } from './leagueDefaults'
+import { cupsForPackage } from './packageCups'
 import { validateCups } from './validateCups'
 import { PACKAGE_FORMAT, PACKAGE_VERSION, TIEBREAKERS } from './types'
 import type { DataPackage, PackageIssue, PackageIssueCode, PackageReport } from './types'
@@ -189,6 +190,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
       }
     }
     if (country !== undefined && league.economy === undefined && !(country in COUNTRY_DEFAULTS)) c.warn('league-defaults-missing', `${path}.economy`, country)
+    if (league.start !== undefined && !(Array.isArray(league.start) && league.start.length === 2 && isInt(league.start[0]) && isInt(league.start[1]) && league.start[0] >= 1 && league.start[0] <= 12 && league.start[1] >= 1 && league.start[1] <= 31)) c.error('bad-date', `${path}.start`, JSON.stringify(league.start))
     if (league.rounds !== undefined && league.rounds !== 1 && league.rounds !== 2) c.error('unknown-value', `${path}.rounds`, String(league.rounds))
     if (league.region !== undefined && !['BR', 'SA', 'EU'].includes(league.region as string)) c.error('unknown-value', `${path}.region`, String(league.region))
     if (league.foreignLimit !== undefined) {
@@ -292,6 +294,11 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
 
   // Copas
   validateCups(input.cups, { leagues, countries: countryIds, error: (...args) => c.error(...args), warn: (...args) => c.warn(...args) })
+  if (c.errors.length === 0) {
+    // Copas padrão que não cabem nas ligas do país (poucos clubes, por exemplo) ficam de fora, com um aviso.
+    const checked = cupsForPackage({ ...(Array.isArray(input.cups) ? { cups: input.cups as never } : {}), leagues: leagues.map((l) => ({ id: l.id, country: l.country ?? '', level: l.level ?? 1, ...(l.teams !== undefined ? { teams: l.teams } : {}) })) })
+    for (const country of checked.skipped) c.warn('cup-defaults-skipped', 'cups', country)
+  }
 
   if (c.errors.length > 0) return done()
   return { pkg: input as unknown as DataPackage, report: { errors: [], warnings: c.warnings } }

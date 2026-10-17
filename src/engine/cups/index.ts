@@ -142,9 +142,13 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
     draw.ties.forEach((tie, i) => {
       let [x, y] = tie.teams
       if (stageSpec.legs === 1) {
-        // Jogo único: quem manda é o clube de menor reputação (se a copa pede) ou o primeiro sorteado.
-        const lower = strength(x) <= strength(y) ? x : y
-        if (spec.homeOfSingleLeg === 'lower-reputation') [x, y] = lower === x ? [x, y] : [y, x]
+        // Jogo único: quem manda vem da regra da copa; sem regra que decida, vale o sorteio (com cabeças de chave, o cabeça de chave).
+        const tier = (id: TeamId) => ctx.teams.get(id)?.tier ?? 1
+        const home = spec.homeOfSingleLeg
+        if (home === 'lower-reputation') [x, y] = strength(x) <= strength(y) ? [x, y] : [y, x]
+        else if (home === 'higher-reputation') [x, y] = strength(x) >= strength(y) ? [x, y] : [y, x]
+        else if (home === 'first-listed') [x, y] = participants.indexOf(x) <= participants.indexOf(y) ? [x, y] : [y, x]
+        else if (home === 'lower-division' && tier(x) !== tier(y)) [x, y] = tier(x) >= tier(y) ? [x, y] : [y, x]
         else if (seeded) [x, y] = [y, x]
         created.push(mkMatch(ctx, `s${stage}-t${i + 1}`, x, y, first, round, { stage, kind: 'knockout', tie: i + 1, leg: 1, ...(stageSpec.neutral ? { neutral: true } : {}) }))
       } else {

@@ -5,15 +5,15 @@
  * e pela tela `?diagnostico=1`.
  */
 import { BRAZILIAN_FIRST_NAMES, BRAZILIAN_SURNAMES, SPANISH_FIRST_NAMES, SPANISH_SURNAMES } from '../data/names'
-import { DEFAULT_CUPS } from '../data/package/cups'
+import { defaultCupsFor } from '../data/package/countryCups'
 import { PACKAGE_FORMAT, PACKAGE_VERSION } from '../data/package/types'
 import type { DataPackage, PackageClub, PackageLeague, PackagePlayer } from '../data/package/types'
 import { createRng } from '../engine/rng'
 import type { Nationality } from '../engine/types'
-import { FULL_WORLD, buildScaleWorld } from './scaleWorld'
+import { COUNTRY_OF_PYRAMID, FULL_WORLD, buildScaleWorld } from './scaleWorld'
 
 /** País de cada liga do mundo de teste (a pirâmide é o prefixo do id). */
-const COUNTRY_OF: Record<string, Nationality> = { br: 'Brazil', ar: 'Argentina', uy: 'Uruguay', py: 'Paraguay', cl: 'Chile', co: 'Colombia', ec: 'Ecuador', en: 'England', es: 'Spain', it: 'Italy', de: 'Germany', fr: 'France', pt: 'Portugal' }
+const COUNTRY_OF = COUNTRY_OF_PYRAMID
 const COUNTRY_NAME: Partial<Record<Nationality, string>> = { Brazil: 'Brasil', Argentina: 'Argentina', Uruguay: 'Uruguai', Paraguay: 'Paraguai', Chile: 'Chile', Colombia: 'Colômbia', Peru: 'Peru', Ecuador: 'Equador', England: 'Inglaterra', Spain: 'Espanha', Italy: 'Itália', Germany: 'Alemanha', France: 'França', Portugal: 'Portugal' }
 const SPANISH_SPEAKING: readonly Nationality[] = ['Argentina', 'Uruguay', 'Paraguay', 'Chile', 'Colombia', 'Peru', 'Ecuador', 'Spain']
 
@@ -125,7 +125,7 @@ export function buildScalePackage(seed = 7): DataPackage {
     leagues,
     clubs,
     players,
-    // A copa e a supercopa do Brasil (as outras copas entram na parte 3B).
-    cups: DEFAULT_CUPS.map((c) => JSON.parse(JSON.stringify(c)) as (typeof DEFAULT_CUPS)[number]),
+    // As copas padrão de cada país (Brasil, Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina).
+    cups: countries.flatMap((c) => defaultCupsFor(c.id as Nationality, leagues.filter((l) => l.country === c.id))),
   }
 }

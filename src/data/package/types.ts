@@ -1,4 +1,4 @@
-import type { Attributes, BoardObjective, CupDiscipline, CupEntrant, CupFormat, CupGroupsSpec, CupLeaguePhaseSpec, CupPrize, CupStageSpec, Finances, Foot, Nationality, Position, Region, Tactic } from '../../engine/types'
+import type { Attributes, BoardObjective, CupDiscipline, CupEntrant, CupFormat, CupGroupsSpec, CupLeaguePhaseSpec, CupPrize, CupSpec, CupStageSpec, Finances, Foot, Nationality, Position, Region, Tactic } from '../../engine/types'
 
 /** Pacote de dados: um mundo (países, ligas, clubes e jogadores) em JSON, que qualquer fonte pode produzir. */
 export const PACKAGE_FORMAT = 'meu-manager-package'
@@ -32,6 +32,8 @@ export interface PackageLeague {
   economy?: { revenue: number; level: number }
   /** 1 = turno único, 2 = turno e returno (padrão). */
   rounds?: 1 | 2
+  /** Mês e dia de referência da primeira rodada (a primeira rodada cai no primeiro sábado a partir daí). Padrão: 11 de abril, o calendário da liga brasileira. */
+  start?: [number, number]
   /** Janelas de transferência: BR, SA ou EU (padrão: a do país). */
   region?: 'BR' | 'SA' | 'EU'
   /** Limite de estrangeiros (jogadores de nacionalidade diferente da do país da liga); sem ele, sem limite. */
@@ -53,7 +55,7 @@ export interface PackageCup {
   leaguePhase?: CupLeaguePhaseSpec
   stages: CupStageSpec[]
   seeding?: 'random' | 'seeded'
-  homeOfSingleLeg?: 'draw' | 'lower-reputation'
+  homeOfSingleLeg?: CupSpec['homeOfSingleLeg']
   awayGoals?: boolean
   extraTime?: boolean
   penalties?: boolean
@@ -162,6 +164,7 @@ export type PackageIssueCode =
   | 'league-defaults-missing'
   | 'cup-bracket'
   | 'cup-groups'
+  | 'cup-defaults-skipped'
 
 export interface PackageIssue {
   code: PackageIssueCode

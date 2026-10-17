@@ -97,7 +97,7 @@ export function validateCups(input: unknown, ctx: CupValidationContext): void {
     if (raw.region !== undefined && !['BR', 'SA', 'EU'].includes(raw.region as string)) err('unknown-value', `${path}.region`, String(raw.region))
     if (typeof raw.format !== 'string' || !FORMATS.includes(raw.format)) err(raw.format === undefined ? 'missing-field' : 'unknown-value', `${path}.format`, String(raw.format ?? 'format'))
     for (const key of ['seeding', 'homeOfSingleLeg'] as const) {
-      const allowed = key === 'seeding' ? ['random', 'seeded'] : ['draw', 'lower-reputation']
+      const allowed = key === 'seeding' ? ['random', 'seeded'] : ['draw', 'lower-reputation', 'higher-reputation', 'lower-division', 'first-listed']
       if (raw[key] !== undefined && !allowed.includes(raw[key] as string)) err('unknown-value', `${path}.${key}`, String(raw[key]))
     }
     for (const key of ['awayGoals', 'extraTime', 'penalties'] as const) if (raw[key] !== undefined && typeof raw[key] !== 'boolean') err('wrong-type', `${path}.${key}`, key)

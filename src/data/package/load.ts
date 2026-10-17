@@ -12,6 +12,7 @@ import { pickMentality, pickStyle } from '../generateTeam'
 import { DEFAULT_START_YEAR } from '../generateWorld'
 import type { World } from '../generateWorld'
 import { classicLeagueId, normalizeCup } from './cups'
+import { cupsForPackage } from './packageCups'
 import { COUNTRY_DEFAULTS } from './leagueDefaults'
 import { generateRealPlayer } from './realPlayer'
 import type { DataPackage, PackageClub, PackageClubGame, PackageLeague } from './types'
@@ -159,7 +160,8 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
 
   const world: World = { seed: options.seed, startYear, teams, players, academy }
   // Copas: as ligas das vagas são ids do pacote; no mundo clássico a competição se chama `serie-a`, `serie-b`...
-  if (pkg.cups && pkg.cups.length > 0) world.cups = pkg.cups.map((c) => normalizeCup(c, isClassicPackage(pkg) ? classicLeagueId : undefined))
+  const cupDefinitions = cupsForPackage(pkg).cups
+  if (cupDefinitions.length > 0) world.cups = cupDefinitions.map((c) => normalizeCup(c, isClassicPackage(pkg) ? classicLeagueId : undefined))
   if (!isClassicPackage(pkg)) {
     const teamById = new Map(teams.map((t) => [t.id, t]))
     world.competitions = pkg.leagues.map((league): CompetitionSetup => {
@@ -172,6 +174,7 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
         teams: members.map((c) => teamById.get(c.id) as Team),
         region,
         ...(league.rounds ? { rounds: league.rounds } : {}),
+        ...(league.start ? { start: [league.start[0], league.start[1]] as [number, number] } : {}),
         pyramid: league.country,
         ...(economy ? { economy } : {}),
         ...(country !== 'Brazil' ? { country } : {}),

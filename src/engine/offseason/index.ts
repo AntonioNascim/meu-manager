@@ -18,7 +18,7 @@ import { applyBirthdays } from '../season/birthdays'
 import { contractEndOn, makeDate } from '../season/dates'
 import { computeStandings } from '../season/standings'
 import { SQUAD_MAX, SQUAD_MIN } from '../types'
-import type { Competition, CompetitionId, DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
+import type { Competition, CompetitionId, CupSpec, DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
 import { turnAcademy } from '../academy/turn'
 import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
@@ -38,6 +38,11 @@ export interface OffseasonOptions {
   createYouth: YouthFactory
   /** O time do jogador: não tem elenco cortado nem tática refeita pela IA. */
   userTeamId?: TeamId
+  /**
+   * Copas padrão do mundo para um jogo de antes das copas (`SeasonState.cupSpecs` ausente): entram na temporada que começa. Quem escolheu
+   * jogar sem copas tem `cupSpecs: []` e não ganha nenhuma.
+   */
+  defaultCupSpecs?: (competitions: readonly Competition[]) => CupSpec[]
 }
 
 const EXTRA_POSITIONS: readonly Position[] = ['CB', 'CM', 'ST', 'AM', 'RW', 'LW', 'DM', 'RB', 'LB']
@@ -260,7 +265,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     competitions: setups,
     ...(state.focus !== undefined ? { focus: state.focus } : {}),
     // As copas voltam em cada temporada com as vagas da que acabou (o campeão de cada edição fica no histórico).
-    ...(state.cupSpecs ? { cupSpecs: state.cupSpecs } : {}),
+    ...((state.cupSpecs ?? options.defaultCupSpecs?.(state.season.competitions)) ? { cupSpecs: (state.cupSpecs ?? options.defaultCupSpecs?.(state.season.competitions)) as CupSpec[] } : {}),
     ...(state.cupHistory ? { cupHistory: state.cupHistory } : {}),
   })
   const report: OffseasonReport = {

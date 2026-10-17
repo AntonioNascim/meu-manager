@@ -93,8 +93,11 @@ export interface CupSpec {
   stages: CupStageSpec[]
   /** Sorteio: aleatório, ou com cabeças de chave (os mais fortes pela reputação são separados e, no mata-mata, ficam com as folgas). */
   seeding: 'random' | 'seeded'
-  /** Mandante do jogo único: sorteado ou o clube de menor reputação. */
-  homeOfSingleLeg: 'draw' | 'lower-reputation'
+  /**
+   * Mandante do jogo único: sorteado (`draw`; com cabeças de chave, o cabeça de chave), o de menor ou de maior reputação, o clube da divisão
+   * inferior (`lower-division`; entre clubes da mesma divisão vale o sorteio) ou o primeiro listado nas vagas (`first-listed`, para supercopas).
+   */
+  homeOfSingleLeg: 'draw' | 'lower-reputation' | 'higher-reputation' | 'lower-division' | 'first-listed'
   /** Regra do gol fora (desligada por padrão): só na ida e volta. */
   awayGoals: boolean
   extraTime: boolean
