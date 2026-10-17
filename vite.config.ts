@@ -19,7 +19,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
-          exclude: ['tests/balance/**'],
+          exclude: ['tests/balance/**', 'tests/long/**'],
           // Folga para máquinas lentas ou ocupadas; os testes rápidos seguem rápidos.
           testTimeout: 30_000,
         },
@@ -32,6 +32,16 @@ export default defineConfig({
           include: ['tests/balance/**/*.test.ts'],
           testTimeout: 600_000,
           hookTimeout: 600_000,
+        },
+      },
+      {
+        // npm run test:long: 30 temporadas no mundo de 282 clubes (~15 minutos); fora do test:all
+        extends: true,
+        test: {
+          name: 'long',
+          include: ['tests/long/**/*.test.ts'],
+          testTimeout: 3_600_000,
+          hookTimeout: 3_600_000,
         },
       },
     ],

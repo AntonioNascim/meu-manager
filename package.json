@@ -5,7 +5,8 @@
   "scripts": {
     "test": "vitest run --project unit",
     "test:balance": "vitest run --project balance",
-    "test:all": "vitest run",
+    "test:all": "vitest run --project unit --project balance",
+    "test:long": "vitest run --project long",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
