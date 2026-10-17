@@ -8,6 +8,7 @@
  * Em paralelo: faltas, cartões, pênaltis, escanteios e lesões.
  */
 import { MATCH } from '../config'
+import { isForeign } from '../foreign'
 import type { PlayType, ShotType } from '../config'
 import { overallAt, playerOverall } from '../overall'
 import { createRng } from '../rng'
@@ -318,6 +319,7 @@ export function startMatch(input: MatchInput): LiveMatch {
       if (!incoming) throw new Error('O reserva não está no banco')
       if (s.subsLeft <= 0) throw new Error('Sem substituições disponíveis')
       if (!canSubstituteAt(s, ctx.minute)) throw new Error('Sem paradas disponíveis: no máximo 3 paradas além do intervalo')
+      assertForeignOk(s, outgoing.player, incoming)
       substitute(ctx, s, outgoing, incoming)
     },
     reorganize(side) {
@@ -333,6 +335,7 @@ export function startMatch(input: MatchInput): LiveMatch {
         const incoming = s.bench.find((p) => p.id === incomingId)
         if (!injured) throw new Error('O jogador não está mais em campo')
         if (!incoming) throw new Error('O reserva não está no banco')
+        assertForeignOk(s, injured.player, incoming)
         substitute(ctx, s, injured, incoming)
       }
       ctx.pendingInjury = undefined
@@ -917,8 +920,24 @@ function canSubstituteAt(side: SideState, minute: number): boolean {
   return side.subsLeft > 0 && (minute === MATCH.halftimeMinute || side.subStops.includes(minute) || side.subStops.length < MATCH.maxSubStops)
 }
 
+/** Estrangeiros em campo do time (limite `lineup` da liga, que vale também depois do apito inicial). */
+function foreignOnPitch(side: SideState): number {
+  return activePlayers(side).filter((p) => isForeign(p.player, side.team)).length
+}
+
+/** A troca respeita o limite de estrangeiros em campo? Passa se não aumenta o número de estrangeiros ou se fica dentro do máximo. */
+function foreignSubOk(side: SideState, outgoing: Player, incoming: Player): boolean {
+  const max = side.team.foreignLimit?.lineup
+  if (max === undefined || !isForeign(incoming, side.team) || isForeign(outgoing, side.team)) return true
+  return foreignOnPitch(side) + 1 <= max
+}
+
+function assertForeignOk(side: SideState, outgoing: Player, incoming: Player): void {
+  if (!foreignSubOk(side, outgoing, incoming)) throw new Error(`Limite de estrangeiros da liga: no máximo ${side.team.foreignLimit?.lineup} em campo ao mesmo tempo. Escolha um jogador da casa para entrar.`)
+}
+
 function bestReplacement(side: SideState, outgoing: PitchPlayer): Player | undefined {
-  return [...side.bench].sort((a, b) => overallAt(b, outgoing.slot) - overallAt(a, outgoing.slot))[0]
+  return [...side.bench].filter((p) => foreignSubOk(side, outgoing.player, p)).sort((a, b) => overallAt(b, outgoing.slot) - overallAt(a, outgoing.slot))[0]
 }
 
 function substitute(

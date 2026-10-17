@@ -5,6 +5,7 @@
  * da base está em `turn.ts`.
  */
 import { ACADEMY, OFFSEASON } from '../config'
+import { foreignCount, squadForeignBlocked } from '../foreign'
 import { salaryScale } from '../economy'
 import { expectedSalary } from '../market/value'
 import type { PricingClub } from '../market/value'
@@ -19,7 +20,7 @@ export type PotentialStars = 1 | 2 | 3 | 4 | 5
 
 export class AcademyError extends Error {
   constructor(
-    readonly code: 'squad-full' | 'not-found',
+    readonly code: 'squad-full' | 'not-found' | 'foreign-limit',
     message: string,
   ) {
     super(message)
@@ -70,12 +71,14 @@ const find = (state: SeasonState, id: PlayerId): Player => {
   return p
 }
 
-/** Promove um jovem da base ao elenco profissional (lança `AcademyError('squad-full')` se o elenco já tem 30). */
+/** Promove um jovem da base ao elenco profissional (lança `AcademyError('squad-full')` se o elenco já tem 30 e `'foreign-limit'` se ele é estrangeiro e o elenco já está no limite da liga). */
 export function promoteYouth(state: SeasonState, playerId: PlayerId): SeasonState {
   const youth = find(state, playerId)
   const team = state.teams.find((t) => t.id === youth.teamId)
   if (!team) throw new AcademyError('not-found', 'Clube não encontrado')
   if (state.players.filter((p) => p.teamId === team.id).length >= SQUAD_MAX) throw new AcademyError('squad-full', `O elenco profissional já tem ${SQUAD_MAX} jogadores`)
+  const squad = state.players.filter((p) => p.teamId === team.id)
+  if (squadForeignBlocked(team, squad, youth)) throw new AcademyError('foreign-limit', `Limite de estrangeiros da liga: o elenco já tem ${foreignCount(squad, team)} (máximo ${team.foreignLimit?.squad}) e ${youth.name} é estrangeiro. Dispense ou venda um estrangeiro antes, ou dispense o jovem.`)
   const year = Number(state.season.currentDate.slice(0, 4))
   return {
     ...state,

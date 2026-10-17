@@ -1,5 +1,6 @@
 /** Virada de temporada da base: evolução, decisões dos 20 anos, promoções da IA e chegada dos jovens novos. */
 import { ACADEMY } from '../config'
+import { squadForeignBlocked } from '../foreign'
 import { ageOneYear } from '../offseason/evolution'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits } from '../offseason/squad'
 import type { Rng } from '../rng'
@@ -63,7 +64,7 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
     /** A IA (e o jogador que deixou passar o prazo) decide: promove quem vale e tem vaga; senão, dispensa quem já fez 20 anos. Devolve true se o jovem saiu da base. */
     const aiDecides = (p: Player, mustDecide: boolean): boolean => {
       const needed = positionDeficits(squad).includes(p.position)
-      const room = squad.length < SQUAD_MAX && (needed || squad.length < desiredSquadSize(team.reputation))
+      const room = squad.length < SQUAD_MAX && !squadForeignBlocked(team, squad, p) && (needed || squad.length < desiredSquadSize(team.reputation))
       if (room && (needed || (p.age >= ACADEMY.ai.minAge && worthPromoting(p, squad)))) {
         promote(p)
         return true
