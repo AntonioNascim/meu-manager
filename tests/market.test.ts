@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { generateWorld } from '../src/data/generateWorld'
+import { MARKET } from '../src/engine/config'
+import { expectedAnnualRevenue } from '../src/engine/finance'
 import {
   expectedSalary,
   isWindowOpen,
@@ -91,6 +93,19 @@ describe('mercado da IA', () => {
       expect(n).toBeLessThanOrEqual(SQUAD_MAX)
       expect(t.squad.length).toBe(n)
     }
+  })
+
+  it('nenhum clube da IA gasta numa janela mais que a fração da receita esperada (windowSpendShare)', () => {
+    let st = season()
+    const window = transferWindows(st.season, st.matches)[0]!
+    for (let i = 0; i < 6; i++) {
+      const date = `2026-01-${String(1 + i * 4).padStart(2, '0')}`
+      st = runMarketTick({ ...st, season: { ...st.season, currentDate: date }, market: { ...st.market, seed: 21 + i } }, date, imp.id).state
+    }
+    const spent = new Map<string, number>()
+    for (const r of st.market.history) if (r.date >= window.start && r.date <= window.end) spent.set(r.toTeamId, (spent.get(r.toTeamId) ?? 0) + r.fee)
+    expect(spent.size).toBeGreaterThan(5)
+    for (const [id, total] of spent) expect(total, id).toBeLessThanOrEqual(MARKET.ai.windowSpendShare * expectedAnnualRevenue(st.teams.find((t) => t.id === id)!))
   })
 
   it('o time do jogador nunca é mexido pela IA; propostas recebidas podem ser recusadas ou aceitas', () => {

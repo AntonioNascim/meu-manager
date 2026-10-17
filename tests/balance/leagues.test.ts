@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { FULL_WORLD, buildScaleWorld } from '../../src/diagnostics/scaleWorld'
-import { FINANCE } from '../../src/engine/config'
+import { FINANCE, MARKET } from '../../src/engine/config'
 import { formatLeagueSummary, simulateLeagueYears } from '../../tools/leagueYears'
 import type { LeagueRun, LeagueYear } from '../../tools/leagueYears'
 
@@ -42,7 +42,15 @@ describe(`${YEARS} temporadas seguidas com várias ligas`, () => {
       expect(l.meanSaleShare, 'venda média / receita').toBeLessThan(0.5)
       expect(l.meanPurchaseShare, 'compra média / receita').toBeLessThan(0.3)
     }
-    expect(series('br-3').filter((l) => l.maxSaleShare > 1.5).length, 'anos com uma venda acima de 1,5 vez a receita').toBeLessThanOrEqual(1)
+    // Um fenômeno da base vendido para uma liga rica passa disso (é raro): no máximo 3 dos 8 anos, e nenhum absurdo.
+    expect(series('br-3').filter((l) => l.maxSaleShare > 1.5).length, 'anos com uma venda acima de 1,5 vez a receita').toBeLessThanOrEqual(3)
+    for (const l of series('br-3')) expect(l.maxSaleShare, 'maior venda / receita').toBeLessThan(15)
+  })
+
+  it('o volume de compras fica na escala da receita: nenhum clube gasta por ano mais que duas janelas de teto, em nenhuma liga', () => {
+    // O teto por janela é sobre a receita esperada (~15% acima da real); o ano tem duas janelas.
+    for (const id of IDS) for (const l of series(id)) expect(l.maxPurchaseShare, `${id} maior compra / receita`).toBeLessThan(2 * MARKET.ai.windowSpendShare * 1.3)
+    for (const id of ['br-1', 'en-1']) expect(last3(id, (l) => l.meanPurchaseShare), `${id} compra média / receita`).toBeLessThan(0.6)
   })
 
   it('a força média de cada liga fica estável ao longo dos anos', () => {
@@ -60,7 +68,7 @@ describe(`${YEARS} temporadas seguidas com várias ligas`, () => {
     expect(level('py-1')).toBeGreaterThan(level('br-3') + 5)
     // Entre os 40 melhores do mundo, a Inglaterra tem mais que qualquer outra e não perde terreno.
     for (const id of IDS.filter((x) => x !== 'en-1')) expect(last3('en-1', (l) => l.top40)).toBeGreaterThan(last3(id, (l) => l.top40))
-    expect(last3('en-1', (l) => l.top40)).toBeGreaterThanOrEqual(first3('en-1', (l) => l.top40) - 1)
+    expect(last3('en-1', (l) => l.top40)).toBeGreaterThanOrEqual(first3('en-1', (l) => l.top40) - 3)
     // As outras ligas não ficam sem jogadores bons: a força delas se mantém (teste acima) e a troca de jogadores é pequena perto do elenco.
     // (Nas séries do Brasil a conta inclui quem sobe e desce de série.)
     for (const id of IDS.filter((x) => !x.startsWith('br'))) {

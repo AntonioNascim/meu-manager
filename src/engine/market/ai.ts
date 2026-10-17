@@ -6,7 +6,7 @@
 import { MARKET } from '../config'
 import { salaryScale } from '../economy'
 import { formationOf } from '../formations'
-import { monthlyOperations, monthlyPayroll } from '../finance'
+import { expectedAnnualRevenue, monthlyOperations, monthlyPayroll } from '../finance'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
@@ -251,7 +251,7 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
     const sellers = squadsNow()
     const squad = sellers.get(team.id) ?? []
     if (signingsInWindow(current, team.id, window) >= MARKET.ai.maxSigningsPerWindow) continue
-    const spendable = spendableOf(team, squad)
+    const spendable = Math.min(spendableOf(team, squad), Math.max(0, MARKET.ai.windowSpendShare * expectedAnnualRevenue(team) - spentInWindow(current, team.id, window)))
     // 1) Propostas pelos jogadores do time do jogador.
     if (userTeamId && incomingCount(current) < MARKET.ai.maxPendingIncoming && rng.chance(MARKET.ai.userOfferChance)) {
       const offer = proposeToUser(current, team, squad, userTeamId, date, window, spendable, rng, sellers, clubs)
@@ -293,6 +293,10 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
 }
 
 const incomingCount = (state: SeasonState): number => state.market.offers.filter((o) => o.status === 'pending' && o.direction === 'incoming').length
+
+/** Quanto o clube já pagou em compras nesta janela. */
+const spentInWindow = (state: SeasonState, teamId: TeamId, window: TransferWindow): number =>
+  state.market.history.filter((r) => r.toTeamId === teamId && r.date >= window.start && r.date <= window.end).reduce((sum, r) => sum + r.fee, 0)
 
 const signingsInWindow = (state: SeasonState, teamId: TeamId, window: TransferWindow): number =>
   state.market.history.filter((r) => r.toTeamId === teamId && r.date >= window.start && r.date <= window.end).length
