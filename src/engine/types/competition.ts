@@ -6,6 +6,8 @@ export type CompetitionType = 'league'
 /** Região da liga: define as janelas de transferência. */
 export type Region = 'BR' | 'SA' | 'EU'
 
+import type { LeagueEconomy } from './team'
+
 export interface Competition {
   id: CompetitionId
   name: string
@@ -26,6 +28,10 @@ export interface Competition {
   rounds?: 1 | 2
   /** Pirâmide: as divisões ligadas por acesso e rebaixamento (as de um país). Sem ela, todas as competições formam uma só. */
   pyramid?: string
+  /** Economia da liga (índice de receita e nível dos jogadores); ausente = a do Brasil. */
+  economy?: LeagueEconomy
+  /** Reputação média dos clubes da divisão (para onde a reputação volta); ausente = `OFFSEASON.reputation.tierMean` da série. */
+  reputationMean?: number
 }
 
 /** Linha da classificação, sempre derivada das partidas finalizadas (nunca guardada). */

@@ -15,6 +15,8 @@ export interface OffseasonReport {
   year: number
   /** Campeão de cada série (índice = série − 1). */
   champions: TeamId[]
+  /** Campeão de cada competição (todas as ligas do mundo), pelo id da competição. */
+  championsByCompetition?: Record<string, TeamId>
   promoted: TeamId[]
   relegated: TeamId[]
   /** Posição final de cada time na sua série. */

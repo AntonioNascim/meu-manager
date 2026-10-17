@@ -66,6 +66,12 @@ export interface SeasonRecord {
   champion: boolean
 }
 
+/** Economia da liga em que o clube joga, em relação ao Brasil (Série A, B e C = 1): `revenue` multiplica TV, patrocínio, ingresso, operação, salários e preços; `level` é quantos pontos de força a mais (ou a menos) os jogadores do país têm. */
+export interface LeagueEconomy {
+  revenue: number
+  level: number
+}
+
 export interface Team {
   id: TeamId
   name: string
@@ -90,4 +96,6 @@ export interface Team {
   history: SeasonRecord[]
   /** Série em que o time joga (1 = A, 2 = B). */
   tier: number
+  /** Economia da liga do clube; ausente = a do Brasil. Vem da competição e acompanha o clube no acesso e rebaixamento. */
+  economy?: LeagueEconomy
 }

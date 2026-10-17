@@ -6,7 +6,7 @@ import { SEASON } from '../config'
 import { refreshListings } from '../market/listings'
 import { createRng, hashSeed } from '../rng'
 import { emptyTraining } from '../types'
-import type { Competition, CompetitionId, IsoDate, MarketState, Match, Player, Region, Season, Team, TrainingState } from '../types'
+import type { Competition, CompetitionId, IsoDate, LeagueEconomy, MarketState, Match, Player, Region, Season, Team, TrainingState } from '../types'
 import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
 import { buildLeagueRounds } from './schedule'
 
@@ -72,6 +72,9 @@ export interface CompetitionSetup {
   rounds?: 1 | 2
   /** Pirâmide do país (divisões ligadas por acesso e rebaixamento). */
   pyramid?: string
+  /** Economia da liga (a do Brasil quando falta) e reputação média da divisão. */
+  economy?: LeagueEconomy
+  reputationMean?: number
 }
 
 const SERIES_LETTERS = ['a', 'b', 'c', 'd'] as const
@@ -101,13 +104,26 @@ export interface SeasonOptions {
   focus?: string
 }
 
+/** Os times com a economia da liga em que jogam (quem já tem a mesma não é recriado). */
+function withEconomy(teams: readonly Team[], setups: readonly CompetitionSetup[]): Team[] {
+  const economies = new Map<string, LeagueEconomy>()
+  for (const s of setups) if (s.economy) for (const t of s.teams) economies.set(t.id, s.economy)
+  if (economies.size === 0) return [...teams]
+  return teams.map((t) => {
+    const economy = economies.get(t.id)
+    return economy && t.economy !== economy ? { ...t, economy } : t
+  })
+}
+
 /** Cria a temporada: todas as partidas (com data e seed) de todas as ligas, ainda por jogar. */
 export function createSeason(options: SeasonOptions): SeasonState {
   const rng = createRng(`${options.seed}:${options.year}:calendar`)
   const matches: Match[] = []
   const competitions: Competition[] = []
   const setups = options.competitions ?? defaultCompetitions(options.teams)
-  const lowestTier = Math.max(...setups.map((s) => s.tier))
+  // A divisão mais baixa de cada pirâmide (um país): é a única que não rebaixa.
+  const lowestTier = new Map<string, number>()
+  for (const s of setups) lowestTier.set(s.pyramid ?? '', Math.max(lowestTier.get(s.pyramid ?? '') ?? 0, s.tier))
 
   for (const setup of setups) {
     const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id), setup.rounds ?? 2)
@@ -137,11 +153,13 @@ export function createSeason(options: SeasonOptions): SeasonState {
       roundCount: rounds.length,
       // Pirâmide: 4 sobem de cada divisão (menos a primeira) e 4 caem de cada uma (menos a última).
       promotionSlots: setup.tier === 1 ? 0 : 4,
-      relegationSlots: setup.tier === lowestTier ? 0 : 4,
+      relegationSlots: setup.tier === lowestTier.get(setup.pyramid ?? '') ? 0 : 4,
       ...(setup.region ? { region: setup.region } : {}),
       ...(setup.start ? { start: setup.start } : {}),
       ...(setup.rounds ? { rounds: setup.rounds } : {}),
       ...(setup.pyramid ? { pyramid: setup.pyramid } : {}),
+      ...(setup.economy ? { economy: setup.economy } : {}),
+      ...(setup.reputationMean !== undefined ? { reputationMean: setup.reputationMean } : {}),
     })
   }
 
@@ -155,7 +173,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
       matchIds: matches.map((m) => m.id),
     },
     matches,
-    teams: [...options.teams],
+    teams: withEconomy(options.teams, setups),
     players: [...options.players],
     academy: [...(options.academy ?? [])],
     training: options.training ?? emptyTraining(),

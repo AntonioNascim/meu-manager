@@ -10,12 +10,14 @@ import { playerOverall } from '../overall'
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import { createSeason } from '../season/calendar'
+import type { CompetitionSetup } from '../season/calendar'
+import { pyramidOf } from '../season/fidelity'
 import type { SeasonState } from '../season/calendar'
 import { applyBirthdays } from '../season/birthdays'
 import { contractEndOn, makeDate } from '../season/dates'
 import { computeStandings } from '../season/standings'
 import { SQUAD_MAX, SQUAD_MIN } from '../types'
-import type { DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
+import type { Competition, CompetitionId, DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
 import { turnAcademy } from '../academy/turn'
 import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
@@ -58,19 +60,42 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   const champions: TeamId[] = []
   const promoted: TeamId[] = []
   const relegated: TeamId[] = []
-  for (const competition of [...state.season.competitions].sort((a, b) => a.tier - b.tier)) {
+  // Cada pirâmide (um país) tem as suas divisões: quem sobe ou cai vai para a divisão vizinha da MESMA pirâmide. Os campeões do relatório (índice = série − 1) são os da pirâmide do técnico.
+  const competitions = [...state.season.competitions].sort((a, b) => a.tier - b.tier)
+  const reportPyramid = state.focus ?? pyramidOf(competitions[0] as Competition)
+  const championsByCompetition: Record<string, TeamId> = {}
+  const destination = new Map<TeamId, CompetitionId>()
+  const neighbour = (c: Competition, step: number) => competitions.find((o) => pyramidOf(o) === pyramidOf(c) && o.tier === c.tier + step)
+  for (const competition of competitions) {
     const rows: StandingRow[] = computeStandings(competition.teamIds, state.matches.filter((m) => m.competitionId === competition.id))
     rows.forEach((r, i) => (finalPositions[r.teamId] = { tier: competition.tier, position: i + 1 }))
-    champions[competition.tier - 1] = (rows[0] as StandingRow).teamId
-    if (competition.relegationSlots > 0) relegated.push(...rows.slice(rows.length - competition.relegationSlots).map((r) => r.teamId))
-    if (competition.promotionSlots > 0) promoted.push(...rows.slice(0, competition.promotionSlots).map((r) => r.teamId))
+    championsByCompetition[competition.id] = (rows[0] as StandingRow).teamId
+    if (pyramidOf(competition) === reportPyramid) champions[competition.tier - 1] = (rows[0] as StandingRow).teamId
+    const below = neighbour(competition, 1)
+    const above = neighbour(competition, -1)
+    if (competition.relegationSlots > 0 && below) {
+      const out = rows.slice(rows.length - competition.relegationSlots).map((r) => r.teamId)
+      relegated.push(...out)
+      for (const id of out) destination.set(id, below.id)
+    }
+    if (competition.promotionSlots > 0 && above) {
+      const up = rows.slice(0, competition.promotionSlots).map((r) => r.teamId)
+      promoted.push(...up)
+      for (const id of up) destination.set(id, above.id)
+    }
+  }
+  const competitionOf = new Map<TeamId, Competition>()
+  for (const c of competitions) for (const id of c.teamIds) competitionOf.set(id, c)
+  const nextCompetition = (id: TeamId): Competition | undefined => {
+    const to = destination.get(id)
+    return to ? competitions.find((c) => c.id === to) : competitionOf.get(id)
   }
 
   // 2) Reputação (e os efeitos dela na torcida e no preço do ingresso da IA).
   const rankByReputation = new Map<TeamId, number>()
-  for (const tier of new Set(state.teams.map((t) => t.tier))) {
+  for (const c of competitions) {
     state.teams
-      .filter((t) => t.tier === tier)
+      .filter((t) => competitionOf.get(t.id) === c)
       .map((t, index) => ({ t, index }))
       .sort((a, b) => b.t.reputation - a.t.reputation || a.index - b.index)
       .forEach(({ t }, i) => rankByReputation.set(t.id, i + 1))
@@ -86,15 +111,18 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (promoted.includes(t.id)) delta += R.promoted
     if (relegated.includes(t.id)) delta += R.relegated
     // Na pirâmide, quem sobe vai uma divisão acima e quem cai, uma abaixo.
-    const tier = t.tier - (promoted.includes(t.id) ? 1 : 0) + (relegated.includes(t.id) ? 1 : 0)
+    const landing = nextCompetition(t.id)
+    const tier = landing ? landing.tier : t.tier
     // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
-    const pulled = t.reputation + delta + R.tierPull * ((R.tierMean[tier] ?? t.reputation) - t.reputation)
+    const mean = landing?.reputationMean ?? R.tierMean[tier] ?? t.reputation
+    const pulled = t.reputation + delta + R.tierPull * (mean - t.reputation)
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId
     return {
       ...t,
       tier,
+      ...(landing?.economy ? { economy: landing.economy } : {}),
       reputation,
       fanBase: Math.round((t.fanBase * (1 + 0.03 * delta)) / 1_000) * 1_000,
       ticketPrice: ai ? defaultTicketPrice(reputation) : t.ticketPrice,
@@ -175,9 +203,9 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
 
   // 7) Nova meta da diretoria, finanças do ano e táticas refeitas.
   const newRank = new Map<TeamId, number>()
-  for (const tier of new Set(teams.map((t) => t.tier))) {
+  for (const c of competitions) {
     teams
-      .filter((t) => t.tier === tier)
+      .filter((t) => nextCompetition(t.id) === c)
       .map((t, index) => ({ t, index }))
       .sort((a, b) => b.t.reputation - a.t.reputation || a.index - b.index)
       .forEach(({ t }, i) => newRank.set(t.id, i + 1))
@@ -206,10 +234,23 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   })
 
   // 8) Nova tabela de jogos.
-  const next = createSeason({ year: nextYear, seed: state.market.seed, teams, players, ...(state.focus !== undefined ? { focus: state.focus } : {}) })
+  const setups: CompetitionSetup[] = state.season.competitions.map((c) => ({
+    id: c.id,
+    name: c.name,
+    tier: c.tier,
+    teams: teams.filter((t) => nextCompetition(t.id) === c),
+    ...(c.region ? { region: c.region } : {}),
+    ...(c.start ? { start: c.start } : {}),
+    ...(c.rounds ? { rounds: c.rounds } : {}),
+    ...(c.pyramid ? { pyramid: c.pyramid } : {}),
+    ...(c.economy ? { economy: c.economy } : {}),
+    ...(c.reputationMean !== undefined ? { reputationMean: c.reputationMean } : {}),
+  }))
+  const next = createSeason({ year: nextYear, seed: state.market.seed, teams, players, competitions: setups, ...(state.focus !== undefined ? { focus: state.focus } : {}) })
   const report: OffseasonReport = {
     year,
     champions,
+    championsByCompetition,
     promoted,
     relegated,
     finalPositions,
