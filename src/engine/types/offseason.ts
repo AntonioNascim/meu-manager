@@ -2,6 +2,19 @@ import type { PlayerId, TeamId } from './common'
 import type { Nationality, Position } from './player'
 import type { LeagueEconomy } from './team'
 
+/** Linha resumida da classificação final: time, jogos, vitórias, empates, derrotas, gols pró, gols contra, pontos. */
+export type ArchivedRow = [teamId: string, played: number, wins: number, draws: number, losses: number, goalsFor: number, goalsAgainst: number, points: number]
+
+/** A virada de temporada de um país: o relatório e a classificação final de cada liga dele (antes da virada). */
+export interface TurnRecord {
+  pyramid: string
+  /** Ano em que a temporada começou e o nome dela ("2026" ou "2026/27"). */
+  year: number
+  label: string
+  report: OffseasonReport
+  tables: { competitionId: string; tier: number; rows: ArchivedRow[] }[]
+}
+
 /** Jogador que saiu do jogo ou do clube na virada de temporada (para o resumo na tela). */
 export interface DepartedPlayer {
   playerId: PlayerId

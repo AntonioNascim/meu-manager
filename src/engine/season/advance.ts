@@ -17,7 +17,7 @@ import { gridProblem } from '../grid'
 import { simulateMatch } from '../match'
 import type { KnockoutRules, MatchInput } from '../match'
 import { cupScopeOf, knockoutRulesFor, progressCups } from '../cups'
-import type { IsoDate, MarketNotice, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
+import type { ArchivedRow, IsoDate, MarketNotice, Match, OffseasonReport, Player, PlayerId, Tactic, Team, TeamId, TurnRecord } from '../types'
 import type { SeasonState } from './calendar'
 import { applyTraining, fitnessProfile } from '../training'
 import { settleDueContracts } from '../offseason/dueContracts'
@@ -25,6 +25,8 @@ import { applyBirthdays } from './birthdays'
 import { applyMatchToPlayers, cupView, progressDays } from './condition'
 import { slimResult } from './compact'
 import { daysBetween } from './dates'
+import { competitionsOf, cycleOfPyramid, focusPyramid, phaseOfPyramid, pyramidFinished, pyramidOfTeamId, seasonLabel } from './cycles'
+import { computeStandings } from './standings'
 import { cupMatchIsQuick, playQuickMatch, quickCompetitionIds } from './fidelity'
 
 export type SeasonEvent = { type: 'matchday'; date: IsoDate } | { type: 'market'; date: IsoDate } | { type: 'season-end' }
@@ -97,7 +99,15 @@ export interface AdvanceOptions {
   userTeamId?: TeamId
   /** Liga o mercado: janelas, negociações da IA e propostas viram eventos do avanço. */
   market?: boolean
+  /**
+   * Vira a temporada de uma pirâmide (um país). Com ela, os países da IA viram sozinhos, no último dia da temporada de cada um; a pirâmide do
+   * técnico espera o jogador (`startNextSeason`). Sem ela, nenhum país vira sozinho. Feita para jogos com técnico: sem técnico os países
+   * virariam para sempre.
+   */
+  turn?: TurnRunner
 }
+
+export type TurnRunner = (state: SeasonState, pyramid: string) => { state: SeasonState; report: OffseasonReport }
 
 export interface AdvanceResult {
   state: SeasonState
@@ -108,6 +118,8 @@ export interface AdvanceResult {
   pendingUserMatch?: Match
   /** Avisos do mercado (janela, propostas recebidas e respondidas). */
   notices: MarketNotice[]
+  /** Países da IA que viraram a temporada neste avanço. */
+  turned?: TurnRecord[]
 }
 
 /** Passa os dias até `date`: recuperação, fechamento dos meses e, se for dia de negociação, o mercado. */
@@ -147,37 +159,128 @@ function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, ma
   return { state: current, notices }
 }
 
+/** A pirâmide do técnico (a do clube dele); sem técnico, nenhuma. */
+const userPyramidOf = (state: SeasonState, options: AdvanceOptions): string | undefined => (options.userTeamId ? pyramidOfTeamId(state, options.userTeamId) : undefined)
+
+/** Países da IA com todos os jogos feitos que esperam o último dia da temporada para virar (só com `options.turn`). */
+function pendingTurns(state: SeasonState, options: AdvanceOptions): string[] {
+  if (!options.turn) return []
+  const mine = userPyramidOf(state, options)
+  return Object.keys(state.cycles).filter((p) => p !== mine && pyramidFinished(state, p))
+}
+
+/** A classificação final de cada liga do país, antes da virada. */
+function finalTables(state: SeasonState, pyramid: string): TurnRecord['tables'] {
+  return competitionsOf(state, pyramid)
+    .sort((a, b) => a.tier - b.tier)
+    .map((c) => ({
+      competitionId: c.id,
+      tier: c.tier,
+      rows: computeStandings(c.teamIds, state.matches.filter((m) => m.competitionId === c.id)).map((r): ArchivedRow => [r.teamId, r.played, r.wins, r.draws, r.losses, r.goalsFor, r.goalsAgainst, r.points]),
+    }))
+}
+
+/** Vira os países da IA que já chegaram ao último dia da temporada. */
+function runDueTurns(state: SeasonState, options: AdvanceOptions): { state: SeasonState; turned: TurnRecord[] } {
+  let current = state
+  const turned: TurnRecord[] = []
+  for (const pyramid of pendingTurns(state, options)) {
+    const cycle = cycleOfPyramid(current, pyramid)
+    if (current.season.currentDate < cycle.end || !pyramidFinished(current, pyramid)) continue
+    const tables = finalTables(current, pyramid)
+    const run = (options.turn as TurnRunner)(current, pyramid)
+    current = run.state
+    turned.push({ pyramid, year: cycle.year, label: seasonLabel(cycle), report: run.report, tables })
+  }
+  return { state: current, turned }
+}
+
+/** Primeiro dia (depois de hoje) em que um país da IA com a temporada acabada chega ao último dia dela. */
+function nextTurnDate(state: SeasonState, options: AdvanceOptions): IsoDate | undefined {
+  let next: IsoDate | undefined
+  for (const pyramid of pendingTurns(state, options)) {
+    const end = cycleOfPyramid(state, pyramid).end
+    if (end > state.season.currentDate && (next === undefined || end < next)) next = end
+  }
+  return next
+}
+
 /**
  * Avança até o próximo evento: passa os dias, escala os times, simula as partidas do dia e atualiza
  * os jogadores. Com `market`, o mercado também gera eventos (abertura e último dia da janela, propostas
  * recebidas e respondidas); dias de negociação sem novidade para o jogador são atravessados em silêncio.
- * Depois da última partida a fase passa para `end-of-season`.
+ * Quando todos os jogos da pirâmide do técnico terminam, devolve `season-end` e espera `startNextSeason`;
+ * as pirâmides da IA viram a temporada sozinhas (com `turn`) no último dia dela.
  */
 export function advanceToNextEvent(state: SeasonState, options: AdvanceOptions = {}): AdvanceResult {
+  return stepWorld(state, options)
+}
+
+/**
+ * Passa o relógio do mundo até `date` (inclusive), jogando o que houver pelo caminho e virando os países da IA que chegarem ao último dia
+ * da temporada. Não para pelos eventos do técnico: serve para o fim da temporada dele, quando só os outros países ainda jogam.
+ */
+export function advanceUntil(state: SeasonState, date: IsoDate, options: AdvanceOptions = {}): AdvanceResult {
+  let current = state
+  const turned: TurnRecord[] = []
+  const notices: MarketNotice[] = []
+  const played: Match[] = []
+  while (current.season.currentDate < date) {
+    const step = stepWorld(current, options, date)
+    current = step.state
+    turned.push(...(step.turned ?? []))
+    notices.push(...step.notices)
+    played.push(...step.played)
+    if (step.pendingUserMatch) return { ...step, played, notices, turned }
+  }
+  // Os países da IA que chegaram ao último dia exatamente em `date` viram agora.
+  const due = runDueTurns(current, options)
+  return { state: due.state, event: { type: 'market', date }, played, notices, turned: [...turned, ...due.turned] }
+}
+
+function stepWorld(state: SeasonState, options: AdvanceOptions, limit?: IsoDate): AdvanceResult {
   let current = state
   const notices: MarketNotice[] = []
+  const turned: TurnRecord[] = []
+  const played: Match[] = []
   for (;;) {
-    const matchEvent = nextEvent(current)
-    if (matchEvent.type === 'season-end') {
+    const due = runDueTurns(current, options)
+    current = due.state
+    turned.push(...due.turned)
+    const mine = userPyramidOf(current, options)
+    if (limit === undefined && mine !== undefined && pyramidFinished(current, mine)) {
       const season = { ...current.season, phase: 'end-of-season' as const }
-      return { state: { ...current, season }, event: matchEvent, played: [], notices }
+      return { state: { ...current, season: mine === focusPyramid(current) ? season : current.season }, event: { type: 'season-end' }, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
     }
+    const matchEvent = nextEvent(current)
     const marketEvent = options.market ? nextMarketEvent(current) : undefined
-    let date = marketEvent && marketEvent.date < matchEvent.date ? marketEvent.date : matchEvent.date
     // O fim do contrato de um jogador do técnico também é um dia a parar (se cair antes do próximo evento).
     const contractEnd = options.userTeamId ? nextContractEnd(current, options.userTeamId) : undefined
-    if (contractEnd !== undefined && contractEnd < date) date = contractEnd
+    const candidates = [matchEvent.type === 'matchday' ? matchEvent.date : undefined, marketEvent?.date, contractEnd, nextTurnDate(current, options), limit].filter((d): d is IsoDate => d !== undefined && d >= current.season.currentDate)
+    if (candidates.length === 0) {
+      const season = { ...current.season, phase: phaseOfPyramid(current, focusPyramid(current)) }
+      return { state: { ...current, season }, event: { type: 'season-end' }, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
+    }
+    const date = candidates.reduce((a, b) => (b < a ? b : a))
     const todayMarket = marketEvent && marketEvent.date === date ? marketEvent : undefined
 
     const passed = passDays(current, date, options, todayMarket)
     notices.push(...passed.notices)
     current = passed.state
-    if (date < matchEvent.date) {
-      // Dia só de mercado: para se há novidade para o jogador, senão segue para o próximo evento.
-      if (notices.length > 0) return { state: current, event: { type: 'market', date }, played: [], notices }
+    if (matchEvent.type === 'matchday' && matchEvent.date === date) {
+      const day = playMatchday(current, date, options, notices)
+      current = day.state
+      played.push(...day.played)
+      if (limit === undefined || day.pendingUserMatch) return { ...day, played, ...(turned.length > 0 ? { turned } : {}) }
+      if (current.season.currentDate >= limit) return { state: current, event: day.event, played, notices, ...(turned.length > 0 ? { turned } : {}) }
       continue
     }
-    return playMatchday(current, date, options, notices)
+    // Dia sem jogos (mercado, fim de contrato, último dia da temporada de um país): para só se há novidade para o jogador.
+    if (limit !== undefined) {
+      if (date >= limit) return { state: current, event: { type: 'market', date }, played, notices, ...(turned.length > 0 ? { turned } : {}) }
+      continue
+    }
+    if (notices.length > 0) return { state: current, event: { type: 'market', date }, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
   }
 }
 
@@ -224,8 +327,7 @@ export function playMatchday(state: SeasonState, date: IsoDate, options: Advance
 
   // As copas sorteiam a fase seguinte (e premiam) antes de dizer se a temporada acabou.
   const moved = progressCups({ ...state, matches, teams: state.teams.map((t) => teams.get(t.id) ?? t), players: state.players.map((p) => changed.get(p.id) ?? p) })
-  const done = moved.matches.every((m) => m.status === 'finished')
-  const season = { ...moved.season, phase: done ? ('end-of-season' as const) : ('in-season' as const) }
+  const season = { ...moved.season, phase: phaseOfPyramid(moved, focusPyramid(moved)) }
   return {
     state: { ...moved, season },
     event: { type: 'matchday', date },
@@ -292,8 +394,7 @@ export function completeMatch(state: SeasonState, played: Match): SeasonState {
     teams: state.teams.map((t) => (t.id === home_.id && !neutral ? gate.team : t)),
     players: state.players.map((p) => changed.get(p.id) ?? p),
   })
-  const done = moved.matches.every((m) => m.status === 'finished')
-  return { ...moved, season: { ...moved.season, phase: done ? 'end-of-season' : 'in-season' } }
+  return { ...moved, season: { ...moved.season, phase: phaseOfPyramid(moved, focusPyramid(moved)) } }
 }
 
 /** Troca a tática do time (o jogador edita a dele entre os jogos). Valida a escalação. */
