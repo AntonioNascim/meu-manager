@@ -497,3 +497,52 @@ Brasil (60 clubes): início 218 KB, fim 429 KB, mediana 48 ms por save. Teste de
 - **Gravar "só dezenas de KB" por avanço não vale.** O treino e a recuperação da condição mexem em todos os jogadores a cada dia (1.507 de 1.540 jogadores mudam num avanço de um dia), então o que a comparação por referência poupa são as ligas que não jogaram no dia, as partidas de rodadas futuras, o mercado e o calendário: ~45% dos pedaços e ~25% dos bytes. Pedaço por clube foi pior (676 pedaços, mediana 686 ms, quase tudo regravado, e o IndexedDB sofre com muitas linhas pequenas), e separar a condição do resto do jogador (dois pedaços por clube) também (1.241 pedaços, e o cadastro mudava quase igual). Ficou **um pedaço por liga**.
 - **Os passos 2 a 4 da seção 4.6** (livro-caixa só da liga do técnico, jogadores das outras ligas em forma compacta, base das outras ligas só como contagem) **não foram necessários**: só a compressão já dá 1,96 MB no fim da temporada (meta 3 MB). Ficam como reserva se o histórico de várias temporadas das 15 ligas passar da folga de ~1 MB.
 - **Não foi medido** o mundo de 282 clubes depois de várias temporadas (a base dos clubes cresce uns 15% nos primeiros anos e o arquivo de temporadas passadas cresce poucos KB por temporada; estimativa: ~2,3 MB), nem o tempo num celular de verdade (estimativa de 3 a 5 vezes este notebook para preparar e comprimir, ou seja, uns 0,5 a 1 s por save, em segundo plano e espaçado pela espera do salvamento automático). Rodar `?diagnostico=1` no aparelho dá o número real.
+
+---
+
+## 13. Resultado da parte B5 (economia por liga)
+
+**Feito na B5**
+
+1. **Índice de receita por liga** (`src/engine/economy.ts`, `LEAGUE` em `config.ts`). `Team.economy` (`{ revenue, level }`, ausente = Brasil) vem da competição (`Competition.economy`) e acompanha o clube no acesso e no rebaixamento. `revenue` multiplica a cota de TV, o patrocínio, o preço padrão do ingresso e o custo de operação, então a folha sustentável, o teto de caixa e os cortes da IA escalam sozinhos. Brasil A, B e C valem 1 (as razões entre divisões continuam as das tabelas de TV de hoje: 1, 0,15 e 0,06). Valores usados no mundo de 282 clubes (`FULL_WORLD`): Inglaterra 5, Espanha 3, Alemanha 2,8, Itália 2,5, França 1,8, Portugal 0,9, Argentina 0,6, Colômbia 0,45, Chile 0,4, Uruguai e Equador 0,3, Paraguai 0,25; `level` (pontos de força dos titulares em relação ao Brasil, já descontando que as ligas pobres têm reputação menor): +8, +7, +6, +6, +3,5, +2, −1, −2, −3, −4, −4 e −5, na mesma ordem.
+2. **Salários e preços levam a liga do clube.** Salário = salário pela força × índice^0,75 × fator da divisão (`salaryTierScale`: a Série C paga 0,6). Preço de transferência = valor pela força × (receita da divisão)^0,75. `expectedSalary(jogador, clube)` e `marketValue(jogador, data, clube)` recebem o clube (sem ele valem o padrão do Brasil); contratos gerados, base, renovação, pré-contrato, anúncios, busca e telas do mercado passam o clube certo. Quem vende para uma liga mais rica pede mais (`LEAGUE.exportPremium`: +20% por dobro do índice do comprador sobre o do vendedor; é o "freio de exportação" simples da seção 4.5, sem contagem de titulares).
+3. **Termo de liga no interesse do jogador** (`MARKET.player.leagueWeight/leagueStep/leagueOldShare`). Subir de nível de liga (liga + divisão, `clubLevel`) atrai e descer exige salário maior, com peso menor para quem tem 31 anos ou mais; jogador livre não tem termo. Sem ele, os clubes da Série C importavam os melhores das ligas pobres, que pagam menos por jogador mas têm nível acima do da Série C.
+4. **Virada de temporada com várias ligas** (`advanceSeason`). Acesso e rebaixamento dentro de cada pirâmide (antes só havia uma), campeão por competição (`OffseasonReport.championsByCompetition`; `champions` continua sendo o da pirâmide do técnico), reputação que volta à média da divisão (`Competition.reputationMean`) e meta da diretoria por liga. Só a divisão mais baixa de cada pirâmide deixa de rebaixar (`createSeason`). Resolve a pendência "virada por pirâmide" da B3.
+5. **Ferramenta de análise por liga** (`tools/leagueYears.ts`): força dos titulares, reputação, quantos dos 40 melhores jogadores do mundo jogam na liga, folha/receita, compras e vendas/receita (média e máximo), saldo/receita e jogadores trocados com outras ligas. `npm run analyze -- years --years 10 --seed 41` imprime o resumo por liga no mundo atual (60 clubes, três séries); `npm run analyze -- years --years 10 --seed 7 --clubs 282` faz o mesmo no mundo de 282 clubes (só o Brasil lance a lance, o resto simplificado); `node tools/run.mjs leagueRun [--clubs 60|282] [--league br-3]` imprime as tabelas ano a ano.
+
+**Resultado, 10 temporadas, mundo de 282 clubes (semente 7; média dos 3 primeiros anos → os 3 últimos)**
+
+| Liga | Força dos titulares | 40 melhores jogadores | Receita média | Folha / receita | Maior saldo / receita | Clubes no vermelho |
+|---|---|---|---|---|---|---|
+| Inglaterra | 75,4 → 77,2 | 15 → 24 | 383 M | 31% | 2,06 | 0 |
+| Espanha | 73,1 → 74,0 | 9 → 8 | 223 M | 31% | 2,07 | 0 |
+| Alemanha | 72,2 → 71,7 | 9 → 6 | 182 M | 32% | 2,08 | 0 |
+| Itália | 71,7 → 71,7 | 4 → 1 | 172 M | 31% | 2,07 | 0 |
+| França | 67,8 → 67,7 | 1 → 0 | 104 M | 35% | 2,01 | 0 |
+| Brasil A | 65,6 → 64,9 | 1 → 0 | 66 M | 31% | 2,00 | 0 |
+| Portugal | 65,7 → 64,4 | 1 → 0 | 43 M | 41% | 2,02 | 0 |
+| Argentina | 62,3 → 62,4 | 0 → 0 | 29 M | 39% | 3,57 (*) | 0 |
+| Colômbia | 59,8 → 60,2 | 0 → 0 | 18 M | 46% | 1,99 | 0 |
+| Chile | 58,6 → 59,1 | 0 → 0 | 14 M | 50% | 2,00 | 0 |
+| Uruguai | 57,7 → 57,5 | 0 → 0 | 11 M | 50% | 2,03 | 0 |
+| Equador | 56,9 → 56,9 | 0 → 0 | 10 M | 51% | 2,01 | 0 |
+| Paraguai | 56,7 → 57,4 | 0 → 0 | 8 M | 54% | 2,15 | 0 |
+| Brasil B | 55,8 → 56,4 | 0 → 0 | 18 M | 62% | 1,93 | 0 |
+| Brasil C | 44,4 → 46,9 | 0 → 0 | 6,6 M | 75% | 1,95 | 0 |
+
+(*) Uma única venda de um fenômeno da base (R$ 85 mi, 8,5 vezes a receita do clube); o teto de caixa gasta o excesso nos meses seguintes.
+
+Antes da B5, no mesmo mundo, todas as ligas de uma divisão só tinham a economia da Série A brasileira (receita de 35 a 50 M, folha em ~35%), o nível dos jogadores era o mesmo e a Série C pagava 115% da receita em salários. Agora:
+- **Nenhum clube vai à falência** em nenhuma das 10 temporadas, e o dinheiro fica perto do teto (`FINANCE.ceilingYears` = 1,5 ano de receita) em todas as ligas.
+- **A força média de cada liga é estável** (variação máxima de 2,5 pontos, na Série C; as outras ficam dentro de ±2). A distância entre as ligas é a pedida: Inglaterra ~12 pontos acima do Brasil A, Paraguai ~8 abaixo.
+- **Os melhores jogadores tendem à liga mais rica sem esvaziar as outras:** a Inglaterra passa de 15 para 24 dos 40 melhores; Espanha, Alemanha e Itália mantêm a força dos titulares (a perda é só do topo). Entre as ligas pobres e a Inglaterra trocam-se poucos jogadores (1 a 8 por ano por liga). Sem o termo de liga e o prêmio de exportação a Inglaterra chegava a 31 dos 40 e a Série C subia 3,4 pontos importando jogadores sul-americanos.
+- **Série C:** folha de 62% a 75% da receita (antes 110%), compras e vendas médias de 0 a 0,05 vez a receita; o maior valor de um ano ficou em 0,6 vez (antes 4,4). No mundo de 60 clubes (`npm run analyze -- years --years 10 --seed 41`): Série A 64,9 → 65,1, B 55,0 → 55,2, C 44,1 → 45,3, ninguém no vermelho, saldo máximo de 1,9 a 2,1 anos de receita nas três séries.
+
+**Testes:** `tests/economy.test.ts` (índice nas receitas, nível, salários, preços, base e termo de liga), `tests/leagues.test.ts` (virada com duas pirâmides), `tests/balance/leagues.test.ts` (120 clubes, 8 temporadas: falência, teto, folha, Série C, estabilidade, ligas ricas) e `tests/balance/longRun.test.ts`, que agora cobra da Série C a mesma regra de caixa das outras (a margem própria `ceilingYears + 3` saiu). **Save:** `Team.economy` e `Competition.economy` são opcionais e o valor padrão é o Brasil, então os saves antigos abrem iguais e a versão do save continua 10.
+
+**O que não entrou ou ficou diferente do plano**
+- **Limite de estrangeiros (`foreignLimit`) não foi feito:** o mundo gerado ainda sorteia as nacionalidades do mesmo jeito em todos os países, então o limite não tem o que limitar. Entra com o pacote multi-liga e as nacionalidades por país (B6 ou depois).
+- **O freio de exportação é um prêmio de preço, não uma contagem de titulares por janela:** a contagem não mordia (as trocas entre ligas já são poucas) e o prêmio é o que contém a Inglaterra.
+- **Vendas altas de fenômenos da base ainda acontecem** (um menino de 18 anos com força 87 e potencial 100 saiu da Série C por R$ 45 mi, 7 vezes a receita do clube, e o teste aceita no máximo um ano assim na Série C). É um jogador raro, que vale isso em qualquer liga; o preço dele já está 8 vezes abaixo do valor pela força.
+- **A Série A brasileira troca muito dinheiro** (compra e venda de ~1,9 vez a receita por clube por ano, no mundo de 60 clubes, e de 0,2 a 0,6 no mundo grande, onde há mais onde gastar). Isso já era assim antes da B5, o caixa não passa do teto e não foi mexido; vale olhar na B6 se o rodízio das ligas simplificadas mudar o volume.
+- **Campeões acima de uns 92 pontos e a checagem de dinastias** continuam para a B6, como combinado, junto com a tela de troca de clube e o treino das ligas simplificadas de uma vez só.
