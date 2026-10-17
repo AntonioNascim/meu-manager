@@ -28,11 +28,12 @@ const teamOf = (state: SeasonState, id: TeamId) => state.teams.find((t) => t.id 
 export function buyerInterest(state: SeasonState, buyerId: TeamId, player: Player, kind: OfferKind, date: IsoDate = state.season.currentDate): BuyerInterest {
   const buyer = teamOf(state, buyerId)
   const squad = playersOf(state, buyerId)
+  const userClub = teamOf(state, player.teamId as TeamId)
   const need = needsOf(buyer, squad).find((n) => n.position === player.position)
   if (!need || playerOverall(player) < need.weakest) return { teamId: buyerId, maxFee: null, reason: 'no-interest' }
-  const ceiling = kind === 'loan' ? loanFee(player, date) * MARKET.userSale.loanWillingness : marketValue(player, date) * MARKET.userSale.purchaseWillingness
+  const ceiling = kind === 'loan' ? loanFee(player, date, userClub) * MARKET.userSale.loanWillingness : marketValue(player, date, userClub) * MARKET.userSale.purchaseWillingness
   const maxFee = Math.round(ceiling / 10_000) * 10_000
-  const salary = kind === 'loan' ? player.contract.salary : Math.max(expectedSalary(player), player.contract.salary)
+  const salary = kind === 'loan' ? player.contract.salary : Math.max(expectedSalary(player, buyer), player.contract.salary)
   const problem = buyerCheck({ buyer, buyerSquad: squad, payroll: monthlyPayroll(squad), fee: 0, salary })
   if (problem) return { teamId: buyerId, maxFee: null, reason: problem }
   return { teamId: buyerId, maxFee: Math.min(maxFee, buyer.finances.transferBudget, buyer.finances.balance) }
@@ -69,7 +70,7 @@ export function sellPlayer(state: SeasonState, userTeamId: TeamId, request: { pl
   const buyer = teamOf(state, request.buyerId)
   const buyerSquad = playersOf(state, request.buyerId)
   const user = teamOf(state, userTeamId)
-  const salary = request.kind === 'loan' ? player.contract.salary : Math.max(expectedSalary(player), player.contract.salary)
+  const salary = request.kind === 'loan' ? player.contract.salary : Math.max(expectedSalary(player, buyer), player.contract.salary)
   const verdict = playerDecision({ player, buyer, buyerSquad, from: user, fromSquad: playersOf(state, userTeamId), salary, kind: request.kind })
   if (!verdict.accepted) return { state, accepted: false, ...(verdict.reason ? { reason: verdict.reason } : {}) }
   const done = executeTransfer(state, { playerId: player.id, toTeamId: request.buyerId, fee: request.fee, salary, contractEnd: request.contractEnd, kind: request.kind, date })

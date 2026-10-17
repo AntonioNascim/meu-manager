@@ -45,11 +45,11 @@ export function interestIn(ctx: InterestContext, player: Player, kind: OfferKind
     buyerSquad: ctx.buyerSquad,
     from,
     ...(player.teamId ? { fromSquad: ctx.squads.get(player.teamId) ?? [] } : {}),
-    salary: expectedSalary(player),
+    salary: expectedSalary(player, ctx.buyer),
     kind,
   })
   if (verdict.minimumSalary === null) return { level: 'none', minimumSalary: null }
-  const ratio = verdict.minimumSalary / expectedSalary(player)
+  const ratio = verdict.minimumSalary / expectedSalary(player, ctx.buyer)
   const t = MARKET.interest
   const level: InterestLevel = ratio <= t.high ? 'high' : ratio <= t.medium ? 'medium' : ratio <= t.low ? 'low' : 'none'
   return { level, minimumSalary: verdict.minimumSalary }

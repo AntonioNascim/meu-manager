@@ -420,6 +420,25 @@ export const FINANCE = {
   hardCutMargin: 1.15,
 } as const
 
+/**
+ * Economia por liga (Fase 2, B5). Cada liga tem um índice de receita `revenue` (Brasil = 1) que multiplica TV, patrocínio,
+ * ingresso e operação dos clubes (`Team.economy`); os salários e os preços de transferência seguem a receita com expoente menor
+ * que 1, porque a liga rica também tem jogadores melhores (que já custam mais pela força). Dentro do Brasil, a receita de cada
+ * divisão (`tierRevenue`: razão das cotas de TV) manda nos preços; os salários só têm o fator de divisão `salaryTierScale`.
+ */
+export const LEAGUE = {
+  /** Receita da divisão em relação à Série A do mesmo país (as cotas de TV do Brasil: 20, 3 e 1,2 milhões). */
+  tierRevenue: { 1: 1, 2: 0.15, 3: 0.06 } as Record<number, number>,
+  /** Salário = salário pela força × (índice de receita da liga)^salaryExponent × fator da divisão. */
+  salaryExponent: 0.75,
+  /** A estrutura da Série C paga menos (também vale para quem desceu para ela). */
+  salaryTierScale: { 1: 1, 2: 1, 3: 0.6 } as Record<number, number>,
+  /** Preço de transferência = valor pela força × (receita da divisão)^valueExponent. */
+  valueExponent: 0.5,
+  /** O ingresso acompanha a receita da liga com este expoente (a procura e o estádio não mudam). */
+  ticketExponent: 1,
+} as const
+
 // ---------------------------------------------------------------------------
 // Mercado de transferências
 // ---------------------------------------------------------------------------

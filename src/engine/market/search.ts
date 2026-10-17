@@ -1,9 +1,10 @@
 /** Busca de jogadores no mercado: filtros, atalhos rápidos e ordenação (funções puras). */
 import { MARKET } from '../config'
+import { valueScale } from '../economy'
 import { playerOverall } from '../overall'
 import type { SeasonState } from '../season/calendar'
 import { potentialRange } from '../training'
-import type { IsoDate, Nationality, Player, Position, TeamId } from '../types'
+import type { IsoDate, Nationality, Player, Position, Team, TeamId } from '../types'
 import { marketValue } from './value'
 
 export type PositionGroup = 'all' | 'GK' | 'DEF' | 'MID' | 'FWD'
@@ -81,7 +82,12 @@ export interface SearchContext {
   budget: number
   /** Força mediana do elenco do time: as barganhas precisam ao menos servir. */
   medianOverall: number
+  /** Clubes por id: o preço de um jogador depende da liga do clube dele. */
+  teams: ReadonlyMap<TeamId, Team>
 }
+
+/** Valor de mercado do jogador no clube em que está. */
+const valueAt = (p: Player, ctx: Pick<SearchContext, 'date' | 'teams'>): number => marketValue(p, ctx.date, p.teamId ? ctx.teams.get(p.teamId) : undefined)
 
 export function searchContext(state: SeasonState, userTeamId: TeamId): SearchContext {
   const team = state.teams.find((t) => t.id === userTeamId)
@@ -94,6 +100,7 @@ export function searchContext(state: SeasonState, userTeamId: TeamId): SearchCon
     year: state.season.year,
     budget: team ? Math.min(team.finances.transferBudget, team.finances.balance) : 0,
     medianOverall: squad[Math.floor(squad.length / 2)] ?? 0,
+    teams: new Map(state.teams.map((t) => [t.id, t])),
   }
 }
 
@@ -101,10 +108,10 @@ export function searchContext(state: SeasonState, userTeamId: TeamId): SearchCon
 export function matchesQuick(p: Player, quick: QuickFilter, ctx: SearchContext): boolean {
   switch (quick) {
     case 'budget':
-      return p.teamId === null || marketValue(p, ctx.date) <= ctx.budget
+      return p.teamId === null || valueAt(p, ctx) <= ctx.budget
     case 'bargain': {
       const overall = playerOverall(p)
-      return overall >= ctx.medianOverall && marketValue(p, ctx.date) <= strengthValue(overall) * MARKET.search.bargainShare
+      return overall >= ctx.medianOverall && valueAt(p, ctx) <= strengthValue(overall) * valueScale(ctx.teams.get(p.teamId as TeamId) ?? {}) * MARKET.search.bargainShare
     }
     case 'prospect':
       return p.age <= MARKET.search.prospectAge && potentialRange(p).high >= MARKET.search.prospectPotential
@@ -119,7 +126,7 @@ export function searchPlayers(state: SeasonState, userTeamId: TeamId, filters: M
   const query = fold(filters.query.trim())
   const teamNames = new Map(state.teams.map((t) => [t.id, fold(t.name)]))
   const tiers = new Map(state.teams.map((t) => [t.id, t.tier]))
-  const valueOf = (p: Player) => (p.teamId === null ? 0 : marketValue(p, ctx.date))
+  const valueOf = (p: Player) => (p.teamId === null ? 0 : valueAt(p, ctx))
   const list = state.players.filter((p) => {
     if (p.teamId === userTeamId || p.contract.loanedFrom) return false
     if (extra && !extra(p)) return false

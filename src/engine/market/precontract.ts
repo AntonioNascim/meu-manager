@@ -154,7 +154,7 @@ function pickTarget(state: SeasonState, buyerId: TeamId, date: IsoDate, rng: Rng
     if (!need) continue
     const gain = overallAt(p, p.position) - need.weakest
     if (gain < MARKET.ai.minUpgrade + P.extraUpgrade) continue
-    const salary = Math.ceil(expectedSalary(p) / 500) * 500
+    const salary = Math.ceil(expectedSalary(p, buyer) / 500) * 500
     const score = gain + rng.float(-1, 1)
     if (!best || score > best.score) best = { player: p, salary, score }
   }

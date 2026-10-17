@@ -14,12 +14,12 @@ import type { OfferReason, Player, PlayerId, Team, TeamId } from '../types'
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
 /** Salário mensal que o jogador pede para ficar. */
-export function renewalDemand(player: Player, team: Pick<Team, 'reputation'>): number {
+export function renewalDemand(player: Player, team: Pick<Team, 'reputation'> & Partial<Pick<Team, 'tier' | 'economy'>>): number {
   const R = OFFSEASON.renewal
   const reputation = clamp(1 - R.reputationDiscount * (team.reputation - R.referenceReputation), R.reputationMin, R.reputationMax)
   const prospect = player.age <= R.prospectAge ? 1 + R.prospectPremium * clamp((player.hidden.potential - playerOverall(player)) / R.prospectGap, 0, 1) : 1
   const veteran = player.age >= R.veteranAge ? 1 - R.veteranDiscount * (player.age - R.veteranAge + 1) : 1
-  return Math.max(R.minimumSalary, Math.round((expectedSalary(player) * reputation * prospect * Math.max(0.5, veteran)) / 500) * 500)
+  return Math.max(R.minimumSalary, Math.round((expectedSalary(player, team) * reputation * prospect * Math.max(0.5, veteran)) / 500) * 500)
 }
 
 export interface RenewalDecision {
@@ -29,7 +29,7 @@ export interface RenewalDecision {
   minimumSalary?: number
 }
 
-export function renewalDecision(args: { player: Player; team: Pick<Team, 'reputation' | 'tactic'>; squad: readonly Player[]; salary: number }): RenewalDecision {
+export function renewalDecision(args: { player: Player; team: Pick<Team, 'reputation' | 'tactic'> & Partial<Pick<Team, 'tier' | 'economy'>>; squad: readonly Player[]; salary: number }): RenewalDecision {
   const { player, team, squad, salary } = args
   const R = OFFSEASON.renewal
   const demand = renewalDemand(player, team)

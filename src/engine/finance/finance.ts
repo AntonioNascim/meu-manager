@@ -3,19 +3,22 @@
  * e custos de operação pagos por mês, e vendas/compras de jogadores (lançadas pelo mercado).
  * Tudo em funções puras: recebem o time e devolvem outro.
  */
-import { FINANCE } from '../config'
+import { FINANCE, LEAGUE } from '../config'
+import { leagueRevenue } from '../economy'
 import { addDays, daysBetween } from '../season/dates'
 import type { FinanceCategory, FinanceEntry, Finances, IsoDate, Player, Team } from '../types'
 
 const roundTo = (value: number, step: number) => Math.round(value / step) * step
 
-export const defaultTicketPrice = (reputation: number): number => Math.round(FINANCE.ticket.base + FINANCE.ticket.perReputation * reputation)
+/** Preço padrão do ingresso: pela reputação e, fora do Brasil, pelo índice de receita da liga (`economy` do clube). */
+export const defaultTicketPrice = (reputation: number, team: Pick<Team, 'economy'> = {}): number =>
+  Math.max(1, Math.round((FINANCE.ticket.base + FINANCE.ticket.perReputation * reputation) * leagueRevenue(team) ** LEAGUE.ticketExponent))
 
 /** Procura por ingressos (pode passar da capacidade): torcida × comparecimento, preço e rival. */
 export function ticketDemand(home: Team, away: Pick<Team, 'reputation'>, price: number = home.ticketPrice): number {
   const t = FINANCE.ticket
   const base = home.fanBase * 0.012
-  const priceFactor = (defaultTicketPrice(home.reputation) / Math.max(1, price)) ** t.elasticity
+  const priceFactor = (defaultTicketPrice(home.reputation, home) / Math.max(1, price)) ** t.elasticity
   const opponent = Math.min(t.opponentFactorMax, Math.max(t.opponentFactorMin, 1 + t.opponentPerReputation * (away.reputation - 10)))
   return base * priceFactor * opponent
 }
@@ -28,13 +31,13 @@ export function matchAttendance(home: Team, away: Pick<Team, 'reputation'>, pric
 export const matchTicketRevenue = (home: Team, away: Pick<Team, 'reputation'>, price: number = home.ticketPrice): number =>
   matchAttendance(home, away, price) * price
 
-export const annualSponsorship = (team: Pick<Team, 'reputation' | 'tier'>): number =>
-  roundTo((FINANCE.sponsorship.base + FINANCE.sponsorship.perReputation * team.reputation ** FINANCE.sponsorship.power) * (FINANCE.sponsorshipTierScale[team.tier] ?? 1), 10_000)
+export const annualSponsorship = (team: Pick<Team, 'reputation' | 'tier' | 'economy'>): number =>
+  roundTo((FINANCE.sponsorship.base + FINANCE.sponsorship.perReputation * team.reputation ** FINANCE.sponsorship.power) * (FINANCE.sponsorshipTierScale[team.tier] ?? 1) * leagueRevenue(team), 10_000)
 
 /** Cota de TV anual da divisão do clube. */
-export const annualTvRights = (team: Pick<Team, 'tier'>): number => FINANCE.tvRights[team.tier] ?? 0
+export const annualTvRights = (team: Pick<Team, 'tier' | 'economy'>): number => (FINANCE.tvRights[team.tier] ?? 0) * leagueRevenue(team)
 
-export const monthlyOperations = (team: Pick<Team, 'stadium' | 'tier'>): number => Math.round((team.stadium.capacity * FINANCE.operationsPerSeat * (FINANCE.operationsTierScale[team.tier] ?? 1)) / 12)
+export const monthlyOperations = (team: Pick<Team, 'stadium' | 'tier' | 'economy'>): number => Math.round((team.stadium.capacity * FINANCE.operationsPerSeat * (FINANCE.operationsTierScale[team.tier] ?? 1) * leagueRevenue(team)) / 12)
 
 /** Folha mensal: salários de quem está no clube (o emprestado é pago por quem o recebeu). */
 export const monthlyPayroll = (players: readonly Pick<Player, 'contract'>[]): number => players.reduce((sum, p) => sum + p.contract.salary, 0)
@@ -105,7 +108,7 @@ export function setTicketPrice(team: Team, price: number): Team {
 /** Preço que mais rende: o que enche o estádio exatamente (acima dele o público cai mais que o preço sobe). */
 export function bestTicketPrice(team: Team, opponentReputation = 10): number {
   const { elasticity, min, max } = FINANCE.ticket
-  const ref = defaultTicketPrice(team.reputation)
+  const ref = defaultTicketPrice(team.reputation, team)
   const demandAtRef = ticketDemand(team, { reputation: opponentReputation }, ref)
   const fillingPrice = ref * (demandAtRef / team.stadium.capacity) ** (1 / elasticity)
   return Math.min(max, Math.max(min, Math.round(fillingPrice)))

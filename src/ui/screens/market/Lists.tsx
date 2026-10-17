@@ -18,9 +18,10 @@ const KIND_LABELS: Record<ListingKind, string> = { transfer: 'À venda', loan: '
 
 function ListSheet({ game, player, onClose }: { game: Game; player: Player; onClose: () => void }) {
   const date = game.season.season.currentDate
+  const club = game.season.teams.find((t) => t.id === game.userTeamId)
   const current = game.season.market.listings.find((l) => l.playerId === player.id && l.by === 'user')
   const [kind, setKind] = useState<ListingKind>(current?.kind ?? 'transfer')
-  const [price, setPrice] = useState<number>(current?.price ?? listingPrice(player, current?.kind ?? 'transfer', date))
+  const [price, setPrice] = useState<number>(current?.price ?? listingPrice(player, current?.kind ?? 'transfer', date, club))
   const [error, setError] = useState<string | null>(null)
 
   const save = () => {
@@ -59,7 +60,7 @@ function ListSheet({ game, player, onClose }: { game: Game; player: Player; onCl
       }
     >
       <p className="text-sm text-muted">
-        {playerName(player)} · valor de mercado {formatMoney(marketValue(player, date))}. Anunciado, ele atrai mais propostas dos clubes, pelo preço que você fixar.
+        {playerName(player)} · valor de mercado {formatMoney(marketValue(player, date, club))}. Anunciado, ele atrai mais propostas dos clubes, pelo preço que você fixar.
       </p>
       <div className="mt-3 flex gap-2">
         {(['transfer', 'loan'] as const).map((k) => (
@@ -69,7 +70,7 @@ function ListSheet({ game, player, onClose }: { game: Game; player: Player; onCl
             aria-pressed={kind === k}
             onClick={() => {
               setKind(k)
-              setPrice(listingPrice(player, k, date))
+              setPrice(listingPrice(player, k, date, club))
             }}
             className={`min-h-11 flex-1 rounded-full border font-bold ${kind === k ? 'border-accent bg-accent text-accent-ink' : 'border-line bg-surface text-slate-200'}`}
           >
@@ -110,7 +111,7 @@ function Mine({ game }: { game: Game }) {
                       <span className="truncate font-bold">{playerName(p)}</span>
                     </span>
                     <span className="block truncate text-xs text-muted">
-                      {p.age} anos · valor {shortMoney(marketValue(p, date))}
+                      {p.age} anos · valor {shortMoney(marketValue(p, date, game.season.teams.find((t) => t.id === game.userTeamId)))}
                     </span>
                   </span>
                   <span className="shrink-0 text-right text-xs">

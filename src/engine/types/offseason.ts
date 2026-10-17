@@ -1,5 +1,6 @@
 import type { PlayerId, TeamId } from './common'
 import type { Position } from './player'
+import type { LeagueEconomy } from './team'
 
 /** Jogador que saiu do jogo ou do clube na virada de temporada (para o resumo na tela). */
 export interface DepartedPlayer {
@@ -45,6 +46,8 @@ export interface YouthRequest {
   teamId: TeamId
   tier: number
   reputation: number
+  /** Economia da liga do clube (nível dos jogadores e salários); sem ela, a do Brasil. */
+  economy?: LeagueEconomy
   positions: Position[]
   /** Idade de cada jovem (mesma ordem de `positions`); sem isso o gerador usa a faixa padrão dos jovens do profissional. */
   ages?: number[]

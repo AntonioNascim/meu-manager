@@ -5,7 +5,9 @@
  * da base está em `turn.ts`.
  */
 import { ACADEMY, OFFSEASON } from '../config'
+import { salaryScale } from '../economy'
 import { expectedSalary } from '../market/value'
+import type { PricingClub } from '../market/value'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
 import { contractEndOn } from '../season/dates'
@@ -43,11 +45,11 @@ export function potentialStars(player: Pick<Player, 'id' | 'age' | 'hidden'>): P
 }
 
 /** Salário do primeiro contrato profissional de um jovem. */
-export const youthSalary = (player: Player): number => Math.max(OFFSEASON.renewal.minimumSalary, Math.round((expectedSalary(player) * ACADEMY.salaryShare) / 1_000) * 1_000)
+export const youthSalary = (player: Player, club?: PricingClub): number => Math.max(club && salaryScale(club) < 1 ? Math.round(OFFSEASON.renewal.minimumSalary * salaryScale(club)) : OFFSEASON.renewal.minimumSalary, Math.round((expectedSalary(player, club) * ACADEMY.salaryShare) / 1_000) * 1_000)
 
 /** O jovem como jogador do elenco profissional, com contrato de jovem. `year` = ano em que a temporada começa/está em andamento. */
-export function toProfessional(player: Player, year: number): Player {
-  const salary = youthSalary(player)
+export function toProfessional(player: Player, year: number, club?: PricingClub): Player {
+  const salary = youthSalary(player, club)
   return { ...player, contract: { salary, endDate: contractEndOn(year + ACADEMY.contractYears), releaseClause: salary * 36 } }
 }
 
@@ -78,7 +80,7 @@ export function promoteYouth(state: SeasonState, playerId: PlayerId): SeasonStat
   return {
     ...state,
     academy: state.academy.filter((p) => p.id !== playerId),
-    players: [...state.players, toProfessional(youth, year)],
+    players: [...state.players, toProfessional(youth, year, team)],
     teams: state.teams.map((t) => (t.id === team.id ? { ...t, squad: [...t.squad, playerId] } : t)),
   }
 }

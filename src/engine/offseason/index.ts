@@ -125,7 +125,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
       ...(landing?.economy ? { economy: landing.economy } : {}),
       reputation,
       fanBase: Math.round((t.fanBase * (1 + 0.03 * delta)) / 1_000) * 1_000,
-      ticketPrice: ai ? defaultTicketPrice(reputation) : t.ticketPrice,
+      ticketPrice: ai ? defaultTicketPrice(reputation, { economy: landing?.economy ?? t.economy }) : t.ticketPrice,
       history: [...t.history, { year, tier: t.tier, finalPosition, champion: champions.includes(t.id) }],
     }
   })
@@ -184,7 +184,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (count <= 0) continue
     const positions = deficits.slice(0, count)
     while (positions.length < count) positions.push(youthRng.pick(EXTRA_POSITIONS))
-    const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, positions, year: nextYear }, youthRng, taken)
+    const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), positions, year: nextYear }, youthRng, taken)
     for (const p of made) {
       taken.add(p.name)
       players.push({ ...p, id: `player-${++counter}`, teamId: team.id })

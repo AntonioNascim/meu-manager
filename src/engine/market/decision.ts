@@ -45,7 +45,7 @@ export interface PlayerDecisionInput {
 export function playerDecision(input: PlayerDecisionInput): PlayerDecision {
   const cfg = MARKET.player
   const { player, buyer, buyerSquad, from, salary, kind } = input
-  const reference = Math.max(player.contract.salary, expectedSalary(player) * 0.8)
+  const reference = Math.max(player.contract.salary, expectedSalary(player, buyer) * 0.8)
   const salaryPoints = clamp(Math.log(Math.max(1, salary) / reference) / Math.log(cfg.salaryStep), -cfg.salaryClamp, cfg.salaryClamp)
 
   const reputationShare = kind === 'loan' ? cfg.loanReputationShare : 1
@@ -103,14 +103,13 @@ export function sellerDecision(args: { seller: Team; sellerSquad: readonly Playe
   if (sellerSquad.length - 1 < MARKET.minSquadAfterSale) return { accepted: false, reason: 'squad-size' }
   const samePosition = sellerSquad.filter((p) => p.position === player.position).length
   if (samePosition - 1 < (MARKET.minByPosition[player.position] ?? 1)) return { accepted: false, reason: 'position-cover' }
-  void seller
   if (kind === 'loan') {
     const role = squadRole(player, sellerSquad)
     if (role === 'key' || role === 'starter') return { accepted: false, reason: 'key-player' }
-    const price = cheaper(loanFee(player, date))
+    const price = cheaper(loanFee(player, date, seller))
     return fee >= price ? { accepted: true } : { accepted: false, reason: 'fee', counter: price }
   }
-  const price = cheaper(askingPrice(player, sellerSquad, date))
+  const price = cheaper(askingPrice(player, sellerSquad, date, seller))
   return fee >= price ? { accepted: true } : { accepted: false, reason: 'fee', counter: price }
 }
 

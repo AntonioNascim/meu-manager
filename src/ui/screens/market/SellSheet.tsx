@@ -79,7 +79,7 @@ export function SellSheet({ game, player, onClose, onDone }: { game: Game; playe
       }
     >
       <p className="text-sm text-muted">
-        {playerName(player)} · valor de mercado {formatMoney(marketValue(player, date))} · salário {formatMoney(player.contract.salary)}
+        {playerName(player)} · valor de mercado {formatMoney(marketValue(player, date, state.teams.find((t) => t.id === game.userTeamId)))} · salário {formatMoney(player.contract.salary)}
       </p>
       <div className="mt-3 flex gap-2">
         {(['purchase', 'loan'] as const).map((k) => (

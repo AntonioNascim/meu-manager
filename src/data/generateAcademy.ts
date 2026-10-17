@@ -33,7 +33,7 @@ export function createAcademy(options: AcademyOptions): Player[] {
     const size = Math.max(min, Math.min(max, Math.round(min + ((team.reputation - 1) / 19) * (max - min)) + rng.int(-1, 1)))
     const positions = Array.from({ length: size }, () => rng.pick(POSITION_BAG))
     const ages = positions.map(() => rng.int(ACADEMY.minAge, ACADEMY.graduationAge - 1))
-    const made = createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, positions, ages, academy: true, year: options.year }, rng, taken)
+    const made = createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), positions, ages, academy: true, year: options.year }, rng, taken)
     for (const p of made) {
       taken.add(p.name)
       out.push({ ...p, id: `player-${number++}`, teamId: team.id, contract: { salary: 0, endDate: contractEndOn(options.year), releaseClause: 0 } })

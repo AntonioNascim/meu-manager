@@ -26,13 +26,15 @@ export function Negotiation({ game, player, open, onClose, extra, initialKind = 
   const free = player.teamId === null
   const [kind, setKind] = useState<OfferKind>(initialKind)
   const [fee, setFee] = useState<number | null>(null)
-  const [salary, setSalary] = useState(expectedSalary(player))
+  const holder = state.teams.find((t) => t.id === player.teamId)
+  const buyer = state.teams.find((t) => t.id === game.userTeamId)
+  const [salary, setSalary] = useState(expectedSalary(player, buyer))
   const [years, setYears] = useState(3)
   const [error, setError] = useState<string | null>(null)
   const interest = useMemo(() => interestIn(interestContext(state, game.userTeamId), player, kind), [state, game.userTeamId, player, kind])
-  const value = free ? 0 : marketValue(player, date)
+  const value = free ? 0 : marketValue(player, date, holder)
   const listing = free ? undefined : listingOf(state, player.id, kind)
-  const price = free ? 0 : salePrice(state, player, squadOf(game, player.teamId as string), kind, date)
+  const price = free ? 0 : salePrice(state, player, squadOf(game, player.teamId as string), kind, date, holder)
   const amount = fee ?? price
 
   const submit = () => {

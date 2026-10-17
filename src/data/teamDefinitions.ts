@@ -3,6 +3,8 @@
  * Série A: ~4 grandes (16–19), ~8 médios (11–15), ~8 pequenos (7–10). Série B: reputação menor (3–8). Série C: reputação ainda menor (2–6).
  */
 
+import type { LeagueEconomy } from '../engine/types'
+
 export interface TeamDefinition {
   name: string
   /** 3 letras, único. Também gera o id (`team-xxx`). */
@@ -13,6 +15,8 @@ export interface TeamDefinition {
   /** 1 = Série A, 2 = Série B, 3 = Série C. */
   tier: 1 | 2 | 3
   reputation: number
+  /** Economia da liga (índice de receita e nível dos jogadores); sem ela, a do Brasil. */
+  economy?: LeagueEconomy
 }
 
 export const TEAM_DEFINITIONS: readonly TeamDefinition[] = [

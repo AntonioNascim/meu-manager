@@ -97,7 +97,7 @@ export function MarketRow({
   favorite?: ReactNode
 }) {
   const overall = playerOverall(player)
-  const value = marketValue(player, game.season.season.currentDate)
+  const value = marketValue(player, game.season.season.currentDate, game.season.teams.find((t) => t.id === player.teamId))
   return (
     <li className="flex items-center">
       <button type="button" onClick={onOpen} className="flex min-h-[72px] min-w-0 flex-1 items-center gap-2 py-2 pl-3 pr-2 text-left">

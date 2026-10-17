@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { MARKET } from '../src/engine/config'
+import { valueScale } from '../src/engine/economy'
 import {
   ANY,
   defaultFilters,
@@ -26,6 +27,8 @@ const USER = 'team-imp'
 const game: Game = createGame(7, USER)
 const state = game.season
 const date = state.season.currentDate
+
+const valueOf = (p: Player) => marketValue(p, date, state.teams.find((x) => x.id === p.teamId))
 
 describe('busca de jogadores', () => {
   it('sem filtros traz todo mundo menos o seu elenco e os emprestados, do mais forte ao mais fraco', () => {
@@ -64,14 +67,14 @@ describe('busca de jogadores', () => {
     }
     const valued = searchPlayers(state, USER, { ...defaultFilters(), value: { min: 1_000_000, max: 5_000_000 } })
     expect(valued.length).toBeGreaterThan(0)
-    expect(valued.every((p) => p.teamId !== null && marketValue(p, date) >= 1_000_000 && marketValue(p, date) <= 5_000_000)).toBe(true)
+    expect(valued.every((p) => p.teamId !== null && valueOf(p) >= 1_000_000 && valueOf(p) <= 5_000_000)).toBe(true)
   })
 
   it('"Cabem no bolso": só quem custa até o orçamento de compras (os livres cabem sempre)', () => {
     const budget = searchContext(state, USER).budget
     const list = searchPlayers(state, USER, { ...defaultFilters(), quick: ['budget'] })
     expect(list.length).toBeGreaterThan(0)
-    expect(list.every((p) => p.teamId === null || marketValue(p, date) <= budget)).toBe(true)
+    expect(list.every((p) => p.teamId === null || valueOf(p) <= budget)).toBe(true)
     expect(list.length).toBeLessThan(searchPlayers(state, USER, defaultFilters()).length)
   })
 
@@ -80,7 +83,7 @@ describe('busca de jogadores', () => {
     const bargains = searchPlayers(state, USER, { ...defaultFilters(), quick: ['bargain'] })
     expect(bargains.length).toBeGreaterThan(0)
     for (const p of bargains) {
-      expect(marketValue(p, date)).toBeLessThanOrEqual(strengthValue(playerOverall(p)) * MARKET.search.bargainShare)
+      expect(valueOf(p)).toBeLessThanOrEqual(strengthValue(playerOverall(p)) * valueScale(state.teams.find((x) => x.id === p.teamId) ?? {}) * MARKET.search.bargainShare)
       expect(playerOverall(p)).toBeGreaterThanOrEqual(ctx.medianOverall)
     }
     const prospects = searchPlayers(state, USER, { ...defaultFilters(), quick: ['prospect'] })
@@ -95,7 +98,7 @@ describe('busca de jogadores', () => {
     const young = searchPlayers(state, USER, { ...defaultFilters(), sort: 'age' })
     expect(young.map((p) => p.age)).toEqual([...young.map((p) => p.age)].sort((a, b) => a - b))
     const cheap = searchPlayers(state, USER, { ...defaultFilters(), sort: 'value-asc', situation: 'club' })
-    const values = cheap.map((p) => marketValue(p, date))
+    const values = cheap.map((p) => valueOf(p))
     expect(values).toEqual([...values].sort((a, b) => a - b))
     const both = searchPlayers(state, USER, { ...defaultFilters(), tier: 1, group: 'FWD', quick: ['budget'], overall: { min: 55, max: ANY.max } })
     expect(both.every((p) => ['RW', 'LW', 'ST'].includes(p.position) && playerOverall(p) >= 55)).toBe(true)

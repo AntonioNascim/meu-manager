@@ -12,7 +12,7 @@ import { createSeason } from '../engine/season'
 import type { CompetitionSetup, SeasonState } from '../engine/season'
 import { DEFAULT_PLAN } from '../engine/training'
 import { emptyTraining } from '../engine/types'
-import type { Player, Team } from '../engine/types'
+import type { LeagueEconomy, Player, Team } from '../engine/types'
 import type { Game } from '../store/game'
 
 export interface LeagueSpec {
@@ -25,24 +25,26 @@ export interface LeagueSpec {
   /** Reputação do primeiro e do último colocado por reputação (1 a 20). */
   repTop: number
   repBottom: number
+  /** Economia da liga (índice de receita e nível dos jogadores em relação ao Brasil); sem ela, a do Brasil. */
+  economy?: LeagueEconomy
 }
 
 export const FULL_WORLD: LeagueSpec[] = [
   { id: 'br-1', name: 'Brasil A', region: 'BR', teams: 20, format: 'double', tier: 1, repTop: 19, repBottom: 7 },
   { id: 'br-2', name: 'Brasil B', region: 'BR', teams: 20, format: 'double', tier: 2, repTop: 8, repBottom: 3 },
   { id: 'br-3', name: 'Brasil C', region: 'BR', teams: 20, format: 'double', tier: 3, repTop: 6, repBottom: 2 },
-  { id: 'ar-1', name: 'Argentina', region: 'SA', teams: 28, format: 'single', tier: 1, repTop: 16, repBottom: 5 },
-  { id: 'uy-1', name: 'Uruguai', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 11, repBottom: 3 },
-  { id: 'py-1', name: 'Paraguai', region: 'SA', teams: 12, format: 'double', tier: 1, repTop: 10, repBottom: 3 },
-  { id: 'cl-1', name: 'Chile', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 11, repBottom: 3 },
-  { id: 'co-1', name: 'Colômbia', region: 'SA', teams: 20, format: 'double', tier: 1, repTop: 12, repBottom: 3 },
-  { id: 'ec-1', name: 'Equador', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 10, repBottom: 3 },
-  { id: 'en-1', name: 'Inglaterra', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 9 },
-  { id: 'es-1', name: 'Espanha', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 8 },
-  { id: 'it-1', name: 'Itália', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 19, repBottom: 7 },
-  { id: 'de-1', name: 'Alemanha', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 19, repBottom: 7 },
-  { id: 'fr-1', name: 'França', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 17, repBottom: 6 },
-  { id: 'pt-1', name: 'Portugal', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4 },
+  { id: 'ar-1', name: 'Argentina', region: 'SA', teams: 28, format: 'single', tier: 1, repTop: 16, repBottom: 5, economy: { revenue: 0.6, level: -1 } },
+  { id: 'uy-1', name: 'Uruguai', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 11, repBottom: 3, economy: { revenue: 0.3, level: -4 } },
+  { id: 'py-1', name: 'Paraguai', region: 'SA', teams: 12, format: 'double', tier: 1, repTop: 10, repBottom: 3, economy: { revenue: 0.25, level: -5 } },
+  { id: 'cl-1', name: 'Chile', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 11, repBottom: 3, economy: { revenue: 0.4, level: -3 } },
+  { id: 'co-1', name: 'Colômbia', region: 'SA', teams: 20, format: 'double', tier: 1, repTop: 12, repBottom: 3, economy: { revenue: 0.45, level: -2 } },
+  { id: 'ec-1', name: 'Equador', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 10, repBottom: 3, economy: { revenue: 0.3, level: -4 } },
+  { id: 'en-1', name: 'Inglaterra', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 9, economy: { revenue: 5, level: 8 } },
+  { id: 'es-1', name: 'Espanha', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 8, economy: { revenue: 3, level: 7 } },
+  { id: 'it-1', name: 'Itália', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 19, repBottom: 7, economy: { revenue: 2.5, level: 6 } },
+  { id: 'de-1', name: 'Alemanha', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 19, repBottom: 7, economy: { revenue: 2.8, level: 6 } },
+  { id: 'fr-1', name: 'França', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 17, repBottom: 6, economy: { revenue: 1.8, level: 3.5 } },
+  { id: 'pt-1', name: 'Portugal', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4, economy: { revenue: 0.9, level: 2 } },
 ]
 
 /** A pirâmide de um país: o prefixo do id da liga (`br-1`, `br-2` e `br-3` são o Brasil). */
@@ -61,13 +63,13 @@ export function buildScaleWorld(specs: LeagueSpec[], seed: number) {
     for (let i = 0; i < spec.teams; i++) {
       const reputation = Math.max(1, Math.round(spec.repTop - ((spec.repTop - spec.repBottom) * i) / (spec.teams - 1)))
       const abbreviation = `${li.toString(36)}${String(i + 1).padStart(2, '0')}`
-      const def: TeamDefinition = { name: `${spec.name} ${i + 1}`, abbreviation, city: spec.name, state: 'XX', colors: ['#111111', '#f2f2f2'], tier: spec.tier, reputation }
+      const def: TeamDefinition = { name: `${spec.name} ${i + 1}`, abbreviation, city: spec.name, state: 'XX', colors: ['#111111', '#f2f2f2'], tier: spec.tier, reputation, ...(spec.economy ? { economy: spec.economy } : {}) }
       const made = generateTeam(rng.fork(abbreviation), ctx, def, i + 1)
       inLeague.push(made.team)
       teams.push(made.team)
       players.push(...made.players)
     }
-    competitions.push({ id: spec.id, name: spec.name, tier: spec.tier, teams: inLeague, region: spec.region, rounds: spec.format === 'single' ? 1 : 2, pyramid: pyramidOfLeague(spec) })
+    competitions.push({ id: spec.id, name: spec.name, tier: spec.tier, teams: inLeague, region: spec.region, rounds: spec.format === 'single' ? 1 : 2, pyramid: pyramidOfLeague(spec), ...(spec.economy ? { economy: spec.economy, reputationMean: (spec.repTop + spec.repBottom) / 2 } : {}) })
   })
   const academy = createAcademy({ teams, seed, year: 2026, firstNumber: ctx.nextPlayerNumber, takenNames: players.map((p) => p.name) })
   return { teams, players, academy, competitions }

@@ -4,7 +4,7 @@ import type { YouthFactory } from '../engine/offseason'
 import { playerOverall } from '../engine/overall'
 import { createGenerationContext, generatePlayer } from './generatePlayer'
 import { GENERATION } from './generationConfig'
-import { teamLevelFor } from './generateTeam'
+import { teamLevelFor, withLeagueSalary } from './generateTeam'
 
 /**
  * Jovens novos: para a base (15 a 19 anos, `request.academy`) ou, na reposição de posições descobertas, direto
@@ -16,7 +16,8 @@ export const createYouth: YouthFactory = (request, rng, taken) => {
   const Y = OFFSEASON.youth
   const ctx = createGenerationContext(request.year)
   ctx.usedNames = new Set(taken)
-  const level = teamLevelFor({ tier: request.tier as 1 | 2 | 3, reputation: request.reputation })
+  const club = { tier: request.tier as 1 | 2 | 3, ...(request.economy ? { economy: request.economy } : {}) }
+  const level = teamLevelFor({ ...club, reputation: request.reputation })
   const wonderkidChance = (request.academy ? ACADEMY.wonderkidChance : Y.wonderkidChance) * (Y.wonderkidTierScale[request.tier] ?? 1)
   return request.positions.map((position, i) => {
     let quality = level - (Y.qualityBelowTeam[request.tier] ?? 7) + (request.academy ? (ACADEMY.qualityOffset[request.tier] ?? 0) : 0) + rng.normal(0, GENERATION.talentSd)
@@ -25,7 +26,7 @@ export const createYouth: YouthFactory = (request, rng, taken) => {
     else if (rng.chance(request.academy ? ACADEMY.prospectChance : Y.prospectChance)) quality += rng.float(Y.prospectBonus[0], Y.prospectBonus[1])
     const age = request.ages?.[i] ?? rng.int(Y.ageRange[0], Y.ageRange[1])
     const generated = generatePlayer(rng, ctx, { position, quality, age, teamId: request.teamId, tier: request.tier })
-    const player = request.academy && !wonderkid ? { ...generated, hidden: { ...generated.hidden, potential: Math.max(Math.round(playerOverall(generated)), generated.hidden.potential + (ACADEMY.potentialOffset[request.tier] ?? 0)) } } : generated
+    const player = withLeagueSalary(request.academy && !wonderkid ? { ...generated, hidden: { ...generated.hidden, potential: Math.max(Math.round(playerOverall(generated)), generated.hidden.potential + (ACADEMY.potentialOffset[request.tier] ?? 0)) } } : generated, club)
     const salary = player.contract.salary
     return { ...player, contract: { ...player.contract, endDate: contractEndOn(request.year + rng.int(2, 4)), releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000 } }
   })

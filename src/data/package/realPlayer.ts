@@ -1,5 +1,5 @@
 import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../../engine/config'
-import { salaryForOverall } from '../../engine/market/value'
+import { salaryForOverall, scaledSalary } from '../../engine/market/value'
 import { overallForPosition } from '../../engine/overall'
 import { createRng } from '../../engine/rng'
 import { ageOn, contractEndOn } from '../../engine/season/dates'
@@ -62,7 +62,7 @@ export function generateRealPlayer(spec: PackagePlayer, id: PlayerId, teamId: Te
   const attributes = spec.attributes ?? drawnAttributes
   const overall = overallForPosition(attributes, spec.position)
   const potential = spec.potential ?? clamp(Math.round(Math.max(overall, softCap(overall + growth))), Math.round(overall), ATTRIBUTE_MAX)
-  const salary = salaryForOverall(overall)
+  const salary = scaledSalary(salaryForOverall(overall), { tier: ctx.tier })
 
   const player: Player = {
     id,

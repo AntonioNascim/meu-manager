@@ -14,7 +14,7 @@ import { InterestText, clubName } from './parts'
 function PreContractSheet({ game, player, onClose }: { game: Game; player: Player; onClose: () => void }) {
   const state = game.season
   const interest = useMemo(() => interestIn(interestContext(state, game.userTeamId), player), [state, game.userTeamId, player])
-  const [salary, setSalary] = useState(Math.ceil(expectedSalary(player) / 500) * 500)
+  const [salary, setSalary] = useState(Math.ceil(expectedSalary(player, state.teams.find((t) => t.id === game.userTeamId)) / 500) * 500)
   const [years, setYears] = useState(3)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 

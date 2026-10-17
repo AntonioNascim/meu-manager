@@ -54,7 +54,7 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
     const squad = players.filter((p) => p.teamId === team.id)
     const count = (map: Record<TeamId, number>) => (map[team.id] = (map[team.id] ?? 0) + 1)
     const promote = (p: Player) => {
-      const pro = toProfessional(p, nextYear)
+      const pro = toProfessional(p, nextYear, team)
       players.push(pro)
       squad.push(pro)
       count(promoted)
@@ -95,7 +95,7 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
     if (n > 0) {
       const positions = Array.from({ length: n }, () => arrivalRng.pick(POSITION_BAG))
       const ages = positions.map(() => arrivalRng.int(ACADEMY.arrivalAge[0], ACADEMY.arrivalAge[1]))
-      const made = input.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, positions, ages, academy: true, year: nextYear }, arrivalRng, input.taken)
+      const made = input.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), positions, ages, academy: true, year: nextYear }, arrivalRng, input.taken)
       for (const p of made) {
         input.taken.add(p.name)
         youths.push(asAcademy({ ...p, id: `player-${++counter}`, teamId: team.id }, nextYear))

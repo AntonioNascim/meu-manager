@@ -1,5 +1,8 @@
 import { FORMATION_TIE_TOLERANCE } from '../engine/config'
+import { leagueLevel, leagueRevenue } from '../engine/economy'
 import { defaultTicketPrice } from '../engine/finance'
+import { salaryForOverall, scaledSalary } from '../engine/market/value'
+import { playerOverall } from '../engine/overall'
 import { buildTactic, rankFormations } from '../engine/lineup'
 import { FORMATION_IDS, getFormation } from '../engine/formations'
 import type { Rng } from '../engine/rng'
@@ -54,9 +57,9 @@ const VETERAN_AGE = 32
 const PROSPECT_MAX_AGE = 20
 
 /** Força média esperada dos 11 titulares, a partir da série e da reputação (1 a 20) do time. */
-export function teamLevelFor(def: Pick<TeamDefinition, 'tier' | 'reputation'>): number {
+export function teamLevelFor(def: Pick<TeamDefinition, 'tier' | 'reputation' | 'economy'>): number {
   const { base, referenceReputation, perReputation } = GENERATION.teamLevel[def.tier]
-  return base + (def.reputation - referenceReputation) * perReputation
+  return base + (def.reputation - referenceReputation) * perReputation + leagueLevel(def)
 }
 
 /** Chance de cada titular ser um craque: zero fora da Série A, cresce com a reputação. */
@@ -100,6 +103,12 @@ export function pickMentality(rng: Rng, reputation: number): Mentality {
   return 0
 }
 
+/** O contrato do jogador gerado com o salário da liga do clube (a Série C e as ligas mais pobres pagam menos, as mais ricas, mais). */
+export function withLeagueSalary(player: Player, club: Pick<TeamDefinition, 'tier' | 'economy'>): Player {
+  const salary = scaledSalary(salaryForOverall(playerOverall(player)), club)
+  return salary === player.contract.salary ? player : { ...player, contract: { ...player.contract, salary, releaseClause: Math.round((salary * Math.max(1, player.contract.releaseClause / Math.max(1, player.contract.salary))) / 1000) * 1000 } }
+}
+
 export interface GeneratedTeam {
   team: Team
   players: Player[]
@@ -123,7 +132,8 @@ export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefiniti
     if (isStarter && rng.chance(starChance(def))) {
       quality += rng.float(GENERATION.star.bonusMin, GENERATION.star.bonusMax)
     }
-    return generatePlayer(rng, ctx, { position: slot.position, quality, age: ages[i] ?? 25, teamId: id, tier: def.tier })
+    const made = generatePlayer(rng, ctx, { position: slot.position, quality, age: ages[i] ?? 25, teamId: id, tier: def.tier })
+    return withLeagueSalary(made, def)
   })
 
   // A formação é a que melhor encaixa os melhores jogadores (sorteia entre as quase empatadas).
@@ -139,7 +149,7 @@ export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefiniti
   })
 
   const monthlyPayroll = players.reduce((sum, p) => sum + p.contract.salary, 0)
-  const balance = Math.round((def.reputation ** 2 * 400_000 * rng.float(0.85, 1.15)) / 10_000) * 10_000
+  const balance = Math.round((def.reputation ** 2 * 400_000 * leagueRevenue(def) * rng.float(0.85, 1.15)) / 10_000) * 10_000
   const target = Math.min(rank, 16)
 
   const team: Team = {
@@ -168,10 +178,11 @@ export function generateTeam(rng: Rng, ctx: GenerationContext, def: TeamDefiniti
       fundsRequests: [],
     },
     fanBase: Math.round((def.reputation ** 2.5 * 12_000 * rng.float(0.85, 1.15)) / 1_000) * 1_000,
-    ticketPrice: defaultTicketPrice(def.reputation),
+    ticketPrice: defaultTicketPrice(def.reputation, def),
     objective: { targetPosition: target, sackingPosition: Math.min(20, target + 6) },
     history: [],
     tier: def.tier,
+    ...(def.economy ? { economy: def.economy } : {}),
   }
 
   return { team, players }

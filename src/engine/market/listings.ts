@@ -8,12 +8,13 @@ import { createRng } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import type { IsoDate, Listing, ListingKind, OfferKind, Player, PlayerId, TeamId } from '../types'
 import { askingPrice, loanFee, marketValue, squadRole } from './value'
+import type { PricingClub } from './value'
 
 const round10k = (v: number) => Math.max(10_000, Math.round(v / 10_000) * 10_000)
 
 /** Preço anunciado de um jogador: a venda sai abaixo do valor de mercado e o empréstimo abaixo da taxa normal. */
-export const listingPrice = (player: Player, kind: ListingKind, date: IsoDate): number =>
-  kind === 'loan' ? round10k(loanFee(player, date) * MARKET.listing.loanShare) : round10k(marketValue(player, date) * MARKET.listing.transferShare)
+export const listingPrice = (player: Player, kind: ListingKind, date: IsoDate, club?: PricingClub): number =>
+  kind === 'loan' ? round10k(loanFee(player, date, club) * MARKET.listing.loanShare) : round10k(marketValue(player, date, club) * MARKET.listing.transferShare)
 
 /** Anúncio do jogador para esse tipo de negócio (compra ↔ transferência). */
 export function listingOf(state: Pick<SeasonState, 'market'>, playerId: PlayerId, kind: OfferKind): Listing | undefined {
@@ -22,8 +23,8 @@ export function listingOf(state: Pick<SeasonState, 'market'>, playerId: PlayerId
 }
 
 /** Preço pelo qual o clube vende (ou empresta): o pedido normal ou o anunciado, o que for menor. */
-export function salePrice(state: Pick<SeasonState, 'market'>, player: Player, squad: readonly Player[], kind: OfferKind, date: IsoDate): number {
-  const base = kind === 'loan' ? loanFee(player, date) : askingPrice(player, squad, date)
+export function salePrice(state: Pick<SeasonState, 'market'>, player: Player, squad: readonly Player[], kind: OfferKind, date: IsoDate, club?: PricingClub): number {
+  const base = kind === 'loan' ? loanFee(player, date, club) : askingPrice(player, squad, date, club)
   const listed = listingOf(state, player.id, kind)
   return listed ? Math.min(base, listed.price) : base
 }
@@ -70,7 +71,7 @@ export function refreshListings(state: SeasonState, date: IsoDate, userTeamId?: 
       if (next.filter((l) => l.teamId === team.id).length >= L.maxPerTeam) break
       if (!rng.chance(L.listChance)) continue
       const kind: ListingKind = rng.chance(p.age <= L.loanAge ? L.youngLoanShare : L.oldLoanShare) ? 'loan' : 'transfer'
-      next.push({ playerId: p.id, teamId: team.id, kind, price: listingPrice(p, kind, date), listedOn: date, by: 'ai' })
+      next.push({ playerId: p.id, teamId: team.id, kind, price: listingPrice(p, kind, date, team), listedOn: date, by: 'ai' })
     }
   }
   return next.length === state.market.listings.length && next.every((l, i) => l === state.market.listings[i]) ? state : { ...state, market: { ...state.market, listings: next } }

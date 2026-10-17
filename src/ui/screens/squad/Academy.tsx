@@ -52,7 +52,7 @@ export function Academy({ game }: { game: Game }) {
   const squadSize = squadOf(game, team.id).length
 
   const promote = (p: Player) => {
-    if (!window.confirm(`Promover ${playerName(p)} ao elenco profissional? Contrato de ${ACADEMY.contractYears} anos, salário de ${formatMoney(youthSalary(p))} por mês.`)) return
+    if (!window.confirm(`Promover ${playerName(p)} ao elenco profissional? Contrato de ${ACADEMY.contractYears} anos, salário de ${formatMoney(youthSalary(p, team))} por mês.`)) return
     try {
       updateGame((g) => promoteUserYouth(g, p.id))
       setOpenId(null)

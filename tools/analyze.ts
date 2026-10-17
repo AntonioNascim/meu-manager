@@ -23,6 +23,8 @@ import { simulateMatch } from '../src/engine/match'
 import { crowdFill } from '../src/engine/match/state'
 import { createRng } from '../src/engine/rng'
 import type { Player, PlayStyle, Team } from '../src/engine/types'
+import { FULL_WORLD, buildScaleWorld } from '../src/diagnostics/scaleWorld'
+import { formatLeagueSummary, formatLeagueYears, simulateLeagueYears } from './leagueYears'
 import { formatYears, simulateYears } from './longRun'
 import { formatSizes, measureSaveSizes } from './saveSize'
 import { simulateSeasons } from './seasons'
@@ -34,7 +36,7 @@ type Section = (typeof SECTIONS)[number]
 
 function parseArgs(argv: string[]) {
   const sections: Section[] = []
-  const options: Record<string, number> = { seasons: 20, worlds: 5, matches: 4000, seed: 1, years: 10, longworlds: 1 }
+  const options: Record<string, number> = { seasons: 20, worlds: 5, matches: 4000, seed: 1, years: 10, longworlds: 1, clubs: 60 }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] as string
     if (arg.startsWith('--')) {
@@ -200,9 +202,20 @@ function runHome(worlds: number, matches: number, firstSeed: number) {
 }
 
 /** Temporadas encadeadas: uma tabela ano a ano por mundo, mais a variação entre o primeiro e o último ano. */
-function runYears(years: number, worlds: number, firstSeed: number) {
+function runYears(years: number, worlds: number, firstSeed: number, clubs: number) {
   for (let w = 0; w < worlds; w++) {
     const seed = firstSeed + w
+    if (clubs > 60) {
+      // Mundo grande (15 ligas): só a pirâmide do Brasil é lance a lance, as outras usam o resultado simplificado.
+      const built = buildScaleWorld(FULL_WORLD, seed)
+      const runs = simulateLeagueYears({ year: 2026, seed: `years-${seed}`, teams: built.teams, players: built.players, academy: built.academy, competitions: built.competitions, focus: 'br' }, years)
+      console.log(`
+Mundo de ${built.teams.length} clubes (mundo ${seed}, ${years} anos; força = média dos 11 titulares)${formatLeagueYears(runs)}
+
+Resumo (primeiros 3 anos → últimos 3)
+${formatLeagueSummary(runs)}`)
+      continue
+    }
     // O mundo nasce do pacote padrão (o mesmo caminho do jogo); WORLD_DIRECT=1 usa a geração direta, para conferir que dão o mesmo resultado.
     const world = process.env.WORLD_DIRECT ? generateWorld({ seed }) : loadWorld(seed)
     const rows = simulateYears(world, years, `years-${seed}`)
@@ -212,6 +225,10 @@ function runYears(years: number, worlds: number, firstSeed: number) {
 Temporadas seguidas (mundo ${seed}, ${years} anos; força = média dos 11 titulares; saldos em R$)
 ${formatYears(rows)}`)
     console.log(`variação ${first.year}-${last.year}: Série A ${f(last.strengthA - first.strengthA)} | Série B ${f(last.strengthB - first.strengthB)} | idade média ${f(last.meanAge - first.meanAge)} | promessas ${last.prospects - first.prospects}`)
+    const leagues = simulateLeagueYears({ year: world.startYear, seed: `years-${seed}`, teams: world.teams, players: world.players, academy: world.academy }, years)
+    console.log(`
+Por liga (primeiros 3 anos → últimos 3)
+${formatLeagueSummary(leagues)}`)
   }
 }
 
@@ -233,6 +250,6 @@ for (const section of sections) {
 Tamanho do save (${options.years} temporadas, time jogado no automático)
 ${formatSizes(measureSaveSizes(options.years as number, options.seed as number))}`)
   if (section === 'training') runTraining(options.years as number, options.longworlds as number, options.seed as number)
-  if (section === 'years') runYears(options.years as number, options.longworlds as number, options.seed as number)
+  if (section === 'years') runYears(options.years as number, options.longworlds as number, options.seed as number, options.clubs as number)
 }
 console.log(`\n(${f((performance.now() - t0) / 1000)} s)`)

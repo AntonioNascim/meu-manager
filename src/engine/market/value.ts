@@ -3,9 +3,19 @@
  * O clube pede mais por quem é importante para ele.
  */
 import { MARKET } from '../config'
+import { salaryScale, valueScale } from '../economy'
 import { overallAt, playerOverall } from '../overall'
 import { daysBetween } from '../season/dates'
-import type { IsoDate, Player } from '../types'
+import type { IsoDate, Player, Team } from '../types'
+
+/** O clube que decide o preço ou o salário: a liga dele (índice de receita) escala os valores. Sem clube, vale o padrão do Brasil. */
+export type PricingClub = Partial<Pick<Team, 'tier' | 'economy'>>
+
+/** Salário de `base` (pela força) no clube: escalado pela liga dele (Brasil = 1) e arredondado em 500. */
+export function scaledSalary(base: number, club?: PricingClub): number {
+  const scale = club ? salaryScale(club) : 1
+  return scale === 1 ? base : Math.max(1_000, Math.round((base * scale) / 500) * 500)
+}
 
 /** Salário mensal em R$: cresce exponencialmente com a força geral (de 1 a 100). */
 export function salaryForOverall(overall: number): number {
@@ -13,8 +23,10 @@ export function salaryForOverall(overall: number): number {
   return Math.max(5000, Math.round(raw / 500) * 500)
 }
 
-/** Salário que o jogador espera receber, pela força dele. */
-export const expectedSalary = (player: Player): number => salaryForOverall(playerOverall(player))
+/** Salário que o jogador espera receber, pela força dele e pela liga do clube que o contrata (sem clube: o padrão do Brasil). */
+export function expectedSalary(player: Player, club?: PricingClub): number {
+  return scaledSalary(salaryForOverall(playerOverall(player)), club)
+}
 
 /** Anos de contrato que faltam na data (0 se já terminou). */
 export const yearsLeft = (player: Pick<Player, 'contract'>, date: IsoDate): number => Math.max(0, daysBetween(date, player.contract.endDate) / 365)
@@ -26,13 +38,20 @@ function ageFactor(age: number): number {
 
 const VALUE_CACHE = new WeakMap<Player, { date: IsoDate; value: number }>()
 
-/** Valor de mercado em R$ (arredondado em 10 mil). Guardado por jogador e data: o jogador é imutável, então só muda se virar outro objeto. */
-export function marketValue(player: Player, date: IsoDate): number {
+/**
+ * Valor de mercado em R$ (arredondado em 10 mil). Guardado por jogador e data: o jogador é imutável, então só muda se virar outro objeto.
+ * `club` é o clube que o tem: a receita da divisão dele escala o preço (um jogador de clube pobre custa menos que o mesmo jogador num rico).
+ */
+export function marketValue(player: Player, date: IsoDate, club?: PricingClub): number {
   const cached = VALUE_CACHE.get(player)
-  if (cached && cached.date === date) return cached.value
-  const value = computeMarketValue(player, date)
-  VALUE_CACHE.set(player, { date, value })
-  return value
+  let value: number
+  if (cached && cached.date === date) value = cached.value
+  else {
+    value = computeMarketValue(player, date)
+    VALUE_CACHE.set(player, { date, value })
+  }
+  const scale = club ? valueScale(club) : 1
+  return scale === 1 ? value : Math.max(10_000, Math.round((value * scale) / 10_000) * 10_000)
 }
 
 function computeMarketValue(player: Player, date: IsoDate): number {
@@ -72,15 +91,15 @@ export function squadRoleIn(strength: number, sortedStrengths: readonly number[]
 }
 
 /** Preço mínimo que o clube pede por um jogador na função `role` do elenco dele. */
-export const askingPriceAs = (player: Player, role: SquadRole, date: IsoDate): number => Math.round((marketValue(player, date) * MARKET.ask[role]) / 10_000) * 10_000
+export const askingPriceAs = (player: Player, role: SquadRole, date: IsoDate, club?: PricingClub): number => Math.round((marketValue(player, date, club) * MARKET.ask[role]) / 10_000) * 10_000
 
 /** Preço mínimo que o clube aceita pela venda. */
-export function askingPrice(player: Player, squad: readonly Player[], date: IsoDate): number {
-  return askingPriceAs(player, squadRole(player, squad), date)
+export function askingPrice(player: Player, squad: readonly Player[], date: IsoDate, club?: PricingClub): number {
+  return askingPriceAs(player, squadRole(player, squad), date, club)
 }
 
 /** Taxa de empréstimo até o fim do contrato/empréstimo. */
-export const loanFee = (player: Player, date: IsoDate): number => Math.round((marketValue(player, date) * MARKET.loanFeeShare) / 10_000) * 10_000
+export const loanFee = (player: Player, date: IsoDate, club?: PricingClub): number => Math.round((marketValue(player, date, club) * MARKET.loanFeeShare) / 10_000) * 10_000
 
 /** Força efetiva do jogador na posição dele no time (para comparar com os titulares do comprador). */
 export const strengthAt = (player: Player): number => overallAt(player, player.position)
