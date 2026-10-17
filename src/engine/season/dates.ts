@@ -45,6 +45,11 @@ export function contractEndOn(year: number): IsoDate {
   return makeDate(year, SEASON.contractEnd.month, SEASON.contractEnd.day)
 }
 
+/** Último dia de um contrato que termina com a temporada `year`: 31/12 no ano civil, 30/6 do ano seguinte na temporada que atravessa o ano. */
+export function contractEndFor(year: number, split = false): IsoDate {
+  return split ? makeDate(year + 1, 6, 30) : contractEndOn(year)
+}
+
 /** Idade completa em `onDate`. */
 export function ageOn(birthDate: IsoDate, onDate: IsoDate): number {
   const [by, bm, bd] = birthDate.split('-').map(Number) as [number, number, number]

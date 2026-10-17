@@ -110,8 +110,9 @@ describe('envelhecer no aniversário', () => {
     const { state } = advanceSeason(ended, { createYouth })
     const stayed = state.players.filter((p) => ages.has(p.id))
     expect(stayed.length).toBeGreaterThan(900)
-    for (const p of stayed) expect(p.age).toBe(ages.get(p.id)! + 1)
-    for (const p of stayed) expect(ageOn(p.birthDate, '2027-01-01')).toBe(p.age)
+    // A virada é no último dia da temporada do país (31/12): todos têm um ano a mais, menos quem faz anos em 1º de janeiro.
+    for (const p of stayed) expect(p.age).toBe(ages.get(p.id)! + birthdaysBetween(p.birthDate, '2026-01-01', state.season.currentDate))
+    for (const p of stayed) expect(ageOn(p.birthDate, state.season.currentDate)).toBe(p.age)
   }, 120_000)
 })
 
@@ -147,6 +148,6 @@ describe('save versão 10', () => {
     next = { ...next, dismissal: undefined }
     next = startNextSeason(next)
     expect(next.season.season.year).toBe(migrated.game.season.season.year + 1)
-    for (const p of next.season.players) expect(ageOn(p.birthDate, `${next.season.season.year}-01-01`)).toBe(p.age)
+    for (const p of next.season.players) expect(ageOn(p.birthDate, next.season.season.currentDate)).toBe(p.age)
   }, 240_000)
 })

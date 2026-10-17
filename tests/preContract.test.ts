@@ -196,7 +196,7 @@ describe('na virada de temporada', () => {
     expect(report.released.some((d) => d.playerId === player.id)).toBe(false)
     expect(next.market.history.some((r) => r.playerId === player.id && r.toTeamId === buyer.id && r.fee === 0)).toBe(true)
     expect(next.market.preContracts).toEqual([])
-    expect(addDays(next.season.currentDate, 0).startsWith('2027')).toBe(true)
+    expect(next.season.currentDate >= '2026-12-31').toBe(true)
   })
 })
 

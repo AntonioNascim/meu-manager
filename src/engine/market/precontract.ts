@@ -11,7 +11,8 @@ import { overallAt } from '../overall'
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
-import { contractEndOn, makeDate } from '../season/dates'
+import { contractEndFor, makeDate } from '../season/dates'
+import { cycleOfPyramid, cycleOfTeam, focusPyramid } from '../season/cycles'
 import { actsThisRound, quickTeamIds } from '../season/fidelity'
 import { SQUAD_MAX } from '../types'
 import type { IsoDate, OfferReason, Player, PlayerId, PreContract, Team, TeamId } from '../types'
@@ -34,7 +35,7 @@ export function preContractOpensOn(endDate: IsoDate): IsoDate {
 export const inPreContractWindow = (player: Pick<Player, 'contract'>, date: IsoDate): boolean => date >= preContractOpensOn(player.contract.endDate) && date <= player.contract.endDate
 
 /** O período de pré-contratos do calendário da liga já abriu (os contratos terminam em `SEASON.contractEnd`)? */
-export const preContractsOpen = (state: Pick<SeasonState, 'season'>, date: IsoDate = state.season.currentDate): boolean => date >= preContractOpensOn(contractEndOn(state.season.year))
+export const preContractsOpen = (state: Pick<SeasonState, 'season' | 'cycles' | 'focus'>, date: IsoDate = state.season.currentDate): boolean => date >= preContractOpensOn(cycleOfPyramid(state, focusPyramid(state)).end)
 
 export const preContractOf = (state: Pick<SeasonState, 'market'>, playerId: PlayerId): PreContract | undefined => state.market.preContracts.find((c) => c.playerId === playerId)
 
@@ -45,16 +46,16 @@ export function canPreContract(state: SeasonState, player: Player, date: IsoDate
 
 /** Jogadores do clube que continuam no ano que vem (contrato depois do fim desta temporada), mais os que chegam por pré-contrato. */
 function nextSeasonSquad(state: SeasonState, teamId: TeamId): Player[] {
-  const year = state.season.year
-  const keeps = state.players.filter((p) => p.teamId === teamId && !isLastContractYear(p, year))
+  const end = cycleOfTeam(state, teamId).end
+  const keeps = state.players.filter((p) => p.teamId === teamId && p.contract.endDate > end)
   const arriving = state.market.preContracts.filter((c) => c.toTeamId === teamId).map((c) => state.players.find((p) => p.id === c.playerId)).filter((p): p is Player => p !== undefined)
   return [...keeps, ...arriving]
 }
 
 /** Quanto o clube já se comprometeu a pagar por mês no ano que vem (quem fica e quem chega). */
 function committedPayroll(state: SeasonState, teamId: TeamId): number {
-  const year = state.season.year
-  const keeps = state.players.filter((p) => p.teamId === teamId && !isLastContractYear(p, year))
+  const end = cycleOfTeam(state, teamId).end
+  const keeps = state.players.filter((p) => p.teamId === teamId && p.contract.endDate > end)
   const incoming = state.market.preContracts.filter((c) => c.toTeamId === teamId).reduce((sum, c) => sum + c.salary, 0)
   return monthlyPayroll(keeps) + incoming
 }
@@ -175,7 +176,7 @@ export interface AppliedPreContract {
  * Na virada: quem assinou pré-contrato muda de clube com o contrato combinado (de graça). O pré-contrato cai se o
  * jogador já saiu do clube, se o contrato dele não vence mais ou se o comprador ficou sem vaga no elenco.
  */
-export function applyPreContracts(players: readonly Player[], preContracts: readonly PreContract[], year: number, due: (player: Player) => boolean = (p) => isLastContractYear(p, year)): { players: Player[]; applied: AppliedPreContract[] } {
+export function applyPreContracts(players: readonly Player[], preContracts: readonly PreContract[], year: number, due: (player: Player) => boolean = (p) => isLastContractYear(p, year), cycleOf?: (teamId: TeamId) => { year: number; split: boolean }): { players: Player[]; applied: AppliedPreContract[] } {
   const applied: AppliedPreContract[] = []
   const byId = new Map(players.map((p) => [p.id, p]))
   const stays = new Map<TeamId, number>()
@@ -186,7 +187,7 @@ export function applyPreContracts(players: readonly Player[], preContracts: read
     if (!p || p.teamId !== c.fromTeamId || !due(p)) continue
     if ((stays.get(c.toTeamId) ?? 0) >= SQUAD_MAX - 1) continue
     stays.set(c.toTeamId, (stays.get(c.toTeamId) ?? 0) + 1)
-    moved.set(p.id, { ...p, teamId: c.toTeamId, contract: { salary: c.salary, endDate: contractEndOn(year + c.years), releaseClause: Math.round((c.salary * 36) / 1000) * 1000 } })
+    moved.set(p.id, { ...p, teamId: c.toTeamId, contract: { salary: c.salary, endDate: contractEndFor((cycleOf?.(c.toTeamId).year ?? year) + c.years, cycleOf?.(c.toTeamId).split ?? false), releaseClause: Math.round((c.salary * 36) / 1000) * 1000 } })
     applied.push({ playerId: p.id, fromTeamId: c.fromTeamId, toTeamId: c.toTeamId })
   }
   return { players: players.map((p) => moved.get(p.id) ?? p), applied }

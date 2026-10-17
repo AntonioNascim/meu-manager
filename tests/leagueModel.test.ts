@@ -28,8 +28,8 @@ describe('contratos com data', () => {
 
   it('no calendário padrão o pré-contrato continua abrindo em 1º de julho', () => {
     const s = fresh()
-    expect(preContractsOpen({ season: { ...s.season, currentDate: '2026-06-30' } })).toBe(false)
-    expect(preContractsOpen({ season: { ...s.season, currentDate: '2026-07-01' } })).toBe(true)
+    expect(preContractsOpen({ ...s, season: { ...s.season, currentDate: '2026-06-30' } })).toBe(false)
+    expect(preContractsOpen({ ...s, season: { ...s.season, currentDate: '2026-07-01' } })).toBe(true)
   })
 
   /** Estado em 1º de junho com um jogador do técnico e um da IA com contrato até 30/6. */

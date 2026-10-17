@@ -4,6 +4,7 @@ import { createYouth } from '../src/data/generateYouth'
 import { advanceSeason, evolvePlayer, positionDeficits, yearlyGain } from '../src/engine/offseason'
 import { playerOverall } from '../src/engine/overall'
 import { createRng } from '../src/engine/rng'
+import { birthdaysBetween } from '../src/engine/season/dates'
 import { computeStandings, createSeason, simulateToSeasonEnd } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
 import { SQUAD_MAX, SQUAD_MIN } from '../src/engine/types'
@@ -80,7 +81,8 @@ describe('virada de temporada', () => {
   it('envelhece todos um ano (no aniversário), zera estatísticas e condição, e aposenta só veteranos', () => {
     const before = new Map(world.players.map((p) => [p.id, p]))
     for (const p of next.players.filter((x) => before.has(x.id))) {
-      expect(p.age).toBe(before.get(p.id)!.age + 1)
+      // A virada é em 31/12: quem faz anos em 1º de janeiro ainda não fez.
+      expect(p.age).toBe(before.get(p.id)!.age + birthdaysBetween(p.birthDate, '2026-01-01', next.season.currentDate))
       expect(p.seasonStats.appearances).toBe(0)
       expect(p.condition.fitness).toBe(100)
     }

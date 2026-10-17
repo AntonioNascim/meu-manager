@@ -12,8 +12,11 @@ export interface DepartedPlayer {
 
 /** O que a virada de temporada fez (derivado na hora; o jogo guarda só o resumo por ano). */
 export interface OffseasonReport {
-  /** Ano da temporada que acabou. */
+  /** Ano em que a temporada que acabou começou. */
   year: number
+  /** Pirâmide (país) que virou a temporada e o nome da temporada ("2026" ou "2026/27"). */
+  pyramid?: string
+  label?: string
   /** Campeão de cada série (índice = série − 1). */
   champions: TeamId[]
   /** Campeão de cada competição (todas as ligas do mundo), pelo id da competição. */
@@ -57,6 +60,8 @@ export interface YouthRequest {
   academy?: boolean
   /** Ano da nova temporada. */
   year: number
+  /** A temporada do país atravessa o ano (os contratos terminam em 30/6). */
+  split?: boolean
 }
 
 export interface SeasonSummary {

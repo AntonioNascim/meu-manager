@@ -7,6 +7,7 @@
 import { applyPreContracts } from '../market/precontract'
 import { createRng } from '../rng'
 import type { SeasonState } from '../season/calendar'
+import { cycleOfTeam } from '../season/cycles'
 import type { IsoDate, MarketNotice, Player, PlayerId, TeamId } from '../types'
 import { expireContracts } from './contracts'
 
@@ -20,24 +21,29 @@ export interface DueContractsResult {
   renewed: number
 }
 
-/** O contrato acaba em (de, até]? Empréstimos não entram: eles voltam para casa na virada. */
-const endsBetween = (from: IsoDate, to: IsoDate) => (p: Player) => p.teamId !== null && !p.contract.loanedFrom && p.contract.endDate > from && p.contract.endDate <= to
+/**
+ * O contrato acaba em (de, até], antes do último dia da temporada do clube? Empréstimos não entram (voltam para casa na virada) e
+ * os contratos que vencem no último dia da temporada também não: esses são resolvidos na virada do país.
+ */
+const endsBetween = (state: SeasonState, from: IsoDate, to: IsoDate) => (p: Player) =>
+  p.teamId !== null && !p.contract.loanedFrom && p.contract.endDate > from && p.contract.endDate <= to && p.contract.endDate < cycleOfTeam(state, p.teamId).end
 
 export function settleDueContracts(state: SeasonState, from: IsoDate, to: IsoDate, userTeamId?: TeamId): DueContractsResult {
-  const due = endsBetween(from, to)
+  const due = endsBetween(state, from, to)
   const nothing: DueContractsResult = { state, notices: [], moved: [], freed: [], renewed: 0 }
   if (to <= from || !state.players.some(due)) return nothing
 
   const year = state.season.year
+  const cycleOf = (teamId: TeamId) => cycleOfTeam(state, teamId)
   const dueIds = new Set(state.players.filter(due).map((p) => p.id))
 
   // 1) Pré-contratos de quem vence hoje: o jogador chega ao clube novo com o contrato combinado.
-  const pre = applyPreContracts(state.players, state.market.preContracts, year, due)
+  const pre = applyPreContracts(state.players, state.market.preContracts, year, due, (teamId) => cycleOf(teamId))
   const movedIds = new Set(pre.applied.map((a) => a.playerId))
 
   // 2) O resto: renovação da IA ou jogador livre.
   const rng = createRng(`${state.market.seed}:${to}:contracts`)
-  const expired = expireContracts({ players: pre.players, teams: state.teams, year, rng, due: (p) => dueIds.has(p.id) && !movedIds.has(p.id), returnLoans: false, ...(userTeamId ? { userTeamId } : {}) })
+  const expired = expireContracts({ players: pre.players, teams: state.teams, year, cycleOf, rng, due: (p) => dueIds.has(p.id) && !movedIds.has(p.id), returnLoans: false, ...(userTeamId ? { userTeamId } : {}) })
 
   const freedIds = new Set(expired.released.map((r) => r.playerId))
   const squadOf = (teamId: TeamId) => expired.players.filter((p) => p.teamId === teamId).map((p) => p.id)

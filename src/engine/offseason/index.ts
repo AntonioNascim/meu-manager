@@ -10,15 +10,17 @@ import { buildTactic, repairTactic } from '../lineup'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
-import { createSeason } from '../season/calendar'
+import { buildPyramid } from '../season/calendar'
 import type { CompetitionSetup } from '../season/calendar'
+import { competitionsOf, cycleOfPyramid, cycleOfTeam, focusPyramid, nextCycle, phaseOfPyramid, pyramidFinished, seasonLabel } from '../season/cycles'
 import { pyramidOf } from '../season/fidelity'
 import type { SeasonState } from '../season/calendar'
 import { applyBirthdays } from '../season/birthdays'
-import { contractEndOn, makeDate } from '../season/dates'
+import { daysBetween } from '../season/dates'
+import { createCups } from '../cups'
 import { computeStandings } from '../season/standings'
 import { SQUAD_MAX, SQUAD_MIN } from '../types'
-import type { Competition, CompetitionId, CupSpec, DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
+import type { Competition, CompetitionId, Cup, CupSpec, DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
 import { turnAcademy } from '../academy/turn'
 import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
@@ -43,6 +45,8 @@ export interface OffseasonOptions {
    * jogar sem copas tem `cupSpecs: []` e não ganha nenhuma.
    */
   defaultCupSpecs?: (competitions: readonly Competition[]) => CupSpec[]
+  /** Vira só a temporada desta pirâmide (um país); sem ela, vira todas. */
+  pyramid?: string
 }
 
 const EXTRA_POSITIONS: readonly Position[] = ['CB', 'CM', 'ST', 'AM', 'RW', 'LW', 'DM', 'RB', 'LB']
@@ -56,27 +60,77 @@ function objectiveFor(rank: number) {
   return { targetPosition: target, sackingPosition: Math.min(20, target + 6) }
 }
 
+/**
+ * Vira a temporada de uma pirâmide (um país): acesso e rebaixamento, reputação, aposentadorias, contratos, base, metas, finanças e
+ * tabela nova. Só mexe nos clubes, jogadores e jogos dela; o relógio do mundo e as outras pirâmides seguem como estão. Sem `pyramid`,
+ * vira todas as pirâmides (uma depois da outra) e o relatório devolvido é o da pirâmide do foco.
+ */
 export function advanceSeason(state: SeasonState, options: OffseasonOptions): { state: SeasonState; report: OffseasonReport } {
-  if (state.season.phase !== 'end-of-season') throw new Error('A temporada ainda não acabou')
-  const year = state.season.year
-  const rng = createRng(`${state.market.seed}:${year}:offseason`)
+  if (options.pyramid !== undefined) return turnPyramid(state, options.pyramid, options)
+  const pyramids: string[] = []
+  for (const c of state.season.competitions) if (!pyramids.includes(pyramidOf(c))) pyramids.push(pyramidOf(c))
+  const focus = focusPyramid(state)
+  let current = state
+  const reports: OffseasonReport[] = []
+  for (const pyramid of pyramids) {
+    const turned = turnPyramid(current, pyramid, options, pyramids.length > 1)
+    current = turned.state
+    reports.push(turned.report)
+  }
+  return { state: current, report: mergeReports(reports, focus) }
+}
+
+/** O relatório de várias pirâmides num só: os campeões por série e o ano são os da pirâmide do foco, o resto soma tudo. */
+function mergeReports(reports: readonly OffseasonReport[], focus: string): OffseasonReport {
+  const main = reports.find((r) => r.pyramid === focus) ?? (reports[0] as OffseasonReport)
+  if (reports.length === 1) return main
+  const merged: OffseasonReport = { ...main, championsByCompetition: {}, promoted: [], relegated: [], finalPositions: {}, retired: [], released: [], renewed: 0, youth: {}, academyArrivals: {}, academyPromoted: {}, academyReleased: {}, academyPending: [], reputationChanges: {}, preContracts: [] }
+  for (const r of reports) {
+    Object.assign(merged.championsByCompetition as Record<string, TeamId>, r.championsByCompetition)
+    merged.promoted.push(...r.promoted)
+    merged.relegated.push(...r.relegated)
+    Object.assign(merged.finalPositions, r.finalPositions)
+    merged.retired.push(...r.retired)
+    merged.released.push(...r.released)
+    merged.renewed += r.renewed
+    Object.assign(merged.youth, r.youth)
+    Object.assign(merged.academyArrivals, r.academyArrivals)
+    Object.assign(merged.academyPromoted, r.academyPromoted)
+    Object.assign(merged.academyReleased, r.academyReleased)
+    merged.academyPending.push(...r.academyPending)
+    Object.assign(merged.reputationChanges, r.reputationChanges)
+    merged.preContracts.push(...r.preContracts)
+  }
+  return merged
+}
+
+function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOptions, multi = false): { state: SeasonState; report: OffseasonReport } {
+  // `season.phase` é a fase da pirâmide do foco: declarada `end-of-season`, ela vale como encerrada.
+  if (!pyramidFinished(state, pyramid) && !(pyramid === focusPyramid(state) && state.season.phase === 'end-of-season')) throw new Error('A temporada ainda não acabou')
+  const cycle = cycleOfPyramid(state, pyramid)
+  const year = cycle.year
+  const split = cycle.split
+  const isMulti = multi || new Set(state.season.competitions.map((c) => pyramidOf(c))).size > 1
+  const rng = createRng(`${state.market.seed}:${year}:offseason${isMulti ? `:${pyramid}` : ''}`)
+  // O relógio do mundo vai (no mínimo) até o último dia da temporada do país; quem chamou pelo avanço do jogo já está lá.
+  const turnDate = state.season.currentDate >= cycle.end ? state.season.currentDate : cycle.end
 
   // 1) Acesso e rebaixamento; histórico de campeões e posições.
   const finalPositions: OffseasonReport['finalPositions'] = {}
   const champions: TeamId[] = []
   const promoted: TeamId[] = []
   const relegated: TeamId[] = []
-  // Cada pirâmide (um país) tem as suas divisões: quem sobe ou cai vai para a divisão vizinha da MESMA pirâmide. Os campeões do relatório (índice = série − 1) são os da pirâmide do técnico.
-  const competitions = [...state.season.competitions].sort((a, b) => a.tier - b.tier)
-  const reportPyramid = state.focus ?? pyramidOf(competitions[0] as Competition)
+  // As divisões do país: quem sobe ou cai vai para a divisão vizinha da MESMA pirâmide. Os campeões do relatório são índice = série − 1.
+  const competitions = competitionsOf(state, pyramid).sort((a, b) => a.tier - b.tier)
+  const scope = new Set<TeamId>(competitions.flatMap((c) => c.teamIds))
   const championsByCompetition: Record<string, TeamId> = {}
   const destination = new Map<TeamId, CompetitionId>()
-  const neighbour = (c: Competition, step: number) => competitions.find((o) => pyramidOf(o) === pyramidOf(c) && o.tier === c.tier + step)
+  const neighbour = (c: Competition, step: number) => competitions.find((o) => o.tier === c.tier + step)
   for (const competition of competitions) {
     const rows: StandingRow[] = computeStandings(competition.teamIds, state.matches.filter((m) => m.competitionId === competition.id))
     rows.forEach((r, i) => (finalPositions[r.teamId] = { tier: competition.tier, position: i + 1 }))
     championsByCompetition[competition.id] = (rows[0] as StandingRow).teamId
-    if (pyramidOf(competition) === reportPyramid) champions[competition.tier - 1] = (rows[0] as StandingRow).teamId
+    champions[competition.tier - 1] = (rows[0] as StandingRow).teamId
     const below = neighbour(competition, 1)
     const above = neighbour(competition, -1)
     if (competition.relegationSlots > 0 && below) {
@@ -110,6 +164,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   const R = OFFSEASON.reputation
   const reputationRng = rng.fork('reputation')
   let teams: Team[] = state.teams.map((t) => {
+    if (!scope.has(t.id)) return t
     const finalPosition = finalPositions[t.id]?.position ?? 10
     const expected = rankByReputation.get(t.id) ?? 10
     let delta = clamp(Math.round((expected - finalPosition) / R.positionStep), -R.positionMax, R.positionMax)
@@ -136,25 +191,38 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
       history: [...t.history, { year, tier: t.tier, finalPosition, champion: champions.includes(t.id) }],
     }
   })
+  const scopeTeams = () => teams.filter((t) => scope.has(t.id))
 
-  // 3) Envelhecimento: a idade já aumentou no aniversário de cada um durante o ano; aqui entram só os aniversários que faltam até o
-  // começo da temporada nova e a condição e as estatísticas voltam ao zero. 4) Aposentadorias. Quem ficou o ano inteiro sem clube sai do jogo.
+  // 3) Envelhecimento: a idade já aumentou no aniversário de cada um durante a temporada; aqui entram só os aniversários que faltam até o
+  // fim dela e a condição e as estatísticas voltam ao zero. 4) Aposentadorias. Jogador livre há um ano ou mais sai do jogo.
   const retired: DepartedPlayer[] = []
   const retireRng = rng.fork('retirement')
   let players: Player[] = []
-  for (const p of applyBirthdays(state.players, state.season.currentDate, makeDate(year + 1, 1, 1), state.market.seed)) {
-    if (p.teamId === null) continue
+  for (const p of applyBirthdays(state.players, state.season.currentDate, turnDate, state.market.seed)) {
+    if (p.teamId === null) {
+      // Jogador livre há muito tempo sai do jogo; os outros começam a temporada novos (e podem se aposentar).
+      if (daysBetween(p.contract.endDate, turnDate) >= OFFSEASON.freeAgentDays) continue
+      const next = startNewSeason(p)
+      if (retires(retireRng, next)) retired.push(departed(next))
+      else players.push(next)
+      continue
+    }
+    if (!scope.has(p.teamId)) {
+      players.push(p)
+      continue
+    }
     const next = startNewSeason(p)
     if (retires(retireRng, next)) retired.push(departed(next))
     else players.push(next)
   }
 
-  // Pré-contratos assinados na temporada: quem combinou com outro clube muda de clube de graça.
-  const preContracts = applyPreContracts(players, state.market.preContracts, year)
+  // Pré-contratos assinados por quem vence com a temporada do país: mudam de clube de graça.
+  const endsNow = (p: Player) => p.teamId !== null && scope.has(p.teamId) && p.contract.endDate <= cycle.end
+  const preContracts = applyPreContracts(players, state.market.preContracts, year, endsNow, (id) => cycleOfTeam(state, id))
   players = preContracts.players
 
   // 5) Fim dos contratos (empréstimos voltam para casa; a IA renova o que faz sentido).
-  const contracts = expireContracts({ players, teams, year, rng: rng.fork('contracts'), ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}) })
+  const contracts = expireContracts({ players, teams, year, split, scope, rng: rng.fork('contracts'), ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}) })
   players = contracts.players
   const released = contracts.released
 
@@ -162,27 +230,28 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
   // (evolução, decisões dos 20 anos, chegada de jovens) e depois a reposição de posições descobertas e o corte do excesso na IA.
   // O corte vem antes da reposição: os jovens que chegam cobrem as posições que o corte deixou descobertas.
   const payrollCut = new Set<PlayerId>()
-  for (const team of teams) {
+  for (const team of scopeTeams()) {
     if (team.id === options.userTeamId) continue
     for (const p of payrollCuts(players.filter((x) => x.teamId === team.id), sustainablePayroll(team), team.finances.balance)) payrollCut.add(p.id)
   }
-  if (payrollCut.size > 0) players = players.map((p) => (payrollCut.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: contractEndOn(year) } } : p))
+  const release = (ids: ReadonlySet<PlayerId>) => (players = players.map((p) => (ids.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: cycle.end } } : p)))
+  if (payrollCut.size > 0) release(payrollCut)
   const youthRng = rng.fork('youth')
   const taken = new Set([...players, ...state.academy].map((p) => p.name))
-  const academyTurn = turnAcademy({ teams, players, academy: state.academy, rng: rng.fork('academy'), year, ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}), createYouth: options.createYouth, taken, counter: state.playerCounter })
+  const academyTurn = turnAcademy({ teams: scopeTeams(), players, academy: state.academy.filter((p) => p.teamId !== null && scope.has(p.teamId)), rng: rng.fork('academy'), year, split, ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}), createYouth: options.createYouth, taken, counter: state.playerCounter })
   players = academyTurn.players
-  const academy = academyTurn.academy
+  const academy = [...state.academy.filter((p) => p.teamId === null || !scope.has(p.teamId)), ...academyTurn.academy]
   let counter = academyTurn.counter
   const youth: OffseasonReport['youth'] = {}
   const nextYear = year + 1
-  for (const team of teams) {
+  for (const team of scopeTeams()) {
     let squad = players.filter((p) => p.teamId === team.id)
     const isUser = team.id === options.userTeamId
     const deficits = positionDeficits(squad)
     // Elenco cheio com posição descoberta (a base promoveu gente demais): a IA libera os sobrantes mais fracos para abrir as vagas.
     if (!isUser && deficits.length > SQUAD_MAX - squad.length) {
       const out = new Set(makeRoom(squad, deficits.length - (SQUAD_MAX - squad.length)).map((p) => p.id))
-      players = players.map((p) => (out.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: contractEndOn(year) } } : p))
+      release(out)
       squad = squad.filter((p) => !out.has(p.id))
     }
     const target = isUser ? Math.max(OFFSEASON.youth.userMinSquad, desiredSquadSize(team.reputation)) : desiredSquadSize(team.reputation)
@@ -191,7 +260,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     if (count <= 0) continue
     const positions = deficits.slice(0, count)
     while (positions.length < count) positions.push(youthRng.pick(EXTRA_POSITIONS))
-    const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), ...(team.country ? { country: team.country } : {}), positions, year: nextYear }, youthRng, taken)
+    const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), ...(team.country ? { country: team.country } : {}), positions, year: nextYear, ...(split ? { split } : {}) }, youthRng, taken)
     for (const p of made) {
       taken.add(p.name)
       players.push({ ...p, id: `player-${++counter}`, teamId: team.id })
@@ -199,14 +268,12 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     youth[team.id] = made.length
   }
   const trimmed = new Set<PlayerId>()
-  for (const team of teams) {
+  for (const team of scopeTeams()) {
     if (team.id === options.userTeamId) continue
     const squad = players.filter((p) => p.teamId === team.id)
     for (const p of trimExcess(squad)) trimmed.add(p.id)
   }
-  if (trimmed.size > 0) {
-    players = players.map((p) => (trimmed.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: contractEndOn(year) } } : p))
-  }
+  if (trimmed.size > 0) release(trimmed)
 
   // 7) Nova meta da diretoria, finanças do ano e táticas refeitas.
   const newRank = new Map<TeamId, number>()
@@ -218,6 +285,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
       .forEach(({ t }, i) => newRank.set(t.id, i + 1))
   }
   teams = teams.map((t) => {
+    if (!scope.has(t.id)) return t
     const squad = players.filter((p) => p.teamId === t.id)
     const summary = summarizeLedger(t.finances.ledger)
     const payroll = monthlyPayroll(squad)
@@ -240,8 +308,8 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     }
   })
 
-  // 8) Nova tabela de jogos.
-  const setups: CompetitionSetup[] = state.season.competitions.map((c) => ({
+  // 8) Nova tabela de jogos do país, na temporada seguinte dele.
+  const setups: CompetitionSetup[] = competitions.map((c) => ({
     id: c.id,
     name: c.name,
     tier: c.tier,
@@ -249,6 +317,8 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     ...(c.region ? { region: c.region } : {}),
     ...(c.start ? { start: c.start } : {}),
     ...(c.rounds ? { rounds: c.rounds } : {}),
+    ...(c.split ? { split: true } : {}),
+    ...(c.gapEvery ? { gapEvery: c.gapEvery } : {}),
     ...(c.pyramid ? { pyramid: c.pyramid } : {}),
     ...(c.economy ? { economy: c.economy } : {}),
     ...(c.country ? { country: c.country } : {}),
@@ -257,19 +327,54 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     relegation: c.relegationSlots,
     ...(c.reputationMean !== undefined ? { reputationMean: c.reputationMean } : {}),
   }))
-  const next = createSeason({
-    year: nextYear,
-    seed: state.market.seed,
+  const upcoming = nextCycle(cycle)
+  const built = buildPyramid({ seed: state.market.seed, cycle: upcoming, setups, rng: createRng(`${state.market.seed}:${upcoming.year}:calendar${isMulti ? `:${pyramid}` : ''}`) })
+  const replaced = new Map(built.competitions.map((c) => [c.id, c]))
+  const oldIds = new Set(competitions.map((c) => c.id))
+  for (const cup of state.cups ?? []) if (cup.pyramid === pyramid) oldIds.add(cup.id)
+  const matches = [...state.matches.filter((m) => !oldIds.has(m.competitionId)), ...built.matches].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+  const gone = new Set(scope)
+  const market = {
+    ...state.market,
+    // Propostas, anúncios e pré-contratos dos clubes que viraram a temporada acabam com ela; os dos outros países seguem.
+    offers: state.market.offers.filter((o) => !gone.has(o.buyerId) && !gone.has(o.sellerId as TeamId)),
+    listings: state.market.listings.filter((l) => !gone.has(l.teamId) && l.teamId !== options.userTeamId),
+    preContracts: state.market.preContracts.filter((c) => !gone.has(c.fromTeamId)),
+    history: [
+      ...state.market.history.filter((h) => daysBetween(h.date, turnDate) <= OFFSEASON.historyDays),
+      ...preContracts.applied.map((a) => ({ date: turnDate, playerId: a.playerId, fromTeamId: a.fromTeamId, toTeamId: a.toTeamId, kind: 'purchase' as const, fee: 0 })),
+    ],
+  }
+  const squadIds = new Set(players.filter((p) => p.teamId === options.userTeamId).map((p) => p.id))
+  const training = {
+    ...state.training,
+    individual: Object.fromEntries(Object.entries(state.training.individual).filter(([teamId, slot]) => players.some((p) => p.id === slot.playerId && p.teamId === teamId))),
+    history: Object.fromEntries(Object.entries(state.training.history).filter(([id]) => squadIds.has(id))),
+  }
+  const cycles = { ...state.cycles, [pyramid]: upcoming }
+  let next: SeasonState = {
+    ...state,
+    season: { ...state.season, currentDate: turnDate, competitions: state.season.competitions.map((c) => replaced.get(c.id) ?? c), matchIds: matches.map((m) => m.id) },
+    cycles,
+    matches,
+    cups: (state.cups ?? []).filter((c) => c.pyramid !== pyramid),
     teams,
     players,
-    competitions: setups,
-    ...(state.focus !== undefined ? { focus: state.focus } : {}),
-    // As copas voltam em cada temporada com as vagas da que acabou (o campeão de cada edição fica no histórico).
-    ...((state.cupSpecs ?? options.defaultCupSpecs?.(state.season.competitions)) ? { cupSpecs: (state.cupSpecs ?? options.defaultCupSpecs?.(state.season.competitions)) as CupSpec[] } : {}),
-    ...(state.cupHistory ? { cupHistory: state.cupHistory } : {}),
-  })
+    academy,
+    market,
+    training,
+    playerCounter: counter,
+  }
+  // As copas voltam em cada temporada com as vagas da que acabou (o campeão de cada edição fica no histórico).
+  const specs = state.cupSpecs ?? options.defaultCupSpecs?.(state.season.competitions)
+  if (specs) next = specs.length > 0 ? createCups(next, specs, pyramid) : { ...next, cupSpecs: [] }
+  if (state.cups === undefined && next.cups?.length === 0) delete (next as { cups?: Cup[] }).cups
+  const focus = focusPyramid(next)
+  next = { ...next, season: { ...next.season, year: cycleOfPyramid(next, focus).year, phase: phaseOfPyramid(next, focus) } }
   const report: OffseasonReport = {
     year,
+    pyramid,
+    label: seasonLabel(cycle),
     champions,
     championsByCompetition,
     promoted,
@@ -286,16 +391,7 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     reputationChanges,
     preContracts: preContracts.applied,
   }
-  const squadIds = new Set(players.filter((p) => p.teamId === options.userTeamId).map((p) => p.id))
-  const training = {
-    ...state.training,
-    individual: Object.fromEntries(Object.entries(state.training.individual).filter(([teamId, slot]) => players.some((p) => p.id === slot.playerId && p.teamId === teamId))),
-    history: Object.fromEntries(Object.entries(state.training.history).filter(([id]) => squadIds.has(id))),
-  }
-  // Os anúncios da IA já nascem com a temporada; o time do jogador não anuncia nada sozinho.
-  const arrived = preContracts.applied.map((a) => ({ date: next.season.currentDate, playerId: a.playerId, fromTeamId: a.fromTeamId, toTeamId: a.toTeamId, kind: 'purchase' as const, fee: 0 }))
-  const market = { ...next.market, history: [...next.market.history, ...arrived], listings: next.market.listings.filter((l) => l.teamId !== options.userTeamId) }
-  return { state: { ...next, academy, playerCounter: counter, training, market }, report }
+  return { state: next, report }
 }
 
 /** Reservas que a IA corta para voltar ao tamanho máximo (os de menor valor, sem deixar posição descoberta). */

@@ -6,7 +6,7 @@ import { OFFSEASON } from '../config'
 import { squadRole } from '../market/value'
 import { playerOverall } from '../overall'
 import type { Rng } from '../rng'
-import { contractEndOn } from '../season/dates'
+import { contractEndFor } from '../season/dates'
 import { CORE_COUNTS, desiredSquadSize } from './squad'
 import { renewalDecision, renewalDemand } from './renewal'
 import type { DepartedPlayer, Player, PlayerId, Team, TeamId } from '../types'
@@ -31,10 +31,10 @@ export function aiWantsToKeep(player: Player, squad: readonly Player[]): boolean
 }
 
 /** Contrato novo do jogador com o salário combinado e a duração sorteada pela idade. */
-export function renewedContract(rng: Rng, player: Player, year: number, salary: number): Player['contract'] {
+export function renewedContract(rng: Rng, player: Player, year: number, salary: number, split = false): Player['contract'] {
   return {
     salary,
-    endDate: contractEndOn(year + contractYearsFor(rng, player.age)),
+    endDate: contractEndFor(year + contractYearsFor(rng, player.age), split),
     releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000,
   }
 }
@@ -44,10 +44,16 @@ export interface ExpireInput {
   teams: readonly Team[]
   /** Ano da temporada que acabou. */
   year: number
+  /** A temporada atravessa o ano (contratos terminam em 30/6). */
+  split?: boolean
   rng: Rng
   userTeamId?: TeamId
-  /** Quais contratos vencem agora (padrão: os que terminam até o fim de `year`, a regra da virada). */
+  /** Quais contratos vencem agora (padrão: os que terminam até o fim da temporada `year`, a regra da virada). */
   due?: (player: Player) => boolean
+  /** Temporada de cada clube, quando os contratos de várias pirâmides vencem juntos (padrão: `year` e `split` para todos). */
+  cycleOf?: (teamId: TeamId) => { year: number; split: boolean }
+  /** Só os clubes deste conjunto têm contratos resolvidos e empréstimos devolvidos (a virada de um país); padrão: todos. */
+  scope?: ReadonlySet<TeamId>
   /** Os empréstimos acabam e voltam para o clube de origem (padrão: sim, na virada). */
   returnLoans?: boolean
 }
@@ -61,11 +67,12 @@ export interface ExpireResult {
 
 export function expireContracts(input: ExpireInput): ExpireResult {
   const { teams, year, rng, userTeamId } = input
-  const due = input.due ?? ((p: Player) => expiresBy(p, year))
+  const due = input.due ?? ((p: Player) => p.contract.endDate <= contractEndFor(year, input.split ?? false))
+  const inScope = (p: Player) => !input.scope || (p.teamId !== null && input.scope.has(p.teamId))
   // Empréstimos acabam: o jogador volta ao clube de origem, com o contrato que tinha lá.
   let players = input.players.map((p) => {
     const origin = p.contract.loanedFrom
-    if (input.returnLoans === false || !origin || !teams.some((t) => t.id === origin)) return p
+    if (input.returnLoans === false || !origin || !inScope(p) || !teams.some((t) => t.id === origin)) return p
     const back = p.contract.loanOriginal ?? { salary: p.contract.salary, endDate: p.contract.endDate, releaseClause: p.contract.releaseClause }
     return { ...p, teamId: origin, contract: { ...back } }
   })
@@ -82,10 +89,12 @@ export function expireContracts(input: ExpireInput): ExpireResult {
     released.push({ playerId: p.id, name: p.nickname ?? p.name, age: p.age, teamId: p.teamId })
   }
   const renew = (p: Player, salary: number) => {
-    renewals.set(p.id, renewedContract(rng, p, year, salary))
+    const cycle = p.teamId && input.cycleOf ? input.cycleOf(p.teamId) : { year, split: input.split ?? false }
+    renewals.set(p.id, renewedContract(rng, p, cycle.year, salary, cycle.split))
     renewed++
   }
   for (const team of teams) {
+    if (input.scope && !input.scope.has(team.id)) continue
     const squad = squads.get(team.id) ?? []
     const expiring = squad.filter(due)
     if (expiring.length === 0) continue

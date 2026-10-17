@@ -642,6 +642,10 @@ export const CAREER = {
 // ---------------------------------------------------------------------------
 
 export const OFFSEASON = {
+  /** Jogador livre há tantos dias ou mais (desde o fim do contrato) sai do jogo na virada de temporada do país. */
+  freeAgentDays: 200,
+  /** O histórico de transferências guarda os últimos tantos dias. */
+  historyDays: 800,
   reputation: {
     /** Pontos de reputação por (posição esperada − posição final) / step, limitados a ±max. */
     positionStep: 5,

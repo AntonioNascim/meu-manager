@@ -11,7 +11,8 @@ import { expectedSalary } from '../market/value'
 import type { PricingClub } from '../market/value'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
-import { contractEndOn } from '../season/dates'
+import { contractEndFor } from '../season/dates'
+import { cycleOfTeam } from '../season/cycles'
 import type { SeasonState } from '../season/calendar'
 import { SQUAD_MAX } from '../types'
 import type { Player, PlayerId, TeamId } from '../types'
@@ -49,9 +50,9 @@ export function potentialStars(player: Pick<Player, 'id' | 'age' | 'hidden'>): P
 export const youthSalary = (player: Player, club?: PricingClub): number => Math.max(club && salaryScale(club) < 1 ? Math.round(OFFSEASON.renewal.minimumSalary * salaryScale(club)) : OFFSEASON.renewal.minimumSalary, Math.round((expectedSalary(player, club) * ACADEMY.salaryShare) / 1_000) * 1_000)
 
 /** O jovem como jogador do elenco profissional, com contrato de jovem. `year` = ano em que a temporada começa/está em andamento. */
-export function toProfessional(player: Player, year: number, club?: PricingClub): Player {
+export function toProfessional(player: Player, year: number, club?: PricingClub, split = false): Player {
   const salary = youthSalary(player, club)
-  return { ...player, contract: { salary, endDate: contractEndOn(year + ACADEMY.contractYears), releaseClause: salary * 36 } }
+  return { ...player, contract: { salary, endDate: contractEndFor(year + ACADEMY.contractYears, split), releaseClause: salary * 36 } }
 }
 
 /** Valor do jovem para a IA: força de hoje mais parte da margem até o potencial. */
@@ -79,11 +80,11 @@ export function promoteYouth(state: SeasonState, playerId: PlayerId): SeasonStat
   if (state.players.filter((p) => p.teamId === team.id).length >= SQUAD_MAX) throw new AcademyError('squad-full', `O elenco profissional já tem ${SQUAD_MAX} jogadores`)
   const squad = state.players.filter((p) => p.teamId === team.id)
   if (squadForeignBlocked(team, squad, youth)) throw new AcademyError('foreign-limit', `Limite de estrangeiros da liga: o elenco já tem ${foreignCount(squad, team)} (máximo ${team.foreignLimit?.squad}) e ${youth.name} é estrangeiro. Dispense ou venda um estrangeiro antes, ou dispense o jovem.`)
-  const year = Number(state.season.currentDate.slice(0, 4))
+  const cycle = cycleOfTeam(state, team.id)
   return {
     ...state,
     academy: state.academy.filter((p) => p.id !== playerId),
-    players: [...state.players, toProfessional(youth, year, team)],
+    players: [...state.players, toProfessional(youth, cycle.year, team, cycle.split)],
     teams: state.teams.map((t) => (t.id === team.id ? { ...t, squad: [...t.squad, playerId] } : t)),
   }
 }

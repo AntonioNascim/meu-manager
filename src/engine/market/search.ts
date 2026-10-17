@@ -3,6 +3,7 @@ import { MARKET } from '../config'
 import { valueScale } from '../economy'
 import { playerOverall } from '../overall'
 import type { SeasonState } from '../season/calendar'
+import { cycleOfTeam } from '../season/cycles'
 import { potentialRange } from '../training'
 import type { IsoDate, Nationality, Player, Position, Team, TeamId } from '../types'
 import { marketValue } from './value'
@@ -75,9 +76,14 @@ export function strengthValue(overall: number): number {
 
 export const isLastContractYear = (p: Pick<Player, 'contract'>, year: number): boolean => Number(p.contract.endDate.slice(0, 4)) <= year
 
+/** O contrato termina até o último dia da temporada do clube dele? */
+export const expiresThisSeason = (state: Pick<SeasonState, 'cycles' | 'season' | 'focus'>, p: Pick<Player, 'contract' | 'teamId'>): boolean => p.teamId !== null && p.contract.endDate <= cycleOfTeam(state, p.teamId).end
+
 export interface SearchContext {
   date: IsoDate
   year: number
+  /** O contrato do jogador termina nesta temporada (a do clube dele)? */
+  expiring: (p: Pick<Player, 'contract' | 'teamId'>) => boolean
   /** Dinheiro que o time pode gastar em compras (orçamento de transferências limitado ao caixa). */
   budget: number
   /** Força mediana do elenco do time: as barganhas precisam ao menos servir. */
@@ -98,6 +104,7 @@ export function searchContext(state: SeasonState, userTeamId: TeamId): SearchCon
   return {
     date: state.season.currentDate,
     year: state.season.year,
+    expiring: (p) => expiresThisSeason(state, p),
     budget: team ? Math.min(team.finances.transferBudget, team.finances.balance) : 0,
     medianOverall: squad[Math.floor(squad.length / 2)] ?? 0,
     teams: new Map(state.teams.map((t) => [t.id, t])),
@@ -116,7 +123,7 @@ export function matchesQuick(p: Player, quick: QuickFilter, ctx: SearchContext):
     case 'prospect':
       return p.age <= MARKET.search.prospectAge && potentialRange(p).high >= MARKET.search.prospectPotential
     case 'expiring':
-      return p.teamId !== null && isLastContractYear(p, ctx.year)
+      return p.teamId !== null && ctx.expiring(p)
   }
 }
 
@@ -133,7 +140,7 @@ export function searchPlayers(state: SeasonState, userTeamId: TeamId, filters: M
     if (filters.tier !== 'all' && (p.teamId === null || tiers.get(p.teamId) !== filters.tier)) return false
     if (filters.situation === 'free' && p.teamId !== null) return false
     if (filters.situation === 'club' && p.teamId === null) return false
-    if (filters.situation === 'expiring' && (p.teamId === null || !isLastContractYear(p, ctx.year))) return false
+    if (filters.situation === 'expiring' && (p.teamId === null || !ctx.expiring(p))) return false
     if (!inGroup(p, filters.group)) return false
     if (filters.position !== 'all' && p.position !== filters.position) return false
     if (filters.nationality !== 'all' && p.nationality !== filters.nationality) return false

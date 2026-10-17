@@ -4,7 +4,7 @@ import { squadForeignBlocked } from '../foreign'
 import { ageOneYear } from '../offseason/evolution'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits } from '../offseason/squad'
 import type { Rng } from '../rng'
-import { contractEndOn } from '../season/dates'
+import { contractEndFor } from '../season/dates'
 import { SQUAD_MAX } from '../types'
 import type { Player, Position, Team, TeamId, YouthRequest } from '../types'
 import { toProfessional, worthPromoting, youthValue } from './index'
@@ -19,6 +19,8 @@ export interface AcademyTurnInput {
   rng: Rng
   /** Ano da temporada que acabou. */
   year: number
+  /** A temporada do país atravessa o ano. */
+  split?: boolean
   userTeamId?: TeamId
   createYouth: YouthFactory
   taken: Set<string>
@@ -37,10 +39,11 @@ export interface AcademyTurn {
 const POSITION_BAG: Position[] = (Object.keys(CORE_COUNTS) as Position[]).flatMap((p) => Array<Position>(CORE_COUNTS[p]).fill(p))
 
 /** O jovem da base não tem salário até ser promovido. */
-const asAcademy = (p: Player, year: number): Player => ({ ...p, contract: { salary: 0, endDate: contractEndOn(year), releaseClause: 0 } })
+const asAcademy = (p: Player, year: number, split: boolean): Player => ({ ...p, contract: { salary: 0, endDate: contractEndFor(year, split), releaseClause: 0 } })
 
 export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
   const nextYear = input.year + 1
+  const split = input.split ?? false
   const evolveRng = input.rng.fork('academy-evolution')
   const arrivalRng = input.rng.fork('academy-arrivals')
   const players = [...input.players]
@@ -55,7 +58,7 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
     const squad = players.filter((p) => p.teamId === team.id)
     const count = (map: Record<TeamId, number>) => (map[team.id] = (map[team.id] ?? 0) + 1)
     const promote = (p: Player) => {
-      const pro = toProfessional(p, nextYear, team)
+      const pro = toProfessional(p, nextYear, team, split)
       players.push(pro)
       squad.push(pro)
       count(promoted)
@@ -80,7 +83,7 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
     // 1) Quem já tinha 20 anos e o jogador deixou sem decisão: a regra da IA decide.
     if (isUser) youths = youths.filter((p) => p.age < ACADEMY.graduationAge || !aiDecides(p, true))
     // 2) Um ano a mais para todos (evoluem um pouco mais devagar que quem joga).
-    youths = youths.map((p) => asAcademy(ageOneYear(evolveRng, p, 0), nextYear))
+    youths = youths.map((p) => asAcademy(ageOneYear(evolveRng, p, 0), nextYear, split))
     // 3) A IA decide sobre os de 20 anos e promove os que já valem a pena, do mais valioso para o menos.
     if (!isUser) youths = [...youths].sort((a, b) => youthValue(b) - youthValue(a)).filter((p) => !aiDecides(p, p.age >= ACADEMY.graduationAge))
     // 4) Chegam de 3 a 5 jovens. Base cheia: a IA dispensa os de menor valor; o jogador fica sem as vagas que faltam.
@@ -96,10 +99,10 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
     if (n > 0) {
       const positions = Array.from({ length: n }, () => arrivalRng.pick(POSITION_BAG))
       const ages = positions.map(() => arrivalRng.int(ACADEMY.arrivalAge[0], ACADEMY.arrivalAge[1]))
-      const made = input.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), positions, ages, academy: true, year: nextYear }, arrivalRng, input.taken)
+      const made = input.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), positions, ages, academy: true, year: nextYear, ...(split ? { split } : {}) }, arrivalRng, input.taken)
       for (const p of made) {
         input.taken.add(p.name)
-        youths.push(asAcademy({ ...p, id: `player-${++counter}`, teamId: team.id }, nextYear))
+        youths.push(asAcademy({ ...p, id: `player-${++counter}`, teamId: team.id }, nextYear, split))
       }
       arrivals[team.id] = made.length
     }

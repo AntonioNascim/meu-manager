@@ -1,5 +1,5 @@
 import { ACADEMY, OFFSEASON } from '../engine/config'
-import { contractEndOn } from '../engine/season/dates'
+import { contractEndFor } from '../engine/season/dates'
 import type { YouthFactory } from '../engine/offseason'
 import { playerOverall } from '../engine/overall'
 import { createGenerationContext, generatePlayer } from './generatePlayer'
@@ -28,6 +28,6 @@ export const createYouth: YouthFactory = (request, rng, taken) => {
     const generated = generatePlayer(rng, ctx, { position, quality, age, teamId: request.teamId, tier: request.tier, ...(request.country ? { country: request.country } : {}) })
     const player = withLeagueSalary(request.academy && !wonderkid ? { ...generated, hidden: { ...generated.hidden, potential: Math.max(Math.round(playerOverall(generated)), generated.hidden.potential + (ACADEMY.potentialOffset[request.tier] ?? 0)) } } : generated, club)
     const salary = player.contract.salary
-    return { ...player, contract: { ...player.contract, endDate: contractEndOn(request.year + rng.int(2, 4)), releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000 } }
+    return { ...player, contract: { ...player.contract, endDate: contractEndFor(request.year + rng.int(2, 4), request.split), releaseClause: Math.round((salary * rng.int(24, 48)) / 1000) * 1000 } }
   })
 }

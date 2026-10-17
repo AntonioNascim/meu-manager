@@ -34,6 +34,12 @@ export function contractEndAfter(cycle: Pick<Cycle, 'end'>, years: number): IsoD
   return makeDate(y + years, m, d)
 }
 
+/** Fim do contrato `years` temporadas depois da temporada atual do clube (contrato novo de quem chega ou renova hoje). */
+export function contractEndIn(state: Pick<SeasonState, 'cycles' | 'season' | 'focus'>, teamId: TeamId, years: number): IsoDate {
+  const cycle = cycleOfTeam(state, teamId)
+  return contractEndAfter(cycle, years)
+}
+
 /** A pirâmide do técnico (a do foco); sem foco, a da primeira competição. */
 export function focusPyramid(state: Pick<SeasonState, 'focus' | 'season'>): string {
   return state.focus ?? (state.season.competitions[0] ? pyramidOf(state.season.competitions[0]) : DEFAULT_PYRAMID)

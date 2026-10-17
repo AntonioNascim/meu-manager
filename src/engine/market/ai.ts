@@ -12,7 +12,8 @@ import { playerOverall } from '../overall'
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
 import type { SeasonState } from '../season/calendar'
-import { addDays, contractEndOn } from '../season/dates'
+import { addDays } from '../season/dates'
+import { contractEndIn } from '../season/cycles'
 import { actsThisRound, quickTeamIds } from '../season/fidelity'
 import type { IsoDate, Listing, OfferKind, Player, Position, Team, TeamId, TransferOffer, TransferWindow } from '../types'
 import { buyerCheck, playerDecision, premiumPrice, sellerDecision } from './decision'
@@ -285,7 +286,7 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
       toTeamId: team.id,
       fee: target.fee,
       salary,
-      contractEnd: contractEndOn(current.season.year + rng.int(minYears, maxYears)),
+      contractEnd: contractEndIn(current, team.id, rng.int(minYears, maxYears)),
       kind: 'purchase',
       date,
     })
@@ -349,7 +350,7 @@ function proposeToUser(
     sellerId: userTeamId,
     fee,
     salary,
-    contractEnd: kind === 'loan' ? contractEndOn(state.season.year) : contractEndOn(state.season.year + rng.int(...MARKET.ai.contractYears)),
+    contractEnd: kind === 'loan' ? contractEndIn(state, team.id, 0) : contractEndIn(state, team.id, rng.int(...MARKET.ai.contractYears)),
     createdOn: date,
     dueOn: lastDay < window.end ? lastDay : window.end,
     status: 'pending',

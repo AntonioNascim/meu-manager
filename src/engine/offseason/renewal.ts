@@ -8,7 +8,7 @@ import { playingTimeIn } from '../market/decision'
 import { expectedSalary } from '../market/value'
 import { playerOverall } from '../overall'
 import type { SeasonState } from '../season/calendar'
-import { contractEndOn } from '../season/dates'
+import { contractEndAfter, cycleOfTeam } from '../season/cycles'
 import type { OfferReason, Player, PlayerId, Team, TeamId } from '../types'
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
@@ -72,7 +72,9 @@ export function renewUserContract(state: SeasonState, teamId: TeamId, request: {
   const verdict = renewalDecision({ player, team, squad, salary: request.salary })
   if (!verdict.accepted) return { state, accepted: false, ...(verdict.reason ? { reason: verdict.reason } : {}), ...(verdict.minimumSalary !== undefined ? { minimumSalary: verdict.minimumSalary } : {}) }
 
-  const endYear = Math.max(Number(player.contract.endDate.slice(0, 4)), state.season.year) + request.years
-  const contract = { salary: request.salary, endDate: contractEndOn(endYear), releaseClause: Math.round((request.salary * 36) / 1000) * 1000 }
+  // Contrato novo: `years` temporadas depois do fim do contrato atual (ou da temporada, se ele já vence antes dela).
+  const cycle = cycleOfTeam(state, teamId)
+  const currentEnd = player.contract.endDate > cycle.end ? player.contract.endDate : cycle.end
+  const contract = { salary: request.salary, endDate: contractEndAfter({ end: currentEnd }, request.years), releaseClause: Math.round((request.salary * 36) / 1000) * 1000 }
   return { state: { ...state, players: state.players.map((p) => (p.id === player.id ? { ...p, contract } : p)) }, accepted: true }
 }
