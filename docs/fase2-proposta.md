@@ -309,7 +309,7 @@ Cada etapa termina com os testes de hoje passando e os resultados do mundo atual
 | **B3** | Resultado simplificado + pré-aquecimento + testes comparando com o completo | Só depois de B2 há "outras ligas" para simplificar |
 | **B4** | Salvamento em partes + compressão + versão 10 | Pode andar junto com B3 |
 | **B5** | Economia por liga (`R`), termo de liga no interesse, limite de estrangeiros, freio de exportação | Precisa das ligas todas existindo |
-| **B6** | Teste de longo prazo das 15 ligas, ajuste fino, pacote do usuário com várias ligas (tirar `unsupported-leagues` aos poucos) | Fecha a fase. Feito (seção 14), menos o pacote com várias ligas |
+| **B6** | Teste de longo prazo das 15 ligas, ajuste fino, pacote do usuário com várias ligas (tirar `unsupported-leagues` aos poucos) | Fecha a fase. Feito nas seções 14 (B6) e 15 (B7, pacote com várias ligas) |
 
 ---
 
@@ -616,3 +616,42 @@ Não era realista: o elenco da Série A vale 2,2 a 2,5 vezes a receita (razoáve
 - **Pacote do usuário com várias ligas** (tirar o `unsupported-leagues` do importador): não foi pedido nesta parte e fica para a B7. A carreira já funciona num mundo com várias ligas (testada no mundo de escala), mas o jogo de hoje só cria mundos de uma pirâmide.
 - **Treino das ligas simplificadas de uma vez só** e **meta de tempo do mercado do mundo grande** (primeiro avanço < 1 s): sem mudança; o teste longo mostra que o mercado das 15 ligas custa ~17 minutos em 30 temporadas (~34 s por temporada).
 - **Equador (+3,1) e Brasil C (+3,5)** sobem mais que as outras ligas em 30 anos, dentro do limite do teste (3,5 e 4,5). O puxão assimétrico da reputação (item 3) empurra um pouco a média das ligas pequenas para cima; se for preciso, o próximo passo é puxar mais forte quem está abaixo da média.
+
+---
+
+## 15. Resultado da parte B7 (pacote de dados com várias ligas)
+
+O formato completo, campo a campo e com exemplos, está em **`docs/formato-pacote.md`** (é o arquivo para montar o pacote real).
+
+**Feito na B7**
+
+1. **O importador aceita vários países e ligas** (`src/data/package/validate.ts`, `load.ts`, `leagueDefaults.ts`). O formato continua na versão 1 (só ganhou campos opcionais). Cada país tem de 1 a 3 divisões em sequência; um país com uma divisão só é uma liga fechada (`promotion` e `relegation` 0). Cada divisão tem de 4 a 40 times (número par); `promotion` de uma divisão tem de ser igual ao `relegation` da de cima, e a primeira não sobe nem a última cai. Campos novos de liga, todos opcionais: `economy` (`revenue` e `level`, com os padrões calibrados na B5/B6 para os 14 países), `rounds` (turno único), `region` (janelas de transferência; padrão do país) e `foreignLimit`. O `id` de país precisa ser uma das 14 nacionalidades do jogo (entraram Inglaterra, Espanha, Itália, Alemanha, França e Portugal, com rótulo e bandeira). O pacote fictício padrão (Brasil, 20 times, 4 sobem e 4 caem) segue sem ligas explícitas, e o mundo gerado é byte a byte o mesmo de antes (`isClassicPackage`).
+2. **Mundo com várias pirâmides.** Cada país vira uma pirâmide (`Competition.pyramid`), com `economy`, `country`, `foreignLimit` e quantos sobem e caem vindos do pacote. O jogador sem atributos, a base e as finanças derivadas já usam a economia da liga (nível dos titulares, salário, caixa e preço do ingresso). Com mais de um país, o jogo começa com o foco (lance a lance) na pirâmide do clube escolhido e o resto no simplificado; `createGame` aceita o mundo já montado (`options.world`) para não montar duas vezes.
+3. **Limite de estrangeiros** (`Team.country`, `Team.foreignLimit`, `src/engine/foreign.ts`). Estrangeiro é quem tem nacionalidade diferente da do país da liga. `squad` (máximo no elenco): barra compra, empréstimo, jogador livre e pré-contrato com o motivo "Limite de estrangeiros da liga", e a IA nem escolhe esses alvos (compra, proposta ao jogador e pré-contrato). `lineup` (máximo entre os 11 titulares): vale na escalação da IA (`aiTactic`, virada, venda), na escalação simplificada das ligas fora do foco, na sugestão automática do jogador, no conserto da tática antes do jogo (`repairTactic`) e como bloqueio quando o técnico tenta escalar mais (`setUserTactic` recusa com mensagem; telas Tática e Escalação mostram "Estrangeiros entre os titulares: N de no máximo M"). Quem já passa do limite ao começar fica (só se barra a entrada de mais um). Não são limitados: as substituições durante a partida, a promoção de jovens da base e quem o técnico já tem ao trocar de clube. País e limite acompanham o clube no acesso e rebaixamento, como a economia. A base dos clubes de fora do Brasil agora nasce com a nacionalidade do país (antes todo jovem era brasileiro, o que estourava o limite em poucas temporadas).
+4. **Novo jogo: país, liga e clube** (`NewGame.tsx`, `worldChoices.ts`). Com mais de um país aparece primeiro o seletor de país (rolagem horizontal), depois as divisões do país e os clubes da divisão por força; com um país só nada muda. As telas passaram a mostrar o **nome da liga** em vez de "Série A/B/C" (tabela, rodadas, artilharia, histórico, painel, página do time, lista de saves), e o arquivo de temporadas passadas guarda a ordem das ligas quando há mais de um país.
+5. **Pacote de exemplo com as 15 ligas** (`src/diagnostics/scalePackage.ts`, `node tools/run.mjs exportScalePackage`): `dados-reais/mundo-ficticio-15-ligas.json`, 1,14 MB, 13 países, 15 ligas, 282 clubes e 7.414 jogadores, **sem atributos, contratos nem base** (só o que um pacote real traria), com turno único na Argentina e limites de estrangeiros em Argentina (6 no elenco), Itália (8 titulares), Inglaterra (17 no elenco) e Espanha (9 titulares). Tudo inventado; a pasta `dados-reais/` não entra no repositório. `node tools/run.mjs packageYears` joga temporadas com ele.
+6. **Medida de importação** (`measureImport` em `src/diagnostics/measure.ts`, seção "Importar um pacote de dados" em `?diagnostico=1`, `node tools/run.mjs measureImport [arquivo]`): mede ler o arquivo, `JSON.parse`, validar, a cópia para o IndexedDB, montar o mundo, criar o jogo, o primeiro avanço e o primeiro save, com o pacote gerado na tela ou com um arquivo do aparelho, e diz se as metas foram atingidas (importar até 5 s, começar o jogo até 3 s, primeiro avanço até 20 s).
+
+**Tempo neste computador** (pacote de 15 ligas, 1,14 MB; o do celular está por medir em `?diagnostico=1`)
+
+| Etapa | Tempo |
+|---|---|
+| Ler o arquivo | 7 ms |
+| `JSON.parse` + validar | 6 + 33 ms |
+| Cópia para o IndexedDB | 18 ms |
+| Montar o mundo (atributos de 7.414 jogadores, táticas, finanças, base) | 0,5 s |
+| **Importar (tudo isso)** | **0,6 s** (meta 5 s) |
+| Criar o jogo e o calendário das 15 ligas (4.808 partidas) | 90 ms (meta 3 s) |
+| Primeiro avanço (a pré-temporada com o mercado de todos os clubes) | 5,3 s (meta 20 s; é o mesmo custo da B3) |
+
+Num aparelho 3 a 6 vezes mais lento, importar fica em 2 a 4 s e começar o jogo em menos de 1 s; o primeiro avanço é o que pesa (16 a 32 s estimados, acima da meta de 20 s no pior caso): reduzir exige limitar candidatos por clube no mercado, que muda as decisões da IA, e continua pendente.
+
+**Jogo com o pacote de exemplo** (`tests/balance/packageLeagues.test.ts`, 3 temporadas com mercado e virada): nenhum clube acima do limite de estrangeiros do elenco em nenhum ano (a primeira versão estourava em 15 clubes na terceira temporada, por causa da base brasileira em todos os países, corrigida), nenhum clube no vermelho.
+
+**Testes:** `tests/multiPackage.test.ts` (validação de países e ligas, economia padrão e a do pacote, jogo com foco por país, escolha do país, limite de estrangeiros no mercado, na escalação da IA, do técnico e do simplificado, medida de importação) e `tests/balance/packageLeagues.test.ts`. `npm test` 704 testes passando, `npm run test:balance` 96. **Save:** `Team.country`, `Team.foreignLimit`, `Competition.country/foreignLimit` e `SaveSummary.league` são opcionais; a versão do save continua 10 e saves antigos abrem iguais.
+
+**O que ficou para depois**
+- **Primeiro avanço do mundo grande** (pré-temporada com o mercado de 282 clubes, ~5 s aqui): meta de tempo do mercado ainda não atingida.
+- **Limite de estrangeiros na promoção da base e nas substituições ao vivo:** não é barrado; o técnico que promove um jovem estrangeiro pode passar do limite do elenco (só a escalação continua obrigada a cumprir `lineup`).
+- **Editor de dados e pacote real** (Fases 4 e 5 do plano): o formato está documentado para montar o pacote real, que fica fora do repositório.
+- **Nomes dos jogadores do pacote de exemplo** vêm de bancos de nomes brasileiros e espanhóis, qualquer que seja a nacionalidade; vale só como teste de importação.

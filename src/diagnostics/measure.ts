@@ -357,7 +357,7 @@ export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', 
 // ---------------------------------------------------------------------------
 
 /** Metas no aparelho de referência para importar um pacote do tamanho do plano (15 ligas, 282 clubes) e começar o jogo. */
-export const IMPORT_TARGETS = { importSeconds: 5, startSeconds: 8 } as const
+export const IMPORT_TARGETS = { importSeconds: 5, startSeconds: 3 } as const
 
 export interface ImportMeasurement {
   label: string
@@ -381,7 +381,7 @@ export interface ImportMeasurement {
   firstAdvanceMs: number
   /** Primeiro save do jogo novo (grava tudo); `null` sem IndexedDB. */
   firstSaveMs: number | null
-  /** Importar (ler + validar + guardar + montar o mundo) e começar (criar o jogo + primeiro avanço). */
+  /** Importar (ler + validar + guardar + montar o mundo) e começar (criar o jogo; o primeiro avanço é a pré-temporada inteira do mercado e tem meta própria). */
   importMs: number
   startMs: number
   errors: number
@@ -437,7 +437,7 @@ export async function measureImport(text: string, options: { label: string; read
     if (options.saveStore === undefined) await store.destroy().catch(() => undefined)
   }
   const importMs = (options.readMs ?? 0) + parseMs + validateMs + (cloneMs ?? 0) + worldMs
-  return { ...empty, clubs: pkg.clubs.length, players: pkg.players.length, leagues: pkg.leagues.length, countries: pkg.countries.length, cloneMs, worldMs, gameMs, firstAdvanceMs, firstSaveMs, importMs, startMs: gameMs + firstAdvanceMs }
+  return { ...empty, clubs: pkg.clubs.length, players: pkg.players.length, leagues: pkg.leagues.length, countries: pkg.countries.length, cloneMs, worldMs, gameMs, firstAdvanceMs, firstSaveMs, importMs, startMs: gameMs }
 }
 
 /** Texto das medidas de importação, para juntar ao relatório do aparelho. */
@@ -454,8 +454,8 @@ export function formatImportReport(m: ImportMeasurement): string {
     lines.push(
       `Montar o mundo (atributos, taticas, financas, base): ${f0(m.worldMs)} ms`,
       `Importar (tudo acima): ${(m.importMs / 1000).toFixed(1)} s - meta ${T.importSeconds} s: ${ok(m.importMs / 1000 <= T.importSeconds)}`,
-      `Criar o jogo (calendario das ligas): ${f0(m.gameMs)} ms | primeiro avanco: ${f0(m.firstAdvanceMs)} ms | primeiro save: ${m.firstSaveMs === null ? 'indisponivel' : `${f0(m.firstSaveMs)} ms`}`,
-      `Comecar o jogo (criar + primeiro avanco): ${(m.startMs / 1000).toFixed(1)} s - meta ${T.startSeconds} s: ${ok(m.startMs / 1000 <= T.startSeconds)}`,
+      `Comecar o jogo (criar o jogo e o calendario das ligas): ${f0(m.startMs)} ms - meta ${T.startSeconds} s: ${ok(m.startMs / 1000 <= T.startSeconds)}`,
+      `Primeiro avanco (a pre-temporada com o mercado de todos os clubes): ${(m.firstAdvanceMs / 1000).toFixed(1)} s - meta ${REFERENCE_TARGETS.worstAdvanceSeconds} s: ${ok(m.firstAdvanceMs / 1000 <= REFERENCE_TARGETS.worstAdvanceSeconds)} | primeiro save: ${m.firstSaveMs === null ? 'indisponivel' : `${f0(m.firstSaveMs)} ms`}`,
     )
   }
   return lines.join('\n')

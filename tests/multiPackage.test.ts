@@ -244,6 +244,7 @@ describe('medida de importação (?diagnostico=1)', () => {
     expect(text).toContain('15 ligas')
     expect(text).toContain('Importar (tudo acima)')
     expect(text).toContain('Comecar o jogo')
+    expect(text).toContain('Primeiro avanco')
   })
 
   it('um arquivo que não é pacote só mostra os erros', async () => {
