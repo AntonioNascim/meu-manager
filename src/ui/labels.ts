@@ -4,6 +4,7 @@
  * Os `Record` abaixo fazem o TypeScript acusar rótulo faltando quando um valor novo é criado.
  */
 import type { PackageIssue } from '../data/package/types'
+import { COUNTRY_INFO } from './countries'
 import type {
   BoardStatus,
   TrainingFocus,
@@ -56,22 +57,8 @@ export const POSITION_SHORT_LABELS: Record<Position, string> = {
   ST: 'ATA',
 }
 
-export const NATIONALITY_LABELS: Record<Nationality, string> = {
-  Brazil: 'Brasil',
-  Argentina: 'Argentina',
-  Uruguay: 'Uruguai',
-  Paraguay: 'Paraguai',
-  Chile: 'Chile',
-  Colombia: 'Colômbia',
-  Peru: 'Peru',
-  Ecuador: 'Equador',
-  England: 'Inglaterra',
-  Spain: 'Espanha',
-  Italy: 'Itália',
-  Germany: 'Alemanha',
-  France: 'França',
-  Portugal: 'Portugal',
-}
+/** Nome em português de cada país (a nacionalidade do jogador); a lista vem de `countries.ts`. */
+export const NATIONALITY_LABELS = Object.fromEntries(Object.entries(COUNTRY_INFO).map(([id, c]) => [id, c.name])) as Record<Nationality, string>
 
 export const FOOT_LABELS: Record<Foot, string> = {
   right: 'Direito',
@@ -398,6 +385,7 @@ export function packageIssueText(issue: PackageIssue): string {
     case 'league-size-unsupported': return `Cada divisão precisa ter um número par de times, de 4 a 40 (${path} declara ${detail}).`
     case 'league-promotion': return `Acesso e rebaixamento em ${path}: o número precisa ser ${expected} (veio ${detail}); quem cai de uma divisão é quem sobe para a de baixo.`
     case 'unsupported-leagues': return `O país "${expected}" tem ${detail} divisões em ${path}. Cada país precisa ter de 1 a 3 divisões em sequência (nível 1, 2 e 3).`
+    case 'league-defaults-missing': return `Não há economia padrão para o país "${detail}" (${path}): a liga usa a do Brasil e as janelas da Europa. Preencha "economy" e "region" da liga se quiser outra coisa.`
     case 'tiebreakers-unsupported': return `Os critérios de desempate de ${path} são diferentes dos do jogo e serão ignorados: vale a ordem padrão.`
   }
 }

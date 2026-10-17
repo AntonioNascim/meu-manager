@@ -1,0 +1,209 @@
+Afghanistan|Afeganistão|v:krg/disc:w
+Albania|Albânia|h:r/star:k
+Algeria|Argélia|v:wg/disc:r
+American Samoa|Samoa Americana|h:n/tri:w
+Andorra|Andorra|v:byr
+Angola|Angola|h:rk/disc:y
+Anguilla|Anguilla|h:n/cant:n
+Antigua and Barbuda|Antígua e Barbuda|h:r/tri:k
+Argentina|Argentina|h:lwl/disc:y
+Armenia|Armênia|h:rbo
+Aruba|Aruba|h:l/star:r
+Australia|Austrália|h:n/star:w
+Austria|Áustria|h:rwr
+Azerbaijan|Azerbaijão|h:brg/disc:w
+Bahamas|Bahamas|h:tyt/tri:k
+Bahrain|Bahrein|v13:wr
+Bangladesh|Bangladesh|h:g/disc:r
+Barbados|Barbados|v:nyn
+Belarus|Belarus|h21:rg/tri:w
+Belgium|Bélgica|v:kyr
+Belize|Belize|h:b/disc:w
+Benin|Benin|h:yr/tri:g
+Bermuda|Bermudas|h:r/cant:r
+Bhutan|Butão|h:yo
+Bolivia|Bolívia|h:ryg
+Bosnia and Herzegovina|Bósnia e Herzegovina|h:b/tri:y
+Botswana|Botsuana|h:lwkwl
+Brazil|Brasil|h:g/disc:b
+British Virgin Islands|Ilhas Virgens Britânicas|h:n/cant:n
+Brunei|Brunei|h:y/disc:r
+Bulgaria|Bulgária|h:wgr
+Burkina Faso|Burkina Faso|h:rg/star:y
+Burundi|Burundi|h:rg/x:w
+Cambodia|Camboja|h121:brb/star:w
+Cameroon|Camarões|v:gry/star:y
+Canada|Canadá|v121:rwr/star:r
+Cape Verde|Cabo Verde|h:b/disc:y
+Cayman Islands|Ilhas Cayman|h:n/cant:n
+Central African Republic|República Centro-Africana|h:bwgy/pl:r
+Chad|Chade|v:byr
+Chile|Chile|h:wr/cant:b
+China|China|h:r/star:y
+Colombia|Colômbia|h211:ybr
+Comoros|Comores|h:ywrb/tri:g
+Congo|Congo|h:gyr
+Costa Rica|Costa Rica|h12421:bwrwb
+Croatia|Croácia|h:rwb
+Cuba|Cuba|h:bwbwb/tri:r
+Curaçao|Curaçao|h:n/star:w
+Cyprus|Chipre|h:w/disc:o
+Czech Republic|República Tcheca|h:wr/tri:b
+Denmark|Dinamarca|nord:r:w
+DR Congo|RD Congo|h:l/star:y
+Djibouti|Djibuti|h:lg/tri:w
+Dominica|Dominica|h:g/disc:r
+Dominican Republic|República Dominicana|h:bwr/pl:w
+Ecuador|Equador|h211:ybr
+Egypt|Egito|h:rwk
+El Salvador|El Salvador|h:bwb
+England|Inglaterra|h:w/pl:r
+Equatorial Guinea|Guiné Equatorial|h:gwr/tri:b
+Eritrea|Eritreia|h:gb/tri:r
+Estonia|Estônia|h:bkw
+Eswatini|Essuatíni|h:bymyb
+Ethiopia|Etiópia|h:gyr/disc:b
+Faroe Islands|Ilhas Faroé|nord:w:b:r
+Fiji|Fiji|h:l/cant:n
+Finland|Finlândia|nord:w:b
+France|França|v:bwr
+Gabon|Gabão|h:gyb
+Gambia|Gâmbia|h:rwbwg
+Georgia|Geórgia|h:w/pl:r
+Germany|Alemanha|h:kry
+Ghana|Gana|h:ryg/star:k
+Gibraltar|Gibraltar|h:wr
+Greece|Grécia|h:bwbwbwbwb/cant:b
+Grenada|Granada|h:r/star:y
+Guam|Guam|h:n/disc:r
+Guatemala|Guatemala|v:lwl
+Guinea|Guiné|v:ryg
+Guinea-Bissau|Guiné-Bissau|h:yg/tri:r
+Guyana|Guiana|h:g/tri:y
+Haiti|Haiti|h:br
+Honduras|Honduras|h:bwb
+Hong Kong|Hong Kong|h:r/star:w
+Hungary|Hungria|h:rwg
+Iceland|Islândia|nord:b:w:r
+India|Índia|h:owg/disc:n
+Indonesia|Indonésia|h:rw
+Iran|Irã|h:gwr/disc:r
+Iraq|Iraque|h:rwk/star:g
+Ireland|Irlanda|v:gwo
+Israel|Israel|h:wbbw
+Italy|Itália|v:gwr
+Ivory Coast|Costa do Marfim|v:owg
+Jamaica|Jamaica|h:g/x:y
+Japan|Japão|h:w/disc:r
+Jordan|Jordânia|h:kwg/tri:r
+Kazakhstan|Cazaquistão|h:l/disc:y
+Kenya|Quênia|h:krg
+Kosovo|Kosovo|h:b/star:w
+Kuwait|Kuwait|h:gwr/tri:k
+Kyrgyzstan|Quirguistão|h:r/disc:y
+Laos|Laos|h121:rbr/disc:w
+Latvia|Letônia|h212:mwm
+Lebanon|Líbano|h121:rwr/star:g
+Lesotho|Lesoto|h:bwg
+Liberia|Libéria|h:rwrwr/cant:b
+Libya|Líbia|h121:rkg
+Liechtenstein|Liechtenstein|h:br
+Lithuania|Lituânia|h:ygr
+Luxembourg|Luxemburgo|h:rwl
+Macau|Macau|h:g/star:w
+Madagascar|Madagascar|h:rg/tri:w
+Malawi|Malawi|h:krg
+Malaysia|Malásia|h:rwrwrwr/cant:n
+Maldives|Maldivas|h:r/cant:g
+Mali|Mali|v:gyr
+Malta|Malta|v:wr
+Mauritania|Mauritânia|h:g/star:y
+Mauritius|Maurício|h:rbyg
+Mexico|México|v:gwr/disc:e
+Moldova|Moldávia|v:byr
+Mongolia|Mongólia|v:rbr
+Montenegro|Montenegro|h:r/star:y
+Montserrat|Montserrat|h:n/cant:n
+Morocco|Marrocos|h:r/star:d
+Mozambique|Moçambique|h:gky/tri:r
+Myanmar|Mianmar|h:ygr/star:w
+Namibia|Namíbia|h:bwg/disc:y
+Nepal|Nepal|h:r/tri:n
+Netherlands|Países Baixos|h:rwb
+New Caledonia|Nova Caledônia|h:bkr/disc:y
+New Zealand|Nova Zelândia|h:n/star:r
+Nicaragua|Nicarágua|h:bwb
+Niger|Níger|h:owg/disc:o
+Nigeria|Nigéria|v:gwg
+North Korea|Coreia do Norte|h:bwrwb
+North Macedonia|Macedônia do Norte|h:r/disc:y
+Northern Ireland|Irlanda do Norte|h:w/pl:r
+Norway|Noruega|nord:r:w:n
+Oman|Omã|h:wrg/cant:r
+Pakistan|Paquistão|v14:wd
+Palestine|Palestina|h:kwg/tri:r
+Panama|Panamá|h:w/cant:b
+Papua New Guinea|Papua-Nova Guiné|h:rk
+Paraguay|Paraguai|h:rwb
+Peru|Peru|v:rwr
+Philippines|Filipinas|h:br/tri:w
+Poland|Polônia|h:wr
+Portugal|Portugal|v25:dr/disc:y
+Puerto Rico|Porto Rico|h:rwrwr/tri:b
+Qatar|Catar|v13:wm
+Romania|Romênia|v:byr
+Russia|Rússia|h:wbr
+Rwanda|Ruanda|h:lyg
+Saint Kitts and Nevis|São Cristóvão e Nevis|h:g/tri:k
+Saint Lucia|Santa Lúcia|h:l/tri:y
+Saint Vincent and the Grenadines|São Vicente e Granadinas|v:byg
+Samoa|Samoa|h:r/cant:b
+San Marino|San Marino|h:wl
+Sao Tome and Principe|São Tomé e Príncipe|h:gyg/tri:r
+Saudi Arabia|Arábia Saudita|h:d
+Scotland|Escócia|h:b/x:w
+Senegal|Senegal|v:gyr/star:g
+Serbia|Sérvia|h:rbw
+Seychelles|Seicheles|h:brywg
+Sierra Leone|Serra Leoa|h:gwb
+Singapore|Singapura|h:rw
+Slovakia|Eslováquia|h:wbr
+Slovenia|Eslovênia|h:wbr
+Solomon Islands|Ilhas Salomão|h:bg/tri:b
+Somalia|Somália|h:l/star:w
+South Africa|África do Sul|h:rb/tri:k
+South Korea|Coreia do Sul|h:w/disc:r
+South Sudan|Sudão do Sul|h:kwr/tri:b
+Spain|Espanha|h121:ryr
+Sri Lanka|Sri Lanka|v:gom
+Sudan|Sudão|h:rwk/tri:g
+Suriname|Suriname|h:gwrwg
+Sweden|Suécia|nord:b:y
+Switzerland|Suíça|h:r/pl:w
+Syria|Síria|h:rwk/star:g
+Taiwan|Taiwan|h:r/cant:b
+Tajikistan|Tajiquistão|h:rwg
+Tanzania|Tanzânia|h:gb/tri:y
+Thailand|Tailândia|h11211:rwbwr
+Timor-Leste|Timor-Leste|h:r/tri:k
+Togo|Togo|h:gygyg/cant:r
+Tonga|Tonga|h:r/cant:w
+Trinidad and Tobago|Trinidad e Tobago|h:r/x:k
+Tunisia|Tunísia|h:r/disc:w
+Turkey|Turquia|h:r/disc:w
+Turkmenistan|Turcomenistão|h:g/star:w
+Turks and Caicos|Ilhas Turcas e Caicos|h:n/cant:n
+Uganda|Uganda|h:kykrky
+Ukraine|Ucrânia|h:by
+United Arab Emirates|Emirados Árabes Unidos|h:gwk/tri:r
+United States|Estados Unidos|h:rwrwrwr/cant:n
+Uruguay|Uruguai|h:wlwlwlwlw
+US Virgin Islands|Ilhas Virgens Americanas|h:w
+Uzbekistan|Uzbequistão|h:bwg
+Vanuatu|Vanuatu|h:rg/tri:k
+Venezuela|Venezuela|h:ybr/star:w
+Vietnam|Vietnã|h:r/star:y
+Wales|País de Gales|h:wg/disc:r
+Yemen|Iêmen|h:rwk
+Zambia|Zâmbia|h:g/cant:r
+Zimbabwe|Zimbábue|h:gykykyg/tri:w

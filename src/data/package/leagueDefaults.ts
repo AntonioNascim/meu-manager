@@ -5,7 +5,7 @@ import type { LeagueEconomy, Nationality, Region } from '../../engine/types'
  * jogadores em relação ao Brasil). Os valores são os calibrados na B5/B6 (`docs/fase2-proposta.md`, seções 13 e 14). O
  * Brasil não tem economia: é a referência (receita 1, nível 0).
  */
-export const COUNTRY_DEFAULTS: Record<Nationality, { region: Region; economy?: LeagueEconomy }> = {
+export const COUNTRY_DEFAULTS: Partial<Record<Nationality, { region: Region; economy?: LeagueEconomy }>> = {
   Brazil: { region: 'BR' },
   Argentina: { region: 'SA', economy: { revenue: 0.6, level: -1 } },
   Uruguay: { region: 'SA', economy: { revenue: 0.3, level: -4 } },

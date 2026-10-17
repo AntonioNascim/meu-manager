@@ -86,7 +86,7 @@ describe('mundo montado de um pacote com várias ligas', () => {
     expect(comps).toHaveLength(15)
     expect(new Set(comps.map((c) => c.pyramid)).size).toBe(13)
     const england = teamIn('en-1')
-    expect(england.economy).toEqual(COUNTRY_DEFAULTS.England.economy)
+    expect(england.economy).toEqual(COUNTRY_DEFAULTS.England!.economy)
     expect(england.country).toBe('England')
     expect(teamIn('br-1').economy).toBeUndefined()
     expect(teamIn('br-1').country).toBeUndefined()

@@ -13,7 +13,7 @@ import { FULL_WORLD, buildScaleWorld } from './scaleWorld'
 
 /** País de cada liga do mundo de teste (a pirâmide é o prefixo do id). */
 const COUNTRY_OF: Record<string, Nationality> = { br: 'Brazil', ar: 'Argentina', uy: 'Uruguay', py: 'Paraguay', cl: 'Chile', co: 'Colombia', ec: 'Ecuador', en: 'England', es: 'Spain', it: 'Italy', de: 'Germany', fr: 'France', pt: 'Portugal' }
-const COUNTRY_NAME: Record<Nationality, string> = { Brazil: 'Brasil', Argentina: 'Argentina', Uruguay: 'Uruguai', Paraguay: 'Paraguai', Chile: 'Chile', Colombia: 'Colômbia', Peru: 'Peru', Ecuador: 'Equador', England: 'Inglaterra', Spain: 'Espanha', Italy: 'Itália', Germany: 'Alemanha', France: 'França', Portugal: 'Portugal' }
+const COUNTRY_NAME: Partial<Record<Nationality, string>> = { Brazil: 'Brasil', Argentina: 'Argentina', Uruguay: 'Uruguai', Paraguay: 'Paraguai', Chile: 'Chile', Colombia: 'Colômbia', Peru: 'Peru', Ecuador: 'Equador', England: 'Inglaterra', Spain: 'Espanha', Italy: 'Itália', Germany: 'Alemanha', France: 'França', Portugal: 'Portugal' }
 const SPANISH_SPEAKING: readonly Nationality[] = ['Argentina', 'Uruguay', 'Paraguay', 'Chile', 'Colombia', 'Peru', 'Ecuador', 'Spain']
 
 /** Limites de estrangeiros do exemplo (para testar a regra; os demais países não têm limite). */

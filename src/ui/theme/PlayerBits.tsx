@@ -2,10 +2,12 @@ import type { ReactNode } from 'react'
 import type { Nationality, Team } from '../../engine/types'
 import { bandFor, conditionBand, moodBand } from '../colors'
 import type { Mood } from '../colors'
+import { COUNTRY_INFO } from '../countries'
 import { NATIONALITY_LABELS } from '../labels'
+import { flagShapes } from './flags'
 
 /** Bandeiras simples (30 x 20) das nacionalidades do jogo. O tipo obriga a desenhar a de cada nacionalidade nova. */
-const FLAGS: Record<Nationality, ReactNode> = {
+const FLAGS: Partial<Record<Nationality, ReactNode>> = {
   Brazil: (
     <>
       <rect width="30" height="20" fill="#2a9d3f" />
@@ -114,7 +116,7 @@ const FLAGS: Record<Nationality, ReactNode> = {
 export function Flag({ nationality, className = '' }: { nationality: Nationality; className?: string }) {
   return (
     <svg viewBox="0 0 30 20" width="22" height="15" role="img" aria-label={NATIONALITY_LABELS[nationality]} className={`shrink-0 rounded-[3px] ring-1 ring-white/20 ${className}`}>
-      {FLAGS[nationality]}
+      {FLAGS[nationality] ?? flagShapes(COUNTRY_INFO[nationality].flag)}
     </svg>
   )
 }

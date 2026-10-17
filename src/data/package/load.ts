@@ -61,8 +61,9 @@ const numberOf = (id: string): number => {
 export function leagueSetup(league: PackageLeague): { country: Nationality; economy?: LeagueEconomy; region: Region } {
   const country = league.country as Nationality
   const defaults = COUNTRY_DEFAULTS[country]
-  const economy = league.economy ?? defaults.economy
-  return { country, ...(economy ? { economy } : {}), region: league.region ?? defaults.region }
+  const economy = league.economy ?? defaults?.economy
+  // País sem padrão calibrado: sem economia (vale a do Brasil) e janelas da Europa, a menos que o pacote diga (a validação avisa).
+  return { country, ...(economy ? { economy } : {}), region: league.region ?? defaults?.region ?? 'EU' }
 }
 
 /**

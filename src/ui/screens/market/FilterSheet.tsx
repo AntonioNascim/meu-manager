@@ -113,7 +113,7 @@ export function FilterSheet({
             <span className={caption}>Nacionalidade</span>
             <select className={select} value={draft.nationality} onChange={(e) => set('nationality', e.target.value as Nationality | 'all')}>
               <option value="all">Todas</option>
-              {NATIONALITIES.map((n) => (
+              {[...NATIONALITIES].sort((x, y) => NATIONALITY_LABELS[x].localeCompare(NATIONALITY_LABELS[y], 'pt')).map((n) => (
                 <option key={n} value={n}>
                   {NATIONALITY_LABELS[n]}
                 </option>

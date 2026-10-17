@@ -2,6 +2,7 @@ import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../../engine/config'
 import { ATTRIBUTE_NAMES, NATIONALITIES, POSITIONS } from '../../engine/types'
 import type { Attributes } from '../../engine/types'
 import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
+import { COUNTRY_DEFAULTS } from './leagueDefaults'
 import { PACKAGE_FORMAT, PACKAGE_VERSION, TIEBREAKERS } from './types'
 import type { DataPackage, PackageIssue, PackageIssueCode, PackageReport } from './types'
 
@@ -186,6 +187,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
         if (typeof e.level !== 'number' || !(e.level >= -15 && e.level <= 15)) c.error('out-of-range', `${path}.economy.level`, String(e.level), '-15–15')
       }
     }
+    if (country !== undefined && league.economy === undefined && !(country in COUNTRY_DEFAULTS)) c.warn('league-defaults-missing', `${path}.economy`, country)
     if (league.rounds !== undefined && league.rounds !== 1 && league.rounds !== 2) c.error('unknown-value', `${path}.rounds`, String(league.rounds))
     if (league.region !== undefined && !['BR', 'SA', 'EU'].includes(league.region as string)) c.error('unknown-value', `${path}.region`, String(league.region))
     if (league.foreignLimit !== undefined) {

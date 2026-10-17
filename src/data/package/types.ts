@@ -134,6 +134,7 @@ export type PackageIssueCode =
   | 'league-promotion'
   | 'unsupported-leagues'
   | 'tiebreakers-unsupported'
+  | 'league-defaults-missing'
 
 export interface PackageIssue {
   code: PackageIssueCode
