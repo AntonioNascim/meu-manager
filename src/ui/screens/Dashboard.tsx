@@ -6,14 +6,12 @@ import { cashOutlook, monthlyPayroll } from '../../engine/finance'
 import { pendingIncoming } from '../../engine/market'
 import {
   academyAlert,
-  advanceGame,
   boardOf,
   lastYearContracts,
   lastUserMatch,
   nextEventOf,
   nextUserMatch,
   squadOf,
-  startNextSeason,
   standingsOf,
   teamById,
   teamStrength,
@@ -24,7 +22,7 @@ import {
   userTrainingPlan,
 } from '../../store/game'
 import type { Game } from '../../store/game'
-import { updateGame } from '../../store/gameStore'
+import { runHeavy } from '../../store/heavy'
 import { Card } from '../components/ui'
 import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
@@ -183,12 +181,13 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
     if (academy.pending > 0) return onNavigate('academy')
     if (seasonOver) {
       if (expiring.length > 0 && !window.confirm(`${expiring.length} contrato(s) vencem agora e esses jogadores vão embora. Encerrar a temporada mesmo assim?`)) return
-      return updateGame(startNextSeason)
+      return void runHeavy('nextSeason')
     }
     if (pending) return onNavigate('match')
-    const moved = advanceGame(game)
-    updateGame(() => moved)
-    if (moved.pendingUserMatch) onNavigate('match')
+    // A pré-temporada, a virada e os mundos grandes calculam num Web Worker, com a tela de progresso.
+    void runHeavy('advance').then((moved) => {
+      if (moved?.pendingUserMatch) onNavigate('match')
+    })
   }
 
   return (

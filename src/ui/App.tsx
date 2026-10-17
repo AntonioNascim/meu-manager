@@ -3,7 +3,9 @@ import { pendingIncoming } from '../engine/market'
 import { academyAlert, lastYearContracts, userTeam } from '../store/game'
 import { flushAutosave, useSaveStatus } from '../store/autosave'
 import { setGame, useGame } from '../store/gameStore'
+import { useBusy } from '../store/heavy'
 import { clearLive } from '../store/liveMatch'
+import { BusyOverlay } from './components/BusyOverlay'
 import { TeamBadge } from './components/ui'
 import { formatDate } from './format'
 import { NAV_TAB_OF, SCREEN_LABELS } from './navigation'
@@ -50,6 +52,7 @@ function initialStandingsSection(hint?: string): 'table' | 'rounds' | 'goals' | 
 
 export function App() {
   const game = useGame()
+  const busy = useBusy()
   const saveStatus = useSaveStatus()
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
   // Aba pedida por quem navegou (atalhos e avisos do painel); some ao trocar de tela pela barra de baixo.
@@ -132,6 +135,7 @@ export function App() {
       </main>
 
       <BottomNav items={tabs} active={NAV_TAB_OF[current]} onSelect={goTab} />
+      {busy !== null && <BusyOverlay label={busy} />}
     </div>
   )
 }
