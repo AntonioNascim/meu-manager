@@ -3,7 +3,7 @@ import { salaryForOverall, scaledSalary } from '../../engine/market/value'
 import { overallForPosition } from '../../engine/overall'
 import { createRng } from '../../engine/rng'
 import { ageOn, contractEndOn } from '../../engine/season/dates'
-import type { Foot, Nationality, Player, PlayerId, Position, TeamId } from '../../engine/types'
+import type { Foot, LeagueEconomy, Nationality, Player, PlayerId, Position, TeamId } from '../../engine/types'
 import { generateAttributes, hiddenAttribute, pickFoot, pickSecondaryPositions, qualityFloorFor, softCap } from '../generatePlayer'
 import { starChance, teamLevelFor } from '../generateTeam'
 import { GENERATION } from '../generationConfig'
@@ -15,8 +15,8 @@ const STARTER_SHARE = 0.54
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
 /** Nível de um clube (ajuste fixo por clube, em torno do nível que a reputação e a divisão dão). */
-export function clubLevel(club: { id: string; reputation: number }, tier: 1 | 2 | 3): number {
-  return teamLevelFor({ tier, reputation: club.reputation }) + createRng(`club-level:${club.id}`).normal(0, GENERATION.teamLevelSd)
+export function clubLevel(club: { id: string; reputation: number }, tier: 1 | 2 | 3, economy?: LeagueEconomy): number {
+  return teamLevelFor({ tier, reputation: club.reputation, ...(economy ? { economy } : {}) }) + createRng(`club-level:${club.id}`).normal(0, GENERATION.teamLevelSd)
 }
 
 export interface RealPlayerContext {
@@ -24,6 +24,8 @@ export interface RealPlayerContext {
   startYear: number
   /** Divisão do clube na pirâmide (1 a 3 nesta fase). */
   tier: 1 | 2 | 3
+  /** Economia da liga do clube (padrão: a do Brasil). */
+  economy?: LeagueEconomy
   /** `null` = jogador livre: usa o nível de um clube médio da divisão. */
   club: { id: string; reputation: number } | null
 }
@@ -38,7 +40,7 @@ export function generateRealPlayer(spec: PackagePlayer, id: PlayerId, teamId: Te
   const rng = createRng(`player:${spec.name}|${spec.birthDate}|${spec.nationality}|${spec.position}`)
   const age = ageOn(spec.birthDate, `${ctx.startYear}-01-01`)
   const reputation = ctx.club?.reputation ?? 8
-  const level = ctx.club ? clubLevel(ctx.club, ctx.tier) : teamLevelFor({ tier: ctx.tier, reputation })
+  const level = ctx.club ? clubLevel(ctx.club, ctx.tier, ctx.economy) : teamLevelFor({ tier: ctx.tier, reputation, ...(ctx.economy ? { economy: ctx.economy } : {}) })
 
   // Sorteios sempre na mesma ordem: um campo dado pelo pacote só substitui o valor, nunca desloca os outros.
   const drawnFoot: Foot = pickFoot(rng, spec.position)
@@ -62,7 +64,7 @@ export function generateRealPlayer(spec: PackagePlayer, id: PlayerId, teamId: Te
   const attributes = spec.attributes ?? drawnAttributes
   const overall = overallForPosition(attributes, spec.position)
   const potential = spec.potential ?? clamp(Math.round(Math.max(overall, softCap(overall + growth))), Math.round(overall), ATTRIBUTE_MAX)
-  const salary = scaledSalary(salaryForOverall(overall), { tier: ctx.tier })
+  const salary = scaledSalary(salaryForOverall(overall), { tier: ctx.tier, ...(ctx.economy ? { economy: ctx.economy } : {}) })
 
   const player: Player = {
     id,

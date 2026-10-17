@@ -5,7 +5,10 @@ import type { Player, Team } from '../../engine/types'
 import { createGame } from '../../store/game'
 import { openGame } from '../../store/gameStore'
 import type { SaveSummary } from '../../store/saveFormat'
-import { TIER_LABELS } from '../labels'
+import { worldChoices } from '../../store/worldChoices'
+import { NATIONALITY_LABELS } from '../labels'
+import { Flag } from '../theme/PlayerBits'
+import { TopTabs } from '../theme/TopTabs'
 import { SlotPicker } from '../components/SlotPicker'
 import { Button, Tabs, TeamBadge } from '../components/ui'
 import type { ChosenPackage } from './ImportPackage'
@@ -15,26 +18,28 @@ interface Option {
   strength: number
 }
 
-/** Tela de novo jogo: escolher um time de qualquer série da pirâmide (A, B ou C). */
+/** Tela de novo jogo: escolher o país, a liga (divisão) e o clube; com um país só, a escolha do país não aparece. */
 export function NewGame({ slots, onBack, dataPackage }: { slots: (SaveSummary | null)[] | null; onBack: () => void; dataPackage?: ChosenPackage }) {
   // O mundo é gerado uma vez para mostrar os times; o jogo é criado com a mesma semente.
   const [seed] = useState(() => Math.floor(Math.random() * 1_000_000) + 1)
   const world = useMemo(() => loadWorld(seed, dataPackage?.data), [seed, dataPackage])
-  const [tier, setTier] = useState<1 | 2 | 3>(1)
-  const tiers = useMemo(() => ([...new Set(world.teams.map((t) => t.tier))].sort((a, b) => a - b) as (1 | 2 | 3)[]), [world])
+  const countries = useMemo(() => worldChoices(world), [world])
+  const [countryId, setCountryId] = useState(() => countries[0]?.country ?? 'Brazil')
+  const country = countries.find((c) => c.country === countryId) ?? (countries[0] as (typeof countries)[number])
+  const [divisionId, setDivisionId] = useState(() => country.divisions[0]?.id ?? '')
+  const division = country.divisions.find((d) => d.id === divisionId) ?? (country.divisions[0] as (typeof country.divisions)[number])
   const [selected, setSelected] = useState<string | null>(null)
   const [choosingSlot, setChoosingSlot] = useState(false)
 
   const options: Option[] = useMemo(() => {
     const byId = new Map<string, Player>(world.players.map((p) => [p.id, p]))
-    return world.teams
-      .filter((t) => t.tier === tier)
+    return division.teams
       .map((team) => ({
         team,
         strength: team.tactic.startingXI.reduce((s, id) => s + playerOverall(byId.get(id) as Player), 0) / team.tactic.startingXI.length,
       }))
       .sort((a, b) => b.strength - a.strength)
-  }, [world, tier])
+  }, [world, division])
 
   const chosen = world.teams.find((t) => t.id === selected)
 
@@ -48,15 +53,36 @@ export function NewGame({ slots, onBack, dataPackage }: { slots: (SaveSummary | 
           </button>
         </div>
         <p className="text-sm text-slate-400">{dataPackage ? `Pacote: ${dataPackage.data.name}. ` : ''}Escolha o time que você vai comandar.</p>
-        <div className="mt-4">
-          <Tabs
-            value={String(tier) as '1' | '2' | '3'}
-            options={tiers.map((t) => ({ id: String(t) as '1' | '2' | '3', label: TIER_LABELS[t] }))}
-            onChange={(id) => {
-              setTier(Number(id) as 1 | 2 | 3)
-              setSelected(null)
-            }}
-          />
+        {countries.length > 1 && (
+          <div className="mt-4" data-testid="country-picker">
+            <TopTabs
+              scroll
+              value={country.country}
+              options={countries.map((c) => ({ id: c.country, label: NATIONALITY_LABELS[c.country] }))}
+              onChange={(id) => {
+                setCountryId(id)
+                setDivisionId(countries.find((c) => c.country === id)?.divisions[0]?.id ?? '')
+                setSelected(null)
+              }}
+            />
+          </div>
+        )}
+        <div className="mt-3">
+          {country.divisions.length > 1 ? (
+            <Tabs
+              value={division.id}
+              options={country.divisions.map((d) => ({ id: d.id, label: d.name }))}
+              onChange={(id) => {
+                setDivisionId(id)
+                setSelected(null)
+              }}
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+              <Flag nationality={country.country} />
+              {division.name}
+            </div>
+          )}
         </div>
       </header>
 
@@ -106,7 +132,7 @@ export function NewGame({ slots, onBack, dataPackage }: { slots: (SaveSummary | 
       </footer>
 
       {choosingSlot && chosen && (
-        <SlotPicker title={`Onde salvar o jogo com o ${chosen.name}?`} slots={slots} onCancel={() => setChoosingSlot(false)} onPick={(slot) => openGame(createGame(seed, chosen.id, dataPackage ? { dataPackage: dataPackage.data, dataPackageId: dataPackage.id } : {}), slot)} />
+        <SlotPicker title={`Onde salvar o jogo com o ${chosen.name}?`} slots={slots} onCancel={() => setChoosingSlot(false)} onPick={(slot) => openGame(createGame(seed, chosen.id, { world, ...(dataPackage ? { dataPackage: dataPackage.data, dataPackageId: dataPackage.id } : {}) }), slot)} />
       )}
     </div>
   )

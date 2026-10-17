@@ -14,6 +14,12 @@ export const NATIONALITIES = [
   'Colombia',
   'Peru',
   'Ecuador',
+  'England',
+  'Spain',
+  'Italy',
+  'Germany',
+  'France',
+  'Portugal',
 ] as const
 export type Nationality = (typeof NATIONALITIES)[number]
 

@@ -5,8 +5,8 @@ import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
 import { PACKAGE_FORMAT, PACKAGE_VERSION, TIEBREAKERS } from './types'
 import type { DataPackage, PackageIssue, PackageIssueCode, PackageReport } from './types'
 
-/** O que o jogo aceita nesta fase: um país, duas ou três divisões de 20 times, 4 sobem e 4 caem entre divisões vizinhas. */
-export const SUPPORTED = { countries: 1, minDivisions: 2, maxDivisions: 3, teamsPerDivision: 20, promotion: 4 } as const
+/** O que o jogo aceita: países com 1 a 3 divisões, de 4 a 40 times (número par) cada. */
+export const SUPPORTED = { maxDivisions: 3, minTeams: 4, maxTeams: 40 } as const
 
 const MAX_ISSUES = 60
 const FOOTS = ['right', 'left', 'both'] as const
@@ -152,6 +152,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
     if (!isObj(country)) return c.error('wrong-type', path, 'country')
     const id = text(c, country, 'id', path)
     text(c, country, 'name', path)
+    if (id !== undefined && !(NATIONALITIES as readonly string[]).includes(id)) c.error('unknown-value', `${path}.id`, id)
     if (id === undefined) return
     if (countryIds.has(id)) c.error('duplicate-id', `${path}.id`, id)
     countryIds.add(id)
@@ -168,13 +169,32 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
     const country = text(c, league, 'country', path)
     if (country !== undefined && !countryIds.has(country)) c.error('unknown-reference', `${path}.country`, country)
     const level = int(c, league, 'level', path, 1, 10)
-    const teams = int(c, league, 'teams', path, 2, 40)
+    const teams = int(c, league, 'teams', path, SUPPORTED.minTeams, SUPPORTED.maxTeams)
+    if (teams !== undefined && teams % 2 !== 0) c.error('league-size-unsupported', `${path}.teams`, teams, 'número par')
     const promotion = int(c, league, 'promotion', path, 0, 10)
     const relegation = int(c, league, 'relegation', path, 0, 10)
     if (league.tiebreakers !== undefined) {
       const list = league.tiebreakers
       if (!Array.isArray(list) || list.some((t) => !(TIEBREAKERS as readonly unknown[]).includes(t))) c.error('unknown-value', `${path}.tiebreakers`, 'tiebreakers')
       else if (list.join() !== TIEBREAKERS.join()) c.warn('tiebreakers-unsupported', `${path}.tiebreakers`)
+    }
+    if (league.economy !== undefined) {
+      const e = league.economy
+      if (!isObj(e)) c.error('wrong-type', `${path}.economy`, 'economy')
+      else {
+        if (typeof e.revenue !== 'number' || !(e.revenue >= 0.05 && e.revenue <= 20)) c.error('out-of-range', `${path}.economy.revenue`, String(e.revenue), '0,05–20')
+        if (typeof e.level !== 'number' || !(e.level >= -15 && e.level <= 15)) c.error('out-of-range', `${path}.economy.level`, String(e.level), '-15–15')
+      }
+    }
+    if (league.rounds !== undefined && league.rounds !== 1 && league.rounds !== 2) c.error('unknown-value', `${path}.rounds`, String(league.rounds))
+    if (league.region !== undefined && !['BR', 'SA', 'EU'].includes(league.region as string)) c.error('unknown-value', `${path}.region`, String(league.region))
+    if (league.foreignLimit !== undefined) {
+      const f = league.foreignLimit
+      if (!isObj(f)) c.error('wrong-type', `${path}.foreignLimit`, 'foreignLimit')
+      else {
+        if (f.squad !== undefined && (!isInt(f.squad) || f.squad < 0 || f.squad > SQUAD_MAX)) c.error('out-of-range', `${path}.foreignLimit.squad`, String(f.squad), `0–${SQUAD_MAX}`)
+        if (f.lineup !== undefined && (!isInt(f.lineup) || f.lineup < 0 || f.lineup > 11)) c.error('out-of-range', `${path}.foreignLimit.lineup`, String(f.lineup), '0–11')
+      }
     }
     if (id === undefined) return
     if (leagueIds.has(id)) c.error('duplicate-id', `${path}.id`, id)
@@ -249,20 +269,22 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
     if (league.teams !== undefined && found !== league.teams) c.error('league-team-count', `${league.path}.teams`, found, league.teams)
   }
 
-  // O que o jogo aceita nesta fase
-  const countriesUsed = new Set(leagues.map((l) => l.country))
-  if (leagues.length < SUPPORTED.minDivisions || leagues.length > SUPPORTED.maxDivisions || countriesUsed.size > SUPPORTED.countries) {
-    c.error('unsupported-leagues', 'leagues', leagues.length, SUPPORTED.maxDivisions)
-  } else {
-    const levels = leagues.map((l) => l.level).sort()
-    if (levels.some((level, i) => level !== i + 1)) c.error('unsupported-leagues', 'leagues', leagues.length, SUPPORTED.maxDivisions)
-    for (const league of leagues) {
-      if (league.teams !== undefined && league.teams !== SUPPORTED.teamsPerDivision) c.error('league-size-unsupported', `${league.path}.teams`, league.teams, SUPPORTED.teamsPerDivision)
-      const expectedPromotion = league.level === 1 ? 0 : SUPPORTED.promotion
-      const expectedRelegation = league.level === leagues.length ? 0 : SUPPORTED.promotion
-      if (league.promotion !== undefined && league.promotion !== expectedPromotion) c.error('league-promotion', `${league.path}.promotion`, league.promotion, expectedPromotion)
-      if (league.relegation !== undefined && league.relegation !== expectedRelegation) c.error('league-promotion', `${league.path}.relegation`, league.relegation, expectedRelegation)
+  // Pirâmides: cada país tem de 1 a 3 divisões em sequência (1, 2, 3), e quem cai de uma divisão é quem sobe para a de baixo.
+  const byCountry = new Map<string, typeof leagues>()
+  for (const league of leagues) if (league.country !== undefined) byCountry.set(league.country, [...(byCountry.get(league.country) ?? []), league])
+  for (const [country, divisions] of byCountry) {
+    const sorted = [...divisions].sort((x, y) => (x.level ?? 0) - (y.level ?? 0))
+    if (sorted.length > SUPPORTED.maxDivisions || sorted.some((d, i) => d.level !== i + 1)) {
+      c.error('unsupported-leagues', sorted[0]?.path ?? 'leagues', sorted.length, country)
+      continue
     }
+    sorted.forEach((league, i) => {
+      const below = sorted[i + 1]
+      const above = sorted[i - 1]
+      if (league.promotion !== undefined && league.promotion !== (above ? (above.relegation ?? league.promotion) : 0)) c.error('league-promotion', `${league.path}.promotion`, league.promotion, above ? (above.relegation ?? 0) : 0)
+      if (league.relegation !== undefined && league.relegation !== (below ? (below.promotion ?? league.relegation) : 0)) c.error('league-promotion', `${league.path}.relegation`, league.relegation, below ? (below.promotion ?? 0) : 0)
+      if (league.teams !== undefined && league.promotion !== undefined && league.relegation !== undefined && league.promotion + league.relegation > league.teams / 2) c.error('league-promotion', `${league.path}.promotion`, league.promotion + league.relegation, `até ${league.teams / 2}`)
+    })
   }
 
   if (c.errors.length > 0) return done()

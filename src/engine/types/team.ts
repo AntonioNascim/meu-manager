@@ -1,4 +1,5 @@
 import type { IsoDate, PlayerId, TeamId } from './common'
+import type { Nationality } from './player'
 import type { Tactic } from './tactics'
 
 export const SQUAD_MIN = 18
@@ -72,6 +73,14 @@ export interface LeagueEconomy {
   level: number
 }
 
+/** Limite de estrangeiros (jogadores de outra nacionalidade que a do país da liga) que a liga permite; cada campo é opcional. */
+export interface ForeignLimit {
+  /** No máximo tantos estrangeiros no elenco (o mercado não deixa contratar além disso). */
+  squad?: number
+  /** No máximo tantos estrangeiros entre os 11 titulares. */
+  lineup?: number
+}
+
 export interface Team {
   id: TeamId
   name: string
@@ -98,4 +107,8 @@ export interface Team {
   tier: number
   /** Economia da liga do clube; ausente = a do Brasil. Vem da competição e acompanha o clube no acesso e rebaixamento. */
   economy?: LeagueEconomy
+  /** País da liga do clube (uma nacionalidade); ausente = Brasil. */
+  country?: Nationality
+  /** Limite de estrangeiros da liga do clube; ausente = sem limite. Acompanha o clube como a economia. */
+  foreignLimit?: ForeignLimit
 }

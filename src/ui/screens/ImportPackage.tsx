@@ -101,7 +101,7 @@ export function ImportPackage({ onBack, onUse }: { onBack: () => void; onUse: (c
         </button>
       </div>
       <p className="text-sm text-muted">
-        Escolha um arquivo de pacote (.json) deste aparelho. Ele fica guardado só neste navegador, junto com os seus saves, e nunca é enviado a lugar nenhum. Nesta versão o jogo aceita um país com duas divisões de 20 times.
+        Escolha um arquivo de pacote (.json) deste aparelho. Ele fica guardado só neste navegador, junto com os seus saves, e nunca é enviado a lugar nenhum. O pacote pode ter vários países, cada um com de 1 a 3 divisões.
       </p>
 
       <Button className="w-full" onClick={() => fileInput.current?.click()}>
@@ -115,7 +115,7 @@ export function ImportPackage({ onBack, onUse }: { onBack: () => void; onUse: (c
             <div className="space-y-2 text-sm" data-testid="package-ok">
               <div className="title text-3xl">{pkg.name}</div>
               <div className="text-muted">
-                {pkg.clubs.length} clubes · {pkg.players.length} jogadores · {pkg.leagues.length} divisões · temporada {pkg.startYear ?? 2026}
+                {pkg.clubs.length} clubes · {pkg.players.length} jogadores · {pkg.countries.length} {pkg.countries.length === 1 ? 'país' : 'países'} · {pkg.leagues.length} divisões · temporada {pkg.startYear ?? 2026}
               </div>
               {pkg.credits && <p className="text-xs text-muted">Créditos: {pkg.credits}</p>}
               {report.warnings.length > 0 && <Issues report={{ errors: [], warnings: report.warnings }} />}

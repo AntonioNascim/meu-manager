@@ -67,6 +67,47 @@ const FLAGS: Record<Nationality, ReactNode> = {
       <circle cx="15" cy="9" r="2.2" fill="#8a5a2b" />
     </>
   ),
+  England: (
+    <>
+      <rect width="30" height="20" fill="#fff" />
+      <rect x="13" width="4" height="20" fill="#d52b1e" />
+      <rect y="8" width="30" height="4" fill="#d52b1e" />
+    </>
+  ),
+  Spain: (
+    <>
+      <rect width="30" height="20" fill="#d52b1e" />
+      <rect y="5" width="30" height="10" fill="#f4d90f" />
+    </>
+  ),
+  Italy: (
+    <>
+      <rect width="30" height="20" fill="#fff" />
+      <rect width="10" height="20" fill="#2a9d3f" />
+      <rect x="20" width="10" height="20" fill="#d52b1e" />
+    </>
+  ),
+  Germany: (
+    <>
+      <rect width="30" height="20" fill="#f4d90f" />
+      <rect width="30" height="6.7" fill="#111" />
+      <rect y="6.7" width="30" height="6.6" fill="#d52b1e" />
+    </>
+  ),
+  France: (
+    <>
+      <rect width="30" height="20" fill="#fff" />
+      <rect width="10" height="20" fill="#1c4fa0" />
+      <rect x="20" width="10" height="20" fill="#d52b1e" />
+    </>
+  ),
+  Portugal: (
+    <>
+      <rect width="30" height="20" fill="#d52b1e" />
+      <rect width="12" height="20" fill="#2a9d3f" />
+      <circle cx="12" cy="10" r="3.2" fill="#f4d90f" />
+    </>
+  ),
 }
 
 /** Bandeira da nacionalidade do jogador. */

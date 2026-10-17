@@ -206,23 +206,24 @@ describe('validação com mensagens claras', () => {
     const r = validatePackage(wrong).report.errors
     expect(r.map((e) => e.code)).toContain('league-team-count')
     expect(packageIssueText(r.find((e) => e.code === 'league-team-count')!)).toBe('A liga em leagues[0] declara 19 times, mas o pacote tem 20 clubes nela.')
-    // divisão com 18 clubes de verdade (e 18 declarados): a versão atual exige 20
+    // divisão com 18 clubes de verdade (e 18 declarados): vale, desde que o número seja par
     const small = copy(good)
     const drop = small.clubs.filter((c) => c.league === 'br-2').slice(0, 2).map((c) => c.id)
     small.clubs = small.clubs.filter((c) => !drop.includes(c.id))
     small.players = small.players.filter((p) => !drop.includes(p.club as string))
     small.academy = small.academy!.filter((p) => !drop.includes(p.club as string))
     small.leagues[1]!.teams = 18
-    expect(issues(small)).toEqual(['league-size-unsupported'])
+    expect(issues(small)).toEqual([])
+    small.leagues[1]!.teams = 17
+    expect(issues(small)).toContain('league-size-unsupported')
   })
 
-  it('pacote com mais ligas é recusado com aviso', () => {
+  it('um país com mais de 3 divisões é recusado com aviso', () => {
     const many = copy(good)
-    many.countries.push({ id: 'Argentina', name: 'Argentina' })
-    many.leagues.push({ id: 'ar-1', name: 'Liga Argentina', country: 'Argentina', level: 1, teams: 20, promotion: 0, relegation: 2 })
+    many.leagues.push({ id: 'br-4', name: 'Série D', country: 'Brazil', level: 4, teams: 20, promotion: 4, relegation: 0 })
     const r = validatePackage(many).report.errors
     expect(r.map((e) => e.code)).toContain('unsupported-leagues')
-    expect(packageIssueText(r.find((e) => e.code === 'unsupported-leagues')!)).toContain('ainda não são suportados')
+    expect(packageIssueText(r.find((e) => e.code === 'unsupported-leagues')!)).toContain('de 1 a 3 divisões')
   })
 
   it('valores inválidos: id repetido, nacionalidade, data, cor, referência, escala', () => {

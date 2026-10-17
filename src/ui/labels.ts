@@ -65,6 +65,12 @@ export const NATIONALITY_LABELS: Record<Nationality, string> = {
   Colombia: 'Colômbia',
   Peru: 'Peru',
   Ecuador: 'Equador',
+  England: 'Inglaterra',
+  Spain: 'Espanha',
+  Italy: 'Itália',
+  Germany: 'Alemanha',
+  France: 'França',
+  Portugal: 'Portugal',
 }
 
 export const FOOT_LABELS: Record<Foot, string> = {
@@ -388,9 +394,9 @@ export function packageIssueText(issue: PackageIssue): string {
     case 'club-squad-size': return `O clube em ${path} tem ${detail} jogadores; o elenco precisa ter de ${String(expected).replace('–', ' a ')}.`
     case 'club-no-goalkeeper': return `O clube "${detail}" (${path}) não tem goleiro.`
     case 'league-team-count': return `A liga em ${path.replace(/\.teams$/, '')} declara ${expected} times, mas o pacote tem ${detail} clubes nela.`
-    case 'league-size-unsupported': return `Nesta versão cada divisão precisa ter ${expected} times (${path} declara ${detail}).`
-    case 'league-promotion': return `Acesso e rebaixamento em ${path}: o jogo usa ${expected} (veio ${detail}).`
-    case 'unsupported-leagues': return `Este pacote tem ${detail} ligas. Por enquanto o jogo aceita um país com duas ou três divisões (Série A, Série B e Série C); pacotes com mais ligas ainda não são suportados.`
+    case 'league-size-unsupported': return `Cada divisão precisa ter um número par de times, de 4 a 40 (${path} declara ${detail}).`
+    case 'league-promotion': return `Acesso e rebaixamento em ${path}: o número precisa ser ${expected} (veio ${detail}); quem cai de uma divisão é quem sobe para a de baixo.`
+    case 'unsupported-leagues': return `O país "${expected}" tem ${detail} divisões em ${path}. Cada país precisa ter de 1 a 3 divisões em sequência (nível 1, 2 e 3).`
     case 'tiebreakers-unsupported': return `Os critérios de desempate de ${path} são diferentes dos do jogo e serão ignorados: vale a ordem padrão.`
   }
 }

@@ -3,13 +3,16 @@ import { defaultTicketPrice } from '../../engine/finance'
 import { FORMATION_IDS, getFormation } from '../../engine/formations'
 import { buildTactic, rankFormations } from '../../engine/lineup'
 import { createRng } from '../../engine/rng'
-import type { Player, Team } from '../../engine/types'
+import { leagueRevenue } from '../../engine/economy'
+import type { CompetitionSetup } from '../../engine/season'
+import type { LeagueEconomy, Nationality, Player, Region, Team } from '../../engine/types'
 import { createAcademy } from '../generateAcademy'
 import { pickMentality, pickStyle } from '../generateTeam'
 import { DEFAULT_START_YEAR } from '../generateWorld'
 import type { World } from '../generateWorld'
+import { COUNTRY_DEFAULTS } from './leagueDefaults'
 import { generateRealPlayer } from './realPlayer'
-import type { DataPackage, PackageClub, PackageClubGame } from './types'
+import type { DataPackage, PackageClub, PackageClubGame, PackageLeague } from './types'
 
 export interface LoadOptions {
   /** Semente do jogo: gera a base dos clubes quando o pacote não traz uma. */
@@ -20,7 +23,7 @@ export interface LoadOptions {
  * Tática, finanças, torcida e meta da diretoria de um clube que o pacote não detalha, derivadas de forma estável
  * (o sorteio vem só do `id` do clube): a mesma lógica da geração do mundo fictício, a partir da reputação e da divisão.
  */
-export function deriveClubGame(club: PackageClub, rank: number, players: readonly Player[]): PackageClubGame {
+export function deriveClubGame(club: PackageClub, rank: number, players: readonly Player[], economy?: LeagueEconomy): PackageClubGame {
   const rng = createRng(`club-game:${club.id}`)
   const ranking = rankFormations(players, FORMATION_IDS.map(getFormation))
   const best = ranking[0]?.score ?? 0
@@ -28,7 +31,7 @@ export function deriveClubGame(club: PackageClub, rank: number, players: readonl
   const formationId = rng.pick(nearBest).formationId
   const tactic = buildTactic(players, { formationId, style: pickStyle(rng, club.reputation), mentality: pickMentality(rng, club.reputation) })
   const monthlyPayroll = players.reduce((sum, p) => sum + p.contract.salary, 0)
-  const balance = Math.round((club.reputation ** 2 * 400_000 * rng.float(0.85, 1.15)) / 10_000) * 10_000
+  const balance = Math.round((club.reputation ** 2 * 400_000 * leagueRevenue({ economy }) * rng.float(0.85, 1.15)) / 10_000) * 10_000
   const target = Math.min(rank, 16)
   return {
     tactic,
@@ -43,7 +46,7 @@ export function deriveClubGame(club: PackageClub, rank: number, players: readonl
       fundsRequests: [],
     },
     fanBase: Math.round((club.reputation ** 2.5 * 12_000 * rng.float(0.85, 1.15)) / 1_000) * 1_000,
-    ticketPrice: defaultTicketPrice(club.reputation),
+    ticketPrice: defaultTicketPrice(club.reputation, { economy }),
     objective: { targetPosition: target, sackingPosition: Math.min(20, target + 6) },
   }
 }
@@ -53,15 +56,34 @@ const numberOf = (id: string): number => {
   return m ? Number(m[1]) : 0
 }
 
+/** Economia, janelas e regras de uma liga: o que o pacote diz ou, se não diz, o padrão do país. */
+export function leagueSetup(league: PackageLeague): { country: Nationality; economy?: LeagueEconomy; region: Region } {
+  const country = league.country as Nationality
+  const defaults = COUNTRY_DEFAULTS[country]
+  const economy = league.economy ?? defaults.economy
+  return { country, ...(economy ? { economy } : {}), region: league.region ?? defaults.region }
+}
+
+/**
+ * O pacote tem só o país padrão (Brasil, 2 ou 3 divisões de 20 times, 4 sobem e 4 caem, sem regras próprias)? Então o mundo
+ * usa as séries padrão do jogo (ids `serie-a`...) e nada muda em relação ao mundo fictício de sempre.
+ */
+export function isClassicPackage(pkg: DataPackage): boolean {
+  if (pkg.leagues.length < 2 || pkg.leagues.length > 3) return false
+  return pkg.leagues.every((l) => l.country === 'Brazil' && l.teams === 20 && l.economy === undefined && l.rounds === undefined && l.region === undefined && l.foreignLimit === undefined && l.promotion === (l.level === 1 ? 0 : 4) && l.relegation === (l.level === pkg.leagues.length ? 0 : 4))
+}
+
 /**
  * Monta o mundo do jogo a partir de um pacote **já validado** (`validatePackage`). É o único caminho: o mundo fictício
  * padrão também passa por aqui (`defaultPackage`).
  */
 export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World {
   const startYear = pkg.startYear ?? DEFAULT_START_YEAR
-  const tierOfLeague = new Map(pkg.leagues.map((l) => [l.id, l.level as 1 | 2 | 3]))
+  const leagueById = new Map(pkg.leagues.map((l) => [l.id, l]))
   const clubById = new Map(pkg.clubs.map((c) => [c.id, c]))
-  const tierOfClub = (clubId: string): 1 | 2 | 3 => tierOfLeague.get((clubById.get(clubId) as PackageClub).league) as 1 | 2 | 3
+  const leagueOf = (clubId: string): PackageLeague => leagueById.get((clubById.get(clubId) as PackageClub).league) as PackageLeague
+  const tierOfClub = (clubId: string): 1 | 2 | 3 => leagueOf(clubId).level as 1 | 2 | 3
+  const economyOfClub = (clubId: string): LeagueEconomy | undefined => leagueSetup(leagueOf(clubId)).economy
 
   // Ids dos jogadores: os do pacote valem; os que faltam recebem o próximo `player-N` livre.
   const used = new Set<string>([...pkg.players, ...(pkg.academy ?? [])].flatMap((p) => (p.id ? [p.id] : [])))
@@ -77,24 +99,28 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
     list.map((spec) => {
       const club = spec.club ? (clubById.get(spec.club) as PackageClub) : null
       const tier = club ? tierOfClub(club.id) : 1
-      return generateRealPlayer(spec, spec.id ?? freshId(), club ? club.id : null, { startYear, tier, club })
+      const economy = club ? economyOfClub(club.id) : undefined
+      return generateRealPlayer(spec, spec.id ?? freshId(), club ? club.id : null, { startYear, tier, club, ...(economy ? { economy } : {}) })
     })
   const players = build(pkg.players)
 
   // Posição de cada clube na sua divisão por reputação (empate: ordem do pacote).
   const rankOf = new Map<string, number>()
-  for (const tier of [1, 2, 3] as const) {
+  for (const league of pkg.leagues) {
     pkg.clubs
       .map((club, index) => ({ club, index }))
-      .filter(({ club }) => tierOfClub(club.id) === tier)
+      .filter(({ club }) => club.league === league.id)
       .sort((a, b) => b.club.reputation - a.club.reputation || a.index - b.index)
       .forEach(({ club }, i) => rankOf.set(club.id, i + 1))
   }
 
+  const squads = new Map<string, Player[]>()
+  for (const p of players) if (p.teamId) squads.set(p.teamId, [...(squads.get(p.teamId) ?? []), p])
   const teams: Team[] = pkg.clubs.map((club) => {
-    const tier = tierOfClub(club.id)
-    const squad = players.filter((p) => p.teamId === club.id)
-    const game = club.game ?? deriveClubGame(club, rankOf.get(club.id) ?? 20, squad)
+    const league = leagueOf(club.id)
+    const { country, economy } = leagueSetup(league)
+    const squad = squads.get(club.id) ?? []
+    const game = club.game ?? deriveClubGame(club, rankOf.get(club.id) ?? 20, squad, economy)
     return {
       id: club.id,
       name: club.name,
@@ -111,7 +137,10 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
       ticketPrice: game.ticketPrice,
       objective: game.objective,
       history: [],
-      tier,
+      tier: league.level,
+      ...(economy ? { economy } : {}),
+      ...(country !== 'Brazil' ? { country } : {}),
+      ...(league.foreignLimit ? { foreignLimit: league.foreignLimit } : {}),
     }
   })
 
@@ -124,5 +153,29 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
         firstNumber: Math.max(players.length, ...[...used].map(numberOf)) + 1,
         takenNames: players.map((p) => p.name),
       })
-  return { seed: options.seed, startYear, teams, players, academy }
+
+  const world: World = { seed: options.seed, startYear, teams, players, academy }
+  if (!isClassicPackage(pkg)) {
+    const teamById = new Map(teams.map((t) => [t.id, t]))
+    world.competitions = pkg.leagues.map((league): CompetitionSetup => {
+      const { country, economy, region } = leagueSetup(league)
+      const members = pkg.clubs.filter((c) => c.league === league.id)
+      return {
+        id: league.id,
+        name: league.name,
+        tier: league.level,
+        teams: members.map((c) => teamById.get(c.id) as Team),
+        region,
+        ...(league.rounds ? { rounds: league.rounds } : {}),
+        pyramid: league.country,
+        ...(economy ? { economy } : {}),
+        ...(country !== 'Brazil' ? { country } : {}),
+        ...(league.foreignLimit ? { foreignLimit: league.foreignLimit } : {}),
+        reputationMean: Math.round((members.reduce((sum, c) => sum + c.reputation, 0) / Math.max(1, members.length)) * 10) / 10,
+        promotion: league.promotion,
+        relegation: league.relegation,
+      }
+    })
+  }
+  return world
 }

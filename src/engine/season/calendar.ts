@@ -6,7 +6,7 @@ import { SEASON } from '../config'
 import { refreshListings } from '../market/listings'
 import { createRng, hashSeed } from '../rng'
 import { emptyTraining } from '../types'
-import type { Competition, CompetitionId, IsoDate, LeagueEconomy, MarketState, Match, Player, Region, Season, Team, TrainingState } from '../types'
+import type { Competition, CompetitionId, ForeignLimit, IsoDate, LeagueEconomy, Nationality, MarketState, Match, Player, Region, Season, Team, TrainingState } from '../types'
 import { SATURDAY, addDays, makeDate, onOrAfterWeekday } from './dates'
 import { buildLeagueRounds } from './schedule'
 
@@ -75,6 +75,11 @@ export interface CompetitionSetup {
   /** Economia da liga (a do Brasil quando falta) e reputação média da divisão. */
   economy?: LeagueEconomy
   reputationMean?: number
+  /** País da liga, limite de estrangeiros e quantos sobem e caem (padrão: 4, menos na primeira e na última divisão da pirâmide). */
+  country?: Nationality
+  foreignLimit?: ForeignLimit
+  promotion?: number
+  relegation?: number
 }
 
 const SERIES_LETTERS = ['a', 'b', 'c', 'd'] as const
@@ -104,14 +109,21 @@ export interface SeasonOptions {
   focus?: string
 }
 
-/** Os times com a economia da liga em que jogam (quem já tem a mesma não é recriado). */
+/** Os times com a economia, o país e o limite de estrangeiros da liga em que jogam (quem já tem os mesmos não é recriado). */
 function withEconomy(teams: readonly Team[], setups: readonly CompetitionSetup[]): Team[] {
-  const economies = new Map<string, LeagueEconomy>()
-  for (const s of setups) if (s.economy) for (const t of s.teams) economies.set(t.id, s.economy)
-  if (economies.size === 0) return [...teams]
+  const setupOf = new Map<string, CompetitionSetup>()
+  for (const s of setups) if (s.economy || s.country || s.foreignLimit) for (const t of s.teams) setupOf.set(t.id, s)
+  if (setupOf.size === 0) return [...teams]
   return teams.map((t) => {
-    const economy = economies.get(t.id)
-    return economy && t.economy !== economy ? { ...t, economy } : t
+    const s = setupOf.get(t.id)
+    if (!s) return t
+    const next: Team = { ...t }
+    if (s.economy) next.economy = s.economy
+    if (s.country) next.country = s.country
+    else delete next.country
+    if (s.foreignLimit) next.foreignLimit = s.foreignLimit
+    else delete next.foreignLimit
+    return next.economy === t.economy && next.country === t.country && next.foreignLimit === t.foreignLimit ? t : next
   })
 }
 
@@ -152,13 +164,15 @@ export function createSeason(options: SeasonOptions): SeasonState {
       teamIds: setup.teams.map((t) => t.id),
       roundCount: rounds.length,
       // Pirâmide: 4 sobem de cada divisão (menos a primeira) e 4 caem de cada uma (menos a última).
-      promotionSlots: setup.tier === 1 ? 0 : 4,
-      relegationSlots: setup.tier === lowestTier.get(setup.pyramid ?? '') ? 0 : 4,
+      promotionSlots: setup.promotion ?? (setup.tier === 1 ? 0 : 4),
+      relegationSlots: setup.relegation ?? (setup.tier === lowestTier.get(setup.pyramid ?? '') ? 0 : 4),
       ...(setup.region ? { region: setup.region } : {}),
       ...(setup.start ? { start: setup.start } : {}),
       ...(setup.rounds ? { rounds: setup.rounds } : {}),
       ...(setup.pyramid ? { pyramid: setup.pyramid } : {}),
       ...(setup.economy ? { economy: setup.economy } : {}),
+      ...(setup.country ? { country: setup.country } : {}),
+      ...(setup.foreignLimit ? { foreignLimit: setup.foreignLimit } : {}),
       ...(setup.reputationMean !== undefined ? { reputationMean: setup.reputationMean } : {}),
     })
   }

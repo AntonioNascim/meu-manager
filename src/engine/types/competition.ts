@@ -6,7 +6,8 @@ export type CompetitionType = 'league'
 /** Região da liga: define as janelas de transferência. */
 export type Region = 'BR' | 'SA' | 'EU'
 
-import type { LeagueEconomy } from './team'
+import type { Nationality } from './player'
+import type { ForeignLimit, LeagueEconomy } from './team'
 
 export interface Competition {
   id: CompetitionId
@@ -30,6 +31,9 @@ export interface Competition {
   pyramid?: string
   /** Economia da liga (índice de receita e nível dos jogadores); ausente = a do Brasil. */
   economy?: LeagueEconomy
+  /** País da liga (nacionalidade) e limite de estrangeiros; ausentes = Brasil e sem limite. */
+  country?: Nationality
+  foreignLimit?: ForeignLimit
   /** Reputação média dos clubes da divisão (para onde a reputação volta); ausente = `OFFSEASON.reputation.tierMean` da série. */
   reputationMean?: number
 }

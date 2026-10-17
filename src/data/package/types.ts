@@ -28,6 +28,14 @@ export interface PackageLeague {
   /** Quantos caem desta divisão para a de baixo. */
   relegation: number
   tiebreakers?: Tiebreaker[]
+  /** Índice de receita e nível dos jogadores da liga em relação ao Brasil; sem ele valem os padrões do país (`leagueDefaults.ts`). */
+  economy?: { revenue: number; level: number }
+  /** 1 = turno único, 2 = turno e returno (padrão). */
+  rounds?: 1 | 2
+  /** Janelas de transferência: BR, SA ou EU (padrão: a do país). */
+  region?: 'BR' | 'SA' | 'EU'
+  /** Limite de estrangeiros (jogadores de nacionalidade diferente da do país da liga); sem ele, sem limite. */
+  foreignLimit?: { squad?: number; lineup?: number }
 }
 
 /** Dados que só uma exportação do jogo traz (sem eles o jogo deriva tudo de forma estável). */

@@ -245,6 +245,10 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     ...(c.rounds ? { rounds: c.rounds } : {}),
     ...(c.pyramid ? { pyramid: c.pyramid } : {}),
     ...(c.economy ? { economy: c.economy } : {}),
+    ...(c.country ? { country: c.country } : {}),
+    ...(c.foreignLimit ? { foreignLimit: c.foreignLimit } : {}),
+    promotion: c.promotionSlots,
+    relegation: c.relegationSlots,
     ...(c.reputationMean !== undefined ? { reputationMean: c.reputationMean } : {}),
   }))
   const next = createSeason({ year: nextYear, seed: state.market.seed, teams, players, competitions: setups, ...(state.focus !== undefined ? { focus: state.focus } : {}) })

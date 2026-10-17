@@ -4,6 +4,7 @@
  */
 import { createYouth } from '../data/generateYouth'
 import { loadWorld } from '../data/package/defaultPackage'
+import type { World } from '../data/generateWorld'
 import type { DataPackage } from '../data/package/types'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
 import type { RenewalResult } from '../engine/offseason'
@@ -79,6 +80,8 @@ export interface Game {
 }
 
 export interface NewGameOptions {
+  /** Mundo já montado a partir do pacote (a tela de novo jogo o tem pronto): evita montar de novo. */
+  world?: World
   /** Pacote de dados já validado (padrão: o mundo fictício). */
   dataPackage?: DataPackage
   /** Referência do pacote guardado no navegador. */
@@ -87,9 +90,21 @@ export interface NewGameOptions {
 
 export function createGame(seed: number, userTeamId: TeamId, options: NewGameOptions = {}): Game {
   // O mundo sempre nasce de um pacote de dados: o do usuário ou o fictício padrão.
-  const world = loadWorld(seed, options.dataPackage)
+  const world = options.world ?? loadWorld(seed, options.dataPackage)
   if (!world.teams.some((t) => t.id === userTeamId)) throw new Error(`Time não encontrado: ${userTeamId}`)
-  const season = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } } })
+  // Mundo com mais de um país: só a pirâmide do técnico é jogada lance a lance (as outras usam a partida simplificada).
+  const pyramids = new Set(world.competitions?.map((c) => c.pyramid))
+  const focus = pyramids.size > 1 ? world.competitions?.find((c) => c.teams.some((t) => t.id === userTeamId))?.pyramid : undefined
+  const season = createSeason({
+    year: world.startYear,
+    seed,
+    teams: world.teams,
+    players: world.players,
+    academy: world.academy,
+    training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } },
+    ...(world.competitions ? { competitions: world.competitions } : {}),
+    ...(focus !== undefined ? { focus } : {}),
+  })
   const market = { ...season.market, listings: season.market.listings.filter((l) => l.teamId !== userTeamId) }
   return {
     seed,

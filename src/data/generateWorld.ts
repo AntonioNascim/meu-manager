@@ -1,4 +1,5 @@
 import { createRng } from '../engine/rng'
+import type { CompetitionSetup } from '../engine/season'
 import type { Player, Team } from '../engine/types'
 import { createAcademy } from './generateAcademy'
 import { createGenerationContext, generateTeam } from './generateTeam'
@@ -18,6 +19,8 @@ export interface World {
   players: Player[]
   /** Categorias de base de todos os clubes (jovens de 15 a 19 anos; não jogam partidas). */
   academy: Player[]
+  /** Ligas do mundo (pacotes com mais de um país ou com regras próprias); sem elas valem as séries padrão do país. */
+  competitions?: CompetitionSetup[]
 }
 
 export const DEFAULT_START_YEAR = 2026
