@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { OpponentOverlay } from '../components/OpponentOverlay'
 import { devFlag } from './match/pitchModel'
 import type { DepartedPlayer, Match, OffseasonReport } from '../../engine/types'
+import { matchLabel } from '../../engine/cups'
 import { cashOutlook, monthlyPayroll } from '../../engine/finance'
 import { pendingIncoming } from '../../engine/market'
 import {
@@ -28,6 +29,7 @@ import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, ou
 import type { ScreenId } from '../navigation'
 import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS } from '../labels'
 import { Highlights } from './dashboard/Highlights'
+import { CupCard } from './dashboard/CupCard'
 import { MiniTable } from './dashboard/MiniTable'
 import { NoticeCenter } from './dashboard/NoticeCenter'
 import { dashboardNotices } from './dashboard/notices'
@@ -95,7 +97,6 @@ function LastMatchCard({ game, match }: { game: Game; match: Match }) {
   const opponent = home.id === team.id ? away : home
   const outcome = outcomeFor(match, team.id)
   const result = match.result
-  const competition = userCompetition(game)
   const capacity = home.stadium.capacity
   const income = home.id === team.id ? team.finances.ledger.find((e) => e.category === 'ticket-sales' && e.date === match.date)?.amount : undefined
   return (
@@ -110,7 +111,7 @@ function LastMatchCard({ game, match }: { game: Game; match: Match }) {
             <span>{away.abbreviation}</span>
           </div>
           <div className="truncate text-sm text-muted">
-            {competition.name} · {home.id === team.id ? 'em casa' : 'fora'} contra {opponent.name}
+            {matchLabel(game.season, match).competition}{match.cup ? ` · ${matchLabel(game.season, match).detail}` : ''} · {home.id === team.id ? 'em casa' : 'fora'} contra {opponent.name}{match.result?.penalties ? ` (${match.result.penalties.home} x ${match.result.penalties.away} nos pênaltis)` : ''}
             {outcome && <span className="sr-only"> ({OUTCOME_LABELS[outcome]})</span>}
           </div>
         </div>
@@ -245,7 +246,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
                 <div className="min-w-0">
                   <div className="title line-clamp-2 text-3xl">{opponent.name}</div>
                   <div className="text-sm text-muted">
-                    {competition.name} · rodada {next.round} · {next.homeTeamId === team.id ? 'em casa' : 'fora'} · {inDays(daysBetween(today, next.date))}
+                    {matchLabel(state, next).competition} · {matchLabel(state, next).detail.toLowerCase()} · {next.cup?.neutral ? 'campo neutro' : next.homeTeamId === team.id ? 'em casa' : 'fora'} · {inDays(daysBetween(today, next.date))}
                   </div>
                 </div>
               </button>
@@ -299,6 +300,8 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
       </div>
 
       <MiniTable game={game} competition={competition} onOpen={() => onNavigate('standings')} />
+
+      <CupCard game={game} onOpen={() => onNavigate('standings', 'cups')} />
 
       <Highlights game={game} onOpen={() => onNavigate('squad', 'players')} />
 

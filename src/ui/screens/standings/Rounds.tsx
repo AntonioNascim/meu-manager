@@ -54,8 +54,13 @@ export function MatchSummary({ game, match, onClose }: { game: Game; match: Matc
         </span>
         <TeamLink team={away} size="sm" className="flex-1 flex-col !items-center text-center text-sm font-bold" />
       </div>
+      {(result.penalties || result.extraTime) && (
+        <p className="text-center text-xs font-bold text-amber-300">
+          {result.penalties ? `Pênaltis: ${result.penalties.home} x ${result.penalties.away} (depois da prorrogação)` : 'Decidido na prorrogação'}
+        </p>
+      )}
       <p className="text-center text-xs text-muted">
-        {formatDate(match.date)} · {home.stadium.name}
+        {formatDate(match.date)} · {match.cup?.neutral ? 'campo neutro' : home.stadium.name}
         {match.attendance ? ` · ${match.attendance.toLocaleString('pt-BR')} pagantes` : ''}
       </p>
       {events.length > 0 ? (

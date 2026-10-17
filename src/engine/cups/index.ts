@@ -318,3 +318,15 @@ function rankInLeague(matches: readonly Match[], teamId: TeamId): number {
   return table.findIndex((r) => r.teamId === teamId) + 1
 }
 
+
+/** Nome da competição e a fase ou rodada de um jogo, para mostrar nas telas ("Copa Nacional", "Quartas de final · volta"). */
+export function matchLabel(state: Pick<SeasonState, 'cups' | 'season'>, match: Pick<Match, 'competitionId' | 'round' | 'cup'>): { competition: string; detail: string } {
+  if (match.cup) {
+    const cup = state.cups?.find((c) => c.id === match.competitionId)
+    const stage = cup ? stageList(cup.spec)[match.cup.stage]?.name : undefined
+    const leg = match.cup.leg === 2 ? ' · volta' : match.cup.leg === 1 && cup?.spec.stages.some((s) => s.name === stage && s.legs === 2) ? ' · ida' : ''
+    const group = match.cup.kind === 'group' ? ` · Grupo ${String.fromCharCode(64 + (match.cup.group ?? 1))}` : ''
+    return { competition: cup?.name ?? match.competitionId, detail: `${stage ?? ''}${group}${leg}` }
+  }
+  return { competition: state.season.competitions.find((c) => c.id === match.competitionId)?.name ?? '', detail: `Rodada ${match.round}` }
+}

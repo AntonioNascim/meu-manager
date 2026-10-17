@@ -7,9 +7,26 @@ import { SectionHeader, TeamLink, shortName } from './parts'
 export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => void }) {
   const log = [...game.seasonLog].reverse()
   const name = (id: string) => teamById(game, id)
+  const cupChampions = Object.entries(game.season.cupHistory ?? {})
+    .flatMap(([cup, list]) => list.map((h) => ({ cup, year: h.year, winnerId: h.winnerId, name: game.season.cupSpecs?.find((s) => s.id === cup)?.name ?? cup })))
+    .sort((a, b) => b.year - a.year || a.name.localeCompare(b.name, 'pt-BR'))
   return (
     <div className="space-y-3">
       <SectionHeader icon="trophy" title="Histórico" subtitle="Temporadas encerradas" tone="violet" />
+      {cupChampions.length > 0 && (
+        <Panel className="p-4" >
+          <h3 className="title text-2xl">Campeões das copas</h3>
+          <ul className="mt-2 space-y-1 text-sm" data-testid="cup-history">
+            {cupChampions.map((c) => (
+              <li key={`${c.cup}-${c.year}`} className="flex items-center gap-2">
+                <span className="w-10 shrink-0 text-xs text-muted">{c.year}</span>
+                <span className="w-32 shrink-0 truncate text-xs text-muted">{c.name}</span>
+                <TeamLink team={name(c.winnerId)} onOpen={onTeam} className="font-bold" />
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
       {log.length === 0 && <Panel className="p-4 text-sm text-muted">Nenhuma temporada foi encerrada ainda. Os campeões, os acessos e os rebaixamentos aparecem aqui depois da primeira virada de temporada.</Panel>}
       {log.map((s) => (
         <Panel key={s.year} className="p-4">

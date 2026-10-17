@@ -86,6 +86,11 @@ export interface MatchSnapshot {
   events: MatchEvent[]
   /** Rastro dos momentos de posse, na ordem (só leitura: serve para desenhar o campo). */
   trace: PlayTrace[]
+  /** A partida foi para a prorrogação (mata-mata empatado nos 90 minutos). */
+  extraTime?: boolean
+  /** Depois do apito final de uma disputa de pênaltis: o placar dela e as cobranças. */
+  penalties?: { home: number; away: number }
+  shootout?: MatchResult['shootout']
   /** Jogador do seu time machucado esperando a escolha de quem entra (o jogo está parado). */
   injuryPending?: { side: MatchSide; playerId: string }
   homeStats: TeamMatchStats
@@ -268,6 +273,8 @@ export function startMatch(input: MatchInput): LiveMatch {
       }
     },
     snapshot() {
+      settle()
+      const decided = moment >= totalMoments && input.knockout ? (finalResult ??= buildResult(ctx, input.knockout)) : undefined
       const total = ctx.home.tally.possession + ctx.away.tally.possession
       const homeShare = total === 0 ? 50 : Math.round((100 * ctx.home.tally.possession) / total)
       return {
@@ -276,6 +283,8 @@ export function startMatch(input: MatchInput): LiveMatch {
         homeGoals: ctx.home.goals,
         awayGoals: ctx.away.goals,
         ...(ctx.extra ? { extraTime: true } : {}),
+        ...(decided?.penalties ? { penalties: decided.penalties } : {}),
+        ...(decided?.shootout ? { shootout: decided.shootout } : {}),
         events: [...ctx.events],
         trace: [...ctx.trace],
         ...(ctx.pendingInjury ? { injuryPending: ctx.pendingInjury } : {}),

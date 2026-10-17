@@ -15,6 +15,8 @@ export interface LiveSession {
   side: MatchSide
   /** O intervalo já aconteceu (o jogo não para de novo no minuto 45). */
   halftimeDone: boolean
+  /** A pausa antes da prorrogação já aconteceu (o jogo não para de novo no minuto 90). */
+  extraDone?: boolean
 }
 
 let session: LiveSession | null = null

@@ -1,3 +1,4 @@
+import { matchLabel } from '../../engine/cups'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_IDS } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
@@ -73,9 +74,32 @@ export function buildLog(snap: MatchSnapshot, halftimeDone: boolean, showFouls =
     })
   for (const { e, i } of events.filter(({ e }) => e.minute <= 45)) push(e, i)
   if (halftimeDone || snap.minute > 45) lines.push({ key: 'half', minute: 45, text: 'Fim do primeiro tempo.', icon: '⏸', strong: false })
-  for (const { e, i } of events.filter(({ e }) => e.minute > 45)) push(e, i)
-  if (snap.finished) lines.push({ key: 'end', minute: 90, text: `Fim de jogo! ${snap.homeGoals} x ${snap.awayGoals}.`, icon: '🏁', strong: true })
+  for (const { e, i } of events.filter(({ e }) => e.minute > 45 && e.minute <= 90)) push(e, i)
+  if (snap.extraTime) {
+    lines.push({ key: 'regular-end', minute: 90, text: 'Fim do tempo normal: o confronto segue empatado. Vai para a prorrogação!', icon: '⏱', strong: true })
+    for (const { e, i } of events.filter(({ e }) => e.minute > 90)) push(e, i)
+  }
+  if (snap.finished && snap.penalties) {
+    for (const [i, kick] of (snap.shootout ?? []).entries()) {
+      lines.push({ key: `pen${i}`, minute: snap.minute, text: `${kick.scored ? 'Gol' : 'Perdeu'}! Cobrança ${Math.floor(i / 2) + 1} (${kick.teamId === snap.home.teamId ? 'mandante' : 'visitante'}).`, icon: kick.scored ? '⚽' : '✖', strong: false, teamId: kick.teamId })
+    }
+    lines.push({ key: 'pens', minute: snap.minute, text: `Pênaltis: ${snap.penalties.home} x ${snap.penalties.away}.`, icon: '🥅', strong: true })
+  }
+  if (snap.finished) lines.push({ key: 'end', minute: snap.extraTime ? 120 : 90, text: `Fim de jogo! ${snap.homeGoals} x ${snap.awayGoals}${snap.penalties ? ` (${snap.penalties.home} x ${snap.penalties.away} nos pênaltis)` : ''}.`, icon: '🏁', strong: true })
   return lines.reverse()
+}
+
+/** Na volta de um confronto de ida e volta: o placar da ida e o que o time precisa. */
+function FirstLegNote({ game, match }: { game: Game; match: NonNullable<Game['pendingUserMatch']> }) {
+  const first = game.season.matches.find((m) => m.competitionId === match.competitionId && m.cup?.stage === match.cup?.stage && m.cup?.tie === match.cup?.tie && m.cup?.leg === 1)
+  if (!first?.result) return null
+  const home = teamById(game, first.homeTeamId)
+  const away = teamById(game, first.awayTeamId)
+  return (
+    <p className="rounded-lg border border-line bg-surface p-2 text-xs text-muted" data-testid="first-leg">
+      Jogo de ida: {home.name} {first.result.homeGoals} x {first.result.awayGoals} {away.name}. {game.season.cups?.find((c) => c.id === match.competitionId)?.spec.awayGoals ? 'Vale a regra do gol fora.' : 'Se a soma dos dois jogos empatar, vai para a prorrogação e os pênaltis.'}
+    </p>
+  )
 }
 
 function Scoreboard({ game, snap, label, speed, onSpeed, onOpponent }: { game: Game; snap: MatchSnapshot; label: string; speed: number; onSpeed: () => void; onOpponent: () => void }) {
@@ -109,12 +133,13 @@ function Scoreboard({ game, snap, label, speed, onSpeed, onOpponent }: { game: G
           <div className="text-4xl font-bold tabular-nums">
             {snap.homeGoals} x {snap.awayGoals}
           </div>
+          {snap.penalties && snap.finished && <div className="text-xs font-bold tabular-nums text-amber-300">({snap.penalties.home} x {snap.penalties.away} nos pênaltis)</div>}
           <div className="text-xs font-semibold text-emerald-400">{label}</div>
         </div>
         {side(away)}
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-700">
-        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(snap.minute / 90) * 100}%` }} />
+        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(snap.minute / (snap.extraTime ? 120 : 90)) * 100}%` }} />
       </div>
     </div>
   )
@@ -521,6 +546,12 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
         setRunning(false)
         return
       }
+      // Mata-mata empatado: pausa no fim dos 90 minutos antes da prorrogação.
+      if (match.minute >= 90 && !live.extraDone) {
+        live.extraDone = true
+        setRunning(false)
+        return
+      }
       if (match.snapshot().injuryPending) return
       timer = window.setTimeout(step, MINUTE_MS / speed + hold)
     }
@@ -531,12 +562,13 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const finished = snap.finished
   const pending = snap.injuryPending?.side === live.side
   const atHalftime = !finished && !running && snap.minute === 45 && live.halftimeDone
-  const label = finished ? 'Fim de jogo' : atHalftime ? 'Intervalo' : snap.minute === 0 ? 'Antes do apito' : `${snap.minute}'${running ? '' : ' · pausado'}`
+  const beforeExtra = !finished && !running && snap.minute === 90 && snap.extraTime === true
+  const label = finished ? 'Fim de jogo' : atHalftime ? 'Intervalo' : beforeExtra ? 'Fim do tempo normal' : snap.minute === 0 ? 'Antes do apito' : `${snap.minute}'${snap.minute > 90 ? ' · prorrogação' : ''}${running ? '' : ' · pausado'}`
   const lines = useMemo(() => buildLog(snap, live.halftimeDone, showFouls), [snap, live.halftimeDone, showFouls])
   const mySide = live.side === 'home' ? snap.home : snap.away
   const opponentSide = live.side === 'home' ? snap.away : snap.home
   const canEdit = !running && !finished
-  const mainLabel = running ? 'Pausar' : atHalftime ? 'Começar o 2º tempo' : snap.minute === 0 ? 'Começar' : 'Continuar'
+  const mainLabel = running ? 'Pausar' : atHalftime ? 'Começar o 2º tempo' : beforeExtra ? 'Começar a prorrogação' : snap.minute === 0 ? 'Começar' : 'Continuar'
   const nextSpeed = () => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length] as (typeof SPEEDS)[number])
 
   const onMain = () => {
@@ -545,8 +577,9 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   }
   const skip = () => {
     live.halftimeDone = true
+    live.extraDone = true
     setRunning(false)
-    live.match.playUntil(90)
+    live.match.playUntil(120)
     absorb(live.match.snapshot())
   }
 
@@ -587,13 +620,14 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
         {snap.minute === 0 && match && (
           <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
             <span>
-              Rodada {match.round} · {formatDate(match.date)} · {teamById(game, match.homeTeamId).stadium.name}
+              {matchLabel(game.season, match).competition} · {matchLabel(game.season, match).detail} · {formatDate(match.date)} · {match.cup?.neutral ? 'campo neutro' : teamById(game, match.homeTeamId).stadium.name}
             </span>
             <button type="button" onClick={adjust} className="font-bold text-accent underline">
               Ajustar tática e escalação
             </button>
           </p>
         )}
+        {snap.minute === 0 && match?.cup?.leg === 2 && <FirstLegNote game={game} match={match} />}
         {alert && (
           <p role="alert" className="rounded-lg border border-amber-400/60 bg-amber-950/60 p-2 text-sm font-semibold text-amber-100">
             ✚ {alert}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Competition } from '../../engine/types'
 import type { Game } from '../../store/game'
 import { TopTabs } from '../theme'
+import { Cups } from './standings/Cups'
 import { History } from './standings/History'
 import { Leaders } from './standings/Leaders'
 import type { LeaderBoard } from './standings/Leaders'
@@ -11,7 +12,7 @@ import { TeamPage } from './standings/TeamPage'
 
 export { latestPlayedRound, zoneOf } from './standings/Table'
 
-type Section = 'table' | 'rounds' | LeaderBoard | 'history'
+type Section = 'table' | 'rounds' | LeaderBoard | 'cups' | 'history'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'table', label: 'Classificação' },
@@ -19,6 +20,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'goals', label: 'Artilharia' },
   { id: 'assists', label: 'Assistências' },
   { id: 'cards', label: 'Cartões' },
+  { id: 'cups', label: 'Copas' },
   { id: 'history', label: 'Histórico' },
 ]
 
@@ -36,7 +38,7 @@ export function Standings({ game, initialSection = 'table' }: { game: Game; init
   return (
     <div className="space-y-3">
       <TopTabs scroll value={section} onChange={setSection} options={SECTIONS} />
-      {section !== 'history' && (
+      {section !== 'history' && section !== 'cups' && (
         <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[...competitions]
             .sort((a, b) => Number(b.pyramid === mine.pyramid) - Number(a.pyramid === mine.pyramid) || a.tier - b.tier)
@@ -56,6 +58,7 @@ export function Standings({ game, initialSection = 'table' }: { game: Game; init
       {section === 'table' && <Table game={game} competition={competition} onTeam={setTeamId} />}
       {section === 'rounds' && <Rounds game={game} competition={competition} onTeam={setTeamId} />}
       {(section === 'goals' || section === 'assists' || section === 'cards') && <Leaders key={`${section}-${competition.id}`} game={game} competition={competition} board={section} onTeam={setTeamId} />}
+      {section === 'cups' && <Cups game={game} onTeam={setTeamId} />}
       {section === 'history' && <History game={game} onTeam={setTeamId} />}
     </div>
   )

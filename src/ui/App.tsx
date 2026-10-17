@@ -45,9 +45,9 @@ function initialMarketTab(hint?: string): MarketTab {
 }
 
 /** Em desenvolvimento, &aba=rounds|goals|assists|cards|history abre a seção da Tabela. */
-function initialStandingsSection(hint?: string): 'table' | 'rounds' | 'goals' | 'assists' | 'cards' | 'history' {
+function initialStandingsSection(hint?: string): 'table' | 'rounds' | 'goals' | 'assists' | 'cards' | 'cups' | 'history' {
   const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
-  return wanted === 'rounds' || wanted === 'goals' || wanted === 'assists' || wanted === 'cards' || wanted === 'history' ? wanted : 'table'
+  return wanted === 'rounds' || wanted === 'goals' || wanted === 'assists' || wanted === 'cards' || wanted === 'cups' || wanted === 'history' ? wanted : 'table'
 }
 
 export function App() {
