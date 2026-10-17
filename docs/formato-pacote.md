@@ -28,7 +28,8 @@ O código está em `src/data/package/` (`types.ts` com os tipos, `validate.ts` c
   "leagues": [ ... ],
   "clubs": [ ... ],
   "players": [ ... ],
-  "academy": [ ... ]
+  "academy": [ ... ],
+  "cups": [ ... ]
 }
 ```
 
@@ -44,6 +45,7 @@ O código está em `src/data/package/` (`types.ts` com os tipos, `validate.ts` c
 | `clubs` | sim | Lista de clubes |
 | `players` | sim | Lista de jogadores (elencos) |
 | `academy` | não | Base dos clubes (jovens de 15 a 19 anos). Sem ela o jogo gera uma |
+| `cups` | não | Copas e supercopas (seção "Copas" abaixo). Sem elas o mundo só tem as ligas |
 
 ## Países (`countries`)
 
@@ -256,6 +258,153 @@ Para um mundo mínimo bastam `name`, `birthDate`, `nationality`, `position` e `c
 
 Opcional. Mesma estrutura de jogador, com `club` **obrigatório**, idades de 15 a 19 anos (na data de início). Sem `academy`, o jogo
 gera a base de cada clube com a semente do jogo, no nível da liga.
+
+## Copas (`cups`)
+
+Opcional. Cada item é uma copa ou supercopa. O **nome vem do pacote**: o jogo publicado usa nomes genéricos ("Copa Nacional",
+"Supercopa Nacional"), porque os nomes oficiais dos campeonatos são marcas; quem monta um pacote próprio decide os nomes.
+
+```json
+{
+  "id": "cup-br",
+  "name": "Copa Nacional",
+  "kind": "cup",
+  "country": "Brazil",
+  "format": "knockout",
+  "entrants": [
+    { "source": { "type": "league", "league": "br-1" } },
+    { "source": { "type": "league", "league": "br-2" } },
+    { "source": { "type": "league", "league": "br-3" } }
+  ],
+  "stages": [
+    { "name": "Primeira fase", "legs": 1, "date": [2, 4] },
+    { "name": "Segunda fase", "legs": 1, "date": [2, 25] },
+    { "name": "Oitavas de final", "legs": 2, "date": [3, 25] },
+    { "name": "Quartas de final", "legs": 2, "date": [5, 6] },
+    { "name": "Semifinais", "legs": 2, "date": [7, 22] },
+    { "name": "Final", "legs": 2, "date": [10, 14], "legGap": 14 }
+  ],
+  "seeding": "seeded",
+  "homeOfSingleLeg": "lower-reputation",
+  "awayGoals": false,
+  "extraTime": true,
+  "penalties": true,
+  "discipline": { "yellowsPerSuspension": 3, "redCardGames": 1, "clearYellowsAfterStage": 3 },
+  "prize": { "perStage": [100000, 150000, 400000, 800000, 1500000, 2500000], "champion": 12000000, "runnerUp": 5000000 }
+}
+```
+
+| Campo | Obrigatório | O que é |
+|---|---|---|
+| `id` | sim | Único no pacote (e diferente dos ids das ligas). Outras copas citam por ele |
+| `name` | sim | Nome mostrado |
+| `kind` | não | `cup` (padrão) ou `supercup` (só um rótulo) |
+| `country` | não | País da copa (uma liga dele precisa estar no pacote). Copa continental usa `region` |
+| `region` | não | `BR`, `SA` ou `EU` |
+| `format` | sim | `knockout`, `groups-knockout` ou `league-knockout` (abaixo) |
+| `entrants` | sim | As vagas: quem joga e em que fase entra (abaixo) |
+| `stages` | sim | As fases de **mata-mata**, da primeira à final (abaixo) |
+| `groups` | só em `groups-knockout` | A fase de grupos |
+| `leaguePhase` | só em `league-knockout` | A fase de liga |
+| `seeding` | não | `random` (padrão) ou `seeded` (cabeças de chave) |
+| `homeOfSingleLeg` | não | Quem manda o jogo único: `draw` (padrão: quem o sorteio põe primeiro; com cabeças de chave, o cabeça de chave) ou `lower-reputation` (o clube de menor reputação) |
+| `awayGoals` | não | Regra do gol fora na ida e volta. **Desligada por padrão** (`false`) |
+| `extraTime` | não | Prorrogação de 30 minutos se o confronto está empatado (padrão `true`) |
+| `penalties` | não | Disputa de pênaltis se continua empatado (padrão `true`) |
+| `discipline` | não | Cartões e suspensões **próprios da copa** (abaixo) |
+| `prize` | não | Premiação em dinheiro (abaixo) |
+
+### Formatos
+
+- **`knockout`**: só mata-mata. As fases de `stages` são jogadas em ordem; cada uma recebe os vencedores da anterior (mais quem
+  entra nela pelas vagas).
+- **`groups-knockout`**: uma fase de grupos e depois o mata-mata. Precisa de `groups`:
+  `{ "name": "Fase de grupos", "count": 8, "advance": 2, "legs": 2, "date": [9, 15], "gapDays": 14 }`. `count` grupos de igual
+  tamanho **par**, `advance` passam de cada grupo, `legs` 1 (só ida) ou 2 (ida e volta), as rodadas ficam `gapDays` dias uma da
+  outra (padrão 7). A primeira fase de `stages` recebe os classificados dos grupos (sorteada como as outras fases, com cabeças de chave pela reputação se `seeding` é `seeded`).
+- **`league-knockout`**: uma fase de liga (tabela única) e depois o mata-mata. Precisa de `leaguePhase`:
+  `{ "name": "Fase de liga", "pots": 4, "matchesPerTeam": 8, "date": [9, 10], "gapDays": 7, "direct": 8, "playoff": 16 }`. Os clubes
+  são separados em `pots` potes pela reputação e cada um enfrenta `matchesPerTeam / pots` rivais de cada pote (inclusive do seu),
+  metade em casa e metade fora; `matchesPerTeam` precisa ser múltiplo de `2 × pots`. Os melhores `direct` pulam a primeira fase de
+  `stages` (o playoff) e os `playoff` seguintes jogam essa primeira fase.
+
+O jogo confere a conta dos clubes: o número de clubes de cada fase tem que levar a uma **final de dois**. Quando o número de
+clubes de uma fase de mata-mata não é potência de dois, os melhores colocados (cabeças de chave) **folgam** e os outros jogam até
+sobrar uma potência de dois. Exemplo: 60 clubes → 4 folgam, 28 confrontos, 32 seguem → 16 → 8 → 4 → 2 → 1 (seis fases).
+
+### Vagas (`entrants`)
+
+Cada vaga tem uma `source` (de onde vêm os clubes), uma `fallback` opcional e a `stage` em que entra (índice na lista de fases da
+copa: com grupos ou fase de liga, o 0 é essa fase e o mata-mata começa no 1; padrão 0).
+
+```json
+{ "source": { "type": "league", "league": "br-1" } }
+{ "source": { "type": "league", "league": "br-1", "positions": [1, 4] } }
+{ "source": { "type": "cup", "cup": "cup-br", "place": "winner" }, "fallback": { "type": "league", "league": "br-1", "positions": [2, 2] } }
+```
+
+- `league` sem `positions`: **todos** os clubes que estão na liga hoje. Com `positions` `[de, até]`: quem **terminou a temporada
+  passada** nessas posições (na primeira temporada de um mundo, vale a ordem de reputação).
+- `cup` com `place` `winner` ou `runner-up`: o campeão ou o vice da **edição passada** daquela copa (na primeira temporada, o clube
+  mais forte entre os que ela teria). Uma copa não pode citar a si mesma.
+- `fallback`: se o clube escolhido já está na copa por outra vaga (o campeão da liga que também ganhou a copa), entra o primeiro da
+  vaga reserva.
+
+### Fases de mata-mata (`stages`)
+
+`{ "name": "Quartas de final", "legs": 2, "date": [5, 6], "legGap": 7, "neutral": false }`
+
+- `legs`: `1` jogo único ou `2` ida e volta. `legGap`: dias entre a ida e a volta (2 a 60; padrão 7).
+- `neutral`: num jogo único, estádio neutro (sem vantagem de casa e sem bilheteria; serve para finais e supercopas).
+- **`date`**: mês e dia de referência do primeiro jogo (volta: `legGap` dias depois). O jogo vai para a **primeira quarta-feira livre
+  a partir dessa data**: livre quer dizer que nenhum dos clubes da fase joga (nem na véspera nem no dia seguinte) uma partida de
+  liga ou de outra copa. Então a copa nunca bate com a liga; a data real pode ficar uma ou mais semanas depois da de referência. A
+  fase seguinte só é sorteada e marcada quando a anterior termina, com pelo menos 4 dias de descanso.
+
+### Desempate, prorrogação e pênaltis
+
+- Confronto de **jogo único**: o placar decide; empate → prorrogação (se `extraTime`) → pênaltis (se `penalties`).
+- **Ida e volta**: soma dos dois jogos; empate → gol fora (se `awayGoals`) → prorrogação **na volta** → pênaltis. Os gols da
+  prorrogação contam na soma.
+- A prorrogação é 30 minutos jogados pelo mesmo motor da partida (os jogadores cansam mais: o jogo todo conta 120 minutos na
+  condição física). Os pênaltis são decididos pelos atributos: a chance de converter é de ~76% para um cobrador médio contra um
+  goleiro médio e sobe com a **finalização e a frieza** (média de determinação e decisão) do cobrador contra os **reflexos, o
+  posicionamento e a decisão** do goleiro. Cobram primeiro os cobradores de pênalti da tática do time, depois os melhores
+  cobradores em campo, o goleiro por último. Cinco cobranças para cada lado e depois morte súbita.
+- Sem prorrogação nem pênaltis ligados e um empate no fim, o jogo sorteia (determinístico pela semente da partida), para a copa
+  nunca travar.
+- `tiebreakers`: a classificação dos grupos e da fase de liga usa a ordem padrão do jogo (pontos, vitórias, saldo, gols, confronto
+  direto, vermelhos, amarelos, sorteio); outra ordem gera um aviso e é ignorada.
+
+### Cartões e suspensões (`discipline`)
+
+`{ "yellowsPerSuspension": 3, "redCardGames": 1, "clearYellowsAfterStage": 3 }` (todos opcionais; padrão 3 amarelos e 1 jogo).
+Os amarelos e as suspensões **de cada copa são só dela**: o amarelo da copa não conta na liga, o vermelho da copa suspende só nos
+jogos da copa e a suspensão da liga não tira ninguém da copa. `clearYellowsAfterStage`: depois dessa fase (índice) os amarelos
+acumulados zeram. Os gols e cartões da copa entram na artilharia da copa, não na da liga (os totais do jogador na temporada somam
+tudo).
+
+### Premiação (`prize`)
+
+`{ "perStage": [100000, 150000, ...], "champion": 12000000, "runnerUp": 5000000 }`, em reais do Brasil. Cada clube recebe
+`perStage[i]` ao estrear na fase `i` (quem folga recebe na fase em que entra) e o campeão e o vice recebem no fim. Os valores são
+multiplicados pelo índice de receita da liga do clube (`economy.revenue`). Entram no caixa como "Premiação das copas". A bilheteria
+dos jogos em casa também entra (menos em campo neutro).
+
+### Quem joga lance a lance
+
+Um jogo de copa é jogado lance a lance se um dos clubes é da pirâmide do técnico; senão usa a partida simplificada (que também faz
+prorrogação e pênaltis). O jogador joga os jogos de copa do seu time como os de liga (tática, escalação, trocas), com a prorrogação
+e os pênaltis na tela.
+
+### Validação
+
+Erros comuns: `cup-bracket` ("A copa em cups[0] não fecha o chaveamento…": a conta de clubes não leva a uma final de dois),
+`cup-groups` (grupos de tamanho ímpar, jogos demais contra cada pote…), referência a liga ou copa que não existe, copa que cita
+a si mesma, data inválida, `perStage` com mais valores que fases, `id` repetido (com outra copa ou com uma liga).
+
+O mundo fictício padrão exporta as suas copas (`defaultPackage`): `Copa Nacional` (60 clubes, seis fases) e `Supercopa Nacional`
+(campeão da liga contra o campeão da copa; se for o mesmo clube, o vice da liga joga) em `cups`.
 
 ## Pacote completo (exportação do próprio jogo)
 

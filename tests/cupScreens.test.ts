@@ -92,3 +92,18 @@ describe('copas nas telas', () => {
     expect(g.season.cups![0]!.log.length).toBeGreaterThan(0)
   })
 })
+
+describe('artilharia da liga sem os gols da copa', () => {
+  it('os gols e cartões de copa saem das listas da liga e entram na artilharia da copa', async () => {
+    const { leaders } = await import('../src/ui/screens/standings/data')
+    const { cupScorers } = await import('../src/ui/screens/standings/cupData')
+    const game = withUser()
+    const team = game.season.teams.find((t) => t.tier === 1)!
+    const player = game.season.players.find((p) => p.teamId === team.id)!
+    const edited: Game = { ...game, season: { ...game.season, players: game.season.players.map((p) => (p.id === player.id ? { ...p, seasonStats: { ...p.seasonStats, goals: 5, cupGoals: 3, yellowCards: 4, cupYellowCards: 4 } } : p)) } }
+    const competition = edited.season.season.competitions.find((c) => c.teamIds.includes(team.id))!
+    expect(leaders(edited, competition, 'goals').find((l) => l.player.id === player.id)?.value).toBe(2)
+    expect(leaders(edited, competition, 'yellow').find((l) => l.player.id === player.id)).toBeUndefined()
+    expect(cupScorers(edited, 'cup-br')).toEqual([])
+  })
+})

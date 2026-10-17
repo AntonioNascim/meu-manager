@@ -52,16 +52,16 @@ export function standingsFor(game: Game, competition: Competition, year: number)
 export type LeaderKind = 'goals' | 'home-goals' | 'away-goals' | 'brazilians' | 'under-23' | 'assists' | 'pass-assists' | 'cross-assists' | 'yellow' | 'red'
 
 const VALUE: Record<LeaderKind, (p: Player) => number> = {
-  goals: (p) => p.seasonStats.goals,
+  goals: (p) => p.seasonStats.goals - (p.seasonStats.cupGoals ?? 0),
   'home-goals': (p) => p.seasonStats.homeGoals ?? 0,
   'away-goals': (p) => p.seasonStats.awayGoals ?? 0,
-  brazilians: (p) => (p.nationality === 'Brazil' ? p.seasonStats.goals : 0),
-  'under-23': (p) => (p.age <= 23 ? p.seasonStats.goals : 0),
-  assists: (p) => p.seasonStats.assists,
+  brazilians: (p) => (p.nationality === 'Brazil' ? p.seasonStats.goals - (p.seasonStats.cupGoals ?? 0) : 0),
+  'under-23': (p) => (p.age <= 23 ? p.seasonStats.goals - (p.seasonStats.cupGoals ?? 0) : 0),
+  assists: (p) => p.seasonStats.assists - (p.seasonStats.cupAssists ?? 0),
   'pass-assists': (p) => p.seasonStats.passAssists ?? 0,
   'cross-assists': (p) => p.seasonStats.crossAssists ?? 0,
-  yellow: (p) => p.seasonStats.yellowCards,
-  red: (p) => p.seasonStats.redCards,
+  yellow: (p) => p.seasonStats.yellowCards - (p.seasonStats.cupYellowCards ?? 0),
+  red: (p) => p.seasonStats.redCards - (p.seasonStats.cupRedCards ?? 0),
 }
 
 export interface Leader {
