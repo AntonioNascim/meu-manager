@@ -115,7 +115,8 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     const tier = landing ? landing.tier : t.tier
     // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
     const mean = landing?.reputationMean ?? R.tierMean[tier] ?? t.reputation
-    const pulled = t.reputation + delta + R.tierPull * (mean - t.reputation)
+    const pull = tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
+    const pulled = t.reputation + delta + pull * (mean - t.reputation)
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId
