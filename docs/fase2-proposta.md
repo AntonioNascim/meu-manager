@@ -465,3 +465,35 @@ Rodízio do mercado, temporada inteira com foco no Brasil: sem rodízio 25,9 s; 
 2. **Campeões acima de uns 92 pontos (B6).** Em algumas sementes o campeão passa de 92 pontos (o teto individual do `season.test.ts` está em 100 só para não quebrar; a média do campeão segue em 79 a 82). Investigar se vem de elencos desequilibrados demais (reputação de topo muito acima do resto) e ajustar a geração ou a reputação, em vez de subir o teto do teste.
 3. **Checagem de dinastias (B6).** No teste de longo prazo das 15 ligas, medir quantas temporadas seguidas o mesmo clube é campeão e quantos clubes diferentes ganham o título em 30 temporadas, em cada liga (o `longRun` de hoje só confere que os campeões variam). Rodar com o simplificado nas ligas fora do foco e com o completo, para saber se o simplificado deixa as ligas mais ou menos previsíveis (hoje o elenco mais forte termina um pouco mais em cima no simplificado).
 4. **Outras pendências da B3 para a B6:** virada por pirâmide (hoje `advanceSeason` só conhece uma pirâmide e carrega o foco), tela de troca de clube (chamar `refocus`) e treino das ligas simplificadas de uma vez só, se ainda for preciso.
+
+---
+
+## 12. Resultado da parte B4 (save em partes comprimidas)
+
+**Sobre a "versão 10":** o `SAVE_VERSION` já estava em 10 desde a B2 (datas de nascimento). A B4 não muda o formato de `Game` nem o envelope: muda **como o envelope é guardado no IndexedDB**. Por isso a versão do save continua 10, o arquivo de backup é o mesmo JSON de antes e o esquema do Dexie subiu para a versão 3 (tabelas novas `manifests` e `parts`; `games` ficou só para ler saves antigos).
+
+**Feito na B4**
+
+1. **Pedaços** (`src/store/saveParts.ts`). O jogo é dividido em: o resto do jogo (`core`), o calendário, os ids das partidas, o mercado, o treino e, para as listas grandes, um pedaço por liga (times, jogadores e base) e um por competição e grupo de 6 rodadas (partidas). Cada pedaço guarda as referências dos objetos que o formam; como o motor é imutável, o que não mudou entre dois saves tem as mesmas referências e **não é serializado, comprimido nem gravado de novo**. Juntar os pedaços devolve o jogo igual, na mesma ordem.
+2. **Compressão** (`src/store/compress.ts`). Cada pedaço vai em gzip (`CompressionStream`, fora da thread da tela). Navegador sem a API grava o texto puro (o pedaço diz como foi gravado, então os dois jeitos abrem em qualquer aparelho).
+3. **Gravação que não corrompe** (`src/store/saves.ts`, classe `SaveStore`). Todo o trabalho (dividir, serializar, comprimir) acontece **antes** de abrir a transação do IndexedDB. Dentro da transação: os pedaços novos entram com ids novos (nunca por cima de pedaço do save atual), depois o manifesto passa a apontar para eles, o resumo é atualizado e só então os pedaços velhos saem. É uma transação só: se o jogo fechar ou o celular apagar no meio, o navegador desfaz tudo e o save anterior continua inteiro. Se o espaço mudou por fora (outra aba), a gravação regrava tudo uma vez. Teste: `tests/saveParts.test.ts` falha a gravação no meio (`beforeCommit`) e confere que os pedaços, o resumo e o jogo ficam iguais, inclusive na primeira gravação de um espaço.
+4. **Saves antigos.** Um espaço no formato antigo (um envelope por linha em `games`, de qualquer versão) abre pela mesma migração de sempre; a primeira gravação o troca pelos pedaços e apaga a linha antiga, na mesma transação. Pedaço que sumiu do disco vira `SaveError('invalid')`, não um jogo quebrado. Exportar e importar o save em arquivo não mudou (JSON com o envelope; `exportSlot` monta o jogo dos pedaços, `importSave` grava em pedaços).
+5. **Medida do tempo de salvar.** `SaveStore.saveDetailed` devolve também `SaveStats` (tempo total e repartido em preparar, comprimir e escrever; pedaços e bytes gravados; tamanho do save inteiro). O salvamento automático guarda isso no status e **espera mais depois de uma gravação lenta** (3 vezes o tempo da última, no máximo 4 s), para um celular simples não ficar comprimindo a cada toque. A tela de diagnóstico (`?diagnostico=1`) agora grava o jogo de teste depois de cada avanço num banco temporário (`meu-manager-diagnostico`, apagado no fim, sem tocar nos saves do jogador) e acrescenta ao relatório o tamanho gravado no início e no fim (meta de 3 MB), a mediana, o p95 e o pior tempo de salvar (metas: 1 s e 4 s) e quanto cada save grava.
+
+**Resultado, mundo de 282 clubes, temporada inteira lance a lance** (`node --expose-gc tools/run.mjs saveWorld --world full`, 68 avanços; este notebook, com `fake-indexeddb` em memória, então o tempo de escrita no disco de um celular fica de fora)
+
+| | Antes (JSON, um objeto) | Em pedaços comprimidos |
+|---|---|---|
+| Tamanho no início da temporada | ~9,8 MB (JSON) | **1,04 MB** |
+| Tamanho no fim da temporada | ~17,8 MB (JSON) | **1,96 MB** (meta: 3 MB) |
+| Primeiro save (grava tudo) | n/d | 205 ms |
+| Salvar a cada avanço: mediana / p95 / pior | n/d | **173 / 271 / 415 ms** |
+| Pedaços gravados por avanço (mediana) | tudo | 65 de 142 (1,4 MB) |
+| Onde vai o tempo (mediana) | n/d | preparar 74 ms, comprimir 87 ms, escrever 15 ms |
+
+Brasil (60 clubes): início 218 KB, fim 429 KB, mediana 48 ms por save. Teste de balanceamento: `tests/balance/saveParts.test.ts` (temporada inteira do Brasil, 3 MB, tempo abaixo de 1 s, abre igual).
+
+**O que não saiu como a proposta previa**
+- **Gravar "só dezenas de KB" por avanço não vale.** O treino e a recuperação da condição mexem em todos os jogadores a cada dia (1.507 de 1.540 jogadores mudam num avanço de um dia), então o que a comparação por referência poupa são as ligas que não jogaram no dia, as partidas de rodadas futuras, o mercado e o calendário: ~45% dos pedaços e ~25% dos bytes. Pedaço por clube foi pior (676 pedaços, mediana 686 ms, quase tudo regravado, e o IndexedDB sofre com muitas linhas pequenas), e separar a condição do resto do jogador (dois pedaços por clube) também (1.241 pedaços, e o cadastro mudava quase igual). Ficou **um pedaço por liga**.
+- **Os passos 2 a 4 da seção 4.6** (livro-caixa só da liga do técnico, jogadores das outras ligas em forma compacta, base das outras ligas só como contagem) **não foram necessários**: só a compressão já dá 1,96 MB no fim da temporada (meta 3 MB). Ficam como reserva se o histórico de várias temporadas das 15 ligas passar da folga de ~1 MB.
+- **Não foi medido** o mundo de 282 clubes depois de várias temporadas (a base dos clubes cresce uns 15% nos primeiros anos e o arquivo de temporadas passadas cresce poucos KB por temporada; estimativa: ~2,3 MB), nem o tempo num celular de verdade (estimativa de 3 a 5 vezes este notebook para preparar e comprimir, ou seja, uns 0,5 a 1 s por save, em segundo plano e espaçado pela espera do salvamento automático). Rodar `?diagnostico=1` no aparelho dá o número real.
