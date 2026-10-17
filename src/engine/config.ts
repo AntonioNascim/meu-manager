@@ -338,8 +338,10 @@ export const SEASON = {
   midweekEvery: 5,
   /** A última rodada tem todos os jogos juntos, no domingo. */
   finalRoundSameDay: true,
-  /** Os contratos terminam neste dia (mês e dia): o fim da temporada do calendário brasileiro, que é de ano civil. */
+  /** Os contratos do ano civil terminam neste dia (mês e dia); na temporada que atravessa o ano terminam em 30 de junho. */
   contractEnd: { month: 12, day: 31 },
+  /** Liga de temporada que atravessa o ano sem data própria: primeira rodada no primeiro sábado a partir daqui, com uma semana de pausa a cada `gapEvery` rodadas de fim de semana (fim de ano e datas de seleções). */
+  split: { startMonth: 8, startDay: 8, gapEvery: 3 },
   /** Maior sequência permitida de jogos seguidos em casa ou fora. */
   maxVenueStreak: 2,
 } as const

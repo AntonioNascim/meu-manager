@@ -27,6 +27,10 @@ export interface Competition {
   start?: [number, number]
   /** 1 = turno único, 2 = turno e returno (padrão). */
   rounds?: 1 | 2
+  /** Temporada que atravessa o ano (agosto a maio): a temporada da pirâmide vai de 1º de julho a 30 de junho. Ausente = ano civil. */
+  split?: boolean
+  /** Uma semana sem rodada a cada tantas rodadas de fim de semana (pausas de calendário); ausente = rodadas todas as semanas. */
+  gapEvery?: number
   /** Pirâmide: as divisões ligadas por acesso e rebaixamento (as de um país). Sem ela, todas as competições formam uma só. */
   pyramid?: string
   /** Economia da liga (índice de receita e nível dos jogadores); ausente = a do Brasil. */
@@ -54,6 +58,17 @@ export interface StandingRow {
 }
 
 export type SeasonPhase = 'pre-season' | 'in-season' | 'end-of-season'
+
+/**
+ * A temporada de uma pirâmide (um país): cada país tem a sua. `year` é o ano em que ela começa: no ano civil a temporada "2026" vai de
+ * 1º/1 a 31/12/2026; na que atravessa o ano (`split`), "2026/27" vai de 1º/7/2026 a 30/6/2027. Contratos terminam em `end`.
+ */
+export interface Cycle {
+  year: number
+  start: IsoDate
+  end: IsoDate
+  split: boolean
+}
 
 export interface Season {
   year: number

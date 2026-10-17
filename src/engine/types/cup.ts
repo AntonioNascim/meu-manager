@@ -121,7 +121,10 @@ export interface CupStageLog {
 export interface Cup {
   id: string
   name: string
+  /** Ano em que a temporada do país da copa começa (a edição). */
   year: number
+  /** Pirâmide (país) da copa: ela acontece na temporada dele. */
+  pyramid?: string
   spec: CupSpec
   entrants: { teamId: TeamId; stage: number }[]
   log: CupStageLog[]
