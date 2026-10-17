@@ -3,6 +3,7 @@ import type { Game } from '../../store/game'
 import { setGame } from '../../store/gameStore'
 import { clearLive } from '../../store/liveMatch'
 import { Button, Card, TeamBadge } from '../components/ui'
+import { JobList } from './career/JobList'
 import { formatDate } from '../format'
 import { DISMISSAL_REASON_LABELS } from '../labels'
 
@@ -24,7 +25,12 @@ export function Dismissed({ game }: { game: Game }) {
           O time estava em {dismissal.position}º lugar, com a confiança da diretoria em {Math.round(dismissal.confidence)}/100. A meta era o {team.objective.targetPosition}º lugar.
         </p>
       </Card>
+      <Card title="Procurar emprego">
+        <p className="mb-3 text-sm text-muted">Clubes com vaga de técnico. Quanto maior a sua reputação, maiores os clubes que aceitam você.</p>
+        <JobList game={game} empty="Nenhum clube com vaga neste mês." />
+      </Card>
       <Button
+        variant="secondary"
         onClick={() => {
           clearLive()
           setGame(null)

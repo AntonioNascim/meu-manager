@@ -4,7 +4,7 @@
  */
 import { generateWorld } from '../src/data/generateWorld'
 import { FULL_WORLD, buildScaleWorld } from '../src/diagnostics/scaleWorld'
-import { formatLeagueSummary, formatLeagueYears, simulateLeagueYears } from './leagueYears'
+import { formatDynasties, formatLeagueSummary, formatTrend, formatLeagueYears, simulateLeagueYears } from './leagueYears'
 
 const args = process.argv.slice(2)
 const flag = (name: string, fallback: string) => {
@@ -29,3 +29,4 @@ const runs = simulateLeagueYears(init, years)
 const filtered = only ? runs.map((r) => ({ ...r, leagues: r.leagues.filter((l) => l.id === only) })) : runs
 console.log(formatLeagueYears(filtered))
 console.log(`\nResumo\n${formatLeagueSummary(filtered)}`)
+console.log(`\nTendência\n${formatTrend(filtered)}\n\nCampeões e dinastias\n${formatDynasties(filtered)}`)

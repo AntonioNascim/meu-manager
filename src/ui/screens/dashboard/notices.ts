@@ -1,5 +1,5 @@
 import { pendingIncoming, windowAt } from '../../../engine/market'
-import { academyAlert, lastYearContracts, squadOf, teamById, userTeam } from '../../../store/game'
+import { academyAlert, lastYearContracts, squadOf, teamById, userJobOpenings, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { daysBetween, formatDate } from '../../format'
 import type { IconName } from '../../theme'
@@ -98,6 +98,11 @@ export function dashboardNotices(game: Game): DashboardNotice[] {
 
   if (academy.arrivals > 0) {
     out.push({ id: 'academy-arrivals', tone: 'info', icon: 'star', title: 'Jovens novos na base', detail: `${plural(academy.arrivals, 'jovem chegou', 'jovens chegaram')} à base.`, to: 'academy' })
+  }
+
+  const jobs = userJobOpenings(game)
+  if (jobs.length > 0) {
+    out.push({ id: 'jobs', tone: 'info', icon: 'swap', title: plural(jobs.length, 'clube quer você', 'clubes querem você'), detail: `${list(jobs.map((j) => teamById(game, j.teamId).name), 2)}: veja as propostas de técnico.`, to: 'career' })
   }
 
   const window = windowAt(state.season, state.matches, today)

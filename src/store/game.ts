@@ -8,6 +8,8 @@ import type { DataPackage } from '../data/package/types'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
 import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
+import { dismissedReputation, jobOpenings, moveCoach, seasonReputation, startingCoach } from '../engine/career'
+import type { Coach, JobOpening } from '../engine/career'
 import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth } from '../engine/academy'
 import { applySavedLineup } from '../engine/tacticEdit'
 import { DEFAULT_PLAN, cancelIndividualTraining, setTrainingPlan, startIndividualTraining, strengthTrend } from '../engine/training'
@@ -25,6 +27,7 @@ import {
   createSeason,
   nextEvent,
   playUserMatchAuto,
+  refocus,
   setTeamTactic,
 } from '../engine/season'
 import type { SeasonEvent, SeasonState } from '../engine/season'
@@ -69,6 +72,8 @@ export interface Game {
   favorites?: string[]
   /** Até 3 escalações guardadas pelo jogador (posição = espaço; vazio = nada guardado). */
   savedLineups?: (SavedLineup | null)[]
+  /** Reputação do técnico e o dia em que chegou ao clube (sem ele, vale a do clube; saves antigos não têm). */
+  coach?: Coach
   /** Pacote de dados importado que deu origem ao mundo (guardado no navegador, tabela `packages`); sem ele, o mundo fictício padrão. */
   dataPackage?: { id: string; name: string }
 }
@@ -94,6 +99,7 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
     notices: [],
     seasonLog: [],
     archive: [],
+    coach: startingCoach(world.teams.find((t) => t.id === userTeamId) as Team),
     ...(options.dataPackage ? { dataPackage: { id: options.dataPackageId ?? 'sem-id', name: options.dataPackage.name } } : {}),
   }
 }
@@ -133,7 +139,9 @@ export function startNextSeason(game: Game): Game {
   const { state, report } = advanceSeason(game.season, { createYouth, userTeamId: game.userTeamId })
   const mine = report.finalPositions[game.userTeamId] as { tier: number; position: number }
   const summary: SeasonSummary = { year: report.year, champions: report.champions, promoted: report.promoted, relegated: report.relegated, userTeamId: game.userTeamId, userTier: mine.tier, userPosition: mine.position }
-  return { ...game, season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], archive: [...game.archive, archiveSeason(game)], lastReport: report }
+  const size = userCompetition(game).teamIds.length
+  const coach: Coach = { ...coachOf(game), reputation: seasonReputation(coachOf(game), { position: mine.position, targetPosition: userTeam(game).objective.targetPosition, teamCount: size }) }
+  return { ...game, season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], archive: [...game.archive, archiveSeason(game)], lastReport: report, coach }
 }
 
 /** Resume a temporada que acabou: classificação final das séries e os jogos do time do jogador. */
@@ -334,7 +342,40 @@ function checkDismissal(game: Game): Game {
   const board = boardOf(game)
   if (!board.dismissal) return game
   const position = standingsOf(game, userCompetition(game)).findIndex((r) => r.teamId === game.userTeamId) + 1
-  return { ...game, dismissal: { date: game.season.season.currentDate, reason: board.dismissal, confidence: board.confidence, position } }
+  const coach = coachOf(game)
+  return { ...game, coach: { ...coach, reputation: dismissedReputation(coach) }, dismissal: { date: game.season.season.currentDate, reason: board.dismissal, confidence: board.confidence, position } }
+}
+
+// ---------------------------------------------------------------------------
+// Carreira: propostas de outros clubes e procura de emprego
+// ---------------------------------------------------------------------------
+
+/** Reputação do técnico (a guardada ou, em saves antigos, a do clube). */
+export const coachOf = (game: Game): Coach => game.coach ?? startingCoach(userTeam(game))
+
+/** Propostas de outros clubes (quem está empregado) ou vagas para se candidatar (quem foi demitido). */
+export function userJobOpenings(game: Game): JobOpening[] {
+  const employed = !game.dismissal
+  const coach = coachOf(game)
+  const confidence = employed ? boardOf(game).confidence : undefined
+  // A lista só muda com o mês, a classificação, o clube ou a confiança: o painel a consulta a cada desenho da tela.
+  const key = `${game.userTeamId}:${coach.reputation}:${confidence}:${game.season.season.currentDate}:${game.season.matches.length}`
+  const cached = jobCache.get(game.season)
+  if (cached?.key === key) return cached.list
+  const list = jobOpenings(game.season, { userTeamId: game.userTeamId, coach, employed, ...(confidence !== undefined ? { confidence } : {}) })
+  jobCache.set(game.season, { key, list })
+  return list
+}
+
+const jobCache = new WeakMap<SeasonState, { key: string; list: JobOpening[] }>()
+
+/** O técnico assume outro clube da lista de propostas ou vagas. Lança erro se o clube não está na lista ou há partida por jogar. */
+export function takeUserJob(game: Game, teamId: TeamId): Game {
+  if (game.pendingUserMatch) throw new Error('Termine a partida antes de trocar de clube')
+  if (!userJobOpenings(game).some((o) => o.teamId === teamId)) throw new Error('Esse clube não tem proposta nem vaga para você')
+  const { dismissal: _out, lastReport: _seen, savedLineups: _lineups, ...kept } = game
+  const season = moveCoach(game.season, game.userTeamId, teamId, { refocus, defaultPlan: DEFAULT_PLAN })
+  return { ...kept, userTeamId: teamId, season, lastDay: [], notices: [], coach: { ...coachOf(game), arrivedOn: game.season.season.currentDate } }
 }
 
 // ---------------------------------------------------------------------------
@@ -388,11 +429,25 @@ export function boardOf(game: Game): BoardEvaluation {
   const index = table.findIndex((r) => r.teamId === team.id)
   return evaluateBoard({
     objective: team.objective,
-    row: table[index],
+    row: sinceArrival(game, table[index]),
     position: index + 1,
     teamCount: table.length,
     totalGames: (table.length - 1) * 2,
     balance: team.finances.balance,
     monthlyCost: monthlyPayroll(squadOf(game, team.id)) + monthlyOperations(team),
   })
+}
+
+/** Linha do time só com os jogos depois da chegada do técnico (quem assume no meio da temporada não herda a campanha anterior). */
+function sinceArrival(game: Game, row: StandingRow | undefined): StandingRow | undefined {
+  const arrived = game.coach?.arrivedOn
+  if (!arrived || !row) return row
+  const mine = game.season.matches.filter((m) => m.status === 'finished' && m.result && m.date >= arrived && (m.homeTeamId === game.userTeamId || m.awayTeamId === game.userTeamId))
+  let points = 0
+  for (const m of mine) {
+    const r = m.result as MatchResult
+    const [gf, ga] = m.homeTeamId === game.userTeamId ? [r.homeGoals, r.awayGoals] : [r.awayGoals, r.homeGoals]
+    points += gf > ga ? 3 : gf === ga ? 1 : 0
+  }
+  return { ...row, played: mine.length, points }
 }

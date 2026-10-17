@@ -600,6 +600,25 @@ export const BOARD = {
   debtPenaltyMax: 25,
 } as const
 
+/** Carreira do técnico (B6): reputação dele, vagas e propostas de outros clubes. */
+export const CAREER = {
+  /** Prestígio do clube = reputação + nível da liga × este peso (para comparar clubes de países diferentes). */
+  levelWeight: 0.25,
+  /** Reputação do técnico (mesma escala dos clubes, 1 a 20): quanto muda por temporada pelo desempenho contra a meta e por título. */
+  seasonGain: 1.5,
+  titleBonus: 1,
+  /** Perda ao ser demitido. */
+  dismissalPenalty: 1.5,
+  /** Confiança da diretoria acima ou abaixo de `atTarget` mexe até isto na reputação que os outros clubes enxergam. */
+  confidenceSwing: 1,
+  /** Chance mensal de um clube estar sem técnico; sobe para quem vai mal (abaixo da meta ou perto da demissão). */
+  vacancy: { base: 0.04, belowTarget: 0.12, nearSacking: 0.35 },
+  /** Propostas a quem está empregado: clubes com vaga de até `above` pontos de prestígio acima do técnico e não abaixo do clube atual menos `slack`. */
+  offer: { above: 1.5, slack: 0.5, max: 3 },
+  /** Procura de quem está sem clube: vagas de até `above` pontos acima da reputação dele; se houver menos de `minListed`, completa. */
+  search: { above: 0.5, minListed: 5 },
+} as const
+
 // ---------------------------------------------------------------------------
 // Virada de temporada
 // ---------------------------------------------------------------------------

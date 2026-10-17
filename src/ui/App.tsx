@@ -10,6 +10,7 @@ import { NAV_TAB_OF, SCREEN_LABELS } from './navigation'
 import type { NavTab, ScreenId } from './navigation'
 import { BottomNav } from './theme'
 import type { NavItem } from './theme'
+import { Career } from './screens/Career'
 import { Dismissed } from './screens/Dismissed'
 import { Market } from './screens/Market'
 import type { MarketTab } from './screens/Market'
@@ -121,6 +122,7 @@ export function App() {
 
       <main className="flex-1 px-4 pb-28 pt-4">
         {current === 'home' && <Dashboard game={game} onNavigate={navigate} />}
+        {current === 'career' && <Career game={game} onTaken={() => navigate('home')} />}
         {current === 'match' && <MatchScreen game={game} onNavigate={navigate} />}
         {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab(hint)} />}
         {current === 'tactics' && <Tactics game={game} />}
