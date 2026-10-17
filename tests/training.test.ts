@@ -289,14 +289,14 @@ describe('base e faixa de potencial', () => {
 
 describe('treino no jogo', () => {
   it('o jogo começa com treino Normal e foco equilibrado, e a escolha vale a partir do próximo avanço', () => {
-    const game = createGame(7, USER)
+    const game = createGame(7, USER, { cups: false })
     expect(userTrainingPlan(game)).toEqual({ intensity: 'normal', focus: 'balanced' })
     const changed = setUserTrainingPlan(game, { intensity: 'intense', focus: 'offensive' })
     expect(userTrainingPlan(changed)).toEqual({ intensity: 'intense', focus: 'offensive' })
   })
 
   it('avançando, os jogadores evoluem aos poucos e o histórico mensal da força é guardado', () => {
-    let game = createGame(7, USER)
+    let game = createGame(7, USER, { cups: false })
     const before = new Map(game.season.players.map((p) => [p.id, playerOverall(p)]))
     for (let i = 0; i < 14; i++) game = advanceToMatchday(game.pendingUserMatch ? { ...game, pendingUserMatch: undefined } : game)
     const mine = game.season.players.filter((p) => p.teamId === USER)
@@ -315,12 +315,12 @@ describe('treino no jogo', () => {
     expect(strengthTrend(history, 58, '2026-06-20')).toBe(-2)
     expect(strengthTrend(history, 70, '2026-05-10')).toBe(0)
     expect(strengthTrend(undefined, 70, '2026-05-10')).toBe(0)
-    const game = createGame(7, USER)
+    const game = createGame(7, USER, { cups: false })
     expect(strengthChange(game, game.season.players[0] as Player)).toBe(0)
   })
 
   it('o plano e o aviso do treino individual terminado passam pela virada de temporada; a virada não faz mais o crescimento', () => {
-    let game = createGame(7, USER)
+    let game = createGame(7, USER, { cups: false })
     const p = game.season.players.find((x) => x.teamId === USER && x.position !== 'GK') as Player
     game = startUserIndividualTraining(setUserTrainingPlan(game, { intensity: 'light', focus: 'defensive' }), p.id, { type: 'group', group: 'technical' })
     expect(cancelUserIndividualTraining(game).season.training.individual[USER]).toBeUndefined()
@@ -345,7 +345,7 @@ describe('treino no jogo', () => {
 describe('save versão 4', () => {
   it('a versão atual é 4 e a migração 3→4 cria o treino do time do jogador', () => {
     expect(SAVE_VERSION).toBeGreaterThanOrEqual(4)
-    const game = createGame(3, USER)
+    const game = createGame(3, USER, { cups: false })
     const old = JSON.parse(JSON.stringify(makeEnvelope(game, '2026-01-01T00:00:00Z')))
     delete old.game.season.training
     old.version = 3
@@ -360,12 +360,12 @@ describe('save versão 4', () => {
 
 describe('telas', () => {
   it('a aba Treino mostra as três intensidades com os indicadores, o foco, a vaga individual e quem mais evolui', () => {
-    const html = renderToStaticMarkup(createElement(Squad, { game: createGame(7, USER), initialTab: 'training' }))
+    const html = renderToStaticMarkup(createElement(Squad, { game: createGame(7, USER, { cups: false }), initialTab: 'training' }))
     for (const text of ['Leve', 'Normal', 'Intensa', 'Evolução', 'Recuperação', 'Risco de lesão', 'Equilibrado', 'Defensivo', 'Treino individual', 'Quem mais evolui', 'potencial']) expect(html).toContain(text)
   })
 
   it('a aba Treino também abre sozinha, e o painel mostra o treino atual', () => {
-    const game = createGame(7, USER)
+    const game = createGame(7, USER, { cups: false })
     expect(renderToStaticMarkup(createElement(Training, { game }))).toContain('Quem mais evolui')
     const dash = renderToStaticMarkup(createElement(Dashboard, { game: setUserTrainingPlan(game, { intensity: 'intense', focus: 'technical' }), onNavigate: () => {} }))
     expect(dash).toContain('Intensa')
@@ -373,7 +373,7 @@ describe('telas', () => {
   })
 
   it('a lista de jogadores mostra setinhas de quem subiu ou caiu desde o último mês', () => {
-    let game = createGame(7, USER)
+    let game = createGame(7, USER, { cups: false })
     const mine = game.season.players.filter((p) => p.teamId === USER)
     const history: Record<string, [string, number][]> = Object.fromEntries(mine.map((p, i) => [p.id, [['2026-01-01', playerOverall(p) + (i === 0 ? 3 : i === 1 ? -3 : 0)] as [string, number]]]))
     game = { ...game, season: { ...game.season, season: { ...game.season.season, currentDate: '2026-03-01' }, training: { ...game.season.training, history } } }
@@ -383,7 +383,7 @@ describe('telas', () => {
   })
 
   it('o avanço não quebra com a base nem com plano de outro time', () => {
-    const game = advanceGame(createGame(7, USER))
+    const game = advanceGame(createGame(7, USER, { cups: false }))
     expect(game.season.academy.length).toBeGreaterThan(100)
     for (const id of TRAINING_INTENSITIES) expect(id).toBeTruthy()
   })

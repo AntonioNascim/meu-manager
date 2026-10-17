@@ -170,7 +170,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const unavailableCount = squad.filter(isUnavailable).length
   const starterOut = starters.some(isUnavailable)
   const preContractLost = game.notices.some((n) => n.type === 'pre-contract-lost')
-  const seasonEnd = state.matches[state.matches.length - 1]?.date ?? today
+  const seasonEnd = [...state.matches].reverse().find((m) => m.cup === undefined)?.date ?? today
   const outlook = cashOutlook(team, payroll, today, seasonEnd)
   const financeAlert = outlook.alerts.length > 0
   const salaryBudget = team.finances.salaryBudget

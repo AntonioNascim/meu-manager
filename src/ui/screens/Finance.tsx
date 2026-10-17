@@ -33,7 +33,7 @@ export function Finance({ game }: { game: Game }) {
   })
   const squad = squadOf(game, team.id)
   const today = game.season.season.currentDate
-  const lastMatch = game.season.matches[game.season.matches.length - 1]
+  const lastMatch = [...game.season.matches].reverse().find((m) => m.cup === undefined)
   const outlook = cashOutlook(team, monthlyPayroll(squad), today, lastMatch?.date ?? today)
   const board = boardOf(game)
   const summary = summarizeLedger(team.finances.ledger)

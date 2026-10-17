@@ -34,7 +34,7 @@ describe('tela de classificação', () => {
   const imp = 'team-imp'
 
   it('mostra a Série A com 20 times, a zona de rebaixamento e o time do jogador em destaque', () => {
-    const game = playDays(createGame(3, imp), 6)
+    const game = playDays(createGame(3, imp, { cups: false }), 6)
     const html = renderToStaticMarkup(createElement(Standings, { game }))
     expect(html.match(/<li/g)).toHaveLength(20)
     expect(html.match(/aria-label="Zona de rebaixamento"/g)).toHaveLength(4)
@@ -46,7 +46,7 @@ describe('tela de classificação', () => {
 
   it('a Série B, quando o jogador comanda um time dela, abre nela e marca o acesso e o rebaixamento', () => {
     const bTeam = generateWorld({ seed: 3 }).teams.find((t) => t.tier === 2)?.id as string
-    const g = playDays(createGame(3, bTeam), 6)
+    const g = playDays(createGame(3, bTeam, { cups: false }), 6)
     expect(userCompetition(g).tier).toBe(2)
     const html = renderToStaticMarkup(createElement(Standings, { game: g }))
     expect(html.match(/aria-label="Zona de acesso"/g)).toHaveLength(4)
@@ -55,7 +55,7 @@ describe('tela de classificação', () => {
 
   it('a Série C, quando o jogador comanda um time dela, abre nela e marca só o acesso', () => {
     const cTeam = generateWorld({ seed: 3 }).teams.find((t) => t.tier === 3)?.id as string
-    const g = playDays(createGame(3, cTeam), 6)
+    const g = playDays(createGame(3, cTeam, { cups: false }), 6)
     expect(userCompetition(g).tier).toBe(3)
     const html = renderToStaticMarkup(createElement(Standings, { game: g }))
     expect(html.match(/aria-label="Zona de acesso"/g)).toHaveLength(4)
@@ -63,7 +63,7 @@ describe('tela de classificação', () => {
   })
 
   it('a ordem da tabela é a da classificação calculada das partidas', () => {
-    const game = playDays(createGame(3, imp), 8)
+    const game = playDays(createGame(3, imp, { cups: false }), 8)
     const rows = standingsOf(game, userCompetition(game))
     const html = renderToStaticMarkup(createElement(Standings, { game }))
     const names = rows.map((r) => game.season.teams.find((t) => t.id === r.teamId)?.name as string)
@@ -74,7 +74,7 @@ describe('tela de classificação', () => {
 
 describe('rodada mais recente', () => {
   it('começa na rodada 1 e acompanha o último jogo disputado', () => {
-    const game = createGame(3, 'team-imp')
+    const game = createGame(3, 'team-imp', { cups: false })
     const matches = game.season.matches.filter((m) => m.competitionId === 'serie-a')
     expect(latestPlayedRound(matches)).toBe(1)
     const played = playDays(game, 10)

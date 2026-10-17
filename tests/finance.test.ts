@@ -150,7 +150,7 @@ function playUntilHome(game: Game, teamId: string): Game {
 
 describe('time do jogador', () => {
   it('registra a bilheteria uma só vez ao concluir a partida, com o público do jogo', () => {
-    const game = playUntilHome(createGame(5, 'team-imp'), 'team-imp')
+    const game = playUntilHome(createGame(5, 'team-imp', { cups: false }), 'team-imp')
     const pending = game.pendingUserMatch!
     const input = userMatchInput(game.season, pending, game.userTeamId)
     const before = userTeam(game).finances.ledger.filter((e) => e.category === 'ticket-sales').length
@@ -162,7 +162,7 @@ describe('time do jogador', () => {
   })
 
   it('jogo fora de casa não rende bilheteria ao time do jogador', () => {
-    let game = createGame(5, 'team-imp')
+    let game = createGame(5, 'team-imp', { cups: false })
     for (let i = 0; i < 80; i++) {
       game = advanceToMatchday(game)
       if (game.pendingUserMatch?.awayTeamId === 'team-imp') break
@@ -178,7 +178,7 @@ describe('time do jogador', () => {
   })
 
   it('o preço definido muda o público do próximo jogo em casa', () => {
-    const game = createGame(5, 'team-tam')
+    const game = createGame(5, 'team-tam', { cups: false })
     const cheap = setUserTicketPrice(game, 10)
     const dear = setUserTicketPrice(game, 60)
     expect(userTeam(cheap).ticketPrice).toBe(10)
@@ -199,7 +199,7 @@ describe('time do jogador', () => {
 
 describe('tela de finanças', () => {
   it('mostra o caixa, o estádio com o ingresso, a folha, as categorias e os botões de extrato e balanço', () => {
-    let game = createGame(5, 'team-imp')
+    let game = createGame(5, 'team-imp', { cups: false })
     for (let i = 0; i < 4; i++) game = playPendingAuto(advanceToMatchday(game))
     const html = renderToStaticMarkup(createElement(Finance, { game }))
     for (const text of ['Caixa', 'Extrato', 'Balanço', 'ingresso', 'última renda', 'Folha', 'Folga', 'Patrocínio', 'Salários', 'Renda média em casa']) expect(html).toContain(text)
@@ -207,7 +207,7 @@ describe('tela de finanças', () => {
 
   it('antes de qualquer lançamento o extrato avisa que não há histórico', async () => {
     const { Statement } = await import('../src/ui/screens/finance/Sheets')
-    const html = renderToStaticMarkup(createElement(Statement, { game: createGame(5, 'team-imp'), onClose: () => {} }))
+    const html = renderToStaticMarkup(createElement(Statement, { game: createGame(5, 'team-imp', { cups: false }), onClose: () => {} }))
     expect(html).toContain('Nenhum lançamento ainda')
   })
 })

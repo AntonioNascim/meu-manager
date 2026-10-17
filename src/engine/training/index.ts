@@ -92,8 +92,9 @@ export function planFor(training: Pick<TrainingState, 'plans'>, teamId: TeamId, 
 
 /** Primeira e última data de jogos da temporada (as partidas são criadas ordenadas por data). */
 function competitionSpan(state: SeasonState): { first: IsoDate; last: IsoDate; rounds: number } | null {
-  const first = state.matches[0]
-  const last = state.matches[state.matches.length - 1]
+  // O treino se reparte pelos jogos de liga: as copas (que entram em outras datas) não mexem no ritmo.
+  const first = state.matches.find((m) => m.cup === undefined)
+  const last = [...state.matches].reverse().find((m) => m.cup === undefined)
   if (!first || !last) return null
   return { first: first.date, last: last.date, rounds: state.season.competitions[0]?.roundCount ?? 38 }
 }

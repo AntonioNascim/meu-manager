@@ -15,16 +15,17 @@ import type { MarketEvent } from '../market'
 import { formationOf } from '../formations'
 import { gridProblem } from '../grid'
 import { simulateMatch } from '../match'
-import type { MatchInput } from '../match'
+import type { KnockoutRules, MatchInput } from '../match'
+import { cupScopeOf, knockoutRulesFor, progressCups } from '../cups'
 import type { IsoDate, MarketNotice, Match, Player, PlayerId, Tactic, Team, TeamId } from '../types'
 import type { SeasonState } from './calendar'
 import { applyTraining, fitnessProfile } from '../training'
 import { settleDueContracts } from '../offseason/dueContracts'
 import { applyBirthdays } from './birthdays'
-import { applyMatchToPlayers, progressDays } from './condition'
+import { applyMatchToPlayers, cupView, progressDays } from './condition'
 import { slimResult } from './compact'
 import { daysBetween } from './dates'
-import { playQuickMatch, quickCompetitionIds } from './fidelity'
+import { cupMatchIsQuick, playQuickMatch, quickCompetitionIds } from './fidelity'
 
 export type SeasonEvent = { type: 'matchday'; date: IsoDate } | { type: 'market'; date: IsoDate } | { type: 'season-end' }
 
@@ -72,9 +73,9 @@ export function aiTactic(team: Team, squad: readonly Player[]) {
 }
 
 /** Simula uma partida agendada com a seed dela (mesma seed = mesmo resultado). */
-export function playMatch(match: Match, home: { team: Team; players: readonly Player[] }, away: { team: Team; players: readonly Player[] }): Match {
+export function playMatch(match: Match, home: { team: Team; players: readonly Player[] }, away: { team: Team; players: readonly Player[] }, knockout?: KnockoutRules, neutral = false): Match {
   const attendance = matchAttendance(home.team, away.team)
-  const result = simulateMatch({ home, away, seed: match.seed, attendance })
+  const result = simulateMatch({ home, away, seed: match.seed, attendance, ...(knockout ? { knockout } : {}), ...(neutral ? { neutral } : {}) })
   return { ...match, status: 'finished', result, attendance }
 }
 
@@ -204,21 +205,29 @@ export function playMatchday(state: SeasonState, date: IsoDate, options: Advance
       pendingUserMatch = m
       return m
     }
-    const finished =
-      allQuick || quickIds.has(m.competitionId)
-        ? playQuickMatch(m, { team: home, players: homeSquad }, { team: away, players: awaySquad })
-        : playMatch(m, { team: { ...home, tactic: aiTactic(home, homeSquad) }, players: homeSquad }, { team: { ...away, tactic: aiTactic(away, awaySquad) }, players: awaySquad })
-    for (const p of applyMatchToPlayers(new Map([[home.id, homeSquad], [away.id, awaySquad]]), finished)) changed.set(p.id, p)
-    teams.set(home.id, collectGate(home, away, m.date).team)
+    // Copa: suspensão e amarelos são os da copa, o mata-mata tem prorrogação e pênaltis e a final pode ser em campo neutro.
+    const cup = m.cup ? state.cups?.find((c) => c.id === m.competitionId) : undefined
+    const scope = cup ? cupScopeOf(cup) : undefined
+    const homeView = cup ? cupView(homeSquad, cup.id) : homeSquad
+    const awayView = cup ? cupView(awaySquad, cup.id) : awaySquad
+    const rules = knockoutRulesFor(cup, m, state.matches)
+    const quick = allQuick || (m.cup ? cupMatchIsQuick(state, m) : quickIds.has(m.competitionId))
+    const finished = quick
+      ? playQuickMatch(m, { team: home, players: homeView }, { team: away, players: awayView }, rules, m.cup?.neutral)
+      : playMatch(m, { team: { ...home, tactic: aiTactic(home, homeView) }, players: homeView }, { team: { ...away, tactic: aiTactic(away, awayView) }, players: awayView }, rules, m.cup?.neutral)
+    for (const p of applyMatchToPlayers(new Map([[home.id, homeSquad], [away.id, awaySquad]]), finished, scope)) changed.set(p.id, p)
+    if (!m.cup?.neutral) teams.set(home.id, collectGate(home, away, m.date).team)
     played.push(finished)
     // O que fica na temporada é o resultado enxuto (narração e notas já foram usadas nos jogadores): a memória não cresce com os lances de milhares de jogos.
     return finished.result ? { ...finished, result: slimResult(finished.result) } : finished
   })
 
-  const done = matches.every((m) => m.status === 'finished')
-  const season = { ...state.season, phase: done ? ('end-of-season' as const) : ('in-season' as const) }
+  // As copas sorteiam a fase seguinte (e premiam) antes de dizer se a temporada acabou.
+  const moved = progressCups({ ...state, matches, teams: state.teams.map((t) => teams.get(t.id) ?? t), players: state.players.map((p) => changed.get(p.id) ?? p) })
+  const done = moved.matches.every((m) => m.status === 'finished')
+  const season = { ...moved.season, phase: done ? ('end-of-season' as const) : ('in-season' as const) }
   return {
-    state: { ...state, season, matches, teams: state.teams.map((t) => teams.get(t.id) ?? t), players: state.players.map((p) => changed.get(p.id) ?? p) },
+    state: { ...moved, season },
     event: { type: 'matchday', date },
     played,
     notices,
@@ -240,9 +249,11 @@ export function simulateToSeasonEnd(state: SeasonState, options: AdvanceOptions 
 export function userMatchInput(state: SeasonState, match: Match, userTeamId: TeamId): MatchInput {
   const squads = groupByTeam(state.players)
   const teamOf = (id: TeamId) => state.teams.find((t) => t.id === id) as Team
+  const cup = match.cup ? state.cups?.find((c) => c.id === match.competitionId) : undefined
+  const rules = knockoutRulesFor(cup, match, state.matches)
   const side = (id: TeamId) => {
     const team = teamOf(id)
-    const squad = squads.get(id) ?? []
+    const squad = cup ? cupView(squads.get(id) ?? [], cup.id) : (squads.get(id) ?? [])
     const tactic = id === userTeamId ? repairTactic(team.tactic, squad, lineupForeign(team)) : aiTactic(team, squad)
     return { team: { ...team, tactic }, players: squad }
   }
@@ -252,6 +263,8 @@ export function userMatchInput(state: SeasonState, match: Match, userTeamId: Tea
     seed: match.seed,
     attendance: matchAttendance(teamOf(match.homeTeamId), teamOf(match.awayTeamId)),
     userControlled: { home: match.homeTeamId === userTeamId, away: match.awayTeamId === userTeamId },
+    ...(rules ? { knockout: rules } : {}),
+    ...(match.cup?.neutral ? { neutral: true } : {}),
   }
 }
 
@@ -265,20 +278,22 @@ export function completeMatch(state: SeasonState, played: Match): SeasonState {
   const home_ = state.teams.find((t) => t.id === played.homeTeamId) as Team
   const away_ = state.teams.find((t) => t.id === played.awayTeamId) as Team
   const gate = collectGate(home_, away_, played.date)
+  const neutral = played.cup?.neutral === true
   const finished: Match = { ...played, attendance: gate.attendance }
   const squads = groupByTeam(state.players)
   const home = squads.get(finished.homeTeamId) ?? []
   const away = squads.get(finished.awayTeamId) ?? []
-  const changed = new Map(applyMatchToPlayers(new Map([[finished.homeTeamId, home], [finished.awayTeamId, away]]), finished).map((p) => [p.id, p]))
+  const cup = finished.cup ? state.cups?.find((c) => c.id === finished.competitionId) : undefined
+  const changed = new Map(applyMatchToPlayers(new Map([[finished.homeTeamId, home], [finished.awayTeamId, away]]), finished, cup ? cupScopeOf(cup) : undefined).map((p) => [p.id, p]))
   const matches = state.matches.map((m) => (m.id === finished.id ? finished : m))
-  const done = matches.every((m) => m.status === 'finished')
-  return {
+  const moved = progressCups({
     ...state,
     matches,
-    teams: state.teams.map((t) => (t.id === home_.id ? gate.team : t)),
+    teams: state.teams.map((t) => (t.id === home_.id && !neutral ? gate.team : t)),
     players: state.players.map((p) => changed.get(p.id) ?? p),
-    season: { ...state.season, phase: done ? 'end-of-season' : 'in-season' },
-  }
+  })
+  const done = moved.matches.every((m) => m.status === 'finished')
+  return { ...moved, season: { ...moved.season, phase: done ? 'end-of-season' : 'in-season' } }
 }
 
 /** Troca a tática do time (o jogador edita a dele entre os jogos). Valida a escalação. */

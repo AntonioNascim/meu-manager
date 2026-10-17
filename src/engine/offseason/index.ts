@@ -252,7 +252,17 @@ export function advanceSeason(state: SeasonState, options: OffseasonOptions): { 
     relegation: c.relegationSlots,
     ...(c.reputationMean !== undefined ? { reputationMean: c.reputationMean } : {}),
   }))
-  const next = createSeason({ year: nextYear, seed: state.market.seed, teams, players, competitions: setups, ...(state.focus !== undefined ? { focus: state.focus } : {}) })
+  const next = createSeason({
+    year: nextYear,
+    seed: state.market.seed,
+    teams,
+    players,
+    competitions: setups,
+    ...(state.focus !== undefined ? { focus: state.focus } : {}),
+    // As copas voltam em cada temporada com as vagas da que acabou (o campeão de cada edição fica no histórico).
+    ...(state.cupSpecs ? { cupSpecs: state.cupSpecs } : {}),
+    ...(state.cupHistory ? { cupHistory: state.cupHistory } : {}),
+  })
   const report: OffseasonReport = {
     year,
     champions,

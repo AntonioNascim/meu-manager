@@ -320,6 +320,16 @@ export const RATING = {
 // Calendário
 // ---------------------------------------------------------------------------
 
+/** Copas (Fase 3). */
+export const CUP = {
+  /** Dias entre a ida e a volta (padrão do pacote). */
+  legGapDays: 7,
+  /** Dias entre as rodadas de uma fase de grupos ou de liga. */
+  groupGapDays: 7,
+  /** Descanso mínimo entre o fim de uma fase e a seguinte. */
+  minRestDays: 4,
+} as const
+
 export const SEASON = {
   /** A primeira rodada é no primeiro sábado em ou depois desta data (mês 1–12). */
   startMonth: 4,

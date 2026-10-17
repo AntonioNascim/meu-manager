@@ -13,7 +13,7 @@ const USER = 'team-imp'
 
 /** Avança até o dia da partida do time. */
 function toMatchDay(seed = 3): Game {
-  let game = createGame(seed, USER)
+  let game = createGame(seed, USER, { cups: false })
   while (!game.pendingUserMatch) game = advanceToMatchday(game)
   return game
 }
@@ -112,7 +112,7 @@ describe('telas da partida (renderização)', () => {
   })
 
   it('sem partida pendente, a tela explica e volta ao painel', () => {
-    const html = renderToStaticMarkup(createElement(MatchScreen, { game: createGame(3, USER), onNavigate: () => {} }))
+    const html = renderToStaticMarkup(createElement(MatchScreen, { game: createGame(3, USER, { cups: false }), onNavigate: () => {} }))
     expect(html).toContain('Não há partida')
   })
 

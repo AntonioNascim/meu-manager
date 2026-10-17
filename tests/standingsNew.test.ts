@@ -19,7 +19,7 @@ const play = (g: Game, n: number) => {
   for (let i = 0; i < n; i++) g = playPendingAuto(advanceToMatchday(g))
   return g
 }
-const played = play(createGame(3, USER), 10)
+const played = play(createGame(3, USER, { cups: false }), 10)
 const comp = (g: Game, tier = 1) => g.season.season.competitions.find((c) => c.tier === tier)!
 const noop = () => {}
 
@@ -82,7 +82,7 @@ describe('rankings', () => {
     expect(assists).not.toContain('Brasileiros')
     const cards = renderToStaticMarkup(createElement(Leaders, { game: played, competition: comp(played), board: 'cards', onTeam: noop }))
     for (const t of ['Cartões', 'Amarelos', 'Vermelhos']) expect(cards).toContain(t)
-    const empty = renderToStaticMarkup(createElement(Leaders, { game: createGame(3, USER), competition: comp(played), board: 'goals', onTeam: noop }))
+    const empty = renderToStaticMarkup(createElement(Leaders, { game: createGame(3, USER, { cups: false }), competition: comp(played), board: 'goals', onTeam: noop }))
     expect(empty).toContain('Ainda não houve gols')
   })
 })

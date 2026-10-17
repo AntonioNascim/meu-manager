@@ -1,4 +1,4 @@
-import type { Attributes, BoardObjective, Finances, Foot, Nationality, Position, Tactic } from '../../engine/types'
+import type { Attributes, BoardObjective, CupDiscipline, CupEntrant, CupFormat, CupGroupsSpec, CupLeaguePhaseSpec, CupPrize, CupStageSpec, Finances, Foot, Nationality, Position, Region, Tactic } from '../../engine/types'
 
 /** Pacote de dados: um mundo (países, ligas, clubes e jogadores) em JSON, que qualquer fonte pode produzir. */
 export const PACKAGE_FORMAT = 'meu-manager-package'
@@ -39,6 +39,29 @@ export interface PackageLeague {
 }
 
 /** Dados que só uma exportação do jogo traz (sem eles o jogo deriva tudo de forma estável). */
+/** Copa definida no pacote. Só `id`, `name`, `format`, `entrants` e `stages` são obrigatórios; o resto tem padrão (`CUP_DEFAULTS`). As ligas das vagas são ids de `leagues`. */
+export interface PackageCup {
+  id: string
+  name: string
+  kind?: 'cup' | 'supercup'
+  /** País da copa (nacional) ou `region` (continental). */
+  country?: string
+  region?: Region
+  format: CupFormat
+  entrants: CupEntrant[]
+  groups?: CupGroupsSpec
+  leaguePhase?: CupLeaguePhaseSpec
+  stages: CupStageSpec[]
+  seeding?: 'random' | 'seeded'
+  homeOfSingleLeg?: 'draw' | 'lower-reputation'
+  awayGoals?: boolean
+  extraTime?: boolean
+  penalties?: boolean
+  tiebreakers?: Tiebreaker[]
+  discipline?: Partial<CupDiscipline>
+  prize?: Partial<CupPrize>
+}
+
 export interface PackageClubGame {
   tactic: Tactic
   finances: Finances
@@ -110,6 +133,8 @@ export interface DataPackage {
   players: PackagePlayer[]
   /** Base dos clubes (jovens de 15 a 19 anos); sem ela o jogo gera uma com a semente do jogo. */
   academy?: PackagePlayer[]
+  /** Copas e supercopas (nacionais ou continentais); sem elas o mundo só tem as ligas. */
+  cups?: PackageCup[]
 }
 
 /** Problema encontrado ao validar um pacote. A interface transforma `code` em texto. */
@@ -135,6 +160,8 @@ export type PackageIssueCode =
   | 'unsupported-leagues'
   | 'tiebreakers-unsupported'
   | 'league-defaults-missing'
+  | 'cup-bracket'
+  | 'cup-groups'
 
 export interface PackageIssue {
   code: PackageIssueCode

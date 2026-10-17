@@ -17,7 +17,7 @@ const play = (game: Game, days: number): Game => {
   return g
 }
 
-const base = play(createGame(6, 'team-imp'), 8)
+const base = play(createGame(6, 'team-imp', { cups: false }), 8)
 const next = play(base, 1)
 const nextCompact = compactGame(next)
 

@@ -22,7 +22,7 @@ const idC = world.teams.find((t) => t.tier === 3)?.id as string
 describe('jogo novo', () => {
   it('cria a temporada com um time da Série A, B ou C', () => {
     for (const id of [idA, idB, idC]) {
-      const g = createGame(11, id)
+      const g = createGame(11, id, { cups: false })
       expect(g.userTeamId).toBe(id)
       expect(userCompetition(g).teamIds).toContain(id)
       expect(g.season.matches).toHaveLength(1140)
@@ -32,12 +32,12 @@ describe('jogo novo', () => {
   })
 
   it('recusa um time que não existe', () => {
-    expect(() => createGame(11, 'nao-existe')).toThrow()
+    expect(() => createGame(11, 'nao-existe', { cups: false })).toThrow()
   })
 })
 
 describe('avançar', () => {
-  const g0 = createGame(12, idA)
+  const g0 = createGame(12, idA, { cups: false })
 
   it('a partida do jogador fica pendente até ser jogada', () => {
     const g1 = advanceToMatchday(g0)
@@ -68,12 +68,12 @@ describe('telas (renderização)', () => {
   })
 
   it('o painel mostra próximo jogo, posição e o botão Avançar', () => {
-    const html = renderToStaticMarkup(createElement(Dashboard, { game: createGame(12, idA), onNavigate: () => {} }))
+    const html = renderToStaticMarkup(createElement(Dashboard, { game: createGame(12, idA, { cups: false }), onNavigate: () => {} }))
     expect(html).toContain('Próximo jogo')
     expect(html).toContain('Classificação')
     expect(html).toContain('Avançar')
     expect(html).not.toContain('Último jogo')
-    const played = playPendingAuto(advanceToMatchday(createGame(12, idA)))
+    const played = playPendingAuto(advanceToMatchday(createGame(12, idA, { cups: false })))
     expect(renderToStaticMarkup(createElement(Dashboard, { game: played, onNavigate: () => {} }))).toContain('Último jogo')
   })
 })

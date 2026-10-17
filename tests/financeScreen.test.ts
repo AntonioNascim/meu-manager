@@ -13,7 +13,7 @@ import { Finance } from '../src/ui/screens/Finance'
 import { SeasonBalance, Statement, TicketSheet } from '../src/ui/screens/finance/Sheets'
 
 const USER = 'team-imp'
-const fresh = createGame(5, USER)
+const fresh = createGame(5, USER, { cups: false })
 const play = (g: Game, n: number) => {
   for (let i = 0; i < n; i++) g = playPendingAuto(advanceToMatchday(g))
   return g
@@ -82,7 +82,7 @@ describe('extrato e balanço', () => {
   })
 
   it('guarda o resultado por categoria da temporada que passou e o balanço compara as duas', () => {
-    const ended = simulateToSeasonEnd(createGame(5, USER).season)
+    const ended = simulateToSeasonEnd(createGame(5, USER, { cups: false }).season)
     const { state } = advanceSeason(ended, { createYouth })
     const past = state.teams.find((t) => t.id === USER)?.finances.pastSeasons.at(-1)
     expect(past?.byCategory?.['tv-rights']).toBeGreaterThan(0)

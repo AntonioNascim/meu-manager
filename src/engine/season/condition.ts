@@ -38,12 +38,29 @@ function countedYellows(yellowsInMatch: number): number {
   return yellowsInMatch >= 2 ? 0 : yellowsInMatch
 }
 
+/** Disciplina própria de uma copa: amarelos e suspensões dela ficam separados dos da liga. */
+export interface CupScope {
+  cupId: string
+  yellowsPerSuspension: number
+  redCardGames: number
+}
+
+/** Os jogadores como a copa os enxerga na hora de escalar: suspensão e amarelos da copa no lugar dos da liga. */
+export function cupView(players: readonly Player[], cupId: string): Player[] {
+  return players.map((p) => {
+    const own = p.condition.cups?.[cupId]
+    const yellowCards = own?.yellowCards ?? 0
+    const suspensionGames = own?.suspensionGames ?? 0
+    return yellowCards === p.condition.yellowCards && suspensionGames === p.condition.suspensionGames ? p : { ...p, condition: { ...p.condition, yellowCards, suspensionGames } }
+  })
+}
+
 /**
  * Efeitos de uma partida finalizada nos jogadores dos dois times (`squads` = elencos completos).
  * Devolve só os jogadores alterados. Quem estava suspenso antes da partida cumpre um jogo;
  * as novas suspensões valem para a próxima partida.
  */
-export function applyMatchToPlayers(squads: ReadonlyMap<TeamId, readonly Player[]>, match: Match): Player[] {
+export function applyMatchToPlayers(squads: ReadonlyMap<TeamId, readonly Player[]>, match: Match, cup?: CupScope): Player[] {
   const result = match.result
   if (match.status !== 'finished' || !result) return []
 
@@ -78,7 +95,10 @@ export function applyMatchToPlayers(squads: ReadonlyMap<TeamId, readonly Player[
       const stats = { ...p.seasonStats }
       let morale = c.morale + moraleShift
 
-      if (c.suspensionGames > 0) c.suspensionGames--
+      // Liga: os contadores da condição; copa: os contadores dela, guardados à parte (a liga não mexe).
+      let suspension = cup ? (p.condition.cups?.[cup.cupId]?.suspensionGames ?? 0) : c.suspensionGames
+      let yellowCount = cup ? (p.condition.cups?.[cup.cupId]?.yellowCards ?? 0) : c.yellowCards
+      if (suspension > 0) suspension--
 
       if (r && r.minutesPlayed > 0) {
         c.fitness = r.finalFitness
@@ -98,23 +118,37 @@ export function applyMatchToPlayers(squads: ReadonlyMap<TeamId, readonly Player[
       const assisted = assists.get(p.id) ?? 0
       const crossed = crossAssists.get(p.id) ?? 0
       stats.goals += scored
-      if (side.teamId === match.homeTeamId) stats.homeGoals += scored
-      else stats.awayGoals += scored
       stats.assists += assisted
-      stats.crossAssists += crossed
-      stats.passAssists += assisted - crossed
+      if (cup) {
+        // Os totais da temporada somam a copa; os contadores só da liga (casa, fora, passe e cruzamento) e as listas da liga não.
+        stats.cupGoals = (stats.cupGoals ?? 0) + scored
+        stats.cupAssists = (stats.cupAssists ?? 0) + assisted
+      } else {
+        if (side.teamId === match.homeTeamId) stats.homeGoals += scored
+        else stats.awayGoals += scored
+        stats.crossAssists += crossed
+        stats.passAssists += assisted - crossed
+      }
 
       const yellow = yellows.get(p.id) ?? 0
       stats.yellowCards += yellow
-      c.yellowCards += countedYellows(yellow)
-      while (c.yellowCards >= CONDITION.yellowsPerSuspension) {
-        c.yellowCards -= CONDITION.yellowsPerSuspension
-        c.suspensionGames++
+      if (cup) stats.cupYellowCards = (stats.cupYellowCards ?? 0) + yellow
+      yellowCount += countedYellows(yellow)
+      const perSuspension = cup ? cup.yellowsPerSuspension : CONDITION.yellowsPerSuspension
+      while (yellowCount >= perSuspension) {
+        yellowCount -= perSuspension
+        suspension++
       }
       if (reds.has(p.id)) {
         stats.redCards++
+        if (cup) stats.cupRedCards = (stats.cupRedCards ?? 0) + 1
         c.redCards++
-        c.suspensionGames += CONDITION.redCardGames
+        suspension += cup ? cup.redCardGames : CONDITION.redCardGames
+      }
+      if (cup) c.cups = { ...c.cups, [cup.cupId]: { yellowCards: yellowCount, suspensionGames: suspension } }
+      else {
+        c.yellowCards = yellowCount
+        c.suspensionGames = suspension
       }
 
       c.morale = clamp(morale, 0, 100)

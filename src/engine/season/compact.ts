@@ -12,5 +12,5 @@ export function slimResult(r: MatchResult): MatchResult {
   const events = r.events
     .filter((e) => e.type === 'goal' || e.type === 'own-goal' || e.type === 'yellow-card' || e.type === 'red-card')
     .map(({ minute, type, teamId, playerId, relatedPlayerId, assistKind }) => ({ minute, type, teamId, playerId, text: '', ...(relatedPlayerId ? { relatedPlayerId } : {}), ...(assistKind ? { assistKind } : {}) }))
-  return { homeGoals: r.homeGoals, awayGoals: r.awayGoals, homeStats: r.homeStats, awayStats: r.awayStats, events, playerResults: [] }
+  return { homeGoals: r.homeGoals, awayGoals: r.awayGoals, homeStats: r.homeStats, awayStats: r.awayStats, events, playerResults: [], ...(r.extraTime ? { extraTime: true } : {}), ...(r.penalties ? { penalties: r.penalties } : {}), ...(r.shootout ? { shootout: r.shootout } : {}) }
 }

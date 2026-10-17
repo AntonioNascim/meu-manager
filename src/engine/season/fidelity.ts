@@ -6,6 +6,7 @@
 import { MARKET } from '../config'
 import { matchAttendance } from '../finance'
 import { simulateQuick } from '../match'
+import type { KnockoutRules } from '../match'
 import { hashSeed } from '../rng'
 import type { CompetitionId, Competition, IsoDate, Match, Player, Team, TeamId } from '../types'
 import type { SeasonState } from './calendar'
@@ -30,6 +31,12 @@ export function quickTeamIds(state: Pick<SeasonState, 'focus' | 'season'>): Read
   return new Set(state.season.competitions.filter((c) => ids.has(c.id)).flatMap((c) => c.teamIds))
 }
 
+/** Um jogo de copa é simplificado se nenhum dos dois clubes é da pirâmide do técnico (copas só entre clubes de fora; as do foco, e as que têm um clube dele, são lance a lance). */
+export function cupMatchIsQuick(state: Pick<SeasonState, 'focus' | 'season'>, match: Pick<Match, 'homeTeamId' | 'awayTeamId'>): boolean {
+  if (state.focus === undefined) return false
+  return pyramidOfTeam(state, match.homeTeamId) !== state.focus && pyramidOfTeam(state, match.awayTeamId) !== state.focus
+}
+
 export function pyramidOfTeam(state: Pick<SeasonState, 'season'>, teamId: TeamId): string | undefined {
   const competition = state.season.competitions.find((c) => c.teamIds.includes(teamId))
   return competition ? pyramidOf(competition) : undefined
@@ -46,9 +53,9 @@ export function refocus(state: SeasonState, teamId: TeamId): SeasonState {
 }
 
 /** Joga uma partida pelo resultado simplificado: devolve o jogo decidido (ainda com as notas, para os jogadores), com o público calculado pelo mandante. */
-export function playQuickMatch(match: Match, home: { team: Team; players: readonly Player[] }, away: { team: Team; players: readonly Player[] }): Match {
+export function playQuickMatch(match: Match, home: { team: Team; players: readonly Player[] }, away: { team: Team; players: readonly Player[] }, knockout?: KnockoutRules, neutral = false): Match {
   const attendance = matchAttendance(home.team, away.team)
-  const result = simulateQuick({ home, away, seed: match.seed, attendance, capacity: home.team.stadium.capacity })
+  const result = simulateQuick({ home, away, seed: match.seed, attendance, capacity: home.team.stadium.capacity, ...(knockout ? { knockout } : {}), ...(neutral ? { neutral } : {}) })
   return { ...match, status: 'finished', result, attendance }
 }
 

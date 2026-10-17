@@ -259,7 +259,7 @@ describe('bola, setas e marcações de cada lance', () => {
 })
 
 describe('campo na tela', () => {
-  const game: Game = createGame(3, 'team-imp')
+  const game: Game = createGame(3, 'team-imp', { cups: false })
 
   it('desenha 22 camisas (11 de cada lado), a bola, as linhas e o nome de quem está com a bola', () => {
     let g = game
@@ -298,7 +298,7 @@ describe('campo na tela', () => {
 describe('outros jogos da rodada (revelados pelo relógio)', () => {
   afterEach(() => clearLive())
   const toDay = (): Game => {
-    let g = createGame(3, 'team-imp')
+    let g = createGame(3, 'team-imp', { cups: false })
     while (!g.pendingUserMatch) g = advanceToMatchday(g)
     return g
   }
@@ -498,7 +498,7 @@ describe('lesão no seu time: o jogo para e o técnico escolhe', () => {
 describe('tela de partida: abas, controles e velocidade', () => {
   afterEach(() => clearLive())
   const toDay = (): Game => {
-    let g = createGame(3, 'team-imp')
+    let g = createGame(3, 'team-imp', { cups: false })
     while (!g.pendingUserMatch) g = advanceToMatchday(g)
     return g
   }

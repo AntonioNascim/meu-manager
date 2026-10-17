@@ -57,7 +57,7 @@ describe('pacote de dados: ida e volta', () => {
   })
 
   it('o jogo novo nasce do pacote padrão e do pacote do usuário', () => {
-    const plain = createGame(9, 'team-imp')
+    const plain = createGame(9, 'team-imp', { cups: false })
     expect(plain.season.teams).toEqual(loadWorld(9).teams)
     expect(plain.dataPackage).toBeUndefined()
     const pkg = valid(bare(9))

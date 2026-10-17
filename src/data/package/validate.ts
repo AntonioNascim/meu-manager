@@ -3,6 +3,7 @@ import { ATTRIBUTE_NAMES, NATIONALITIES, POSITIONS } from '../../engine/types'
 import type { Attributes } from '../../engine/types'
 import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
 import { COUNTRY_DEFAULTS } from './leagueDefaults'
+import { validateCups } from './validateCups'
 import { PACKAGE_FORMAT, PACKAGE_VERSION, TIEBREAKERS } from './types'
 import type { DataPackage, PackageIssue, PackageIssueCode, PackageReport } from './types'
 
@@ -288,6 +289,9 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
       if (league.teams !== undefined && league.promotion !== undefined && league.relegation !== undefined && league.promotion + league.relegation > league.teams / 2) c.error('league-promotion', `${league.path}.promotion`, league.promotion + league.relegation, `até ${league.teams / 2}`)
     })
   }
+
+  // Copas
+  validateCups(input.cups, { leagues, countries: countryIds, error: (...args) => c.error(...args), warn: (...args) => c.warn(...args) })
 
   if (c.errors.length > 0) return done()
   return { pkg: input as unknown as DataPackage, report: { errors: [], warnings: c.warnings } }

@@ -1,5 +1,7 @@
 import { createRng } from '../engine/rng'
 import type { CompetitionSetup } from '../engine/season'
+import type { CupSpec } from '../engine/types'
+import { defaultCupSpecs } from './package/cups'
 import type { Player, Team } from '../engine/types'
 import { createAcademy } from './generateAcademy'
 import { createGenerationContext, generateTeam } from './generateTeam'
@@ -21,6 +23,8 @@ export interface World {
   academy: Player[]
   /** Ligas do mundo (pacotes com mais de um país ou com regras próprias); sem elas valem as séries padrão do país. */
   competitions?: CompetitionSetup[]
+  /** Copas do mundo (definições prontas para o jogo); sem elas só há ligas. */
+  cups?: CupSpec[]
 }
 
 export const DEFAULT_START_YEAR = 2026
@@ -48,5 +52,5 @@ export function generateWorld(options: WorldOptions): World {
   }
 
   const academy = createAcademy({ teams, seed: options.seed, year: startYear, firstNumber: ctx.nextPlayerNumber, takenNames: players.map((p) => p.name) })
-  return { seed: options.seed, startYear, teams, players, academy }
+  return { seed: options.seed, startYear, teams, players, academy, cups: defaultCupSpecs() }
 }

@@ -83,6 +83,8 @@ export interface Game {
 }
 
 export interface NewGameOptions {
+  /** `false` joga só as ligas, sem as copas do mundo (padrão: com as copas que o pacote define). */
+  cups?: boolean
   /** Mundo já montado a partir do pacote (a tela de novo jogo o tem pronto): evita montar de novo. */
   world?: World
   /** Pacote de dados já validado (padrão: o mundo fictício). */
@@ -107,6 +109,7 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
     training: { ...emptyTraining(), plans: { [userTeamId]: DEFAULT_PLAN } },
     ...(world.competitions ? { competitions: world.competitions } : {}),
     ...(focus !== undefined ? { focus } : {}),
+    ...(options.cups !== false && world.cups && world.cups.length > 0 ? { cupSpecs: world.cups } : {}),
   })
   const market = { ...season.market, listings: season.market.listings.filter((l) => l.teamId !== userTeamId) }
   return {
@@ -169,7 +172,7 @@ export function archiveSeason(game: Game): SeasonArchive {
   const tables = ordered
     .map((c) => standingsOf(game, c).map((r): ArchivedRow => [r.teamId, r.played, r.wins, r.draws, r.losses, r.goalsFor, r.goalsAgainst, r.points]))
   const userMatches = game.season.matches
-    .filter((m) => m.status === 'finished' && m.result && (m.homeTeamId === game.userTeamId || m.awayTeamId === game.userTeamId))
+    .filter((m) => m.cup === undefined && m.status === 'finished' && m.result && (m.homeTeamId === game.userTeamId || m.awayTeamId === game.userTeamId))
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((m): ArchivedMatch => {
       const home = m.homeTeamId === game.userTeamId

@@ -11,7 +11,7 @@ import { squadHighlights } from '../src/ui/screens/dashboard/Highlights'
 import { miniWindow } from '../src/ui/screens/dashboard/MiniTable'
 
 const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node)
-const base = createGame(12, 'team-imp')
+const base = createGame(12, 'team-imp', { cups: false })
 
 const mapUser = (game: Game, fn: (p: Player, i: number) => Player): Game => {
   const ids = new Set(squadOf(game, game.userTeamId).map((p) => p.id))
@@ -72,7 +72,7 @@ const game0Year = (g: Game) => g.season.season.year
 
 describe('painel reunido', () => {
   it('próximo jogo traz posição e forma do adversário e o botão da tática', () => {
-    let game = createGame(12, 'team-imp')
+    let game = createGame(12, 'team-imp', { cups: false })
     for (let i = 0; i < 4; i++) game = playPendingAuto(advanceToMatchday(game))
     const out = html(createElement(Dashboard, { game, onNavigate: () => {} }))
     expect(out).toContain('data-testid="opponent-form"')
@@ -84,7 +84,7 @@ describe('painel reunido', () => {
     expect(miniWindow(rows, 9)).toEqual({ start: 7, rows: [7, 8, 9, 10, 11] })
     expect(miniWindow(rows, 0)).toEqual({ start: 0, rows: [0, 1, 2, 3, 4] })
     expect(miniWindow(rows, 19)).toEqual({ start: 15, rows: [15, 16, 17, 18, 19] })
-    let game = createGame(12, 'team-imp')
+    let game = createGame(12, 'team-imp', { cups: false })
     for (let i = 0; i < 4; i++) game = playPendingAuto(advanceToMatchday(game))
     const out = html(createElement(Dashboard, { game, onNavigate: () => {} }))
     expect(out).toContain('data-testid="mini-table"')

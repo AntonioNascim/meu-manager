@@ -3,6 +3,7 @@
  * Rodadas aos fins de semana (jogos no sábado e no domingo) e algumas na quarta-feira.
  */
 import { SEASON } from '../config'
+import { createCups } from '../cups'
 import { refreshListings } from '../market/listings'
 import { createRng, hashSeed } from '../rng'
 import { emptyTraining } from '../types'
@@ -113,6 +114,9 @@ export interface SeasonOptions {
   competitions?: readonly CompetitionSetup[]
   /** Pirâmide jogada lance a lance (as outras são simplificadas); sem ela todas são lance a lance. */
   focus?: string
+  /** Copas do mundo (definições do pacote) e o campeão de cada edição passada; sem elas só há ligas. */
+  cupSpecs?: readonly CupSpec[]
+  cupHistory?: CupHistory
 }
 
 /** Os times com a economia, o país e o limite de estrangeiros da liga em que jogam (quem já tem os mesmos não é recriado). */
@@ -201,6 +205,8 @@ export function createSeason(options: SeasonOptions): SeasonState {
     playerCounter: [...options.players, ...(options.academy ?? [])].reduce((max, p) => Math.max(max, Number(p.id.replace(/\D/g, '')) || 0), 0),
     market: { seed: options.seed, offers: [], history: [], listings: [], preContracts: [], handled: makeDate(options.year, 1, 1), counter: 0 },
   }
+  // As copas entram depois das ligas: o sorteio da primeira fase já escolhe os dias livres de jogo.
+  const withCups = options.cupSpecs && options.cupSpecs.length > 0 ? createCups({ ...state, ...(options.cupHistory ? { cupHistory: options.cupHistory } : {}) }, options.cupSpecs) : state
   // A janela de janeiro já abre com os anúncios dos clubes da IA (o jogador, se houver, anuncia depois).
-  return refreshListings(state, makeDate(options.year, 1, 1))
+  return refreshListings(withCups, makeDate(options.year, 1, 1))
 }

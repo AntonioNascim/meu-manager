@@ -1,9 +1,9 @@
-import type { Player } from '../../engine/types'
+import type { CupSpec, Player } from '../../engine/types'
 import { generateWorld } from '../generateWorld'
 import type { World } from '../generateWorld'
 import { worldFromPackage } from './load'
 import { PACKAGE_FORMAT, PACKAGE_VERSION, TIEBREAKERS } from './types'
-import type { DataPackage, PackagePlayer } from './types'
+import type { DataPackage, PackageCup, PackagePlayer } from './types'
 
 const FICTIONAL_LEAGUES = [
   { id: 'br-1', name: 'Série A', country: 'Brazil', level: 1, teams: 20, promotion: 0, relegation: 4, tiebreakers: [...TIEBREAKERS] },
@@ -56,7 +56,20 @@ export function packageFromWorld(world: World, name = 'Mundo fictício'): DataPa
     })),
     players: world.players.map((p) => packagePlayer(p)),
     academy: world.academy.map((p) => packagePlayer(p)),
+    ...(world.cups && world.cups.length > 0 ? { cups: world.cups.map(cupToPackage) } : {}),
   }
+}
+
+/** `serie-a` -> `br-1`: o id da liga no pacote (o inverso de `classicLeagueId`). */
+const packageLeagueId = (competitionId: string): string => {
+  const letter = /^serie-([a-d])$/.exec(competitionId)?.[1]
+  return letter ? `br-${'abcd'.indexOf(letter) + 1}` : competitionId
+}
+
+/** Uma copa do jogo no formato do pacote (a definição completa serve, só os ids das ligas voltam ao do pacote). */
+function cupToPackage(spec: CupSpec): PackageCup {
+  const source = (s: CupSpec['entrants'][number]['source']) => (s.type === 'league' ? { ...s, league: packageLeagueId(s.league) } : s)
+  return { ...spec, entrants: spec.entrants.map((e) => ({ source: source(e.source), ...(e.fallback ? { fallback: source(e.fallback) } : {}), ...(e.stage !== undefined ? { stage: e.stage } : {}) })) }
 }
 
 /** O pacote padrão do jogo: o mundo fictício de uma semente. */
