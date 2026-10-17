@@ -26,8 +26,8 @@ describe(`${YEARS} temporadas seguidas`, () => {
 
   it('o dinheiro não se acumula sem limite: perto do teto da IA e sem crescer ao longo dos anos', () => {
     for (const r of rows) expect(r.maxBalanceInRevenueYears).toBeLessThan(FINANCE.ceilingYears + 1.5)
-    // Na Série C a receita é pequena e uma venda grande de jogador (R$ 60 mi contra R$ 6 mi de receita) pesa muito: margem maior, que o teto vai gastando.
-    for (const r of rows) expect(r.maxBalanceInRevenueYearsC).toBeLessThan(FINANCE.ceilingYears + 3)
+    // A Série C segue a mesma regra das outras: preços e salários acompanham a receita da divisão, então nenhuma venda pesa muito mais que a receita dela.
+    for (const r of rows) expect(r.maxBalanceInRevenueYearsC).toBeLessThan(FINANCE.ceilingYears + 1.5)
     const early = mean(rows.slice(0, 3).map((r) => r.maxEndBalance))
     const late = mean(rows.slice(-3).map((r) => r.maxEndBalance))
     expect(late).toBeLessThan(early * 1.25)
