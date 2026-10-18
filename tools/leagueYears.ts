@@ -179,7 +179,7 @@ function measureLeagues(ended: SeasonState, start: Start, pyramid: string): Leag
  * Joga `years` temporadas de cada país com o relógio único do mundo: cada país vira a temporada no último dia dela (ano civil em 31/12,
  * a que atravessa o ano em 30/6) e é medido nesse dia, antes de virar. O ano `i` de `runs` reúne a `i`-ésima temporada de cada país.
  */
-export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[] {
+export function simulateLeagueYears(init: LeagueInit, years: number, observe?: { before(state: SeasonState, pyramid: string): void; after(state: SeasonState, pyramid: string): void }): LeagueRun[] {
   const state: SeasonState = createSeason({ year: init.year, seed: init.seed, teams: init.teams, players: init.players, academy: init.academy, ...(init.competitions ? { competitions: init.competitions } : {}), ...(init.focus !== undefined ? { focus: init.focus } : {}), ...(init.cupSpecs ? { cupSpecs: init.cupSpecs } : {}) })
   const pyramids = [...new Set(state.season.competitions.map((c) => pyramidOf(c)))]
   const starts = new Map(pyramids.map((p) => [p, beginSeason(state, p)]))
@@ -189,7 +189,9 @@ export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[
     const index = done.get(pyramid) as number
     if (index < years) runs[index]?.leagues.push(...measureLeagues(s, starts.get(pyramid) as Start, pyramid))
     done.set(pyramid, index + 1)
+    observe?.before(s, pyramid)
     const turned = advanceSeason(s, { createYouth, pyramid })
+    observe?.after(turned.state, pyramid)
     if (index + 1 < years) starts.set(pyramid, beginSeason(turned.state, pyramid))
     return turned
   }

@@ -5,22 +5,29 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { FULL_WORLD, buildScaleWorld } from '../../src/diagnostics/scaleWorld'
+import { loadWorld } from '../../src/data/package/defaultPackage'
+import { validatePackage } from '../../src/data/package/validate'
+import { buildScalePackage } from '../../src/diagnostics/scalePackage'
 import { FINANCE } from '../../src/engine/config'
+import { continentalObserver } from '../../tools/continentalRun'
+import type { ContinentalRun } from '../../tools/continentalRun'
 import { dynastiesOf, formatDynasties, formatTrend, simulateLeagueYears } from '../../tools/leagueYears'
 import type { LeagueRun, LeagueYear } from '../../tools/leagueYears'
 
 const YEARS = 30
-/** Calendários reais: as ligas europeias atravessam o ano (agosto a maio) e as outras jogam no ano civil. */
-const calendars = <T extends { region?: string }>(list: T[]): T[] => list.map((c) => (c.region === 'EU' ? { ...c, split: true, start: [8, 8] as [number, number] } : c))
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1)
 
 describe(`${YEARS} temporadas no mundo de 282 clubes`, () => {
   let runs: LeagueRun[] = []
+  let continental: ContinentalRun
   let ids: string[] = []
   beforeAll(() => {
-    const world = buildScaleWorld(FULL_WORLD, 7)
-    runs = simulateLeagueYears({ year: 2026, seed: 'years-7', teams: world.teams, players: world.players, academy: world.academy, competitions: calendars(world.competitions), focus: 'br' }, YEARS)
+    // O mundo do jogo: pacote de 15 ligas importado como o jogo importa (calendários de cada país, copas nacionais e continentais).
+    const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(7))))
+    const world = loadWorld(7, pkg)
+    const watched = continentalObserver()
+    continental = watched.run
+    runs = simulateLeagueYears({ year: 2026, seed: 'years-7', teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus: 'Brazil', ...(world.cups ? { cupSpecs: world.cups } : {}) }, YEARS, watched.observer)
     console.log(`\n${world.teams.length} clubes, ${YEARS} anos\n${formatTrend(runs)}\n\n${formatDynasties(runs)}`)
     // O vitest só mostra o console quando o teste falha: o relatório também vai para um arquivo.
     mkdirSync('node_modules/.cache', { recursive: true })
