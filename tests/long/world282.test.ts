@@ -1,6 +1,7 @@
 /**
  * Longo prazo no mundo de 282 clubes (15 ligas): 30 temporadas seguidas com mercado e virada, só o Brasil lance a lance.
- * Leva ~15 minutos, então fica fora do `npm run test:all`: rode `npm run test:long`. Os números da última rodada estão na
+ * Leva ~15 minutos, então fica fora do `npm run test:all`: rode `npm run test:long`. As checagens são `expect.soft`: uma que falha não
+ * interrompe as outras, e o relatório mostra todas de uma vez (uma rodada custa ~17 minutos). Os números da última rodada estão na
  * seção 14 de docs/fase2-proposta.md; `node tools/run.mjs leagueRun --clubs 282 --years 30` imprime as tabelas.
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -86,81 +87,81 @@ ${formatDynasties(runs)}
   it('ninguém vai à falência e o caixa não passa do teto', () => {
     for (const id of ids) {
       for (const l of series(id)) {
-        expect(l.negativeEver, `${id} no vermelho`).toBe(0)
-        expect(l.maxCeilingShare, `${id} saldo / teto`).toBeLessThan(1.5)
+        expect.soft(l.negativeEver, `${id} no vermelho`).toBe(0)
+        expect.soft(l.maxCeilingShare, `${id} saldo / teto`).toBeLessThan(1.5)
       }
-      expect(decade(id, 2, (l) => l.meanCeilingShare), `${id} saldo médio / teto`).toBeLessThan(1.2)
+      expect.soft(decade(id, 2, (l) => l.meanCeilingShare), `${id} saldo médio / teto`).toBeLessThan(1.2)
     }
   })
 
   it('a força média de cada liga fica estável', () => {
     for (const id of ids) {
       const first = span(id, 0, 3, (l) => l.strength)
-      for (const d of [1, 2]) expect(Math.abs(decade(id, d, (l) => l.strength) - first), `${id} década ${d + 1}`).toBeLessThan(id === 'br-3' ? 5 : 3.5)
+      for (const d of [1, 2]) expect.soft(Math.abs(decade(id, d, (l) => l.strength) - first), `${id} década ${d + 1}`).toBeLessThan(id === 'br-3' ? 5 : 3.5)
       // E não segue andando: a última década é parecida com a anterior.
-      expect(Math.abs(decade(id, 2, (l) => l.strength) - decade(id, 1, (l) => l.strength)), `${id} última década`).toBeLessThan(2.5)
+      expect.soft(Math.abs(decade(id, 2, (l) => l.strength) - decade(id, 1, (l) => l.strength)), `${id} última década`).toBeLessThan(2.5)
     }
   })
 
   it('as idades e os craques se mantêm', () => {
     for (const id of ids) for (let d = 0; d < 3; d++) {
       const age = decade(id, d, (l) => l.meanAge)
-      expect(age, `${id} idade média`).toBeGreaterThan(24)
-      expect(age, `${id} idade média`).toBeLessThan(28)
+      expect.soft(age, `${id} idade média`).toBeGreaterThan(24)
+      expect.soft(age, `${id} idade média`).toBeLessThan(28)
     }
     const stars = (d: number) => mean(Array.from({ length: 10 }, (_, k) => ids.reduce((s, id) => s + (series(id)[d * 10 + k] as LeagueYear).stars, 0)))
-    expect(stars(0)).toBeGreaterThanOrEqual(10)
-    expect(stars(2)).toBeLessThan(stars(0) * 2.5)
-    expect(stars(2)).toBeGreaterThan(stars(0) * 0.4)
+    expect.soft(stars(0)).toBeGreaterThanOrEqual(10)
+    expect.soft(stars(2)).toBeLessThan(stars(0) * 2.5)
+    expect.soft(stars(2)).toBeGreaterThan(stars(0) * 0.4)
   })
 
   it('os melhores jogadores se concentram nas ligas ricas e a fatia da Inglaterra para de crescer', () => {
     const share = (d: number) => decade('en-1', d, (l) => l.top40) / 40
     // A fatia da Inglaterra oscila entre 38% e 51% dos 40 melhores (o mundo gerado pelo pacote já a começa alta); não pode ruir nem passar de 60%.
-    expect(share(1)).toBeGreaterThan(share(0) - 0.15)
-    expect(share(2)).toBeLessThan(share(1) + 0.08)
-    for (const d of [0, 1, 2]) expect(share(d), `fatia da Inglaterra na década ${d + 1}`).toBeLessThan(0.6)
+    expect.soft(share(1)).toBeGreaterThan(share(0) - 0.15)
+    expect.soft(share(2)).toBeLessThan(share(1) + 0.08)
+    for (const d of [0, 1, 2]) expect.soft(share(d), `fatia da Inglaterra na década ${d + 1}`).toBeLessThan(0.6)
     // Espanha, Alemanha e Itália mantêm jogadores bons: a força dos titulares delas já está coberta pelo teste de estabilidade.
-    for (const id of ['es-1', 'de-1', 'it-1']) expect(decade(id, 2, (l) => l.top40)).toBeGreaterThan(0)
+    for (const id of ['es-1', 'de-1', 'it-1']) expect.soft(decade(id, 2, (l) => l.top40)).toBeGreaterThan(0)
   })
 
   it('copas continentais: campeões variados, sem dinastias, dinheiro limitado e título que dá reputação', () => {
     const cups = [...new Set(continental.editions.map((e) => e.cup))]
-    expect(cups.sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2'])
+    expect.soft(cups.sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2'])
     for (const cup of cups) {
       const list = continental.editions.filter((e) => e.cup === cup).sort((a, b) => a.year - b.year)
       const titles = titlesOf(list)
-      expect(list.length, `${cup} edições`).toBeGreaterThanOrEqual(YEARS - 3)
-      expect(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(0.4)
-      expect(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(0.2)
-      expect(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
+      expect.soft(list.length, `${cup} edições`).toBeGreaterThanOrEqual(YEARS - 3)
+      expect.soft(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(0.4)
+      expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(0.2)
+      expect.soft(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
     }
     // Nenhum país leva quase tudo da copa principal europeia ou da sul-americana (a Inglaterra e o Brasil têm mais vagas e clubes mais fortes).
     for (const cup of ['cont-eu-1', 'cont-sa-1']) {
       const list = continental.editions.filter((e) => e.cup === cup)
       const best = Math.max(...countBy(list.map((e) => e.winnerPyramid)).values())
-      expect(best / list.length, `${cup} fatia do país que mais ganha`).toBeLessThan(0.7)
+      expect.soft(best / list.length, `${cup} fatia do país que mais ganha`).toBeLessThan(0.7)
     }
     const shares = continental.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
-    expect(mean(shares), 'dinheiro continental / receita (média)').toBeLessThan(0.08)
-    expect(Math.max(...shares), 'dinheiro continental / receita (máximo)').toBeLessThan(0.5)
+    expect.soft(mean(shares), 'dinheiro continental / receita (média)').toBeLessThan(0.08)
+    expect.soft(Math.max(...shares), 'dinheiro continental / receita (máximo)').toBeLessThan(0.5)
     const delta = mean(continental.reputationAfter.map((r) => r.after - r.before))
-    expect(delta, 'reputação do campeão continental').toBeGreaterThan(0)
-    expect(delta, 'reputação do campeão continental').toBeLessThan(1.5)
+    expect.soft(delta, 'reputação do campeão continental').toBeGreaterThan(0)
+    expect.soft(delta, 'reputação do campeão continental').toBeLessThan(1.5)
   })
 
   it('campeões: pontos, raros acima de 92 e dinastias', () => {
     for (const d of dynastiesOf(runs)) {
-      expect(d.championPoints, `${d.id} pontos do campeão`).toBeGreaterThan(68)
-      expect(d.championPoints, `${d.id} pontos do campeão`).toBeLessThan(84)
-      expect(d.highCount, `${d.id} campeões acima de 92 pontos`).toBeLessThanOrEqual(3)
+      expect.soft(d.championPoints, `${d.id} pontos do campeão`).toBeGreaterThan(68)
+      expect.soft(d.championPoints, `${d.id} pontos do campeão`).toBeLessThan(84)
+      expect.soft(d.highCount, `${d.id} campeões acima de 92 pontos`).toBeLessThanOrEqual(3)
     }
     // Divisões de acesso (Brasil B e C): o campeão sobe e sai da divisão, então quase todo ano é um campeão novo; só se exige que ninguém repita muito.
     const tops = dynastiesOf(runs).filter((d) => !['br-2', 'br-3'].includes(d.id)).flatMap((d) => d.blocks)
-    expect(mean(tops.map((b) => b.distinct)), 'campeões diferentes por 10 temporadas').toBeGreaterThanOrEqual(4)
-    expect(mean(tops.map((b) => b.distinct)), 'campeões diferentes por 10 temporadas').toBeLessThanOrEqual(8)
-    expect(tops.filter((b) => b.maxTitles > 5).length / tops.length, 'blocos com um clube de mais de 5 títulos').toBeLessThan(0.2)
-    for (const d of dynastiesOf(runs).filter((x) => ['br-2', 'br-3'].includes(x.id))) for (const b of d.blocks) expect(b.maxTitles, `${d.id} títulos de um clube`).toBeLessThanOrEqual(3)
-    expect(FINANCE.ceilingYears).toBeGreaterThan(0)
+    expect.soft(mean(tops.map((b) => b.distinct)), 'campeões diferentes por 10 temporadas').toBeGreaterThanOrEqual(4)
+    expect.soft(mean(tops.map((b) => b.distinct)), 'campeões diferentes por 10 temporadas').toBeLessThanOrEqual(8)
+    expect.soft(tops.filter((b) => b.maxTitles > 5).length / tops.length, 'blocos com um clube de mais de 5 títulos').toBeLessThan(0.2)
+    for (const d of dynastiesOf(runs).filter((x) => ['br-2', 'br-3'].includes(x.id))) for (const b of d.blocks) expect.soft(b.maxTitles, `${d.id} títulos de um clube`).toBeLessThanOrEqual(3)
+    expect.soft(FINANCE.ceilingYears).toBeGreaterThan(0)
   })
 })
