@@ -9,7 +9,7 @@ import { leagueRevenue } from '../economy'
 import { recordEntry } from '../finance'
 import { createRng, hashSeed } from '../rng'
 import type { SeasonState } from '../season/calendar'
-import { cycleOfPyramid, focusPyramid } from '../season/cycles'
+import { cycleOfPyramid, focusPyramid, phaseOfPyramid } from '../season/cycles'
 import { pyramidOf } from '../season/fidelity'
 import { WEDNESDAY, addDays, makeDate, onOrAfterWeekday } from '../season/dates'
 import type { Competition, Cup, CupSpec, CupStageSpec, IsoDate, Match, MatchCupInfo, StandingRow, Team, TeamId } from '../types'
@@ -290,6 +290,8 @@ export function ensureContinentals(state: SeasonState): SeasonState {
     const edition = Math.min(...pyramids.map((p) => cycleOfPyramid(current, p).year))
     const existing = current.cups?.find((c) => c.id === spec.id)
     if (existing && (existing.year >= edition || existing.winnerId === undefined)) continue
+    // A edição só nasce no começo da temporada: com algum país já jogando a dele (um save antigo, no meio do ano), espera a virada.
+    if (pyramids.some((p) => phaseOfPyramid(current, p) !== 'pre-season')) continue
     const excluded = new Set<TeamId>()
     let waiting = false
     for (const id of spec.excludeCups ?? []) {

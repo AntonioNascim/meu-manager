@@ -226,3 +226,18 @@ describe('telas das copas continentais', () => {
     expect(table).toContain('Chaveamento')
   }, 600_000)
 })
+
+describe('saves de antes das copas continentais', () => {
+  it('ganham as copas continentais na virada, sem mudar a temporada em andamento', async () => {
+    const { defaultCupSpecsForCompetitions } = await import('../src/data/package/packageCups')
+    const national = specs.filter((s) => s.country !== undefined)
+    const start = createSeason({ year: 2026, seed: 7, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus: 'Brazil', cupSpecs: national })
+    expect(start.cups!.some((c) => c.pyramid === undefined)).toBe(false)
+    const turn = (s: SeasonState, pyramid: string) => advanceSeason(s, { createYouth, pyramid, defaultCupSpecs: defaultCupSpecsForCompetitions })
+    const later = advanceUntil(start, '2027-01-02', { turn }).state
+    expect(later.cups!.filter((c) => c.pyramid === undefined).map((c) => `${c.id}:${c.year}`).sort()).toEqual(['cont-sa-1:2027', 'cont-sa-2:2027'])
+    // A Europa só abre a temporada seguinte em 1º de julho: as copas europeias nascem depois da virada dos países de lá.
+    const europe = advanceUntil(later, '2027-07-03', { turn }).state
+    expect(europe.cups!.filter((c) => c.pyramid === undefined).map((c) => c.id).sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2'])
+  }, 600_000)
+})
