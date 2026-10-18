@@ -11,6 +11,7 @@ import { hashSeed } from '../rng'
 import type { CompetitionId, Competition, IsoDate, Match, Player, Team, TeamId } from '../types'
 import type { SeasonState } from './calendar'
 import { daysBetween } from './dates'
+import { cycleOfPyramid, phaseOfPyramid } from './cycles'
 
 export const DEFAULT_PYRAMID = 'default'
 
@@ -49,7 +50,9 @@ export function pyramidOfTeam(state: Pick<SeasonState, 'season'>, teamId: TeamId
 export function refocus(state: SeasonState, teamId: TeamId): SeasonState {
   const pyramid = pyramidOfTeam(state, teamId)
   if (pyramid === undefined || pyramid === state.focus) return state
-  return { ...state, focus: pyramid }
+  // `season.year` e `season.phase` são os da pirâmide do foco.
+  const next = { ...state, focus: pyramid }
+  return { ...next, season: { ...next.season, year: cycleOfPyramid(next, pyramid).year, phase: phaseOfPyramid(next, pyramid) } }
 }
 
 /** Joga uma partida pelo resultado simplificado: devolve o jogo decidido (ainda com as notas, para os jogadores), com o público calculado pelo mandante. */

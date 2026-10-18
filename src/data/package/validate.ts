@@ -191,6 +191,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
     }
     if (country !== undefined && league.economy === undefined && !(country in COUNTRY_DEFAULTS)) c.warn('league-defaults-missing', `${path}.economy`, country)
     if (league.start !== undefined && !(Array.isArray(league.start) && league.start.length === 2 && isInt(league.start[0]) && isInt(league.start[1]) && league.start[0] >= 1 && league.start[0] <= 12 && league.start[1] >= 1 && league.start[1] <= 31)) c.error('bad-date', `${path}.start`, JSON.stringify(league.start))
+    if (league.split !== undefined && typeof league.split !== 'boolean') c.error('unknown-value', `${path}.split`, String(league.split))
     if (league.rounds !== undefined && league.rounds !== 1 && league.rounds !== 2) c.error('unknown-value', `${path}.rounds`, String(league.rounds))
     if (league.region !== undefined && !['BR', 'SA', 'EU'].includes(league.region as string)) c.error('unknown-value', `${path}.region`, String(league.region))
     if (league.foreignLimit !== undefined) {

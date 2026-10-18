@@ -32,6 +32,8 @@ export interface PackageLeague {
   economy?: { revenue: number; level: number }
   /** 1 = turno único, 2 = turno e returno (padrão). */
   rounds?: 1 | 2
+  /** A temporada atravessa o ano (agosto a maio; contratos até 30 de junho). Padrão do país: Europa sim, Brasil e América do Sul não. */
+  split?: boolean
   /** Mês e dia de referência da primeira rodada (a primeira rodada cai no primeiro sábado a partir daí). Padrão: 11 de abril, o calendário da liga brasileira. */
   start?: [number, number]
   /** Janelas de transferência: BR, SA ou EU (padrão: a do país). */

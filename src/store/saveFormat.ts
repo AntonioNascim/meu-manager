@@ -14,7 +14,7 @@ import type { Match, Player, Team } from '../engine/types'
 import { userTeam, userCompetition } from './game'
 import type { Game } from './game'
 
-export const SAVE_VERSION = 10
+export const SAVE_VERSION = 11
 
 /** O que vai para o disco (e para o arquivo de backup). */
 export interface SaveEnvelope {
@@ -49,6 +49,7 @@ export type Migration = (envelope: { version: number; savedAt: string; game: unk
 
 /**
  * Migrações por versão de origem: `MIGRATIONS[1]` leva a versão 1 para a 2, e assim por diante.
+ * 10 → 11: temporadas por pirâmide (`season.cycles`, `Cup.pyramid`): o save antigo tem todas as pirâmides no ano civil da temporada que estava em andamento, como sempre foi, e as virada seguintes seguem o ciclo de cada país.
  * 9 → 10: data de nascimento dos jogadores (a idade passa a aumentar no aniversário, não na virada) e contratos com data de fim valida. As datas são geradas de forma estável a partir de cada jogador: quem está no elenco profissional faz a idade atual na data do save; a base mantém a idade do começo da temporada (ela envelhece na virada). O mundo continua com as séries que o save já tinha (um save de duas séries segue com duas).
  * 8 → 9: posicionamento livre (`tactic.grid`, o ponto da grade de cada titular): as táticas dos times e as escalações guardadas ganham a grade da formação pronta que já tinham, então nada muda no jogo.
  * 7 → 8: contagens novas por jogador (gols em casa e fora, assistências de passe e de cruzamento); saves antigos começam em zero (a artilharia geral não muda, as abas Casa, Fora, Passes e Cruzamentos contam dali em diante).
@@ -130,6 +131,26 @@ export const MIGRATIONS: Record<number, Migration> = {
     for (const team of game.season?.teams ?? []) withGrid(team.tactic)
     for (const saved of game.savedLineups ?? []) withGrid(saved)
     return { ...envelope, version: 9 }
+  },
+  10: (envelope) => {
+    type OldCup = { pyramid?: string; spec?: { entrants?: { source?: { type?: string; league?: string }; fallback?: { type?: string; league?: string } }[] } }
+    type OldCompetition = { id: string; pyramid?: string }
+    const game = envelope.game as { season?: { cycles?: Record<string, unknown>; cups?: OldCup[]; focus?: string; season?: { year?: number; competitions?: OldCompetition[] } } }
+    const state = game.season
+    const year = state?.season?.year ?? 2026
+    const competitions = state?.season?.competitions ?? []
+    const pyramidOf = (c: OldCompetition) => c.pyramid ?? 'default'
+    if (state) {
+      state.cycles ??= {}
+      for (const c of competitions) state.cycles[pyramidOf(c)] ??= { year, start: `${year}-01-01`, end: `${year}-12-31`, split: false }
+      for (const cup of state.cups ?? []) {
+        if (cup.pyramid) continue
+        const ids = (cup.spec?.entrants ?? []).flatMap((e) => [e.source, e.fallback]).filter((s) => s?.type === 'league').map((s) => s?.league)
+        const owner = competitions.find((c) => ids.includes(c.id))
+        cup.pyramid = owner ? pyramidOf(owner) : (state.focus ?? (competitions[0] ? pyramidOf(competitions[0]) : 'default'))
+      }
+    }
+    return { ...envelope, version: 11 }
   },
   9: (envelope) => {
     type OldPlayer = { id: string; name: string; age: number; birthDate?: string; contract?: { endDate?: string } }

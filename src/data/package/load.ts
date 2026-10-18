@@ -4,6 +4,7 @@ import { FORMATION_IDS, getFormation } from '../../engine/formations'
 import { buildTactic, rankFormations } from '../../engine/lineup'
 import { lineupForeign } from '../../engine/foreign'
 import { createRng } from '../../engine/rng'
+import { contractEndFor } from '../../engine/season/dates'
 import { leagueRevenue } from '../../engine/economy'
 import type { CompetitionSetup } from '../../engine/season'
 import type { LeagueEconomy, Nationality, Player, Region, Team } from '../../engine/types'
@@ -60,12 +61,14 @@ const numberOf = (id: string): number => {
 }
 
 /** Economia, janelas e regras de uma liga: o que o pacote diz ou, se não diz, o padrão do país. */
-export function leagueSetup(league: PackageLeague): { country: Nationality; economy?: LeagueEconomy; region: Region } {
+export function leagueSetup(league: PackageLeague): { country: Nationality; economy?: LeagueEconomy; region: Region; split: boolean; start?: [number, number] } {
   const country = league.country as Nationality
   const defaults = COUNTRY_DEFAULTS[country]
   const economy = league.economy ?? defaults?.economy
   // País sem padrão calibrado: sem economia (vale a do Brasil) e janelas da Europa, a menos que o pacote diga (a validação avisa).
-  return { country, ...(economy ? { economy } : {}), region: league.region ?? defaults?.region ?? 'EU' }
+  const region = league.region ?? defaults?.region ?? 'EU'
+  const start = league.start ? ([league.start[0], league.start[1]] as [number, number]) : defaults?.calendar.start
+  return { country, ...(economy ? { economy } : {}), region, split: league.split ?? defaults?.calendar.split ?? region === 'EU', ...(start ? { start } : {}) }
 }
 
 /**
@@ -106,7 +109,14 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
       const economy = club ? economyOfClub(club.id) : undefined
       return generateRealPlayer(spec, spec.id ?? freshId(), club ? club.id : null, { startYear, tier, club, ...(economy ? { economy } : {}) })
     })
-  const players = build(pkg.players)
+  // Contratos de clubes de temporada que atravessa o ano terminam em 30 de junho (o gerador usa 31 de dezembro).
+  const splitClub = (clubId: string | null) => clubId !== null && leagueSetup(leagueOf(clubId)).split
+  const localize = (p: Player): Player => {
+    if (!splitClub(p.teamId) || !p.contract.endDate.endsWith('-12-31')) return p
+    const year = Math.max(Number(p.contract.endDate.slice(0, 4)), startYear + 1)
+    return { ...p, contract: { ...p.contract, endDate: contractEndFor(year - 1, true) } }
+  }
+  const players = build(pkg.players).map(localize)
 
   // Posição de cada clube na sua divisão por reputação (empate: ordem do pacote).
   const rankOf = new Map<string, number>()
@@ -149,14 +159,14 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
   })
 
   const academy = pkg.academy
-    ? build(pkg.academy)
+    ? build(pkg.academy).map(localize)
     : createAcademy({
         teams,
         seed: options.seed,
         year: startYear,
         firstNumber: Math.max(players.length, ...[...used].map(numberOf)) + 1,
         takenNames: players.map((p) => p.name),
-      })
+      }).map(localize)
 
   const world: World = { seed: options.seed, startYear, teams, players, academy }
   // Copas: as ligas das vagas são ids do pacote; no mundo clássico a competição se chama `serie-a`, `serie-b`...
@@ -165,7 +175,7 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
   if (!isClassicPackage(pkg)) {
     const teamById = new Map(teams.map((t) => [t.id, t]))
     world.competitions = pkg.leagues.map((league): CompetitionSetup => {
-      const { country, economy, region } = leagueSetup(league)
+      const { country, economy, region, split, start } = leagueSetup(league)
       const members = pkg.clubs.filter((c) => c.league === league.id)
       return {
         id: league.id,
@@ -174,7 +184,8 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
         teams: members.map((c) => teamById.get(c.id) as Team),
         region,
         ...(league.rounds ? { rounds: league.rounds } : {}),
-        ...(league.start ? { start: [league.start[0], league.start[1]] as [number, number] } : {}),
+        ...(start ? { start } : {}),
+        ...(split ? { split: true } : {}),
         pyramid: league.country,
         ...(economy ? { economy } : {}),
         ...(country !== 'Brazil' ? { country } : {}),
