@@ -731,3 +731,41 @@ Cada país passa a ter a sua temporada, com um relógio de mundo só.
 **Números (mundo de 282 clubes, calendários reais, 30 temporadas, `npm run test:long`):** 5 testes passam em 744 s; ninguém no vermelho nem acima do teto, idades entre 24 e 28, força de cada liga estável (A brasileira 65,5 → 64,5 → 63,9, dentro do limite), campeões variados. **Tempo:** ~20 a 24 s por temporada (`node tools/run.mjs cycleRun`), igual aos 22,7 s com copas medidos na 3B. **Memória:** a mesma medida da B1 (`node --expose-gc tools/run.mjs worldScale --world full --live`): antes 125,0 MB de pico bruto, 37,7 MB vivos e 51,0 MB no fim; agora 133,4, 38,6 e 52,0. A diferença (+1 MB vivo) é ruído de coleta de lixo; os 300 a 350 MB vistos antes eram o `heapUsed` bruto no fim de cada ano de `memRun`, uma medida diferente (com lixo e com a virada). Com `--expose-gc` a memória viva do mundo com copas e calendários reais é de 52 a 56 MB (54 a 56 sem copas), estável ao longo dos anos.
 
 **Correções no caminho.** Os laços "simular a temporada e virar" de testes e ferramentas supunham um calendário só; num mundo misto, `simulateToSeasonEnd` + `advanceSeason` deixa os jogos do país que já virou no passado. `simulateLeagueYears`, `packageYears` e o teste do pacote de 15 ligas usam agora `advanceUntil` com `turn`. `advanceUntil` não guarda os jogos do caminho (guardá-los estourou a pilha e acumulava anos de partidas). O mercado não trava mais num evento que o relógio já passou. Ajustes de teste: o treino Leve poupa menos condição (+0,76 contra o Normal) porque as pausas dão descanso a todos; o teste de campeão simplificado × completo usa 8 mundos.
+
+## 21. Equilíbrio das copas europeias: Inglaterra e Espanha (medições em andamento)
+
+**Problema.** Na copa principal europeia (`cont-eu-1`), a Inglaterra ganhava a maior parte dos títulos e a Espanha quase nenhum (1 em 30 temporadas no teste de longo prazo). Meta: distribuição variada, nenhum país acima de ~40% dos títulos (na vida real, nas últimas 20 edições, a Espanha ganhou mais que a Inglaterra, e Itália e Alemanha também ganharam).
+
+**Medições** (`node --expose-gc tools/run.mjs continentalRun --years 20 --focus England`, mundo de 282 clubes, semente 7; títulos da `cont-eu-1` em 20 edições):
+
+| Configuração (mundo de teste, `scaleWorld.ts`) | Inglaterra | Espanha | Outros |
+|---|---|---|---|
+| Original: Inglaterra receita 5, nível 8, piso de reputação 9; Espanha 3 / 7 | 14 | 3 | Itália 2, Alemanha 1 |
+| Inglaterra 4 / 7,5; Espanha com `repCurve` 2,3 | 17 | 0 | Alemanha 3 |
+| Inglaterra 3,5 / 7,2 com piso 8 (igual ao da Espanha); Espanha `repCurve` 2,3 | 16 | 1 | Alemanha 3 |
+| Idem, sem os limites de estrangeiros do pacote de teste | 15 | 2 | Alemanha 3 |
+
+Com o foco no Brasil (medição anterior) a Inglaterra também ficava em 15 a 17: o domínio **não** vem do foco do técnico (motor completo contra simplificado). Na `cont-eu-3` a Espanha ganha bastante (7 a 12), então o problema está no topo, não na liga toda.
+
+**Diagnóstico.**
+- A configuração da Espanha (receita 3, nível 7) não estava abaixo da Itália (2,5 / 6); a repartição das vagas (raiz da receita) dá à Inglaterra só uma ou duas vagas a mais.
+- Os limites de estrangeiros (`en-1` elenco 17, `es-1` escalação 9, `it-1` escalação 8) **não** explicam: sem eles, a Inglaterra ainda ganha 15 e a Espanha 2.
+- **Profundidade.** `leagueRun --clubs 282 --years 10 --ids en-1,es-1,it-1,de-1,fr-1` (com Inglaterra 3,5 / 7,2 e Espanha `repCurve` 2,3): força média dos titulares Inglaterra 73,0, Espanha 71,4, Alemanha 70,6, Itália 70,4, França 67,5; craques 8 a 12 na Inglaterra contra 3 a 6 na Espanha; 13 dos 40 melhores jogadores do mundo na Inglaterra contra 8 na Espanha; campeão da liga com 82 pontos contra 78. A escada de reputação mais íngreme da Espanha tirou profundidade dela sem dar nada ao topo, porque a reputação já está no teto (20) nos dois países. A única alavanca para um topo mais forte é o nível da liga (`economy.level`).
+
+**Em teste.** Inglaterra receita 3,5, nível 7, `repCurve` 1,4 (rica de forma espalhada); Espanha receita 3,2, nível 7,6, `repCurve` 2,3 (topo forte, meio fraco). Se a distribuição ficar boa, os valores vão também para `COUNTRY_DEFAULTS` (`leagueDefaults.ts`) e para a tabela de `docs/formato-pacote.md`; depois `npm run test:long`. Resultado a registrar abaixo.
+
+**Correção do diagnóstico (descoberta posterior).** O pacote de teste (`scalePackage.ts`) não passa `economy` às ligas: na simulação vale a economia de `COUNTRY_DEFAULTS` (`leagueDefaults.ts`; a Inglaterra continuava com 5 / 8), e `scaleWorld.ts` só define a força inicial dos elencos. As linhas da tabela acima que mudam só o `scaleWorld.ts` mexeram, na prática, na força inicial e na escada de reputação, e o mundo nascia num nível e a economia real puxava a Inglaterra para cima: `tools/topClubs.ts` (`node --expose-gc tools/run.mjs topClubs --years 10`) mostra a média dos titulares da liga inglesa subindo de 73,2 para 76,1 em 10 anos (clubes de 79 a 82) com Itália e Alemanha parados. **Ao calibrar, mude `leagueDefaults.ts` e `scaleWorld.ts` juntos, com os mesmos valores.** Com Inglaterra 3,8 / 7,2 (`repCurve` 1,7) e Espanha 3,4 / 7,4 (`repCurve` 2,0) nos dois arquivos, o topo depois de 10 anos ficou parelho: Inglaterra 79,5, Espanha 79,4, Alemanha 79,2, França 76,5, Itália 75,4 (média da liga 74,4 / 73,8 / 70,7 / 68,4 / 71,1).
+
+**Pendente:** a medição de campeões de 20 anos com esses valores (`continentalRun --years 20 --focus England`) foi interrompida duas vezes por falta de memória do computador; falta rodá-la, conferir que nenhum país passa de ~40% das edições da `cont-eu-1`, atualizar a tabela de `docs/formato-pacote.md` (Inglaterra 3,8 / 7,2; Espanha 3,4 / 7,4) e rodar `npm run test:long`.
+
+**Resultado (valores finais: Inglaterra receita 3,6 / nível 7, `repCurve` 1,7; Espanha 3,4 / 7,4, `repCurve` 2,0; iguais em `leagueDefaults.ts`, `scaleWorld.ts` e `formato-pacote.md`).** Títulos em 20 edições, Inglaterra como foco:
+
+| Copa | Inglaterra | Espanha | Alemanha | Itália | Outros |
+|---|---|---|---|---|---|
+| `cont-eu-1` | 8 | 8 | 1 | 2 | França 1 |
+| `cont-eu-2` | 9 | 3 | 4 | 3 | França 1 |
+| `cont-eu-3` | 10 | 4 | 3 | 2 | Portugal 1 |
+
+Com 3,8 / 7,2 a Inglaterra tinha 8, 11 e 9 (47% somando as três) e a Espanha 6, 4 e 6. Na copa principal nenhum país passa de 40%; a Inglaterra segue mais forte nas secundárias (45% das três). Na liga inglesa a força média dos titulares sobe de 72,4 para 74,0 em 30 anos, parelha com a da Espanha (72,4 para 73,8). `npm test`: 803 testes passam.
+
+**`npm run test:long` (30 temporadas, 1 013 s): 5 de 6 passam.** Falhou `copas continentais: campeões variados, sem dinastias...` na primeira asserção da `cont-sa-1`: um clube sul-americano com 7 títulos em 30 edições (23%, limite 20%). É dinastia na América do Sul, fora do que foi calibrado aqui; as asserções seguintes (fatia por país na `cont-eu-1`, dinheiro, reputação) não chegaram a rodar. Em aberto: ver se é sorte da semente (a mudança de economia desloca o sorteio de todo o mundo) ou efeito real. Também em aberto: a asserção de país só exige menos de 70% na `cont-eu-1`; a meta combinada é ~40%.
