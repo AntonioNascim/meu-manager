@@ -1,0 +1,23 @@
+-- país
+Argentina  n   48 média 4.1% p90 9.1% máx 17.5%
+Brazil     n   56 média 4.8% p90 11.9% máx 16.5%
+Chile      n   40 média 3.8% p90 6.9% máx 29.7%
+Colombia   n   40 média 4.0% p90 6.3% máx 18.3%
+Ecuador    n   40 média 4.2% p90 9.4% máx 14.8%
+England    n   80 média 8.3% p90 18.2% máx 29.3%
+France     n   56 média 4.6% p90 8.7% máx 11.2%
+Germany    n   72 média 4.9% p90 8.8% máx 24.9%
+Italy      n   80 média 4.9% p90 8.8% máx 14.4%
+Paraguay   n   32 média 2.8% p90 5.6% máx 17.1%
+Portugal   n   48 média 5.2% p90 11.0% máx 11.3%
+Spain      n   80 média 4.8% p90 7.6% máx 22.1%
+Uruguay    n   32 média 2.5% p90 5.0% máx 6.0%
+-- divisão
+1          n  704 média 4.8% p90 9.7% máx 29.7%
+-- reputação
+12         n  327 média 5.0% p90 9.5% máx 29.3%
+16         n  105 média 6.4% p90 13.3% máx 22.6%
+20         n    3 média 5.1% p90 7.6% máx 7.6%
+4          n   72 média 3.0% p90 5.7% máx 17.1%
+8          n  197 média 4.3% p90 9.7% máx 29.7%
+geral média 4.8 p50 3.7 p90 9.7 p99 21.3

@@ -3,6 +3,7 @@
  * relógio único e mede os campeões de cada edição (variedade e dinastias), o dinheiro continental de cada clube contra a receita dele e a
  * reputação dos campeões. Uso: node --expose-gc tools/run.mjs continentalRun [--years 10] [--seed 7]
  */
+import { writeFileSync } from 'node:fs'
 import { createYouth } from '../src/data/generateYouth'
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
@@ -28,6 +29,8 @@ export interface MoneyRow {
   pyramid: string
   continental: number
   revenue: number
+  reputation: number
+  tier: number
 }
 
 export interface ContinentalRun {
@@ -60,7 +63,7 @@ export function continentalObserver(): { observer: TurnObserver; run: Continenta
         if (cup.winnerId && !seen.has(`${cup.id}:${cup.year}`)) {
           seen.add(`${cup.id}:${cup.year}`)
           const team = s.teams.find((t) => t.id === cup.winnerId)!
-          run.editions.push({ cup: cup.id, year: cup.year, winnerId: cup.winnerId, ...(cup.runnerUpId ? { runnerUpId: cup.runnerUpId } : {}), winnerPyramid: scope.has(cup.winnerId) ? pyramid : '?', winnerReputation: team.reputation })
+          run.editions.push({ cup: cup.id, year: cup.year, winnerId: cup.winnerId, ...(cup.runnerUpId ? { runnerUpId: cup.runnerUpId } : {}), winnerPyramid: s.season.competitions.find((c) => c.teamIds.includes(cup.winnerId as string))?.pyramid ?? '?', winnerReputation: team.reputation })
           pending.set(cup.winnerId, team.reputation)
         }
         if (!seen.has(`n:${cup.id}:${cup.year}`)) {
@@ -71,7 +74,7 @@ export function continentalObserver(): { observer: TurnObserver; run: Continenta
       for (const t of s.teams) {
         if (!scope.has(t.id)) continue
         const continental = t.finances.ledger.filter((e) => e.category === 'cup-prize' && ((e.description ?? '').startsWith('Liga Continental') || (e.description ?? '').startsWith('Copa Continental'))).reduce((sum, e) => sum + e.amount, 0)
-        run.money.push({ teamId: t.id, year, pyramid, continental, revenue: revenueOf(t.finances.ledger) })
+        run.money.push({ teamId: t.id, year, pyramid, continental, revenue: revenueOf(t.finances.ledger), reputation: t.reputation, tier: t.tier })
       }
     },
     after(next, pyramid) {
@@ -124,6 +127,9 @@ if (process.argv[1]?.includes('continentalRun')) {
   console.log(`dinheiro continental / receita (clubes que jogaram): média ${(100 * mean).toFixed(1)}%, mediana ${(100 * (sorted[Math.floor(sorted.length / 2)] ?? 0)).toFixed(1)}%, máximo ${(100 * (sorted[sorted.length - 1] ?? 0)).toFixed(1)}% (${shares.length} clube-temporadas)`)
   const deltas = run.reputationAfter.map((r) => r.after - r.before)
   console.log(`reputação do campeão continental na virada: ${(deltas.reduce((a, b) => a + b, 0) / (deltas.length || 1)).toFixed(2)} (${deltas.length} títulos)`)
+  if (process.env.DUMP) {
+    writeFileSync(process.env.DUMP, JSON.stringify(run.money))
+  }
   const counts = [...run.clubsInContinental.values()]
   console.log(`clubes que jogaram alguma copa continental: ${counts.length}; mais vezes: ${Math.max(...counts)} edições`)
 }

@@ -72,7 +72,13 @@ function countryEntrants(l: ContinentalLeague, from: number, count: number, stag
   return [{ source: league(l.id, from, from + count - 1), ...(stage ? { stage } : {}) }]
 }
 
-const prize = (perStage: number[], champion: number, runnerUp: number) => ({ perStage, champion, runnerUp })
+/**
+ * Premiação em unidades do Brasil (vezes o índice de receita da liga do clube). Medida em 10 temporadas do mundo de 282 clubes: com os valores
+ * "cheios" (campeão da copa principal europeia = 35M) o dinheiro continental era 14,7% da receita em média (23,7% na Inglaterra, até 119% de um
+ * clube pequeno); `SCALE` leva a média a ~5%, o que não cria clubes que ganham tudo sempre.
+ */
+const SCALE = 0.33
+const prize = (perStage: number[], champion: number, runnerUp: number) => ({ perStage: perStage.map((v) => Math.round((v * SCALE) / 100_000) * 100_000), champion: Math.round((champion * SCALE) / 100_000) * 100_000, runnerUp: Math.round((runnerUp * SCALE) / 100_000) * 100_000 })
 
 /** Europa: três copas (24, 16 e 12 clubes). `undefined` se os países da região não têm clubes para as vagas. */
 function europe(leagues: readonly ContinentalLeague[]): PackageCup[] | undefined {

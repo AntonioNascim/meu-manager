@@ -17,6 +17,43 @@ import type { LeagueRun, LeagueYear } from '../../tools/leagueYears'
 const YEARS = 30
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1)
 
+/** Resumo das copas continentais para o arquivo de relatório: campeões, dinastias e dinheiro. */
+function continentalReport(run: ContinentalRun): string {
+  const lines: string[] = []
+  for (const cup of [...new Set(run.editions.map((e) => e.cup))]) {
+    const list = run.editions.filter((e) => e.cup === cup).sort((a, b) => a.year - b.year)
+    const titles = titlesOf(list)
+    lines.push(`${cup}: ${list.length} edições, ${titles.size} campeões diferentes, máximo ${Math.max(...titles.values())} títulos, ${streakOf(list)} seguidos; por país: ${[...countBy(list.map((e) => e.winnerPyramid))].map(([k, v]) => `${k} ${v}`).join(', ')}`)
+  }
+  const shares = run.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
+  lines.push(`dinheiro continental / receita: média ${(100 * mean(shares)).toFixed(1)}%, máximo ${(100 * Math.max(...shares)).toFixed(1)}% (${shares.length} clube-temporadas)`)
+  lines.push(`reputação do campeão na virada: ${mean(run.reputationAfter.map((r) => r.after - r.before)).toFixed(2)} (${run.reputationAfter.length} títulos)`)
+  return lines.join('\n')
+}
+
+function titlesOf(list: { winnerId: string }[]): Map<string, number> {
+  const titles = new Map<string, number>()
+  for (const e of list) titles.set(e.winnerId, (titles.get(e.winnerId) ?? 0) + 1)
+  return titles
+}
+
+/** A maior sequência de títulos seguidos do mesmo clube (1 = ninguém repetiu). */
+function streakOf(list: { winnerId: string }[]): number {
+  let best = 1
+  let run = 1
+  list.forEach((e, i) => {
+    run = i > 0 && list[i - 1]?.winnerId === e.winnerId ? run + 1 : 1
+    best = Math.max(best, run)
+  })
+  return best
+}
+
+function countBy(values: string[]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const v of values) out.set(v, (out.get(v) ?? 0) + 1)
+  return out
+}
+
 describe(`${YEARS} temporadas no mundo de 282 clubes`, () => {
   let runs: LeagueRun[] = []
   let continental: ContinentalRun
@@ -37,6 +74,7 @@ ${formatTrend(runs)}
 ${formatDynasties(runs)}
 `)
     ids = runs[0]?.leagues.map((l) => l.id) ?? []
+    writeFileSync('node_modules/.cache/continental282.txt', continentalReport(continental))
   })
   const series = (id: string): LeagueYear[] => runs.map((r) => r.leagues.find((l) => l.id === id) as LeagueYear)
   const span = (id: string, from: number, to: number, pick: (l: LeagueYear) => number) => mean(series(id).slice(from, to).map(pick))
@@ -80,6 +118,31 @@ ${formatDynasties(runs)}
     expect(share(2)).toBeLessThan(0.7)
     // Espanha, Alemanha e Itália mantêm jogadores bons: a força dos titulares delas já está coberta pelo teste de estabilidade.
     for (const id of ['es-1', 'de-1', 'it-1']) expect(decade(id, 2, (l) => l.top40)).toBeGreaterThan(0)
+  })
+
+  it('copas continentais: campeões variados, sem dinastias, dinheiro limitado e título que dá reputação', () => {
+    const cups = [...new Set(continental.editions.map((e) => e.cup))]
+    expect(cups.sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2'])
+    for (const cup of cups) {
+      const list = continental.editions.filter((e) => e.cup === cup).sort((a, b) => a.year - b.year)
+      const titles = titlesOf(list)
+      expect(list.length, `${cup} edições`).toBeGreaterThanOrEqual(YEARS - 3)
+      expect(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(0.4)
+      expect(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(0.3)
+      expect(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(3)
+    }
+    // Nenhum país leva quase tudo da copa principal europeia ou da sul-americana (a Inglaterra e o Brasil têm mais vagas e clubes mais fortes).
+    for (const cup of ['cont-eu-1', 'cont-sa-1']) {
+      const list = continental.editions.filter((e) => e.cup === cup)
+      const best = Math.max(...countBy(list.map((e) => e.winnerPyramid)).values())
+      expect(best / list.length, `${cup} fatia do país que mais ganha`).toBeLessThan(0.7)
+    }
+    const shares = continental.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
+    expect(mean(shares), 'dinheiro continental / receita (média)').toBeLessThan(0.08)
+    expect(Math.max(...shares), 'dinheiro continental / receita (máximo)').toBeLessThan(0.5)
+    const delta = mean(continental.reputationAfter.map((r) => r.after - r.before))
+    expect(delta, 'reputação do campeão continental').toBeGreaterThan(0)
+    expect(delta, 'reputação do campeão continental').toBeLessThan(1.5)
   })
 
   it('campeões: pontos, raros acima de 92 e dinastias', () => {
