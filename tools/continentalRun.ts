@@ -1,7 +1,8 @@
 /**
  * Equilíbrio das copas continentais: joga N temporadas do mundo de 282 clubes (calendários reais, copas nacionais e continentais) com o
  * relógio único e mede os campeões de cada edição (variedade e dinastias), o dinheiro continental de cada clube contra a receita dele e a
- * reputação dos campeões. Uso: node --expose-gc tools/run.mjs continentalRun [--years 10] [--seed 7]
+ * reputação dos campeões. Uso: node --expose-gc tools/run.mjs continentalRun [--years 10] [--seed 7] [--focus Brazil]
+ * (`--focus` troca o país jogado lance a lance; o resto usa a partida simplificada: serve para ver se a diferença entre as duas favorece um país).
  */
 import { writeFileSync } from 'node:fs'
 import { createYouth } from '../src/data/generateYouth'
@@ -91,11 +92,11 @@ export function continentalObserver(): { observer: TurnObserver; run: Continenta
   return { observer, run }
 }
 
-export function simulateContinental(years: number, seed = 7): ContinentalRun {
+export function simulateContinental(years: number, seed = 7, focus = 'Brazil'): ContinentalRun {
   const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(seed))))
   if (!pkg) throw new Error('pacote inválido')
   const world = loadWorld(seed, pkg)
-  const state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus: 'Brazil', ...(world.cups ? { cupSpecs: world.cups } : {}) })
+  const state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus, ...(world.cups ? { cupSpecs: world.cups } : {}) })
   const { observer, run } = continentalObserver()
   const turn = (s: SeasonState, pyramid: string) => {
     observer.before(s, pyramid)
@@ -111,7 +112,7 @@ if (process.argv[1]?.includes('continentalRun')) {
   const args = process.argv.slice(2)
   const opt = (name: string, fallback: string) => (args.includes(`--${name}`) ? (args[args.indexOf(`--${name}`) + 1] as string) : fallback)
   const years = Number(opt('years', '10'))
-  const run = simulateContinental(years, Number(opt('seed', '7')))
+  const run = simulateContinental(years, Number(opt('seed', '7')), opt('focus', 'Brazil'))
   const cups = [...new Set(run.editions.map((e) => e.cup))]
   for (const cup of cups) {
     const list = run.editions.filter((e) => e.cup === cup).sort((a, b) => a.year - b.year)

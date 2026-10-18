@@ -23,7 +23,10 @@ function continentalReport(run: ContinentalRun): string {
   for (const cup of [...new Set(run.editions.map((e) => e.cup))]) {
     const list = run.editions.filter((e) => e.cup === cup).sort((a, b) => a.year - b.year)
     const titles = titlesOf(list)
-    lines.push(`${cup}: ${list.length} edições, ${titles.size} campeões diferentes, máximo ${Math.max(...titles.values())} títulos, ${streakOf(list)} seguidos; por país: ${[...countBy(list.map((e) => e.winnerPyramid))].map(([k, v]) => `${k} ${v}`).join(', ')}`)
+    lines.push(`${cup}: ${list.length} edições, ${titles.size} campeões diferentes, máximo ${Math.max(...titles.values())} títulos, ${streakOf(list)} seguidos`)
+    lines.push(`   por país: ${[...countBy(list.map((e) => e.winnerPyramid))].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ')}`)
+    lines.push(`   por clube: ${[...titles].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `${k} ${v}`).join(', ')}${titles.size > 10 ? ` (+${titles.size - 10} com menos)` : ''}`)
+    lines.push(`   campeões: ${list.map((e) => e.winnerId.replace('team-', '')).join(' ')}`)
   }
   const shares = run.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
   lines.push(`dinheiro continental / receita: média ${(100 * mean(shares)).toFixed(1)}%, máximo ${(100 * Math.max(...shares)).toFixed(1)}% (${shares.length} clube-temporadas)`)
@@ -128,8 +131,8 @@ ${formatDynasties(runs)}
       const titles = titlesOf(list)
       expect(list.length, `${cup} edições`).toBeGreaterThanOrEqual(YEARS - 3)
       expect(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(0.4)
-      expect(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(0.3)
-      expect(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(3)
+      expect(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(0.2)
+      expect(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
     }
     // Nenhum país leva quase tudo da copa principal europeia ou da sul-americana (a Inglaterra e o Brasil têm mais vagas e clubes mais fortes).
     for (const cup of ['cont-eu-1', 'cont-sa-1']) {
