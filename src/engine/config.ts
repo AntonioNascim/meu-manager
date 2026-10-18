@@ -467,7 +467,8 @@ export const LEAGUE = {
 
 export const MARKET = {
   /** Rodízio das negociações das ligas fora do foco do técnico: só um em cada tantos clubes age por rodada. */
-  rotation: { outOfFocusEvery: 6 },
+  /** Rodízio das ligas fora do foco: 1 em cada `outOfFocusEvery` clubes negocia por rodada, mas os `alwaysActiveTop` clubes de maior reputação de cada liga negociam sempre (são eles que disputam as copas continentais; sem isso o país do técnico, que negocia o tempo todo, ganhava vantagem sobre os grandes dos outros países). */
+  rotation: { outOfFocusEvery: 6, alwaysActiveTop: 5 },
   /** Valor de mercado: base × e^(perPoint × (força efetiva − referência)), vezes idade e contrato. */
   value: {
     base: 300_000,
