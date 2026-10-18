@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { OfferError, buyerInterest, isWindowOpen, marketValue, releaseCost } from '../../../engine/market'
-import { makeDate } from '../../../engine/season/dates'
+import { contractEndIn } from '../../../engine/season'
 import type { OfferKind, Player } from '../../../engine/types'
 import { releaseUserSquadPlayer, sellUserPlayer } from '../../../store/game'
 import type { Game } from '../../../store/game'
@@ -12,10 +12,9 @@ import { Sheet } from '../../theme'
 /** Vender, emprestar ou liberar um jogador do seu elenco (aberto pelo detalhe do jogador no Elenco). */
 export function SellSheet({ game, player, onClose, onDone }: { game: Game; player: Player; onClose: () => void; onDone: () => void }) {
   const state = game.season
-  const year = state.season.year
-  const open = isWindowOpen(state)
   const [kind, setKind] = useState<OfferKind>('purchase')
   const [buyerId, setBuyerId] = useState<string | null>(null)
+  const open = isWindowOpen(state, state.season.currentDate, [game.userTeamId, buyerId])
   const [fee, setFee] = useState<number | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const buyers = useMemo(
@@ -34,7 +33,7 @@ export function SellSheet({ game, player, onClose, onDone }: { game: Game; playe
   const sell = () => {
     if (!chosen) return
     try {
-      const contractEnd = makeDate(kind === 'loan' ? year : year + 3, 12, 31)
+      const contractEnd = contractEndIn(state, chosen.team.id, kind === 'loan' ? 0 : 3)
       const { game: next, result } = sellUserPlayer(game, { playerId: player.id, buyerId: chosen.team.id, kind, fee: value, contractEnd })
       if (result.accepted) {
         updateGame(() => next)

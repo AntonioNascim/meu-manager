@@ -11,7 +11,7 @@ import { createAcademy } from '../data/generateAcademy'
 import { isSlim, slimResult } from '../engine/season/compact'
 import { birthDateFor, contractEndOn } from '../engine/season/dates'
 import type { Match, Player, Team } from '../engine/types'
-import { userTeam, userCompetition } from './game'
+import { userTeam, userCompetition, userSeasonLabel } from './game'
 import type { Game } from './game'
 
 export const SAVE_VERSION = 11
@@ -37,6 +37,8 @@ export interface SaveSummary {
   league?: string
   /** Ano da temporada em andamento e data atual do jogo (AAAA-MM-DD). */
   year: number
+  /** Nome da temporada ("2026" ou "2026/27"); saves antigos não têm e valem o ano. */
+  label?: string
   date: string
   /** Temporadas já encerradas. */
   seasonsPlayed: number
@@ -256,6 +258,7 @@ export function summarizeGame(game: Game, slot: number, savedAt: string): SaveSu
     tier: team.tier,
     league: userCompetition(game).name,
     year: game.season.season.year,
+    label: userSeasonLabel(game),
     date: game.season.season.currentDate,
     seasonsPlayed: game.seasonLog.length,
   }

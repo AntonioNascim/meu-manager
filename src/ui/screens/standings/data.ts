@@ -1,4 +1,4 @@
-import { computeStandings } from '../../../engine/season'
+import { computeStandings, cycleOfPyramid, focusPyramid } from '../../../engine/season'
 import type { Competition, Match, Player, StandingRow, Team, TeamId } from '../../../engine/types'
 import type { ArchivedRow, Game } from '../../../store/game'
 
@@ -33,19 +33,25 @@ export function archivedStandings(rows: readonly ArchivedRow[]): StandingRow[] {
   })) as StandingRow[]
 }
 
-/** Anos disponíveis na tela: as temporadas passadas guardadas e a atual (última). */
-export function seasonYears(game: Game): number[] {
-  return [...game.archive.map((a) => a.year), game.season.season.year]
+/** A temporada guardada tem a tabela final desta liga? (Saves antigos não dizem a quais ligas: valem para a pirâmide do técnico.) */
+const archiveHas = (game: Game, a: Game['archive'][number], competition: Competition): boolean =>
+  a.competitions ? a.competitions.includes(competition.id) : (competition.pyramid ?? 'default') === focusPyramid(game.season)
+
+const currentYearOf = (game: Game, competition: Competition): number => cycleOfPyramid(game.season, competition.pyramid ?? 'default').year
+
+/** Anos disponíveis na tela para a liga: as temporadas passadas guardadas e a atual (última), cada uma com o ano em que começou. */
+export function seasonYears(game: Game, competition: Competition): number[] {
+  return [...game.archive.filter((a) => archiveHas(game, a, competition)).map((a) => a.year), currentYearOf(game, competition)]
 }
 
 export function standingsFor(game: Game, competition: Competition, year: number): StandingRow[] {
-  if (year === game.season.season.year) {
+  if (year === currentYearOf(game, competition)) {
     return computeStandings(
       competition.teamIds,
       game.season.matches.filter((m) => m.competitionId === competition.id),
     )
   }
-  const archive = game.archive.find((a) => a.year === year)
+  const archive = game.archive.find((a) => a.year === year && archiveHas(game, a, competition))
   return archivedStandings(archive?.tables[archive.competitions ? archive.competitions.indexOf(competition.id) : competition.tier - 1] ?? [])
 }
 

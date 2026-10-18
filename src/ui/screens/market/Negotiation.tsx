@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { OfferError, expectedSalary, interestContext, interestIn, listingOf, marketValue, salePrice } from '../../../engine/market'
 import { playerOverall } from '../../../engine/overall'
-import { makeDate } from '../../../engine/season/dates'
+import { contractEndIn } from '../../../engine/season'
 import type { OfferKind, Player } from '../../../engine/types'
 import { makeUserOffer, squadOf } from '../../../store/game'
 import type { Game } from '../../../store/game'
@@ -22,7 +22,6 @@ const Line = ({ label, value }: { label: string; value: React.ReactNode }) => (
 export function Negotiation({ game, player, open, onClose, extra, initialKind = 'purchase' }: { game: Game; player: Player; open: boolean; onClose: () => void; extra?: React.ReactNode; initialKind?: OfferKind }) {
   const state = game.season
   const date = state.season.currentDate
-  const year = state.season.year
   const free = player.teamId === null
   const [kind, setKind] = useState<OfferKind>(initialKind)
   const [fee, setFee] = useState<number | null>(null)
@@ -39,7 +38,7 @@ export function Negotiation({ game, player, open, onClose, extra, initialKind = 
 
   const submit = () => {
     try {
-      const contractEnd = makeDate(kind === 'loan' ? year : year + years, 12, 31)
+      const contractEnd = contractEndIn(state, game.userTeamId, kind === 'loan' ? 0 : years)
       updateGame((g) => makeUserOffer(g, { kind, playerId: player.id, fee: amount, salary, contractEnd }))
       onClose()
     } catch (e) {

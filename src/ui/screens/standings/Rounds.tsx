@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Competition, Match, MatchEvent } from '../../../engine/types'
-import { competitionMatches, teamById } from '../../../store/game'
+import { competitionMatches, competitionSeasonLabel, teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { formatDate, playerName } from '../../format'
 import { Icon, Sheet } from '../../theme'
@@ -85,7 +85,7 @@ export function Rounds({ game, competition, onTeam }: { game: Game; competition:
 
   return (
     <div className="space-y-3">
-      <SectionHeader icon="calendar" title="Rodadas" subtitle={`${competition.name} · temporada ${game.season.season.year}`} tone="violet" />
+      <SectionHeader icon="calendar" title="Rodadas" subtitle={`${competition.name} · temporada ${competitionSeasonLabel(game, competition)}`} tone="violet" />
       <div className="flex items-center justify-between rounded-2xl border border-line bg-surface p-2">
         <button type="button" className="min-h-12 min-w-12 rounded-xl border border-line bg-surface-2 text-xl font-bold disabled:opacity-30" disabled={round <= 1} onClick={() => setChosen(round - 1)} aria-label="Rodada anterior">
           ‹

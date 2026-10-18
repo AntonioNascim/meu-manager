@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Competition } from '../../../engine/types'
+import { competitionSeasonLabel } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { playerName } from '../../format'
 import { TopTabs } from '../../theme'
@@ -94,7 +95,7 @@ export function Leaders({ game, competition, board, onTeam }: { game: Game; comp
 
   return (
     <div className="space-y-3">
-      <SectionHeader icon={cfg.icon} title={cfg.title} subtitle={`${competition.name} · ${game.season.season.year}`} tone={cfg.tone} />
+      <SectionHeader icon={cfg.icon} title={cfg.title} subtitle={`${competition.name} · ${competitionSeasonLabel(game, competition)}`} tone={cfg.tone} />
       <TopTabs scroll value={active} onChange={setKind} activeClass={`${tone.chip} shadow`} options={cfg.tabs.map((t) => ({ id: t.id, label: t.label }))} />
       <div className="flex items-center justify-between px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
         <span>Jogador</span>

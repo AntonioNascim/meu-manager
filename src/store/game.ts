@@ -33,7 +33,8 @@ import {
   refocus,
   setTeamTactic,
 } from '../engine/season'
-import { advanceUntil, cycleOfPyramid, focusPyramid, makeCycle, pyramidFinished, pyramidOfTeamId, seasonLabel } from '../engine/season'
+import { pyramidOfCupSpec } from '../engine/cups'
+import { advanceUntil, cycleOfPyramid, cycleOfTeam, focusPyramid, makeCycle, pyramidFinished, pyramidOfTeamId, seasonLabel } from '../engine/season'
 import type { SeasonEvent, SeasonState, TurnRunner } from '../engine/season'
 import { emptyTraining } from '../engine/types'
 import type { ArchivedRow, TurnRecord, BoardEvaluation, Competition, ListingKind, IndividualGoal, IndividualTraining, FinishedTraining, TrainingPlan, Dismissal, OffseasonReport, SeasonSummary, IsoDate, MarketNotice, Match, OfferKind, MatchResult, Player, SavedLineup, StandingRow, Tactic, Team, TeamId } from '../engine/types'
@@ -443,6 +444,25 @@ export const userTeam = (game: Game) => teamById(game, game.userTeamId)
 export const squadOf = (game: Game, teamId: TeamId): Player[] => game.season.players.filter((p) => p.teamId === teamId)
 /** Próximo evento do mundo; `season-end` quando todos os jogos do país do técnico terminaram (os outros países seguem jogando por baixo). */
 export const nextEventOf = (game: Game): SeasonEvent => (pyramidFinished(game.season, pyramidOfTeamId(game.season, game.userTeamId) ?? focusPyramid(game.season)) ? { type: 'season-end' } : nextEvent(game.season))
+
+/** Nome da temporada do país do técnico ("2026" ou "2026/27"). */
+export const userSeasonLabel = (game: Game): string => seasonLabel(cycleOfTeam(game.season, game.userTeamId))
+
+/** Nome de uma temporada do país do técnico, a partir do ano em que ela começou. */
+export const userSeasonLabelOf = (game: Game, year: number): string => seasonLabel({ year, split: cycleOfTeam(game.season, game.userTeamId).split })
+
+/** Nome da edição de uma copa (a temporada do país dela). */
+export function cupSeasonLabel(game: Game, cupId: string, year: number): string {
+  const spec = game.season.cupSpecs?.find((s) => s.id === cupId)
+  const pyramid = (spec ? pyramidOfCupSpec(spec, game.season.season.competitions) : undefined) ?? focusPyramid(game.season)
+  return seasonLabelOf(game, pyramid, year)
+}
+
+/** Nome da temporada atual do país de uma liga. */
+export const competitionSeasonLabel = (game: Game, competition: Pick<Competition, 'pyramid'>): string => seasonLabel(cycleOfPyramid(game.season, competition.pyramid ?? 'default'))
+
+/** Nome de uma temporada passada (ou da atual) de um país, a partir do ano em que ela começou. */
+export const seasonLabelOf = (game: Game, pyramid: string, year: number): string => seasonLabel({ year, split: game.season.cycles[pyramid]?.split ?? false })
 
 export function userCompetition(game: Game): Competition {
   return game.season.season.competitions.find((c) => c.teamIds.includes(game.userTeamId)) as Competition

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { cupMatches, cupStatus, groupTables, leaguePhaseTable, stageList, tiesOfStage } from '../../../engine/cups'
 import type { TieView } from '../../../engine/cups'
 import type { Cup, Match, StandingRow } from '../../../engine/types'
-import { teamById } from '../../../store/game'
+import { seasonLabelOf, teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { formatDate } from '../../format'
 import { Tabs } from '../../components/ui'
@@ -219,7 +219,7 @@ export function Cups({ game, onTeam }: { game: Game; onTeam: (id: string) => voi
           ))}
         </div>
       )}
-      <SectionHeader icon="trophy" title={cup.name} subtitle={`${cup.year} · ${winner ? `campeão: ${shortName(winner)}` : `${cup.entrants.length} clubes`}`} tone="gold" />
+      <SectionHeader icon="trophy" title={cup.name} subtitle={`${seasonLabelOf(game, cup.pyramid ?? 'default', cup.year)} · ${winner ? `campeão: ${shortName(winner)}` : `${cup.entrants.length} clubes`}`} tone="gold" />
       <p className="text-sm text-muted" data-testid="cup-status">
         {cupStatusText(game, cup)}
       </p>

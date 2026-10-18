@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Competition } from '../../../engine/types'
-import { teamById } from '../../../store/game'
+import { seasonLabelOf, teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { ZONE_LABELS } from '../../labels'
 import type { Zone } from '../../labels'
@@ -30,10 +30,10 @@ const cols = ['J', 'V', 'E', 'D', 'GP', 'GC', 'SG'] as const
 
 /** Classificação da temporada atual ou de uma passada (seta no topo), com faixa de zona, bolinhas dos últimos 5 jogos e o seu time em destaque. */
 export function Table({ game, competition, onTeam }: { game: Game; competition: Competition; onTeam: (id: string) => void }) {
-  const years = seasonYears(game)
+  const years = seasonYears(game, competition)
   const [year, setYear] = useState(years[years.length - 1] as number)
   const index = years.indexOf(year)
-  const current = year === game.season.season.year
+  const current = year === years[years.length - 1]
   const rows = useMemo(() => standingsFor(game, competition, year), [game, competition, year])
   const matches = useMemo(() => game.season.matches.filter((m) => m.competitionId === competition.id), [game.season.matches, competition.id])
   const started = rows.some((r) => r.played > 0)
@@ -45,7 +45,7 @@ export function Table({ game, competition, onTeam }: { game: Game; competition: 
 
   return (
     <div className="space-y-3">
-      <SectionHeader icon="trophy" title="Campeonato" subtitle={`${competition.name} · temporada ${year}`} tone="gold" />
+      <SectionHeader icon="trophy" title="Campeonato" subtitle={`${competition.name} · temporada ${seasonLabelOf(game, competition.pyramid ?? 'default', year)}`} tone="gold" />
       <div className="flex items-center justify-between rounded-2xl border border-line bg-surface p-1">
         <button type="button" className="min-h-11 min-w-12 rounded-xl text-xl font-bold disabled:opacity-30" disabled={index <= 0} onClick={() => setYear(years[index - 1] as number)} aria-label="Temporada anterior">
           ‹

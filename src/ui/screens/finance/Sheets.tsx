@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FINANCE } from '../../../engine/config'
 import { bestTicketPrice, matchAttendance, summarizeLedger } from '../../../engine/finance'
 import type { FinanceCategory } from '../../../engine/types'
-import { setUserTicketPrice, userTeam } from '../../../store/game'
+import { setUserTicketPrice, userSeasonLabel, userSeasonLabelOf, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { updateGame } from '../../../store/gameStore'
 import { formatCompactMoney, formatDate, formatMoney } from '../../format'
@@ -66,8 +66,8 @@ export function SeasonBalance({ game, onClose }: { game: Game; onClose: () => vo
     <li className="flex items-center justify-between bg-surface-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
       <span>{label}</span>
       <span className="flex gap-4">
-        <span className="w-24 text-right">{game.season.season.year}</span>
-        <span className="w-24 text-right">{past ? past.year : '–'}</span>
+        <span className="w-24 text-right">{userSeasonLabel(game)}</span>
+        <span className="w-24 text-right">{past ? userSeasonLabelOf(game, past.year) : '–'}</span>
       </span>
     </li>
   )

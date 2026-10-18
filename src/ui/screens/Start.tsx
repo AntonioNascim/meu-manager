@@ -56,7 +56,7 @@ export function Start() {
   }
 
   const remove = async (summary: SaveSummary) => {
-    if (!window.confirm(`Excluir o save do espaço ${summary.slot} (${summary.teamName}, temporada ${summary.year})? Isso não pode ser desfeito.`)) return
+    if (!window.confirm(`Excluir o save do espaço ${summary.slot} (${summary.teamName}, temporada ${summary.label ?? summary.year})? Isso não pode ser desfeito.`)) return
     await deleteSlot(summary.slot)
     await refresh()
   }
@@ -80,7 +80,7 @@ export function Start() {
     if (imported === null) return
     try {
       const summary = await importSave(imported, slot)
-      setMessage(`Save de ${summary.teamName} (temporada ${summary.year}) importado para o espaço ${slot}.`)
+      setMessage(`Save de ${summary.teamName} (temporada ${summary.label ?? summary.year}) importado para o espaço ${slot}.`)
       setImported(null)
       await refresh()
     } catch (e) {

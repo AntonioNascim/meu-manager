@@ -70,7 +70,7 @@ function SeasonReport({ game, report }: { game: Game; report: OffseasonReport })
   const youth = report.youth[game.userTeamId] ?? 0
   const reputation = report.reputationChanges[game.userTeamId]
   return (
-    <Card title={`Temporada ${report.year} encerrada`}>
+    <Card title={`Temporada ${report.label ?? report.year} encerrada`}>
       <ul className="space-y-1 text-sm">
         {report.champions.map((id, i) => <li key={id}>Campeão da {tierName(game, i + 1)}: <b>{name(id)}</b></li>)}
         <li className="text-win">Subiram: {report.promoted.map(name).join(', ')}</li>

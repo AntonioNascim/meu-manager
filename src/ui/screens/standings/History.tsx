@@ -1,5 +1,5 @@
 import type { Game } from '../../../store/game'
-import { teamById, tierName } from '../../../store/game'
+import { cupSeasonLabel, teamById, tierName } from '../../../store/game'
 import { Icon, Panel } from '../../theme'
 import { SectionHeader, TeamLink, shortName } from './parts'
 
@@ -19,7 +19,7 @@ export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => 
           <ul className="mt-2 space-y-1 text-sm" data-testid="cup-history">
             {cupChampions.map((c) => (
               <li key={`${c.cup}-${c.year}`} className="flex items-center gap-2">
-                <span className="w-10 shrink-0 text-xs text-muted">{c.year}</span>
+                <span className="w-14 shrink-0 text-xs text-muted">{cupSeasonLabel(game, c.cup, c.year)}</span>
                 <span className="w-32 shrink-0 truncate text-xs text-muted">{c.name}</span>
                 <TeamLink team={name(c.winnerId)} onOpen={onTeam} className="font-bold" />
               </li>
@@ -31,7 +31,7 @@ export function History({ game, onTeam }: { game: Game; onTeam: (id: string) => 
       {log.map((s) => (
         <Panel key={s.year} className="p-4">
           <div className="flex items-baseline justify-between">
-            <h3 className="title text-3xl">{s.year}</h3>
+            <h3 className="title text-3xl">{s.label ?? s.year}</h3>
             <span className="text-xs font-bold text-accent">
               Seu time: {s.userPosition}º na {tierName(game, s.userTier)}
             </span>
