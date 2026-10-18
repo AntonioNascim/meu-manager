@@ -732,6 +732,31 @@ Cada país passa a ter a sua temporada, com um relógio de mundo só.
 
 **Correções no caminho.** Os laços "simular a temporada e virar" de testes e ferramentas supunham um calendário só; num mundo misto, `simulateToSeasonEnd` + `advanceSeason` deixa os jogos do país que já virou no passado. `simulateLeagueYears`, `packageYears` e o teste do pacote de 15 ligas usam agora `advanceUntil` com `turn`. `advanceUntil` não guarda os jogos do caminho (guardá-los estourou a pilha e acumulava anos de partidas). O mercado não trava mais num evento que o relógio já passou. Ajustes de teste: o treino Leve poupa menos condição (+0,76 contra o Normal) porque as pausas dão descanso a todos; o teste de campeão simplificado × completo usa 8 mundos.
 
+## 20. Fase 3, parte 3C: copas continentais (estado em 18/10/2026)
+
+O motor, o formato e as ferramentas das copas continentais estão descritos em `CLAUDE.md` (parte 3C) e em `docs/formato-pacote.md`. Esta seção guarda o **estado do equilíbrio** na branch `continentais`, para retomar depois.
+
+**Já calibrado**
+- **Premiação continental:** média de ~5% da receita dos clubes que jogam (máximo ~40% de um clube pequeno).
+- **Clubes fora do foco:** os 5 maiores de cada liga negociam sempre (`MARKET.rotation.alwaysActiveTop`); sem isso o país do técnico levava vantagem. Ferramenta `engineBias` confere o motor completo contra o simplificado.
+- **Inglaterra e Espanha (seção 21):** a Inglaterra ganhava a copa principal europeia (14 a 17 títulos em 20 edições). A causa era a economia de `COUNTRY_DEFAULTS` (a do pacote de teste vale na simulação; `scaleWorld.ts` só dá a força inicial). Valores atuais, iguais em `leagueDefaults.ts`, `scaleWorld.ts` e `formato-pacote.md`: Inglaterra receita 3,6 e nível 7 (`repCurve` 1,7); Espanha 3,4 e 7,4 (`repCurve` 2,0). Resultado em 20 edições (foco Inglaterra): `cont-eu-1` Inglaterra 8, Espanha 8, Itália 2, Alemanha 1, França 1; a Inglaterra segue mais forte nas secundárias (`cont-eu-2` 9, `cont-eu-3` 10). `npm test`: 803 testes passam com esses valores.
+- **Ferramenta nova:** `node --expose-gc tools/run.mjs topClubs --years 10` (força dos 6 maiores clubes de cada país europeu, no início e depois de N anos).
+
+**Metas do `tests/long/world282.test.ts`** (30 temporadas, 282 clubes; todas as checagens são `expect.soft`, então uma rodada mostra todas as falhas)
+- Cada copa continental: pelo menos 27 edições, mais de 40% de campeões diferentes, **no máximo 20% dos títulos para um clube** (não afrouxar: o maior campeão real tem ~13%), no máximo 2 seguidos.
+- `cont-eu-1`: nenhum país com 70% ou mais (a meta combinada é ~40%; a checagem ainda não foi apertada).
+- `cont-sa-1` (Libertadores): **Brasil de 50% a 75%, Argentina de 15% a 30% e em segundo, os outros países somando pelo menos 5%**.
+- Dinheiro continental: média abaixo de 8% da receita, máximo abaixo de 50%; título dá reputação (média entre 0 e 1,5).
+
+**Medições pesadas na nuvem.** O computador de desenvolvimento não aguenta as medições longas (o Claude Code as interrompeu várias vezes por falta de memória). O workflow `.github/workflows/medicao.yml` ("Medições pesadas", `workflow_dispatch`, também na `main` para aparecer na aba Actions) roda no GitHub: `continentais` (sementes separadas por vírgula, uma execução paralela por semente; anos e foco), `test-long`, `ligas` ou `personalizada` (qualquer ferramenta de `tools/`). Escolha a branch `continentais` em "Use workflow from"; o resultado vai para o resumo da execução e para Artifacts (30 dias). **O workflow ainda não foi rodado nem validado no GitHub** (o YAML foi conferido só à mão).
+
+**O que falta**
+1. Rodar `continentais` com a semente 23 (e outras) pelo workflow, Brasil como foco, 30 anos. Já medido aqui (30 anos, Brasil como foco), `cont-sa-1`: semente 7 → Brasil 83%, Argentina 13%, outros 3% (fora da meta); semente 11 → Brasil 67%, Argentina 17%, outros 17% (dentro). Maior clube: 4 títulos (13%) nas duas.
+2. **Ajustar o domínio do Brasil e a força da Argentina** na `cont-sa-1`, como se fez com a Inglaterra: ver primeiro os clubes de topo de cada país (adaptar `topClubs` para a América do Sul), a economia de `COUNTRY_DEFAULTS` (Brasil sem `economy`, receita 1; Argentina 0,6 / −1) e a repartição das vagas (raiz da receita). Lembrar de mudar `leagueDefaults.ts` e `scaleWorld.ts` juntos.
+3. Entender os 7 títulos de um clube sul-americano (23%) que reprovaram o `test:long`: `continentalRun` usa outra semente de simulação (`createSeason` com a semente passada) que o teste (`years-7`), então as duas medições não são iguais; o workflow `test-long` mostra o que o teste vê.
+4. Decidir se aperta a checagem da `cont-eu-1` para perto de 40% e se a Inglaterra com 45% das três copas europeias é aceitável.
+5. Só depois de 1 a 4, rodar o `test:long` **uma vez** (pelo workflow), com os números finais, e registrar o resultado aqui e na seção 21.
+
 ## 21. Equilíbrio das copas europeias: Inglaterra e Espanha (medições em andamento)
 
 **Problema.** Na copa principal europeia (`cont-eu-1`), a Inglaterra ganhava a maior parte dos títulos e a Espanha quase nenhum (1 em 30 temporadas no teste de longo prazo). Meta: distribuição variada, nenhum país acima de ~40% dos títulos (na vida real, nas últimas 20 edições, a Espanha ganhou mais que a Inglaterra, e Itália e Alemanha também ganharam).
