@@ -195,3 +195,34 @@ describe('uma temporada com as cinco copas (mundo de 282 clubes)', () => {
     expect(continental.every((m) => [2, 3, 4].includes(weekday(m.date)))).toBe(true)
   })
 })
+
+describe('telas das copas continentais', () => {
+  const top = world.competitions!.find((c) => c.id === 'br-1')!.teams.reduce((a, b) => (b.reputation > a.reputation ? b : a))
+
+  it('o caminho do seu time aparece no painel e na partida; a Tabela lista a copa continental', async () => {
+    const { createElement } = await import('react')
+    const { renderToStaticMarkup } = await import('react-dom/server')
+    const { advanceGame, createGame, finishPendingMatch, playPendingAuto } = await import('../src/store/game')
+    const { Dashboard } = await import('../src/ui/screens/Dashboard')
+    const { MatchScreen } = await import('../src/ui/screens/Match')
+    const { Standings } = await import('../src/ui/screens/Standings')
+    const { clearLive, beginLive } = await import('../src/store/liveMatch')
+    let game = createGame(7, top.id, { world })
+    game = { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === top.id ? { ...t, objective: { targetPosition: 20, sackingPosition: 20 } } : t)) } }
+    for (let i = 0; i < 200 && !(game.pendingUserMatch?.competitionId === 'cont-sa-1'); i++) game = game.pendingUserMatch ? playPendingAuto(game) : advanceGame(game)
+    expect(game.pendingUserMatch?.competitionId).toBe('cont-sa-1')
+    const noop = () => {}
+    const screen = renderToStaticMarkup(createElement(MatchScreen, { game, onNavigate: noop }))
+    expect(screen).toContain('Copa Continental dos Campeões da América do Sul')
+    clearLive()
+    const live = beginLive(game)
+    live.match.playUntil(120)
+    game = finishPendingMatch(game, live.match.result())
+    const panel = renderToStaticMarkup(createElement(Dashboard, { game, onNavigate: noop }))
+    expect(panel).toContain('Copa Continental dos Campeões da América do Sul')
+    expect(panel).toContain('Caminho:')
+    const table = renderToStaticMarkup(createElement(Standings, { game, initialSection: 'cups' }))
+    expect(table).toContain('Copa Continental dos Campeões da América do Sul')
+    expect(table).toContain('Chaveamento')
+  }, 600_000)
+})

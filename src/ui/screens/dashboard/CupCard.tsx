@@ -4,6 +4,7 @@ import type { Game } from '../../../store/game'
 import { formatDate } from '../../format'
 import { Eyebrow, Panel } from '../../theme'
 import { cupStatusText } from '../standings/Cups'
+import { CupPathLine } from '../standings/CupPath'
 import { matchLabel } from '../../../engine/cups'
 
 /** Copas em que o seu time joga: onde está em cada uma e o próximo jogo de copa. Não aparece se ele não está em nenhuma. */
@@ -25,6 +26,7 @@ export function CupCard({ game, onOpen }: { game: Game; onOpen: () => void }) {
           <li key={cup.id}>
             <div className="title text-2xl">{cup.name}</div>
             <div className="text-sm text-muted">{cupStatusText(game, cup)}</div>
+            <CupPathLine game={game} cupId={cup.id} className="mt-0.5" />
           </li>
         ))}
       </ul>

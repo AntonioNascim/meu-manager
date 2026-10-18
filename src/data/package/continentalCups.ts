@@ -229,9 +229,10 @@ export function defaultContinentalCups(region: Region, leagues: readonly Contine
   return undefined
 }
 
-/** Região e receita de um país quando o pacote não diz (os padrões do jogo). */
+/** O continente de um país (o Brasil, de janelas próprias, conta como América do Sul); `region` é o que o pacote diz, senão o padrão do país. */
 export function countryRegion(country: string, region?: Region): Region | undefined {
-  return region ?? COUNTRY_DEFAULTS[country as Nationality]?.region
+  const r = region ?? COUNTRY_DEFAULTS[country as Nationality]?.region
+  return r === 'BR' ? 'SA' : r
 }
 export function countryRevenue(country: string, revenue?: number): number {
   return revenue ?? COUNTRY_DEFAULTS[country as Nationality]?.economy?.revenue ?? 1

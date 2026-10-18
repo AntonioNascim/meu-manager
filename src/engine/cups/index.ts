@@ -19,6 +19,7 @@ import { isContinental, stageList } from './plan'
 import { cupMatches, groupTables, leaguePhaseTable, tiesOfStage } from './tie'
 
 export * from './plan'
+export * from './path'
 export * from './tie'
 export { resolveEntrants } from './entrants'
 
@@ -462,8 +463,9 @@ function rankInLeague(matches: readonly Match[], teamId: TeamId): number {
 export function matchLabel(state: Pick<SeasonState, 'cups' | 'season'>, match: Pick<Match, 'competitionId' | 'round' | 'cup'>): { competition: string; detail: string } {
   if (match.cup) {
     const cup = state.cups?.find((c) => c.id === match.competitionId)
-    const stage = cup ? stageList(cup.spec)[match.cup.stage]?.name : undefined
-    const leg = match.cup.leg === 2 ? ' · volta' : match.cup.leg === 1 && cup?.spec.stages.some((s) => s.name === stage && s.legs === 2) ? ' · ida' : ''
+    const descriptor = cup ? stageList(cup.spec)[match.cup.stage] : undefined
+    const stage = descriptor?.name
+    const leg = match.cup.leg === 2 ? ' · volta' : match.cup.leg === 1 && descriptor?.legs === 2 ? ' · ida' : ''
     const group = match.cup.kind === 'group' ? ` · Grupo ${String.fromCharCode(64 + (match.cup.group ?? 1))}` : ''
     return { competition: cup?.name ?? match.competitionId, detail: `${stage ?? ''}${group}${leg}` }
   }
