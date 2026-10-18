@@ -224,25 +224,23 @@ export function advanceUntil(state: SeasonState, date: IsoDate, options: Advance
   let current = state
   const turned: TurnRecord[] = []
   const notices: MarketNotice[] = []
-  const played: Match[] = []
+  // Os jogos jogados no caminho não são guardados (seriam anos de partidas na memória): quem precisa deles consulta `state.matches`.
   while (current.season.currentDate < date) {
     const step = stepWorld(current, options, date)
     current = step.state
-    turned.push(...(step.turned ?? []))
-    notices.push(...step.notices)
-    played.push(...step.played)
-    if (step.pendingUserMatch) return { ...step, played, notices, turned }
+    for (const t of step.turned ?? []) turned.push(t)
+    for (const n of step.notices) notices.push(n)
+    if (step.pendingUserMatch) return { ...step, played: [], notices, turned }
   }
   // Os países da IA que chegaram ao último dia exatamente em `date` viram agora.
   const due = runDueTurns(current, options)
-  return { state: due.state, event: { type: 'market', date }, played, notices, turned: [...turned, ...due.turned] }
+  return { state: due.state, event: { type: 'market', date }, played: [], notices, turned: [...turned, ...due.turned] }
 }
 
 function stepWorld(state: SeasonState, options: AdvanceOptions, limit?: IsoDate): AdvanceResult {
   let current = state
   const notices: MarketNotice[] = []
   const turned: TurnRecord[] = []
-  const played: Match[] = []
   for (;;) {
     const due = runDueTurns(current, options)
     current = due.state
@@ -272,14 +270,14 @@ function stepWorld(state: SeasonState, options: AdvanceOptions, limit?: IsoDate)
     if (matchEvent.type === 'matchday' && matchEvent.date === date) {
       const day = playMatchday(current, date, options, notices)
       current = day.state
-      played.push(...day.played)
-      if (limit === undefined || day.pendingUserMatch) return { ...day, played, ...(turned.length > 0 ? { turned } : {}) }
-      if (current.season.currentDate >= limit) return { state: current, event: day.event, played, notices, ...(turned.length > 0 ? { turned } : {}) }
+      
+      if (limit === undefined || day.pendingUserMatch) return { ...day, ...(turned.length > 0 ? { turned } : {}) }
+      if (current.season.currentDate >= limit) return { state: current, event: day.event, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
       continue
     }
     // Dia sem jogos (mercado, fim de contrato, último dia da temporada de um país): para só se há novidade para o jogador.
     if (limit !== undefined) {
-      if (date >= limit) return { state: current, event: { type: 'market', date }, played, notices, ...(turned.length > 0 ? { turned } : {}) }
+      if (date >= limit) return { state: current, event: { type: 'market', date }, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
       continue
     }
     if (notices.length > 0) return { state: current, event: { type: 'market', date }, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }

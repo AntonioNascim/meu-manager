@@ -1,0 +1,31 @@
+
+> meu-manager@0.1.0 test:long
+> vitest run --project long
+
+
+ RUN  v5.0.3 C:/Users/Ana Kerolly/Downloads/projetos/projetosmeumanager
+
+ ❯ |long| tests/long/world282.test.ts (5 tests | 5 skipped) 807395ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |long| tests/long/world282.test.ts > 30 temporadas no mundo de 282 clubes
+RangeError: Maximum call stack size exceeded
+ ❯ advanceUntil src/engine/season/advance.ts:233:12
+    231|     turned.push(...(step.turned ?? []))
+    232|     notices.push(...step.notices)
+    233|     played.push(...step.played)
+       |            ^
+    234|     if (step.pendingUserMatch) return { ...step, played, notices, turn…
+    235|   }
+ ❯ simulateLeagueYears tools/leagueYears.ts:198:3
+ ❯ tests/long/world282.test.ts:23:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 skipped (5)
+   Start at  00:05:14
+   Duration  810.13s (tests 100%)
+
