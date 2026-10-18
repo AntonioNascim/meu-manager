@@ -264,6 +264,7 @@ Os testes de balanceamento (`tests/balance/`) simulam milhares de partidas e tem
   - `npm test`: testes rápidos (regras, geração, consistência do motor), de ~5 s a ~20 s conforme a carga da máquina.
   - `npm run test:balance`: balanceamento e experimentos estatísticos (milhares de partidas, 20 temporadas inteiras, estilos e formações; de ~1,5 a ~5 min). Obrigatório depois de mexer em `config.ts`, no motor de partida ou na geração.
   - `npm run test:all`: os dois.
+  - **Medições pesadas (`npm run test:long`, `continentalRun`, `leagueRun`) não cabem na memória do PC de desenvolvimento:** rode pelo workflow `Medições pesadas` (aba Actions › Run workflow, `.github/workflows/medicao.yml`), que guarda o resultado para baixar (`docs/fase2-proposta.md`, seção 21).
   - `npm run analyze`: ferramenta de análise (`tools/analyze.ts`, fora do jogo e dos testes) que imprime posição e pontos por faixa de força nas duas séries (`bands`), estilos com elencos equivalentes (`styles`) e vantagem do mandante por série e ocupação (`home`) e a tabela ano a ano de várias temporadas seguidas com virada (`years`). Ex.: `npm run analyze -- bands --seasons 40`, `npm run analyze -- years --years 10 --seed 41`, `npm run analyze -- home --matches 6000`. Use depois de mexer em `config.ts`, no motor ou na geração.
 - Interface pensada primeiro para celular.
 

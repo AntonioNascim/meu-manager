@@ -136,11 +136,25 @@ ${formatDynasties(runs)}
       expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(0.2)
       expect.soft(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
     }
-    // Nenhum país leva quase tudo da copa principal europeia ou da sul-americana (a Inglaterra e o Brasil têm mais vagas e clubes mais fortes).
-    for (const cup of ['cont-eu-1', 'cont-sa-1']) {
-      const list = continental.editions.filter((e) => e.cup === cup)
+    // Nenhum país leva quase tudo da copa principal europeia (a Inglaterra tem mais vagas e clubes mais fortes).
+    {
+      const list = continental.editions.filter((e) => e.cup === 'cont-eu-1')
       const best = Math.max(...countBy(list.map((e) => e.winnerPyramid)).values())
-      expect.soft(best / list.length, `${cup} fatia do país que mais ganha`).toBeLessThan(0.7)
+      expect.soft(best / list.length, 'cont-eu-1 fatia do país que mais ganha').toBeLessThan(0.7)
+    }
+    // Copa principal sul-americana, como a Libertadores real (os clubes brasileiros ganharam mais da metade das últimas 30 edições): o Brasil
+    // fica entre 50% e 75%, a Argentina em segundo com 15% a 30% e os outros países ganham de vez em quando.
+    {
+      const list = continental.editions.filter((e) => e.cup === 'cont-sa-1')
+      const byCountry = countBy(list.map((e) => e.winnerPyramid))
+      const share = (country: string) => (byCountry.get(country) ?? 0) / list.length
+      const others = [...byCountry].filter(([country]) => country !== 'Brazil' && country !== 'Argentina').reduce((sum, [, n]) => sum + n, 0) / list.length
+      expect.soft(share('Brazil'), 'cont-sa-1 fatia do Brasil').toBeGreaterThanOrEqual(0.5)
+      expect.soft(share('Brazil'), 'cont-sa-1 fatia do Brasil').toBeLessThanOrEqual(0.75)
+      expect.soft(share('Argentina'), 'cont-sa-1 fatia da Argentina').toBeGreaterThanOrEqual(0.15)
+      expect.soft(share('Argentina'), 'cont-sa-1 fatia da Argentina').toBeLessThanOrEqual(0.3)
+      expect.soft(share('Argentina'), 'cont-sa-1 a Argentina é a segunda').toBeGreaterThanOrEqual(Math.max(0, ...[...byCountry].filter(([c]) => c !== 'Brazil' && c !== 'Argentina').map(([c]) => share(c))))
+      expect.soft(others, 'cont-sa-1 fatia dos outros países').toBeGreaterThanOrEqual(0.05)
     }
     const shares = continental.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
     expect.soft(mean(shares), 'dinheiro continental / receita (média)').toBeLessThan(0.08)

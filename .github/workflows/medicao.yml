@@ -1,0 +1,143 @@
+name: Medições pesadas
+
+# Roda à mão pela aba Actions (Run workflow), na branch escolhida em "Use workflow from". Serve para as medições que não cabem na
+# memória do computador de desenvolvimento. O resultado aparece no resumo da execução e fica para baixar em "Artifacts" (30 dias).
+on:
+  workflow_dispatch:
+    inputs:
+      medicao:
+        description: Qual medição rodar
+        type: choice
+        required: true
+        default: continentais
+        options:
+          - continentais
+          - test-long
+          - ligas
+          - personalizada
+      sementes:
+        description: "continentais: sementes separadas por vírgula (uma execução em paralelo para cada)"
+        type: string
+        default: "23"
+      anos:
+        description: "continentais e ligas: temporadas simuladas"
+        type: string
+        default: "30"
+      foco:
+        description: "continentais: país jogado lance a lance (nome em inglês)"
+        type: string
+        default: Brazil
+      ferramenta:
+        description: "personalizada: nome da ferramenta em tools/ (ex.: topClubs)"
+        type: string
+        default: ""
+      argumentos:
+        description: "personalizada: argumentos da ferramenta (ex.: --years 10 --seed 7)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    env:
+      MEDICAO: ${{ inputs.medicao }}
+      SEMENTES: ${{ inputs.sementes }}
+      ANOS: ${{ inputs.anos }}
+      FOCO: ${{ inputs.foco }}
+      FERRAMENTA: ${{ inputs.ferramenta }}
+      ARGUMENTOS: ${{ inputs.argumentos }}
+    steps:
+      # Os valores digitados vão para variáveis de ambiente (nunca direto no comando) e são conferidos antes de qualquer coisa rodar.
+      - id: matrix
+        run: |
+          [[ "$ANOS" =~ ^[0-9]{1,2}$ ]] || { echo "anos inválido: $ANOS"; exit 1; }
+          [[ "$FOCO" =~ ^[A-Za-z]+$ ]] || { echo "foco inválido: $FOCO"; exit 1; }
+          if [ "$MEDICAO" = "personalizada" ]; then
+            [[ "$FERRAMENTA" =~ ^[A-Za-z0-9]+$ ]] || { echo "ferramenta inválida: $FERRAMENTA"; exit 1; }
+            [[ "$ARGUMENTOS" =~ ^[A-Za-z0-9\ ._,=:-]*$ ]] || { echo "argumentos inválidos: $ARGUMENTOS"; exit 1; }
+          fi
+          if [ "$MEDICAO" = "continentais" ]; then
+            [[ "$SEMENTES" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "sementes inválidas: $SEMENTES"; exit 1; }
+            echo "matrix={\"semente\":[\"${SEMENTES//,/\",\"}\"]}" >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix={"semente":["-"]}' >> "$GITHUB_OUTPUT"
+          fi
+
+  medir:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      MEDICAO: ${{ inputs.medicao }}
+      SEMENTE: ${{ matrix.semente }}
+      ANOS: ${{ inputs.anos }}
+      FOCO: ${{ inputs.foco }}
+      FERRAMENTA: ${{ inputs.ferramenta }}
+      ARGUMENTOS: ${{ inputs.argumentos }}
+      # A máquina do GitHub tem 16 GB; o padrão do Node limita o heap bem abaixo disso.
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Medir
+        run: |
+          set -o pipefail
+          mkdir -p resultado
+          echo "Branch: $GITHUB_REF_NAME ($GITHUB_SHA)" | tee resultado/cabecalho.txt
+          case "$MEDICAO" in
+            continentais)
+              echo "Copas continentais: semente $SEMENTE, $ANOS anos, foco $FOCO" | tee -a resultado/cabecalho.txt
+              node --expose-gc tools/run.mjs continentalRun --years "$ANOS" --seed "$SEMENTE" --focus "$FOCO" | tee "resultado/continentais-semente-$SEMENTE.txt"
+              ;;
+            test-long)
+              npm run test:long 2>&1 | tee resultado/test-long.txt
+              ;;
+            ligas)
+              node --expose-gc tools/run.mjs leagueRun --clubs 282 --years "$ANOS" | tee resultado/ligas.txt
+              ;;
+            personalizada)
+              # Sem aspas de propósito: os argumentos já foram conferidos (só letras, números e . _ , = : -).
+              node --expose-gc tools/run.mjs "$FERRAMENTA" $ARGUMENTOS | tee "resultado/$FERRAMENTA.txt"
+              ;;
+          esac
+
+      # O test:long grava os relatórios completos em node_modules/.cache, inclusive quando falha.
+      - name: Juntar relatórios do test:long
+        if: always() && inputs.medicao == 'test-long'
+        run: |
+          mkdir -p resultado
+          cp node_modules/.cache/world282.txt node_modules/.cache/continental282.txt resultado/ || true
+
+      - name: Resumo na página da execução
+        if: always()
+        run: |
+          {
+            echo "## ${MEDICAO} (semente ${SEMENTE})"
+            echo '```'
+            tail -c 60000 resultado/*.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: medicao-${{ inputs.medicao }}-semente-${{ matrix.semente }}
+          path: resultado/
+          retention-days: 30
+          if-no-files-found: warn
