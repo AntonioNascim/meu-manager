@@ -11,6 +11,8 @@ import { dynastiesOf, formatDynasties, formatTrend, simulateLeagueYears } from '
 import type { LeagueRun, LeagueYear } from '../../tools/leagueYears'
 
 const YEARS = 30
+/** Calendários reais: as ligas europeias atravessam o ano (agosto a maio) e as outras jogam no ano civil. */
+const calendars = <T extends { region?: string }>(list: T[]): T[] => list.map((c) => (c.region === 'EU' ? { ...c, split: true, start: [8, 8] as [number, number] } : c))
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1)
 
 describe(`${YEARS} temporadas no mundo de 282 clubes`, () => {
@@ -18,7 +20,7 @@ describe(`${YEARS} temporadas no mundo de 282 clubes`, () => {
   let ids: string[] = []
   beforeAll(() => {
     const world = buildScaleWorld(FULL_WORLD, 7)
-    runs = simulateLeagueYears({ year: 2026, seed: 'years-7', teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions, focus: 'br' }, YEARS)
+    runs = simulateLeagueYears({ year: 2026, seed: 'years-7', teams: world.teams, players: world.players, academy: world.academy, competitions: calendars(world.competitions), focus: 'br' }, YEARS)
     console.log(`\n${world.teams.length} clubes, ${YEARS} anos\n${formatTrend(runs)}\n\n${formatDynasties(runs)}`)
     // O vitest só mostra o console quando o teste falha: o relatório também vai para um arquivo.
     mkdirSync('node_modules/.cache', { recursive: true })
