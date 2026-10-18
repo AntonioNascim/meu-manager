@@ -10,8 +10,8 @@ import { marketValue } from '../src/engine/market/value'
 import { expectedAnnualRevenue } from '../src/engine/finance'
 import { advanceSeason } from '../src/engine/offseason'
 import { playerOverall } from '../src/engine/overall'
-import { createSeason, simulateToSeasonEnd } from '../src/engine/season'
-import type { CompetitionSetup, SeasonState } from '../src/engine/season'
+import { advanceUntil, createSeason, cycleOfPyramid, pyramidOf } from '../src/engine/season'
+import type { CompetitionSetup, SeasonState, TurnRunner } from '../src/engine/season'
 import type { CupSpec, Player, Team } from '../src/engine/types'
 import { lowestBalance } from './longRun'
 
@@ -79,52 +79,78 @@ function revenueOf(t: Team): number {
 }
 const sumOf = (t: Team, category: string, sign: 1 | -1) => t.finances.ledger.filter((e) => e.category === category && e.amount * sign > 0).reduce((s, e) => s + e.amount * sign, 0)
 
-export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[] {
-  let state: SeasonState = createSeason({ year: init.year, seed: init.seed, teams: init.teams, players: init.players, academy: init.academy, ...(init.competitions ? { competitions: init.competitions } : {}), ...(init.focus !== undefined ? { focus: init.focus } : {}), ...(init.cupSpecs ? { cupSpecs: init.cupSpecs } : {}) })
-  const runs: LeagueRun[] = []
-  for (let i = 0; i < years; i++) {
-    const byId = new Map(state.players.map((p) => [p.id, p]))
-    const leagueOf = new Map<string, string>()
-    for (const c of state.season.competitions) for (const id of c.teamIds) leagueOf.set(id, c.id)
-    const top40 = new Map<string, number>()
-    for (const p of [...state.players].filter((x) => x.teamId).sort((a, b) => playerOverall(b) - playerOverall(a)).slice(0, 40)) {
-      const l = leagueOf.get(p.teamId as string) as string
-      top40.set(l, (top40.get(l) ?? 0) + 1)
-    }
-    const strengthOf = (t: Team) => mean(t.tactic.startingXI.map((id) => playerOverall(byId.get(id) as Player)))
-    const teamOf = new Map(state.teams.map((t) => [t.id, t]))
-    const startStrength = new Map(state.season.competitions.map((c) => [c.id, mean(c.teamIds.map((id) => strengthOf(teamOf.get(id) as Team)))]))
-    const startRep = new Map(state.season.competitions.map((c) => [c.id, mean(c.teamIds.map((id) => (teamOf.get(id) as Team).reputation))]))
+/** O que se mede no começo da temporada de um país (e fica guardado até a virada dele). */
+interface Start {
+  date: string
+  from: string
+  teamOf: Map<string, Team>
+  leagueOf: Map<string, string>
+  top40: Map<string, number>
+  strength: Map<string, number>
+  reputation: Map<string, number>
+  squads: Map<string, Player[]>
+  players: readonly Player[]
+}
 
-    const clubsOf = new Map(state.season.competitions.map((c) => [c.id, new Set(c.teamIds)]))
-    const squadOf = (id: string) => state.players.filter((p) => p.teamId && clubsOf.get(id)?.has(p.teamId))
-    const squads = new Map(state.season.competitions.map((c) => [c.id, squadOf(c.id)]))
+/** Foto do começo da temporada das ligas de uma pirâmide (ou de todas, sem `pyramid`). */
+function beginSeason(state: SeasonState, pyramid?: string): Start {
+  const mine = state.season.competitions.filter((c) => pyramid === undefined || pyramidOf(c) === pyramid)
+  const byId = new Map(state.players.map((p) => [p.id, p]))
+  const leagueOf = new Map<string, string>()
+  for (const c of state.season.competitions) for (const id of c.teamIds) leagueOf.set(id, c.id)
+  const top40 = new Map<string, number>()
+  for (const p of [...state.players].filter((x) => x.teamId).sort((a, b) => playerOverall(b) - playerOverall(a)).slice(0, 40)) {
+    const l = leagueOf.get(p.teamId as string) as string
+    top40.set(l, (top40.get(l) ?? 0) + 1)
+  }
+  const strengthOf = (t: Team) => mean(t.tactic.startingXI.map((id) => playerOverall(byId.get(id) as Player)))
+  const teamOf = new Map(state.teams.map((t) => [t.id, t]))
+  const squads = new Map<string, Player[]>()
+  for (const c of mine) {
+    const ids = new Set(c.teamIds)
+    squads.set(c.id, state.players.filter((p) => p.teamId && ids.has(p.teamId)))
+  }
+  return {
+    date: state.season.currentDate,
+    from: pyramid === undefined ? state.season.currentDate : cycleOfPyramid(state, pyramid).start,
+    teamOf,
+    leagueOf,
+    top40,
+    strength: new Map(mine.map((c) => [c.id, mean(c.teamIds.map((id) => strengthOf(teamOf.get(id) as Team)))])),
+    reputation: new Map(mine.map((c) => [c.id, mean(c.teamIds.map((id) => (teamOf.get(id) as Team).reputation))])),
+    squads,
+    players: state.players,
+  }
+}
 
-    const ended = simulateToSeasonEnd(state, { market: true })
-    const endedTeams = new Map(ended.teams.map((t) => [t.id, t]))
-    const signed = new Map<string, number>()
-    const sold = new Map<string, number>()
-    for (const h of ended.market.history) {
-      if (h.kind !== 'purchase') continue
-      const to = leagueOf.get(h.toTeamId)
-      const from = h.fromTeamId ? leagueOf.get(h.fromTeamId) : undefined
-      if (!to || !from || to === from) continue
-      signed.set(to, (signed.get(to) ?? 0) + 1)
-      sold.set(from, (sold.get(from) ?? 0) + 1)
-    }
-    const leagues: LeagueYear[] = ended.season.competitions.map((c) => {
+/** As medidas das ligas de uma pirâmide no último dia da temporada dela (`ended`), com a foto do começo (`start`). */
+function measureLeagues(ended: SeasonState, start: Start, pyramid: string): LeagueYear[] {
+  const endedTeams = new Map(ended.teams.map((t) => [t.id, t]))
+  const signed = new Map<string, number>()
+  const sold = new Map<string, number>()
+  for (const h of ended.market.history) {
+    if (h.kind !== 'purchase' || h.date < start.from) continue
+    const to = start.leagueOf.get(h.toTeamId)
+    const from = h.fromTeamId ? start.leagueOf.get(h.fromTeamId) : undefined
+    if (!to || !from || to === from) continue
+    signed.set(to, (signed.get(to) ?? 0) + 1)
+    sold.set(from, (sold.get(from) ?? 0) + 1)
+  }
+  return ended.season.competitions
+    .filter((c) => pyramidOf(c) === pyramid)
+    .map((c) => {
       const teams = c.teamIds.map((id) => endedTeams.get(id) as Team)
       const revenue = teams.map(revenueOf)
       const table = computeStandings(c.teamIds, ended.matches.filter((m) => m.competitionId === c.id))
-      const squad = squads.get(c.id) as Player[]
+      const squad = start.squads.get(c.id) as Player[]
       const payroll = teams.map((t) => ended.players.filter((p) => p.teamId === t.id).reduce((s, p) => s + p.contract.salary, 0) * 12)
       return {
         id: c.id,
         name: c.name,
         clubs: teams.length,
-        strength: startStrength.get(c.id) as number,
-        reputation: startRep.get(c.id) as number,
-        top40: top40.get(c.id) ?? 0,
+        strength: start.strength.get(c.id) as number,
+        reputation: start.reputation.get(c.id) as number,
+        top40: start.top40.get(c.id) ?? 0,
         maxBalanceYears: Math.max(...teams.map((t, k) => t.finances.balance / Math.max(1, revenue[k] as number))),
         negativeEver: teams.filter((t) => lowestBalance(t) < 0).length,
         payrollShare: mean(teams.map((_, k) => (payroll[k] as number) / Math.max(1, revenue[k] as number))),
@@ -142,14 +168,37 @@ export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[
         maxCeilingShare: Math.max(...teams.map((t) => t.finances.balance / (FINANCE.ceilingYears * expectedAnnualRevenue(t)))),
         meanCeilingShare: mean(teams.map((t) => t.finances.balance / (FINANCE.ceilingYears * expectedAnnualRevenue(t)))),
         revenueVsExpected: mean(teams.map((t, k) => (revenue[k] as number) / expectedAnnualRevenue(t))),
-        dealsPerClub: ended.market.history.filter((h) => h.kind === 'purchase' && h.fromTeamId !== null && c.teamIds.includes(h.toTeamId)).length / teams.length,
-        squadValueShare: mean(c.teamIds.map((id) => state.players.filter((p) => p.teamId === id).reduce((sum, p) => sum + marketValue(p, state.season.currentDate, teamOf.get(id) as Team), 0) / Math.max(1, (revenue[c.teamIds.indexOf(id)] as number)))),
+        dealsPerClub: ended.market.history.filter((h) => h.kind === 'purchase' && h.fromTeamId !== null && h.date >= start.from && c.teamIds.includes(h.toTeamId)).length / teams.length,
+        squadValueShare: mean(c.teamIds.map((id) => start.players.filter((p) => p.teamId === id).reduce((sum, p) => sum + marketValue(p, start.date, start.teamOf.get(id) as Team), 0) / Math.max(1, revenue[c.teamIds.indexOf(id)] as number))),
         stars: squad.filter((p) => playerOverall(p) >= 85).length,
       }
     })
-    runs.push({ year: ended.season.year, leagues })
-    if (i < years - 1) state = advanceSeason(ended, { createYouth }).state
+}
+
+/**
+ * Joga `years` temporadas de cada país com o relógio único do mundo: cada país vira a temporada no último dia dela (ano civil em 31/12,
+ * a que atravessa o ano em 30/6) e é medido nesse dia, antes de virar. O ano `i` de `runs` reúne a `i`-ésima temporada de cada país.
+ */
+export function simulateLeagueYears(init: LeagueInit, years: number): LeagueRun[] {
+  const state: SeasonState = createSeason({ year: init.year, seed: init.seed, teams: init.teams, players: init.players, academy: init.academy, ...(init.competitions ? { competitions: init.competitions } : {}), ...(init.focus !== undefined ? { focus: init.focus } : {}), ...(init.cupSpecs ? { cupSpecs: init.cupSpecs } : {}) })
+  const pyramids = [...new Set(state.season.competitions.map((c) => pyramidOf(c)))]
+  const starts = new Map(pyramids.map((p) => [p, beginSeason(state, p)]))
+  const runs: LeagueRun[] = Array.from({ length: years }, (_, i) => ({ year: init.year + i, leagues: [] }))
+  const done = new Map(pyramids.map((p) => [p, 0]))
+  const turn: TurnRunner = (s, pyramid) => {
+    const index = done.get(pyramid) as number
+    if (index < years) runs[index]?.leagues.push(...measureLeagues(s, starts.get(pyramid) as Start, pyramid))
+    done.set(pyramid, index + 1)
+    const turned = advanceSeason(s, { createYouth, pyramid })
+    if (index + 1 < years) starts.set(pyramid, beginSeason(turned.state, pyramid))
+    return turned
   }
+  // Até 30 de junho do ano seguinte ao último: todos os países já viraram `years` vezes (os da Europa viram em 30/6).
+  const split = state.season.competitions.some((c) => c.split)
+  advanceUntil(state, split ? `${init.year + years}-06-30` : `${init.year + years - 1}-12-31`, { market: true, turn })
+  // Mantém a ordem das ligas do mundo em cada ano.
+  const order = new Map(state.season.competitions.map((c, i) => [c.id, i]))
+  for (const run of runs) run.leagues.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
   return runs
 }
 

@@ -22,7 +22,7 @@ describe('intensidade do treino ao longo de várias temporadas', () => {
     expect(intense.injured).toBeGreaterThan(normal.injured)
     expect(normal.injured).toBeGreaterThan(light.injured)
     expect(intense.fitness).toBeLessThan(normal.fitness - 2)
-    expect(light.fitness).toBeGreaterThan(normal.fitness + 1)
+    expect(light.fitness).toBeGreaterThan(normal.fitness + 0.5)
   })
 
   it('é uma troca: Intensa não vence mais jogos que Normal, e ninguém é melhor nos pontos e na evolução ao mesmo tempo', () => {

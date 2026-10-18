@@ -16,6 +16,7 @@ import {
   simulateToSeasonEnd,
 } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
+import { simulateLeagueYears } from '../tools/leagueYears'
 import { MIGRATIONS, makeEnvelope, migrateSave } from '../src/store/saveFormat'
 import { advanceToMatchday, createGame, nextEventOf, playPendingAuto, startNextSeason } from '../src/store/game'
 import type { Game } from '../src/store/game'
@@ -186,4 +187,28 @@ describe('save versão 11', () => {
     expect(Object.keys(state.cycles).sort()).toEqual(['br', 'en', 'uy'])
     expect(state.cycles.br).toEqual({ year: 2026, start: '2026-01-01', end: '2026-12-31', split: false })
   })
+})
+
+describe('vários anos com calendários diferentes (relógio único)', () => {
+  it('cada país é medido e vira no último dia da temporada dele, `years` vezes, sem sobrar jogo no passado', () => {
+    const runs = simulateLeagueYears({ year: 2026, seed: 'ciclos', teams: built.teams, players: built.players, academy: built.academy, competitions, focus: 'br' }, 3)
+    expect(runs).toHaveLength(3)
+    for (const run of runs) {
+      expect(run.leagues.map((l) => l.id)).toEqual(['br-1', 'uy-1', 'en-1'])
+      for (const l of run.leagues) {
+        expect(l.negativeEver, l.id).toBe(0)
+        expect(l.championGames, l.id).toBeGreaterThanOrEqual(l.id === 'uy-1' ? 30 : 38)
+      }
+    }
+  }, 240_000)
+
+  it('advanceUntil com `turn` e sem técnico leva o mundo a uma data e deixa todos os países na temporada certa', () => {
+    const state = createSeason({ ...base, year: 2026 })
+    const turn = (s: SeasonState, pyramid: string) => advanceSeason(s, { createYouth, pyramid })
+    const result = advanceUntil(state, '2028-01-15', { turn })
+    expect(Object.fromEntries(Object.entries(result.state.cycles).map(([k, c]) => [k, seasonLabel(c)]))).toEqual({ br: '2028', uy: '2028', en: '2027/28' })
+    expect(result.turned?.map((t) => `${t.pyramid}:${t.label}`).sort()).toEqual(['br:2026', 'br:2027', 'en:2026/27', 'uy:2026', 'uy:2027'])
+    // Nenhum jogo ficou para trás: tudo o que está marcado é do dia do relógio em diante.
+    expect(result.state.matches.filter((m) => m.status === 'scheduled').every((m) => m.date >= result.state.season.currentDate)).toBe(true)
+  }, 240_000)
 })

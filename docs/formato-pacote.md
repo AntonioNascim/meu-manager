@@ -93,7 +93,8 @@ divisão só é uma liga **fechada** (ninguém sobe nem cai).
 | `promotion` | sim | Quantos sobem desta divisão para a de cima. **0 na divisão 1** |
 | `relegation` | sim | Quantos caem desta divisão para a de baixo. **0 na última divisão do país** |
 | `rounds` | não | `1` = turno único, `2` = turno e returno (padrão) |
-| `start` | não | `[mês, dia]` de referência da primeira rodada da liga (cai no primeiro sábado a partir daí). Padrão: 11 de abril, o calendário da liga brasileira |
+| `start` | não | `[mês, dia]` de referência da primeira rodada da liga (cai no primeiro sábado a partir daí). Padrão: o do país (tabela do calendário abaixo) |
+| `split` | não | `true` = a temporada atravessa o ano (agosto a maio; vai de 1º de julho a 30 de junho e os contratos terminam em 30/6); `false` = ano civil (1º/1 a 31/12). Padrão: o do país (Europa sim; Brasil e América do Sul não) |
 | `region` | não | Janelas de transferência: `BR` (janeiro até a véspera da 1ª rodada e julho), `SA` (janeiro a 15/3 e julho), `EU` (janeiro e julho a agosto). Padrão: a do país (ver tabela) |
 | `economy` | não | Economia da liga (ver abaixo). Padrão: a do país |
 | `foreignLimit` | não | Limite de estrangeiros (ver abaixo). Padrão: sem limite |
@@ -415,7 +416,27 @@ Quando um pacote tem um país com liga e **nenhuma copa dele** em `cups`, o jogo
 
 Simplificações: onde a copa real inclui divisões que o pacote não tem, entram só os clubes que existem, e os melhores (cabeças de chave) folgam na primeira fase para o chaveamento fechar. Na supercopa, se o campeão ou o finalista da copa já está entre os primeiros da liga, entra o próximo da liga.
 
-**Calendário.** A temporada do jogo é o ano civil, então a temporada europeia real (agosto a maio) não existe: as ligas de todos os países começam pelo calendário da liga brasileira (abril a novembro) e as copas ficam entre janeiro e outubro, cada fase na primeira quarta-feira livre. A supercopa é jogada no começo do ano. Use `start` na liga para mudar o início de uma liga.
+**Calendário.** Cada país tem a sua temporada (ver "Temporadas por país" abaixo). As copas padrão dos países europeus supõem a temporada que atravessa o ano: janeiro a junho já são do ano seguinte ao da edição (a edição "2026/27" tem a copa de novembro de 2026 a maio de 2027), cada fase na primeira quarta-feira livre. As supercopas de Espanha e Itália são no meio da temporada (janeiro e dezembro) e a da Alemanha, em agosto, antes da liga.
+
+### Temporadas por país
+
+O relógio do jogo é um só, mas **cada país tem a sua temporada**: a virada (acesso, rebaixamento, evolução, contratos, base, meta da diretoria, finanças e estatísticas), a tabela de jogos e as copas são do país e acontecem no último dia da temporada dele. A temporada aparece como "2026" (ano civil) ou "2026/27" (atravessa o ano). Os contratos terminam no último dia da temporada do clube (31/12 ou 30/6); o `endDate` de um jogador do pacote em 31/12 passa para 30/6 do mesmo ano (no mínimo o fim da primeira temporada) quando o clube é de liga `split`.
+
+| País | Temporada | Primeira rodada (a partir de) |
+|---|---|---|
+| Brasil | ano civil | 24/1 |
+| Argentina | ano civil | 7/2 |
+| Uruguai, Chile, Equador | ano civil | 14/2 |
+| Paraguai | ano civil | 31/1 |
+| Colômbia | ano civil | 24/1 |
+| Peru | ano civil | 7/2 |
+| Inglaterra, França, Portugal | 2026/27 | 8/8 |
+| Espanha | 2026/27 | 15/8 |
+| Itália, Alemanha | 2026/27 | 22/8 |
+
+Todas as ligas fazem uma semana de pausa a cada 3 rodadas de fim de semana (fim de ano, datas de seleções). O jogo começa em 1º de janeiro de `startYear` se o técnico escolhe um clube de ano civil e em 1º de julho se escolhe um clube de temporada que atravessa o ano; um país que ainda não abriu a temporada dele nessa data joga a primeira que começa depois.
+
+**Janelas de transferência por região** (cada clube segue a da região da liga dele): `BR` janeiro até a véspera da 1ª rodada e julho; `SA` janeiro a 15/3 e julho; `EU` janeiro e julho a agosto. A janela de verão europeia cai no meio da temporada brasileira.
 
 ### Validação
 

@@ -148,7 +148,7 @@ describe('temporada inteira, simplificada contra completa', () => {
   }
 
   it('campeão, empates, artilharia, cartões e a vantagem do elenco mais forte ficam parecidos', () => {
-    const worlds = [41, 42, 43, 44, 45, 46].map((seed) => generateWorld({ seed }))
+    const worlds = [41, 42, 43, 44, 45, 46, 47, 48].map((seed) => generateWorld({ seed }))
     const full = worlds.map((w) => metrics(w, 'full'))
     const quick = worlds.map((w) => metrics(w, 'quick'))
     const avg = (rows: SeasonMetrics[], key: keyof SeasonMetrics) => mean(rows.map((r) => r[key]))

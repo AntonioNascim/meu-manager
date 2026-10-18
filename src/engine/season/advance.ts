@@ -256,13 +256,15 @@ function stepWorld(state: SeasonState, options: AdvanceOptions, limit?: IsoDate)
     const marketEvent = options.market ? nextMarketEvent(current, options.userTeamId ? regionOfTeam(current, options.userTeamId) : undefined) : undefined
     // O fim do contrato de um jogador do técnico também é um dia a parar (se cair antes do próximo evento).
     const contractEnd = options.userTeamId ? nextContractEnd(current, options.userTeamId) : undefined
-    const candidates = [matchEvent.type === 'matchday' ? matchEvent.date : undefined, marketEvent?.date, contractEnd, nextTurnDate(current, options), limit].filter((d): d is IsoDate => d !== undefined && d >= current.season.currentDate)
+    // Evento do mercado que o relógio já passou (a virada de um país não passa dias): acontece hoje, para não travar os seguintes.
+    const marketDate = marketEvent && marketEvent.date < current.season.currentDate ? current.season.currentDate : marketEvent?.date
+    const candidates = [matchEvent.type === 'matchday' ? matchEvent.date : undefined, marketDate, contractEnd, nextTurnDate(current, options), limit].filter((d): d is IsoDate => d !== undefined && d >= current.season.currentDate)
     if (candidates.length === 0) {
       const season = { ...current.season, phase: phaseOfPyramid(current, focusPyramid(current)) }
       return { state: { ...current, season }, event: { type: 'season-end' }, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
     }
     const date = candidates.reduce((a, b) => (b < a ? b : a))
-    const todayMarket = marketEvent && marketEvent.date === date ? marketEvent : undefined
+    const todayMarket = marketEvent && marketDate === date ? marketEvent : undefined
 
     const passed = passDays(current, date, options, todayMarket)
     notices.push(...passed.notices)
