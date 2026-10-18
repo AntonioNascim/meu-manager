@@ -104,10 +104,25 @@ export function drawLeaguePhase(teamIds: readonly TeamId[], spec: Pick<CupLeague
       }
     }
   }
-  // Distribui em datas: cada clube joga uma vez por data.
+  return { matchdays: spreadInDays(rng.shuffle(fixtures), matchesPerTeam, rng) }
+}
+
+/**
+ * Distribui os jogos em datas, cada clube jogando uma vez por data, com o menor número de datas que der (a quantidade de jogos por clube,
+ * ou uma a mais): coloração de arestas de um grafo, com troca de cores ao longo de caminhos alternados (cadeias de Kempe) quando não há cor
+ * livre nos dois clubes. Sem isso a distribuição gulosa precisava de bem mais datas e a fase de liga se espalhava pela temporada inteira.
+ */
+export function spreadInDays(fixtures: readonly Fixture[], perTeam: number, rng: Rng): Fixture[][] {
+  for (let colors = perTeam; colors <= perTeam + 6; colors++) {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const days = tryColoring(attempt === 0 ? fixtures : rng.shuffle(fixtures), colors, rng)
+      if (days) return days
+    }
+  }
+  // Último recurso: distribuição gulosa (sempre dá certo, só usa mais datas).
   const matchdays: Fixture[][] = []
   const busy: Set<TeamId>[] = []
-  for (const f of rng.shuffle(fixtures)) {
+  for (const f of fixtures) {
     let day = busy.findIndex((set) => !set.has(f.homeTeamId) && !set.has(f.awayTeamId))
     if (day < 0) {
       busy.push(new Set())
@@ -118,5 +133,66 @@ export function drawLeaguePhase(teamIds: readonly TeamId[], spec: Pick<CupLeague
     busy[day]?.add(f.awayTeamId)
     matchdays[day]?.push(f)
   }
-  return { matchdays }
+  return matchdays
+}
+
+function tryColoring(fixtures: readonly Fixture[], colors: number, rng: Rng): Fixture[][] | undefined {
+  const at = new Map<TeamId, (number | undefined)[]>()
+  const slots = (id: TeamId) => {
+    let list = at.get(id)
+    if (!list) at.set(id, (list = Array<number | undefined>(colors).fill(undefined)))
+    return list
+  }
+  const color: number[] = Array(fixtures.length).fill(-1)
+  const ends = (e: number): [TeamId, TeamId] => [(fixtures[e] as Fixture).homeTeamId, (fixtures[e] as Fixture).awayTeamId]
+  const other = (e: number, id: TeamId): TeamId => (ends(e)[0] === id ? ends(e)[1] : ends(e)[0])
+  const free = (id: TeamId) => slots(id).flatMap((x, c) => (x === undefined ? [c] : []))
+
+  for (let e = 0; e < fixtures.length; e++) {
+    const [u, v] = ends(e)
+    const freeU = free(u)
+    const freeV = free(v)
+    let chosen = freeU.find((c) => freeV.includes(c))
+    if (chosen === undefined) {
+      // Troca de cores ao longo do caminho alternado que sai de v: libera a cor c1 em v sem tirá-la de u.
+      for (const c1 of rng.shuffle(freeU)) {
+        for (const c2 of rng.shuffle(freeV)) {
+          const path: number[] = []
+          let at_ = v
+          let want = c1
+          for (;;) {
+            const edge = slots(at_)[want]
+            if (edge === undefined) break
+            path.push(edge)
+            at_ = other(edge, at_)
+            want = want === c1 ? c2 : c1
+          }
+          const touchesU = path.some((edge) => ends(edge).includes(u))
+          if (touchesU) continue
+          for (const edge of path) {
+            const [a, b] = ends(edge)
+            slots(a)[color[edge] as number] = undefined
+            slots(b)[color[edge] as number] = undefined
+          }
+          for (const edge of path) {
+            const swapped = color[edge] === c1 ? c2 : c1
+            color[edge] = swapped
+            const [a, b] = ends(edge)
+            slots(a)[swapped] = edge
+            slots(b)[swapped] = edge
+          }
+          chosen = c1
+          break
+        }
+        if (chosen !== undefined) break
+      }
+    }
+    if (chosen === undefined) return undefined
+    color[e] = chosen
+    slots(u)[chosen] = e
+    slots(v)[chosen] = e
+  }
+  const days: Fixture[][] = Array.from({ length: colors }, () => [])
+  fixtures.forEach((f, e) => days[color[e] as number]?.push(f))
+  return days.filter((d) => d.length > 0)
 }

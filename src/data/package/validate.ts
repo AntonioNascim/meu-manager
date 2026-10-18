@@ -1,6 +1,6 @@
 import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../../engine/config'
 import { ATTRIBUTE_NAMES, NATIONALITIES, POSITIONS } from '../../engine/types'
-import type { Attributes } from '../../engine/types'
+import type { Attributes, Region } from '../../engine/types'
 import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
 import { COUNTRY_DEFAULTS } from './leagueDefaults'
 import { cupsForPackage } from './packageCups'
@@ -163,7 +163,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
 
   // Ligas
   const leagueIds = new Set<string>()
-  const leagues: { id: string; country?: string; level?: number; teams?: number; promotion?: number; relegation?: number; path: string }[] = []
+  const leagues: { id: string; country?: string; level?: number; teams?: number; promotion?: number; relegation?: number; region?: Region; economy?: { revenue: number }; path: string }[] = []
   ;(input.leagues as unknown[]).forEach((league, i) => {
     const path = `leagues[${i}]`
     if (!isObj(league)) return c.error('wrong-type', path, 'league')
@@ -205,7 +205,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
     if (id === undefined) return
     if (leagueIds.has(id)) c.error('duplicate-id', `${path}.id`, id)
     leagueIds.add(id)
-    leagues.push({ id, ...(country !== undefined ? { country } : {}), ...(level !== undefined ? { level } : {}), ...(teams !== undefined ? { teams } : {}), ...(promotion !== undefined ? { promotion } : {}), ...(relegation !== undefined ? { relegation } : {}), path })
+    leagues.push({ id, ...(country !== undefined ? { country } : {}), ...(level !== undefined ? { level } : {}), ...(teams !== undefined ? { teams } : {}), ...(promotion !== undefined ? { promotion } : {}), ...(relegation !== undefined ? { relegation } : {}), ...(typeof league.region === 'string' && ['BR', 'SA', 'EU'].includes(league.region) ? { region: league.region as Region } : {}), ...(isObj(league.economy) && typeof league.economy.revenue === 'number' ? { economy: { revenue: league.economy.revenue } } : {}), path })
   })
 
   // Clubes
@@ -297,7 +297,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
   validateCups(input.cups, { leagues, countries: countryIds, error: (...args) => c.error(...args), warn: (...args) => c.warn(...args) })
   if (c.errors.length === 0) {
     // Copas padrão que não cabem nas ligas do país (poucos clubes, por exemplo) ficam de fora, com um aviso.
-    const checked = cupsForPackage({ ...(Array.isArray(input.cups) ? { cups: input.cups as never } : {}), leagues: leagues.map((l) => ({ id: l.id, country: l.country ?? '', level: l.level ?? 1, ...(l.teams !== undefined ? { teams: l.teams } : {}) })) })
+    const checked = cupsForPackage({ ...(Array.isArray(input.cups) ? { cups: input.cups as never } : {}), leagues: leagues.map((l) => ({ id: l.id, country: l.country ?? '', level: l.level ?? 1, ...(l.teams !== undefined ? { teams: l.teams } : {}), ...(l.region ? { region: l.region } : {}), ...(l.economy ? { economy: l.economy } : {}) })) })
     for (const country of checked.skipped) c.warn('cup-defaults-skipped', 'cups', country)
   }
 

@@ -45,9 +45,29 @@ function busyDays(matches: readonly Match[], teamIds: ReadonlySet<TeamId>): Map<
  * Primeiro dia de jogo da copa: a quarta-feira a partir de `notBefore` em que nenhum dos clubes joga (nem na véspera nem no dia
  * seguinte), então os jogos da copa nunca batem com a liga.
  */
-export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: ReadonlyMap<TeamId, ReadonlySet<IsoDate>>, weekday: number = WEDNESDAY): IsoDate {
+export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: ReadonlyMap<TeamId, ReadonlySet<IsoDate>>, weekday: number = WEDNESDAY, tolerant = false): IsoDate {
   const ids = [...teamIds]
   let day = onOrAfterWeekday(notBefore, weekday)
+  if (tolerant) {
+    // Copa com clubes de vários países (as continentais): as rodadas de meio de semana das ligas de seis países cobrem quase todas as semanas, então,
+    // depois de esperar um pouco, vale o dia anterior e aceita-se um jogo colado em outro de alguns clubes (nunca no mesmo dia).
+    for (let week = 0; week < 80; week++, day = addDays(day, 7)) {
+      const tolerance = week < 2 ? 0 : Math.ceil(ids.length * (week < 4 ? 0.15 : week < 6 ? 0.4 : 1))
+      for (const candidate of [day, addDays(day, -1)]) {
+        if (candidate < notBefore) continue
+        let same = 0
+        let adjacent = 0
+        for (const id of ids) {
+          const days = busy.get(id)
+          if (!days) continue
+          if (days.has(candidate)) same++
+          else if (days.has(addDays(candidate, -1)) || days.has(addDays(candidate, 1))) adjacent++
+        }
+        if (same === 0 && adjacent <= tolerance) return candidate
+      }
+    }
+    return day
+  }
   for (let i = 0; i < 80; i++, day = addDays(day, 7)) {
     const free = ids.every((id) => {
       const days = busy.get(id)
@@ -139,6 +159,7 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
   // Copa de um país segue a temporada dele; a continental, a do continente (a europeia atravessa o ano).
   const split = cup.pyramid !== undefined ? state.cycles[cup.pyramid]?.split === true : spec.region === 'EU'
   const weekday = spec.weekday ?? WEDNESDAY
+  const tolerant = isContinental(spec)
   const descriptor = stageList(spec)[stage] as ReturnType<typeof stageList>[number]
   const participants = participantsOf(ctx, stage)
   const rng = createRng(`${state.market.seed}:${cup.year}:${cup.id}:draw:${stage}`)
@@ -155,8 +176,8 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
   if (descriptor.kind === 'knockout') {
     const stageSpec = descriptor.stage as CupStageSpec
     const draw = drawKnockout(participants, seeded, strength, rng)
-    const first = pickCupDay(maxDate(stageAnchor(cup, split, stageSpec.date), notBefore), draw.ties.flatMap((t) => t.teams), busy, weekday)
-    const second = stageSpec.legs === 2 ? pickCupDay(addDays(first, stageSpec.legGap ?? CUP.legGapDays), draw.ties.flatMap((t) => t.teams), busy, weekday) : undefined
+    const first = pickCupDay(maxDate(stageAnchor(cup, split, stageSpec.date), notBefore), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant)
+    const second = stageSpec.legs === 2 ? pickCupDay(addDays(first, stageSpec.legGap ?? CUP.legGapDays), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant) : undefined
     draw.ties.forEach((tie, i) => {
       let [x, y] = tie.teams
       if (stageSpec.legs === 1) {
@@ -184,7 +205,7 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
     const days = Math.max(...perGroup.map((r) => r.length))
     let notYet = maxDate(stageAnchor(cup, split, g.date), notBefore)
     for (let d = 0; d < days; d++) {
-      const day = pickCupDay(notYet, participants, busy, weekday)
+      const day = pickCupDay(notYet, participants, busy, weekday, tolerant)
       notYet = addDays(day, gap)
       perGroup.forEach((rounds, gi) => (rounds[d] ?? []).forEach((f, i) => created.push(mkMatch(ctx, `s${stage}-g${gi + 1}-r${d + 1}-${i + 1}`, f.homeTeamId, f.awayTeamId, day, round + d, { stage, kind: 'group', group: gi + 1 }))))
     }
@@ -196,7 +217,7 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
     const gap = lp.gapDays ?? CUP.groupGapDays
     let notYet = maxDate(stageAnchor(cup, split, lp.date), notBefore)
     draw.matchdays.forEach((fixtures, d) => {
-      const day = pickCupDay(notYet, participants, busy, weekday)
+      const day = pickCupDay(notYet, participants, busy, weekday, tolerant)
       notYet = addDays(day, gap)
       fixtures.forEach((f, i) => created.push(mkMatch(ctx, `s${stage}-r${d + 1}-${i + 1}`, f.homeTeamId, f.awayTeamId, day, round + d, { stage, kind: 'league' })))
     })

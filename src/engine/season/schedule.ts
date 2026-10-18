@@ -70,12 +70,13 @@ export function buildLeagueRounds(teamIds: readonly TeamId[], rng: Rng, rounds: 
     }),
   )
 
-  const candidates: Fixture[][][] = []
+  const options: { full: Fixture[][]; violations: number }[] = []
   for (let shift = 0; shift < canonical.length; shift++) {
     const turn = [...canonical.slice(shift), ...canonical.slice(0, shift)]
     const full = rounds === 2 ? mirror(turn) : turn.map((round) => round.map((f) => ({ ...f })))
-    if (venueViolations(full) === 0) candidates.push(full)
+    options.push({ full, violations: venueViolations(full) })
   }
-  if (candidates.length === 0) throw new Error('Não foi possível ajustar os mandos da tabela')
-  return rng.pick(candidates)
+  // Tabelas pequenas (grupos de 4 clubes) não evitam toda sequência de três mandos iguais: ficam com as que repetem menos.
+  const fewest = Math.min(...options.map((o) => o.violations))
+  return rng.pick(options.filter((o) => o.violations === fewest)).full
 }
