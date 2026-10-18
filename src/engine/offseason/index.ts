@@ -161,6 +161,13 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
       .forEach(({ t }, i) => rankByReputation.set(t.id, i + 1))
   }
   const reputationChanges: OffseasonReport['reputationChanges'] = {}
+  // O título (e a final) de uma copa continental da temporada dá reputação ao clube.
+  const continental = new Map<TeamId, number>()
+  for (const cup of state.cups ?? []) {
+    if (cup.pyramid !== undefined || cup.winnerId === undefined || cup.year !== year) continue
+    continental.set(cup.winnerId, (continental.get(cup.winnerId) ?? 0) + OFFSEASON.reputation.continentalChampion)
+    if (cup.runnerUpId) continental.set(cup.runnerUpId, (continental.get(cup.runnerUpId) ?? 0) + OFFSEASON.reputation.continentalFinalist)
+  }
   const R = OFFSEASON.reputation
   const reputationRng = rng.fork('reputation')
   let teams: Team[] = state.teams.map((t) => {
@@ -177,7 +184,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
     const mean = landing?.reputationMean ?? R.tierMean[tier] ?? t.reputation
     const pull = tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
-    const pulled = t.reputation + delta + pull * (mean - t.reputation)
+    const pulled = t.reputation + delta + pull * (mean - t.reputation) + (continental.get(t.id) ?? 0)
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId

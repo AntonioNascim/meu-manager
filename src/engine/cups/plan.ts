@@ -2,21 +2,28 @@
  * Forma de uma copa: as fases em ordem (grupos ou fase de liga, se houver, e depois o mata-mata) e como cada fase de
  * mata-mata reparte os clubes (confrontos e folgas). Funções puras, usadas pelo motor e pela validação do pacote.
  */
-import type { CupSpec } from '../types'
+import type { CupSpec, CupStageSpec } from '../types'
+
+export const isContinental = (spec: Pick<CupSpec, 'country' | 'region'>): boolean => spec.country === undefined && spec.region !== undefined
 
 export interface StageDescriptor {
   kind: 'groups' | 'league' | 'knockout'
   name: string
   /** Jogo único ou ida e volta (no mata-mata); grupos usam `groups.legs`. */
   legs: 1 | 2
+  /** A definição da fase de mata-mata (datas, jogo único ou ida e volta, campo neutro). */
+  stage?: CupStageSpec
+  /** Fase preliminar (jogada antes dos grupos). */
+  preliminary?: boolean
 }
 
 /** As fases da copa na ordem em que são jogadas. O índice delas é o usado em `CupEntrant.stage`, `CupPrize.perStage` e `MatchCupInfo.stage`. */
 export function stageList(spec: CupSpec): StageDescriptor[] {
   const out: StageDescriptor[] = []
+  if (spec.format === 'groups-knockout') for (const s of spec.preliminary ?? []) out.push({ kind: 'knockout', name: s.name, legs: s.legs, stage: s, preliminary: true })
   if (spec.format === 'groups-knockout' && spec.groups) out.push({ kind: 'groups', name: spec.groups.name, legs: spec.groups.legs })
   if (spec.format === 'league-knockout' && spec.leaguePhase) out.push({ kind: 'league', name: spec.leaguePhase.name, legs: 1 })
-  for (const s of spec.stages) out.push({ kind: 'knockout', name: s.name, legs: s.legs })
+  for (const s of spec.stages) out.push({ kind: 'knockout', name: s.name, legs: s.legs, stage: s })
   return out
 }
 
@@ -44,6 +51,21 @@ export function knockoutShape(n: number): KnockoutShape {
 }
 
 /**
+ * Fases preliminares: `entering[i]` clubes entram na fase `i` (além dos vencedores da anterior). Devolve quantos chegam aos grupos (os que
+ * passam da última preliminar) ou o motivo do erro.
+ */
+export function checkPreliminary(spec: CupSpec, entering: readonly number[]): { ok: true; out: number } | { ok: false; reason: string } {
+  const stages = stageList(spec)
+  let carried = 0
+  for (let i = 0; i < stages.length && stages[i]?.preliminary; i++) {
+    const n = carried + (entering[i] ?? 0)
+    if (n < 2) return { ok: false, reason: `a fase "${stages[i]?.name}" tem menos de 2 clubes` }
+    carried = knockoutShape(n).advancing
+  }
+  return { ok: true, out: carried }
+}
+
+/**
  * Confere se o número de clubes que entra em cada fase leva a uma final de dois clubes. `entering[i]` = clubes que entram na fase
  * `i` da lista (além dos que vêm da fase anterior); `fromPhase` = quantos saem da fase de grupos ou de liga para o mata-mata
  * (`direct` e `playoff` na fase de liga). Devolve a lista de clubes por fase de mata-mata ou o motivo do erro.
@@ -52,7 +74,9 @@ export function checkBracket(spec: CupSpec, entering: readonly number[], phaseOu
   const stages = stageList(spec)
   const sizes: number[] = []
   let carried = 0
-  const firstKnockout = stages.findIndex((s) => s.kind === 'knockout')
+  // As fases preliminares ficam antes dos grupos; o chaveamento principal é o que vem depois deles.
+  const phase = stages.findIndex((s) => s.kind !== 'knockout')
+  const firstKnockout = stages.findIndex((s, i) => s.kind === 'knockout' && i > phase)
   if (firstKnockout < 0) return { ok: false, reason: 'sem fases de mata-mata' }
   for (let i = firstKnockout; i < stages.length; i++) {
     let n: number

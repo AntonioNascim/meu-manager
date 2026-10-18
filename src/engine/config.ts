@@ -658,6 +658,9 @@ export const OFFSEASON = {
     /** Na primeira divisão, quem fica nela e está acima da média perde reputação mais devagar (nas séries de acesso o puxão é simétrico, para a média delas não andar): os clubes grandes se mantêm grandes (sem isso o topo encolhia 0,3 da distância por ano e as ligas ficavam sem dinastias). */
     tierPullAbove: 0.1,
     champion: 0,
+    /** Reputação a mais (antes de arredondar) para o campeão e o vice de uma copa continental na temporada. */
+    continentalChampion: 0.8,
+    continentalFinalist: 0.35,
     promoted: 1,
     relegated: -1,
   },

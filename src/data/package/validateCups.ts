@@ -4,7 +4,7 @@
  */
 import { NATIONALITIES } from '../../engine/types'
 import type { CupSpec } from '../../engine/types'
-import { checkBracket, stageList } from '../../engine/cups/plan'
+import { checkBracket, checkPreliminary, stageList } from '../../engine/cups/plan'
 import type { PackageIssueCode } from './types'
 import { TIEBREAKERS } from './types'
 import type { PackageCup } from './types'
@@ -29,8 +29,13 @@ const validMonthDay = (v: unknown): v is [number, number] => {
 }
 
 /** Quantos clubes uma vaga traz (para conferir o chaveamento antes de jogar). */
-function sourceCount(source: Obj, ctx: CupValidationContext): number {
+function sourceCount(source: Obj, ctx: CupValidationContext, raws: Map<string, Obj>): number {
   if (source.type === 'cup') return 1
+  // Um clube por grupo da outra copa.
+  if (source.type === 'cup-group-place') {
+    const groups = raws.get(source.cup as string)?.groups
+    return isObj(groups) && isInt(groups.count) ? groups.count : 0
+  }
   const league = ctx.leagues.find((l) => l.id === source.league)
   const positions = source.positions
   if (Array.isArray(positions) && positions.length === 2) return Math.max(0, (positions[1] as number) - (positions[0] as number) + 1)
@@ -68,6 +73,17 @@ function checkSource(source: unknown, path: string, ctx: CupValidationContext, c
     }
     return true
   }
+  if (source.type === 'cup-group-place') {
+    if (typeof source.cup !== 'string' || !cupIds.has(source.cup) || source.cup === selfId) {
+      ctx.error('unknown-reference', `${path}.cup`, String(source.cup))
+      return false
+    }
+    if (!isInt(source.place) || source.place < 1 || source.place > 8) {
+      ctx.error('out-of-range', `${path}.place`, String(source.place), '1 a 8')
+      return false
+    }
+    return true
+  }
   ctx.error('unknown-value', `${path}.type`, String(source.type))
   return false
 }
@@ -78,6 +94,7 @@ export function validateCups(input: unknown, ctx: CupValidationContext): void {
   if (!Array.isArray(input)) return ctx.error('wrong-type', 'cups', 'cups')
   const ids = new Set<string>()
   const cupIds = new Set(input.flatMap((c) => (isObj(c) && typeof c.id === 'string' ? [c.id] : [])))
+  const raws = new Map(input.flatMap((c) => (isObj(c) && typeof c.id === 'string' ? [[c.id, c] as [string, Obj]] : [])))
   input.forEach((raw, i) => {
     const path = `cups[${i}]`
     if (!isObj(raw)) return ctx.error('wrong-type', path, 'cup')
@@ -97,9 +114,12 @@ export function validateCups(input: unknown, ctx: CupValidationContext): void {
     if (raw.region !== undefined && !['BR', 'SA', 'EU'].includes(raw.region as string)) err('unknown-value', `${path}.region`, String(raw.region))
     if (typeof raw.format !== 'string' || !FORMATS.includes(raw.format)) err(raw.format === undefined ? 'missing-field' : 'unknown-value', `${path}.format`, String(raw.format ?? 'format'))
     for (const key of ['seeding', 'homeOfSingleLeg'] as const) {
-      const allowed = key === 'seeding' ? ['random', 'seeded'] : ['draw', 'lower-reputation', 'higher-reputation', 'lower-division', 'first-listed']
+      const allowed = key === 'seeding' ? ['random', 'seeded', 'ranked'] : ['draw', 'lower-reputation', 'higher-reputation', 'lower-division', 'first-listed']
       if (raw[key] !== undefined && !allowed.includes(raw[key] as string)) err('unknown-value', `${path}.${key}`, String(raw[key]))
     }
+    if (raw.weekday !== undefined && raw.weekday !== 2 && raw.weekday !== 3 && raw.weekday !== 4) err('out-of-range', `${path}.weekday`, String(raw.weekday), '2 (terça), 3 (quarta) ou 4 (quinta)')
+    if (raw.excludeCups !== undefined && (!Array.isArray(raw.excludeCups) || raw.excludeCups.some((x) => typeof x !== 'string' || !cupIds.has(x) || x === id))) err('unknown-reference', `${path}.excludeCups`, 'excludeCups')
+    if (raw.preliminary !== undefined && (!Array.isArray(raw.preliminary) || raw.format !== 'groups-knockout')) err('wrong-type', `${path}.preliminary`, 'preliminary (só em groups-knockout)')
     for (const key of ['awayGoals', 'extraTime', 'penalties'] as const) if (raw[key] !== undefined && typeof raw[key] !== 'boolean') err('wrong-type', `${path}.${key}`, key)
     if (raw.tiebreakers !== undefined) {
       if (!Array.isArray(raw.tiebreakers) || raw.tiebreakers.some((t) => !(TIEBREAKERS as readonly unknown[]).includes(t))) err('unknown-value', `${path}.tiebreakers`, 'tiebreakers')
@@ -118,10 +138,12 @@ export function validateCups(input: unknown, ctx: CupValidationContext): void {
       const ok = checkSource(e.source, `${p}.source`, local, cupIds, id)
       if (e.fallback !== undefined) checkSource(e.fallback, `${p}.fallback`, local, cupIds, id)
       if (e.stage !== undefined && (!isInt(e.stage) || e.stage < 0)) err('out-of-range', `${p}.stage`, String(e.stage), '0 ou mais')
-      if (ok) entering[(e.stage as number | undefined) ?? 0] = (entering[(e.stage as number | undefined) ?? 0] ?? 0) + sourceCount(e.source as Obj, ctx)
+      if (ok && isObj(e.source) && e.source.type === 'cup-group-place' && ((e.stage as number | undefined) ?? 0) < 1) err('out-of-range', `${p}.stage`, String(e.stage ?? 0), 'a vaga que depende dos grupos de outra copa entra a partir da fase 1')
+      if (ok) entering[(e.stage as number | undefined) ?? 0] = (entering[(e.stage as number | undefined) ?? 0] ?? 0) + sourceCount(e.source as Obj, ctx, raws)
     })
-    raw.stages.forEach((s, k) => {
-      const p = `${path}.stages[${k}]`
+    const stageLists: [string, unknown[]][] = [['stages', raw.stages], ['preliminary', Array.isArray(raw.preliminary) ? raw.preliminary : []]]
+    for (const [listName, list] of stageLists) list.forEach((s, k) => {
+      const p = `${path}.${listName}[${k}]`
       if (!isObj(s)) return err('wrong-type', p, 'stage')
       if (typeof s.name !== 'string' || s.name === '') err('missing-field', `${p}.name`, 'name')
       if (s.legs !== 1 && s.legs !== 2) err('out-of-range', `${p}.legs`, String(s.legs), '1 ou 2')
@@ -154,6 +176,7 @@ export function validateCups(input: unknown, ctx: CupValidationContext): void {
       if (!isInt(g.count) || g.count < 2 || g.count > 32) err('out-of-range', `${path}.groups.count`, String(g.count), '2–32')
       if (!isInt(g.advance) || g.advance < 1) err('out-of-range', `${path}.groups.advance`, String(g.advance), '1 ou mais')
       if (g.legs !== 1 && g.legs !== 2) err('out-of-range', `${path}.groups.legs`, String(g.legs), '1 ou 2')
+      if (g.direct !== undefined && (!isInt(g.direct) || g.direct < 0 || (isInt(g.advance) && g.direct >= g.advance))) err('out-of-range', `${path}.groups.direct`, String(g.direct), 'de 0 até advance − 1')
       if (!validMonthDay(g.date)) err('bad-date', `${path}.groups.date`, JSON.stringify(g.date))
     } else if (format === 'league-knockout') {
       const lp = raw.leaguePhase
@@ -184,12 +207,17 @@ function validateShape(spec: CupSpec, counts: number[], path: string, ctx: CupVa
   }
   if (spec.format === 'groups-knockout') {
     const g = spec.groups as NonNullable<CupSpec['groups']>
-    const clubs = counts[0] ?? 0
+    // Fases preliminares: os vencedores vão para os grupos, junto com quem entra neles.
+    const prelim = checkPreliminary(spec, counts)
+    if (!prelim.ok) return err(prelim.reason)
+    const groupsAt = spec.preliminary?.length ?? 0
+    const clubs = prelim.out + (counts[groupsAt] ?? 0)
     if (clubs % g.count !== 0) return ctx.error('cup-groups', `${path}.groups.count`, `${clubs} clubes não se repartem em ${g.count} grupos iguais`)
     const size = clubs / g.count
     if (size < 2 || size % 2 !== 0) return ctx.error('cup-groups', `${path}.groups.count`, `cada grupo precisa de um número par de clubes (tem ${size})`)
     if (g.advance >= size) return ctx.error('cup-groups', `${path}.groups.advance`, `passam ${g.advance} de ${size} clubes por grupo`)
-    const r = checkBracket(spec, counts, { first: g.count * g.advance })
+    const direct = g.direct ?? 0
+    const r = checkBracket(spec, counts, { first: g.count * (g.advance - direct), ...(direct > 0 ? { later: g.count * direct } : {}) })
     if (!r.ok) err(r.reason)
     return
   }
