@@ -19,10 +19,10 @@ const withUser = (): Game => {
   return createGame(3, smallTeam(probe).id)
 }
 
-/** Avança até a próxima partida do jogador (a primeira dele é de copa). */
+/** Avança até a próxima partida de copa do jogador (a liga abre em janeiro, antes da copa, e esses jogos são jogados direto). */
 function untilPending(game: Game): Game {
   let g = game
-  for (let i = 0; i < 40 && !g.pendingUserMatch; i++) g = advanceGame(g)
+  for (let i = 0; i < 80 && !g.pendingUserMatch?.cup; i++) g = g.pendingUserMatch ? playPendingAuto(g) : advanceGame(g)
   return g
 }
 

@@ -29,7 +29,7 @@ import {
 } from '../src/engine/training'
 import { ATTRIBUTE_NAMES, TRAINING_FOCUSES, TRAINING_INTENSITIES, emptyTraining } from '../src/engine/types'
 import type { Attributes, Player, TrainingIntensity } from '../src/engine/types'
-import { advanceGame, advanceToMatchday, cancelUserIndividualTraining, createGame, setUserTrainingPlan, startNextSeason, startUserIndividualTraining, strengthChange, userTrainingPlan } from '../src/store/game'
+import { advanceGame, advanceToMatchday, cancelUserIndividualTraining, createGame, playPendingAuto, setUserTrainingPlan, startNextSeason, startUserIndividualTraining, strengthChange, userTrainingPlan } from '../src/store/game'
 import { MIGRATIONS, SAVE_VERSION, makeEnvelope, migrateSave, validateGame } from '../src/store/saveFormat'
 import { Dashboard } from '../src/ui/screens/Dashboard'
 import { Squad } from '../src/ui/screens/Squad'
@@ -298,7 +298,7 @@ describe('treino no jogo', () => {
   it('avançando, os jogadores evoluem aos poucos e o histórico mensal da força é guardado', () => {
     let game = createGame(7, USER, { cups: false })
     const before = new Map(game.season.players.map((p) => [p.id, playerOverall(p)]))
-    for (let i = 0; i < 14; i++) game = advanceToMatchday(game.pendingUserMatch ? { ...game, pendingUserMatch: undefined } : game)
+    for (let i = 0; i < 30; i++) game = advanceToMatchday(playPendingAuto(game))
     const mine = game.season.players.filter((p) => p.teamId === USER)
     expect(mine.every((p) => (game.season.training.history[p.id]?.length ?? 0) >= 2)).toBe(true)
     const young = game.season.players.filter((p) => p.age <= 21 && p.hidden.potential > playerOverall(p) + 8)

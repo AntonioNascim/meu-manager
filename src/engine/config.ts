@@ -332,16 +332,18 @@ export const CUP = {
 
 export const SEASON = {
   /** A primeira rodada é no primeiro sábado em ou depois desta data (mês 1–12). */
-  startMonth: 4,
-  startDay: 11,
+  startMonth: 1,
+  startDay: 24,
+  /** Uma semana sem rodada a cada tantas rodadas de fim de semana (pausas de calendário); 0 = rodadas todas as semanas. */
+  gapEvery: 3,
   /** Toda rodada múltipla deste número é no meio de semana (quarta); as demais, no fim de semana. */
   midweekEvery: 5,
   /** A última rodada tem todos os jogos juntos, no domingo. */
   finalRoundSameDay: true,
   /** Os contratos do ano civil terminam neste dia (mês e dia); na temporada que atravessa o ano terminam em 30 de junho. */
   contractEnd: { month: 12, day: 31 },
-  /** Liga de temporada que atravessa o ano sem data própria: primeira rodada no primeiro sábado a partir daqui, com uma semana de pausa a cada `gapEvery` rodadas de fim de semana (fim de ano e datas de seleções). */
-  split: { startMonth: 8, startDay: 8, gapEvery: 3 },
+  /** Liga de temporada que atravessa o ano sem data própria: primeira rodada no primeiro sábado a partir daqui. */
+  split: { startMonth: 8, startDay: 8 },
   /** Maior sequência permitida de jogos seguidos em casa ou fora. */
   maxVenueStreak: 2,
 } as const

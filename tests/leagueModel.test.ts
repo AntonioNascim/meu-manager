@@ -107,9 +107,9 @@ describe('janelas por região', () => {
 
   it('Brasil é o padrão e não mudou', () => {
     const [pre, mid] = transferWindows(s.season, s.matches)
-    expect(pre).toEqual({ name: 'pre-season', start: '2026-01-01', end: '2026-04-10' })
+    expect(pre).toEqual({ name: 'pre-season', start: '2026-01-01', end: '2026-01-23' })
     expect(mid).toEqual({ name: 'mid-year', start: '2026-07-01', end: '2026-07-31' })
-    expect(first).toBe('2026-04-11')
+    expect(first).toBe('2026-01-24')
   })
 
   it('América do Sul fecha em 15 de março e a Europa abre em janeiro e de julho a agosto', () => {
@@ -118,7 +118,7 @@ describe('janelas por região', () => {
       ['mid-year', '2026-01-01', '2026-01-31'],
       ['pre-season', '2026-07-01', '2026-08-31'],
     ])
-    expect(windowAt(s.season, s.matches, '2026-04-01', 'BR')?.name).toBe('pre-season')
+    expect(windowAt(s.season, s.matches, '2026-01-10', 'BR')?.name).toBe('pre-season')
     expect(windowAt(s.season, s.matches, '2026-04-01', 'SA')).toBeNull()
     expect(windowAt(s.season, s.matches, '2026-08-15', 'EU')?.name).toBe('pre-season')
     expect(windowAt(s.season, s.matches, '2026-08-15', 'BR')).toBeNull()
@@ -145,7 +145,7 @@ describe('formato e calendário por liga', () => {
   })
 
   it('o início da primeira rodada vem da liga', () => {
-    expect(roundSlots(2026, 10)[0]!.days[0]).toBe('2026-04-11')
+    expect(roundSlots(2026, 10)[0]!.days[0]).toBe('2026-01-24')
     expect(roundSlots(2026, 10, [8, 10])[0]!.days[0]).toBe('2026-08-15')
     expect(roundSlots(2026, 10, [2, 1])[0]!.days[0]).toBe('2026-02-07')
   })

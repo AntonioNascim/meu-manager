@@ -15,7 +15,7 @@ import {
   summarizeLedger,
   ticketDemand,
 } from '../src/engine/finance'
-import { advanceToNextEvent, completeMatch, createSeason, playUserMatchAuto, simulateToSeasonEnd, userMatchInput } from '../src/engine/season'
+import { advanceToNextEvent, completeMatch, createSeason, defaultCompetitions, playUserMatchAuto, simulateToSeasonEnd, userMatchInput } from '../src/engine/season'
 import { advanceToMatchday, createGame, playPendingAuto, setUserTicketPrice, userTeam } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { Finance } from '../src/ui/screens/Finance'
@@ -122,7 +122,8 @@ describe('finanças ao longo da temporada', () => {
   })
 
   it('a pré-temporada paga os meses que passam até a primeira rodada', () => {
-    const step = advanceToNextEvent(season())
+    // Liga com a primeira rodada em abril: três inícios de mês antes dela.
+    const step = advanceToNextEvent(createSeason({ year: 2026, seed: 5, teams: world.teams, players: world.players, competitions: defaultCompetitions(world.teams).map((c) => ({ ...c, start: [4, 11] as [number, number] })) }))
     const ledger = step.state.teams[0]!.finances.ledger
     // 1º de fevereiro, março e abril, antes da rodada de 11 de abril.
     expect(ledger.filter((e) => e.category === 'sponsorship')).toHaveLength(3)

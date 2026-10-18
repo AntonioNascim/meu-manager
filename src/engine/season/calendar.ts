@@ -164,7 +164,7 @@ export function buildPyramid(args: { seed: number | string; cycle: Cycle; setups
   for (const setup of setups) {
     const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id), setup.rounds ?? 2)
     const start = setup.start ?? (cycle.split ? [SEASON.split.startMonth, SEASON.split.startDay] : undefined)
-    const gapEvery = setup.gapEvery ?? (cycle.split && !setup.start ? SEASON.split.gapEvery : undefined)
+    const gapEvery = (setup.gapEvery ?? SEASON.gapEvery) || undefined
     const slots = roundSlots(cycle.year, rounds.length, start, gapEvery)
     rounds.forEach((fixtures, roundIndex) => {
       const slot = slots[roundIndex] as RoundSlot

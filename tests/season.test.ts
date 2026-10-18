@@ -148,13 +148,13 @@ describe('calendário', () => {
     expect(Math.max(...perDay.values())).toBe(1)
   })
 
-  it('o intervalo entre as rodadas de um mesmo time nunca passa de uma semana', () => {
+  it('o intervalo entre as rodadas de um mesmo time nunca passa de uma semana (duas, nas pausas de calendário)', () => {
     for (const team of world.teams.slice(0, 3)) {
       const dates = state.matches.filter((m) => m.homeTeamId === team.id || m.awayTeamId === team.id).map((m) => m.date)
       for (let i = 1; i < dates.length; i++) {
         const gap = daysBetween(dates[i - 1] as string, dates[i] as string)
         expect(gap).toBeGreaterThanOrEqual(1)
-        expect(gap).toBeLessThanOrEqual(8)
+        expect(gap).toBeLessThanOrEqual(16)
       }
     }
   })
