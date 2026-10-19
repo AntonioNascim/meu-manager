@@ -101,9 +101,9 @@ export interface CupSpec {
   region?: Region
   /**
    * Copa mundial (Copa Intercontinental, Mundial de Clubes): sem país nem região, joga-se nos anos de calendário `year` com
-   * `(year − offset) % every === 0`; a edição nasce a partir de `from` (mês e dia) desse ano, com os campeões mais recentes de cada continente.
+   * `(year − offset) % every === 0`; a edição nasce a partir de `from` (mês e dia) desse ano, com os campeões mais recentes de cada continente. `pause`: nesse período do ano da edição as ligas de ano civil não marcam rodadas (os jogos da copa cabem sem conflito).
    */
-  world?: { every: number; offset: number; from: [number, number] }
+  world?: { every: number; offset: number; from: [number, number]; pause?: { from: [number, number]; to: [number, number] } }
   format: CupFormat
   entrants: CupEntrant[]
   groups?: CupGroupsSpec

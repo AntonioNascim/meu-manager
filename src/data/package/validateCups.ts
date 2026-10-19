@@ -145,6 +145,7 @@ export function validateCups(input: unknown, ctx: CupValidationContext): void {
       const w = raw.world
       if (!isObj(w) || !isInt(w.every) || w.every < 1 || w.every > 20 || !isInt(w.offset) || !validMonthDay(w.from)) err('out-of-range', `${path}.world`, JSON.stringify(w), '{ every: 1–20, offset: ano, from: [mês, dia] }')
       else if (raw.country !== undefined || raw.region !== undefined) err('wrong-type', `${path}.world`, 'world (sem country nem region)')
+      else if (w.pause !== undefined && (!isObj(w.pause) || !validMonthDay(w.pause.from) || !validMonthDay(w.pause.to))) err('bad-date', `${path}.world.pause`, JSON.stringify(w.pause))
     }
     if (typeof raw.format !== 'string' || !FORMATS.includes(raw.format)) err(raw.format === undefined ? 'missing-field' : 'unknown-value', `${path}.format`, String(raw.format ?? 'format'))
     for (const key of ['seeding', 'homeOfSingleLeg'] as const) {

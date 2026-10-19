@@ -106,7 +106,7 @@ describe('copas mundiais no pacote', () => {
       for (const brand of ['FIFA', 'Mundial de Clubes da', 'Intercontinental Cup']) expect(s.name).not.toContain(brand)
     }
     expect(spec('world-1').world).toEqual({ every: 1, offset: 0, from: [12, 1] })
-    expect(spec('world-2').world).toEqual({ every: 4, offset: 2025, from: [6, 1] })
+    expect(spec('world-2').world).toEqual({ every: 4, offset: 2025, from: [6, 1], pause: { from: [6, 3], to: [7, 22] } })
   })
 
   it('o Mundial de Clubes tem 32 clubes em 8 grupos de 4, oitavas, quartas, semifinais e final', () => {
@@ -247,7 +247,7 @@ describe('uma edição do Mundial de Clubes (2029), sem esperar quatro anos de j
     const tables = groupTables(matches, 0)
     expect(tables).toHaveLength(8)
     for (const t of tables) expect(t.rows).toHaveLength(4)
-    expect(matches.every((m) => weekday(m.date) === 3)).toBe(true)
+    expect(matches.every((m) => [2, 3, 4].includes(weekday(m.date)))).toBe(true)
     expect(matches.every((m) => m.date >= '2029-06-01' && m.date <= '2029-07-05')).toBe(true)
     const days = new Map<string, Match[]>()
     for (const m of created.matches) for (const id of [m.homeTeamId, m.awayTeamId]) days.set(`${id}:${m.date}`, [...(days.get(`${id}:${m.date}`) ?? []), m])

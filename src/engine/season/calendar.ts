@@ -52,18 +52,34 @@ export interface RoundSlot {
 
 export const isMidweekRound = (round: number) => round % SEASON.midweekEvery === 0
 
-/** Datas de cada rodada. Rodadas de meio de semana não avançam o fim de semana seguinte. `start` = mês e dia a partir do qual vale o primeiro sábado (padrão: o do calendário brasileiro). */
-export function roundSlots(year: number, roundCount: number, start: readonly [number, number] = [SEASON.startMonth, SEASON.startDay], gapEvery?: number): RoundSlot[] {
+/**
+ * Períodos do ano de calendário `year` em que as ligas de ano civil não marcam rodadas: o das copas mundiais (`CupSpec.world.pause`) cuja edição cai
+ * nesse ano (o Mundial de Clubes: os clubes das ligas de ano civil jogam o Mundial em vez da liga).
+ */
+export function leaguePauses(specs: readonly Pick<CupSpec, 'world'>[] | undefined, year: number): [IsoDate, IsoDate][] {
+  const out: [IsoDate, IsoDate][] = []
+  for (const spec of specs ?? []) {
+    const w = spec.world
+    if (!w?.pause || (((year - w.offset) % w.every) + w.every) % w.every !== 0) continue
+    out.push([makeDate(year, w.pause.from[0], w.pause.from[1]), makeDate(year, w.pause.to[0], w.pause.to[1])])
+  }
+  return out
+}
+
+/** Datas de cada rodada. Rodadas de meio de semana não avançam o fim de semana seguinte. `start` = mês e dia a partir do qual vale o primeiro sábado (padrão: o do calendário brasileiro). `pauses`: períodos sem rodadas (o fim de semana seguinte vale). */
+export function roundSlots(year: number, roundCount: number, start: readonly [number, number] = [SEASON.startMonth, SEASON.startDay], gapEvery?: number, pauses: readonly [IsoDate, IsoDate][] = []): RoundSlot[] {
+  const paused = (d: IsoDate) => pauses.some(([a, b]) => d >= a && d <= b)
   let saturday = onOrAfterWeekday(makeDate(year, start[0], start[1]), SATURDAY)
   let lastSaturday = saturday
   let weekends = 0
   const slots: RoundSlot[] = []
   for (let round = 1; round <= roundCount; round++) {
-    if (isMidweekRound(round) && round < roundCount) {
+    if (isMidweekRound(round) && round < roundCount && !paused(addDays(lastSaturday, 4))) {
       // Quarta-feira depois do último fim de semana jogado.
       slots.push({ round, kind: 'midweek', days: [addDays(lastSaturday, 4)] })
       continue
     }
+    while (paused(saturday) || paused(addDays(saturday, 1))) saturday = addDays(saturday, 7)
     const sunday = addDays(saturday, 1)
     const days = SEASON.finalRoundSameDay && round === roundCount ? [sunday] : [saturday, sunday]
     slots.push({ round, kind: 'weekend', days })
@@ -155,8 +171,10 @@ export interface PyramidBuild {
 }
 
 /** As ligas de uma pirâmide numa temporada: tabela de jogos (datas e sementes) e as competições. `rng` sorteia os mandos. */
-export function buildPyramid(args: { seed: number | string; cycle: Cycle; setups: readonly CompetitionSetup[]; rng: ReturnType<typeof createRng> }): PyramidBuild {
+export function buildPyramid(args: { seed: number | string; cycle: Cycle; setups: readonly CompetitionSetup[]; rng: ReturnType<typeof createRng>; cupSpecs?: readonly Pick<CupSpec, 'world'>[] }): PyramidBuild {
   const { seed, cycle, setups, rng } = args
+  // Ligas de ano civil pausam no período do Mundial de Clubes; as de temporada que atravessa o ano já estão de férias nele.
+  const pauses = cycle.split ? [] : leaguePauses(args.cupSpecs, cycle.year)
   const matches: Match[] = []
   const competitions: Competition[] = []
   // A divisão mais baixa da pirâmide é a única que não rebaixa.
@@ -165,7 +183,7 @@ export function buildPyramid(args: { seed: number | string; cycle: Cycle; setups
     const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id), setup.rounds ?? 2)
     const start = setup.start ?? (cycle.split ? [SEASON.split.startMonth, SEASON.split.startDay] : undefined)
     const gapEvery = (setup.gapEvery ?? SEASON.gapEvery) || undefined
-    const slots = roundSlots(cycle.year, rounds.length, start, gapEvery)
+    const slots = roundSlots(cycle.year, rounds.length, start, gapEvery, pauses)
     rounds.forEach((fixtures, roundIndex) => {
       const slot = slots[roundIndex] as RoundSlot
       fixtures.forEach((fixture, i) => {
@@ -225,7 +243,7 @@ export function createSeason(options: SeasonOptions): SeasonState {
     // A temporada do país segue a da primeira divisão dele.
     const cycle = firstCycle(own.slice().sort((a, b) => a.tier - b.tier)[0]?.split === true, startDate)
     cycles[pyramid] = cycle
-    const built = buildPyramid({ seed: options.seed, cycle, setups: own, rng })
+    const built = buildPyramid({ seed: options.seed, cycle, setups: own, rng, ...(options.cupSpecs ? { cupSpecs: options.cupSpecs } : {}) })
     matches.push(...built.matches)
     competitions.push(...built.competitions)
   }

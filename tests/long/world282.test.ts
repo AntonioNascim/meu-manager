@@ -12,7 +12,7 @@ import { buildScalePackage } from '../../src/diagnostics/scalePackage'
 import { FINANCE } from '../../src/engine/config'
 import { continentalObserver } from '../../tools/continentalRun'
 import type { ContinentalRun } from '../../tools/continentalRun'
-import { dynastiesOf, formatDynasties, formatTrend, simulateLeagueYears } from '../../tools/leagueYears'
+import { dynastiesOf, formatDynasties, formatTrend, leagueIds, seriesOf, simulateLeagueYears } from '../../tools/leagueYears'
 import type { LeagueRun, LeagueYear } from '../../tools/leagueYears'
 
 const YEARS = 30
@@ -77,10 +77,10 @@ ${formatTrend(runs)}
 
 ${formatDynasties(runs)}
 `)
-    ids = runs[0]?.leagues.map((l) => l.id) ?? []
+    ids = leagueIds(runs)
     writeFileSync('node_modules/.cache/continental282.txt', continentalReport(continental))
   })
-  const series = (id: string): LeagueYear[] => runs.map((r) => r.leagues.find((l) => l.id === id) as LeagueYear)
+  const series = (id: string): LeagueYear[] => seriesOf(runs, id)
   const span = (id: string, from: number, to: number, pick: (l: LeagueYear) => number) => mean(series(id).slice(from, to).map(pick))
   const decade = (id: string, d: number, pick: (l: LeagueYear) => number) => span(id, d * 10, d * 10 + 10, pick)
 
@@ -109,7 +109,7 @@ ${formatDynasties(runs)}
       expect.soft(age, `${id} idade média`).toBeGreaterThan(24)
       expect.soft(age, `${id} idade média`).toBeLessThan(28)
     }
-    const stars = (d: number) => mean(Array.from({ length: 10 }, (_, k) => ids.reduce((s, id) => s + (series(id)[d * 10 + k] as LeagueYear).stars, 0)))
+    const stars = (d: number) => mean(Array.from({ length: 10 }, (_, k) => ids.reduce((s, id) => s + (series(id)[d * 10 + k]?.stars ?? 0), 0)))
     expect.soft(stars(0)).toBeGreaterThanOrEqual(10)
     expect.soft(stars(2)).toBeLessThan(stars(0) * 2.5)
     expect.soft(stars(2)).toBeGreaterThan(stars(0) * 0.4)

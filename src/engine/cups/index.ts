@@ -11,7 +11,7 @@ import { createRng, hashSeed } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { cycleOfPyramid, focusPyramid, phaseOfPyramid } from '../season/cycles'
 import { pyramidOf } from '../season/fidelity'
-import { WEDNESDAY, addDays, makeDate, onOrAfterWeekday } from '../season/dates'
+import { WEDNESDAY, addDays, makeDate, onOrAfterWeekday, weekday as dayOfWeek } from '../season/dates'
 import type { Competition, Cup, CupSpec, CupStageSpec, IsoDate, Match, MatchCupInfo, StandingRow, Team, TeamId } from '../types'
 import { drawGroups, drawKnockout, drawLeaguePhase, groupRounds } from './draw'
 import { resolveEntrants } from './entrants'
@@ -50,6 +50,27 @@ export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: 
   const ids = [...teamIds]
   let day = onOrAfterWeekday(notBefore, weekday)
   if (tolerant) {
+    // Primeiro procura, por até 10 semanas, um dia de terça a quinta em que nenhum clube joga nem na véspera nem no dia seguinte (copas com
+    // clubes de vários países: as ligas ocupam muita quarta-feira, mas a terça ou a quinta costuma estar livre). Só se não achar aceita jogo colado.
+    let bestDay: IsoDate | undefined
+    let bestAdjacent = Infinity
+    for (let week = 0, base = day; week < 10; week++, base = addDays(base, 7)) {
+      for (const candidate of [base, addDays(base, -1), addDays(base, 1)]) {
+        if (candidate < notBefore || dayOfWeek(candidate) < 2 || dayOfWeek(candidate) > 4) continue
+        let same = 0
+        let adjacent = 0
+        for (const id of ids) {
+          const days = busy.get(id)
+          if (!days) continue
+          if (days.has(candidate)) same++
+          else if (days.has(addDays(candidate, -1)) || days.has(addDays(candidate, 1))) adjacent++
+        }
+        if (same > 0) continue
+        if (adjacent === 0) return candidate
+        if (adjacent < bestAdjacent) (bestAdjacent = adjacent), (bestDay = candidate)
+      }
+    }
+    if (bestDay !== undefined && bestAdjacent <= Math.ceil(ids.length * 0.15)) return bestDay
     // Copa com clubes de vários países (as continentais): as rodadas de meio de semana das ligas de seis países cobrem quase todas as semanas, então,
     // depois de esperar um pouco, vale o dia anterior e aceita-se um jogo colado em outro de alguns clubes (nunca no mesmo dia).
     for (let week = 0; week < 80; week++, day = addDays(day, 7)) {

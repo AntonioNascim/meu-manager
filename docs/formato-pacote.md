@@ -136,8 +136,8 @@ Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leag
 | `France` | EU | 1,8 | 3,5 |
 | `Portugal` | EU | 0,9 | 2 |
 | `Netherlands` | EU | 1,2 | 2,6 |
-| `Mexico` | NA | 0,9 | −1 |
-| `United States` | NA | 1 | −0,5 |
+| `Mexico` | NA | 1 | 0 |
+| `United States` | NA | 0,9 | −2 |
 | `Egypt` | AF | 0,35 | −3,5 |
 | `Japan` | AS | 0,7 | −1,5 |
 | `Australia` | OC | 0,3 | −4 |

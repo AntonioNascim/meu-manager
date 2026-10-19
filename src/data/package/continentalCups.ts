@@ -304,7 +304,7 @@ export function defaultWorldCups(leagues: readonly ContinentalLeague[], cups: re
       ...common,
       id: 'world-2',
       name: 'Mundial de Clubes',
-      world: { every: 4, offset: 2025, from: [6, 1] },
+      world: { every: 4, offset: 2025, from: [6, 1], pause: { from: [6, 3], to: [7, 22] } },
       format: 'groups-knockout',
       entrants: [
         { source: { type: 'region', region: 'EU', count: 12, cup: 'cont-eu-1', last: 4 } },

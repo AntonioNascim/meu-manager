@@ -52,7 +52,7 @@ export interface PackageCup {
   country?: string
   region?: Region
   /** Copa mundial (sem país nem região): os anos de calendário em que se joga e a data a partir da qual a edição nasce (`CupSpec.world`). */
-  world?: { every: number; offset: number; from: [number, number] }
+  world?: { every: number; offset: number; from: [number, number]; pause?: { from: [number, number]; to: [number, number] } }
   format: CupFormat
   entrants: CupEntrant[]
   groups?: CupGroupsSpec

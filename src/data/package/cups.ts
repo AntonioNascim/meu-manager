@@ -27,7 +27,7 @@ export function normalizeCup(cup: PackageCup, league: (packageLeagueId: string) 
     kind: cup.kind ?? CUP_DEFAULTS.kind,
     ...(cup.country ? { country: cup.country as Nationality } : {}),
     ...(cup.region ? { region: cup.region } : {}),
-    ...(cup.world ? { world: { every: cup.world.every, offset: cup.world.offset, from: [cup.world.from[0], cup.world.from[1]] as [number, number] } } : {}),
+    ...(cup.world ? { world: { every: cup.world.every, offset: cup.world.offset, from: [cup.world.from[0], cup.world.from[1]] as [number, number], ...(cup.world.pause ? { pause: { from: [cup.world.pause.from[0], cup.world.pause.from[1]] as [number, number], to: [cup.world.pause.to[0], cup.world.pause.to[1]] as [number, number] } } : {}) } } : {}),
     format: cup.format,
     entrants: cup.entrants.map((e) => ({ source: mapSource(e.source), ...(e.fallback ? { fallback: mapSource(e.fallback) } : {}), ...(e.stage !== undefined ? { stage: e.stage } : {}) })),
     ...(cup.groups ? { groups: { ...cup.groups } } : {}),
