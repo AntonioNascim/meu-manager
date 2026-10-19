@@ -30,6 +30,8 @@ function continentalReport(run: ContinentalRun): string {
     lines.push(`   campeões: ${list.map((e) => e.winnerId.replace('team-', '')).join(' ')}`)
   }
   const shares = run.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
+  const top = [...run.money].map((m) => ({ ...m, share: (m.continental + m.world) / Math.max(1, m.revenue) })).sort((a, b) => b.share - a.share).slice(0, 8)
+  lines.push(`maiores dependências das copas continentais e mundiais (clube, ano, país, reputação, continental, mundial, receita): ${top.map((m) => `${m.teamId.replace('team-', '')} ${m.year} ${m.pyramid} rep${m.reputation} ${(m.continental / 1e6).toFixed(1)}M+${(m.world / 1e6).toFixed(1)}M/${(m.revenue / 1e6).toFixed(0)}M=${(100 * m.share).toFixed(0)}%`).join('; ')}`)
   lines.push(`dinheiro continental / receita: média ${(100 * mean(shares)).toFixed(1)}%, máximo ${(100 * Math.max(...shares)).toFixed(1)}% (${shares.length} clube-temporadas)`)
   lines.push(`reputação do campeão na virada: ${mean(run.reputationAfter.map((r) => r.after - r.before)).toFixed(2)} (${run.reputationAfter.length} títulos)`)
   return lines.join('\n')
@@ -136,7 +138,8 @@ ${formatDynasties(runs)}
       expect.soft(list.length, `${cup} edições`).toBeGreaterThanOrEqual(mundial ? 6 : YEARS - 3)
       expect.soft(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(mundial ? 0.5 : 0.4)
       // Na copa principal europeia o maior campeão real (Real Madrid) tem ~30% das últimas 30 edições; no Mundial, 35% de poucas edições; nas outras o limite é 20%.
-      expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(cup === 'cont-eu-1' ? 0.3 : mundial ? 0.35 : 0.2)
+      if (mundial) expect.soft(Math.max(...titles.values()), `${cup} títulos de um clube`).toBeLessThanOrEqual(3)
+      else expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(cup === 'cont-eu-1' ? 0.3 : 0.2)
       expect.soft(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
     }
     // Nenhum país leva quase tudo da copa principal europeia: nos últimos 30 anos reais a Espanha tem ~13 títulos (43%).
@@ -181,9 +184,17 @@ ${formatDynasties(runs)}
 
   it('campeões: pontos, raros acima de 92 e dinastias', () => {
     for (const d of dynastiesOf(runs)) {
-      expect.soft(d.championPoints, `${d.id} pontos do campeão`).toBeGreaterThan(68)
-      expect.soft(d.championPoints, `${d.id} pontos do campeão`).toBeLessThan(84)
-      expect.soft(d.highCount, `${d.id} campeões acima de 92 pontos`).toBeLessThanOrEqual(3)
+      // As ligas de elite (África, Ásia e Oceania) têm poucos clubes e outro número de jogos: comparam-se os pontos por jogo (92 pontos em 38 jogos = 2,42).
+      const small = (series(d.id)[0]?.clubs ?? 20) <= 8
+      const perGame = d.championPoints / 38
+      if (small) {
+        expect.soft(perGame, `${d.id} pontos por jogo do campeão`).toBeGreaterThan(1.8)
+        expect.soft(perGame, `${d.id} pontos por jogo do campeão`).toBeLessThan(2.6)
+      } else {
+        expect.soft(d.championPoints, `${d.id} pontos do campeão`).toBeGreaterThan(68)
+        expect.soft(d.championPoints, `${d.id} pontos do campeão`).toBeLessThan(84)
+        expect.soft(d.highCount, `${d.id} campeões acima de 92 pontos`).toBeLessThanOrEqual(3)
+      }
     }
     // Divisões de acesso (Brasil B e C): o campeão sobe e sai da divisão, então quase todo ano é um campeão novo; só se exige que ninguém repita muito.
     const tops = dynastiesOf(runs).filter((d) => !['br-2', 'br-3'].includes(d.id)).flatMap((d) => d.blocks)

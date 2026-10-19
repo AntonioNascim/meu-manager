@@ -54,9 +54,9 @@ export const FULL_WORLD: LeagueSpec[] = [
   { id: 'mx-1', name: 'México', region: 'NA', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4, repCurve: 1.4, economy: { revenue: 1, level: 0 } },
   { id: 'us-1', name: 'Estados Unidos', region: 'NA', teams: 20, format: 'single', tier: 1, repTop: 13, repBottom: 3, repCurve: 1.5, economy: { revenue: 0.9, level: -2 } },
   // Ligas de elite: só os clubes mais fortes do continente, para as copas mundiais (África, Ásia e Oceania não têm ligas completas).
-  { id: 'af-1', name: 'Elite da África', leagueName: 'Elite da África', region: 'AF', teams: 8, format: 'double', tier: 1, repTop: 13, repBottom: 6, repCurve: 1.3, economy: { revenue: 0.35, level: -3.5 } },
-  { id: 'as-1', name: 'Elite da Ásia', leagueName: 'Elite da Ásia', region: 'AS', teams: 8, format: 'double', tier: 1, repTop: 14, repBottom: 6, repCurve: 1.3, economy: { revenue: 0.7, level: -1.5 } },
-  { id: 'oc-1', name: 'Elite da Oceania', leagueName: 'Elite da Oceania', region: 'OC', teams: 4, format: 'double', tier: 1, repTop: 10, repBottom: 6, economy: { revenue: 0.3, level: -4 } },
+  { id: 'af-1', name: 'Elite da África', leagueName: 'Elite da África', region: 'AF', teams: 8, format: 'double', tier: 1, repTop: 13, repBottom: 6, repCurve: 1.3, economy: { revenue: 0.35, level: -4.5 } },
+  { id: 'as-1', name: 'Elite da Ásia', leagueName: 'Elite da Ásia', region: 'AS', teams: 8, format: 'double', tier: 1, repTop: 14, repBottom: 6, repCurve: 1.3, economy: { revenue: 0.7, level: -2 } },
+  { id: 'oc-1', name: 'Elite da Oceania', leagueName: 'Elite da Oceania', region: 'OC', teams: 4, format: 'double', tier: 1, repTop: 10, repBottom: 6, economy: { revenue: 0.3, level: -5.5 } },
 ]
 
 /** País de cada pirâmide do mundo de teste (o prefixo do id da liga). */

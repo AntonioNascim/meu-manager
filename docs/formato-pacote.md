@@ -138,9 +138,9 @@ Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leag
 | `Netherlands` | EU | 1,2 | 2,6 |
 | `Mexico` | NA | 1 | 0 |
 | `United States` | NA | 0,9 | −2 |
-| `Egypt` | AF | 0,35 | −3,5 |
-| `Japan` | AS | 0,7 | −1,5 |
-| `Australia` | OC | 0,3 | −4 |
+| `Egypt` | AF | 0,35 | −4,5 |
+| `Japan` | AS | 0,7 | −2 |
+| `Australia` | OC | 0,3 | −5,5 |
 
 As divisões de baixo já são mais pobres que a principal por regra do jogo (a 2ª divisão tem 15% da receita da 1ª e a 3ª, 6%; a
 3ª paga 60% do salário; o nível dos jogadores cai por divisão): **não** coloque isso em `economy`, que é a economia **do país**.
@@ -455,7 +455,7 @@ O jogo traz estas duas como padrão quando o pacote tem as três copas continent
 
 | Id | Formato |
 |---|---|
-| `world-1` (todo ano, a partir de 1º de dezembro) | 6 clubes: os campeões mais recentes da Europa, da América do Sul e da América do Norte (as copas continentais) e os campeões das ligas de elite de África, Ásia e Oceania. Jogo único em campo neutro: primeira fase (2 jogos; os dois cabeças de chave folgam), semifinais e final, nas quartas-feiras de dezembro |
+| `world-1` (todo ano, a partir de 1º de dezembro) | 6 clubes, no formato da FIFA, jogo único em campo neutro: Oceania × Ásia (play-off); o vencedor × África e América do Norte × América do Sul (segunda fase); os dois vencedores (semifinais); o vencedor decide o título contra o campeão da Europa, que entra direto na final. Os clubes são os campeões mais recentes das copas continentais e os campeões das ligas de elite de África, Ásia e Oceania. Quartas-feiras de dezembro (terça a quinta) |
 | `world-2` (a cada 4 anos: 2029, 2033..., a partir de 1º de junho) | 32 clubes: 12 da Europa, 6 da América do Sul, 4 da África, 4 da Ásia, 4 da América do Norte, 1 da Oceania e o país-sede (o campeão da primeira liga da América do Norte). Cada continente leva os campeões das últimas 4 edições da copa continental e completa pelos mais fortes. 8 grupos de 4 (turno único), oitavas, quartas, semifinais e final em jogo único neutro, de junho a 18 de julho (antes da abertura das ligas da Europa, da África, da Ásia e da Oceania; as ligas de ano civil seguem jogando) |
 
 **África, Ásia e Oceania sem ligas completas.** O mundo de teste leva só os clubes mais fortes desses continentes, uma liga de elite por continente (8, 8 e 4 clubes, `country` Egito, Japão e Austrália, sem acesso nem rebaixamento, temporada de agosto a maio). Eles passam pela mesma virada de temporada que qualquer clube (elenco, evolução, contratos, base, finanças), então ficam vivos e coerentes sem criar as ligas inteiras. Um pacote real pode trazer ligas completas desses países: as copas mundiais usam os clubes mais fortes de primeira divisão do continente, sejam quantos forem.

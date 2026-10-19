@@ -116,10 +116,14 @@ describe('copas mundiais no pacote', () => {
     expect(stageList(cup).map((s) => s.name)).toEqual(['Fase de grupos', 'Oitavas de final', 'Quartas de final', 'Semifinais', 'Final'])
   })
 
-  it('a Copa Intercontinental tem 6 clubes: um campeão de cada continente, com duas folgas', () => {
+  it('a Copa Intercontinental tem 6 clubes no formato da FIFA: o campeão europeu entra direto na final', () => {
     const cup = spec('world-1')
     expect(cup.entrants).toHaveLength(6)
-    expect(stageList(cup).map((s) => s.name)).toEqual(['Primeira fase', 'Semifinais', 'Final'])
+    expect(stageList(cup).map((s) => s.name)).toEqual(['Play-off', 'Segunda fase', 'Semifinais', 'Final'])
+    const entry = (region: string) => cup.entrants.find((e) => (e.source.type === 'cup' ? e.source.cup === region : e.source.type === 'league' && e.source.league === region))?.stage
+    expect(entry('cont-eu-1')).toBe(3)
+    expect([entry('cont-sa-1'), entry('cont-na-1'), entry('af-1')]).toEqual([1, 1, 1])
+    expect([entry('as-1'), entry('oc-1')]).toEqual([0, 0])
   })
 
   it('só existem quando todos os continentes têm clubes: sem a África, nada de copas mundiais (e um aviso)', () => {

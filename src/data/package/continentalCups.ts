@@ -253,7 +253,7 @@ function northAmerica(leagues: readonly ContinentalLeague[]): PackageCup[] | und
       weekday: 3,
       seeding: 'seeded',
       homeOfSingleLeg: 'draw',
-      prize: prize([2_000_000, 3_000_000, 4_000_000, 6_000_000], 14_000_000, 6_000_000),
+      prize: prize([1_000_000, 1_500_000, 2_000_000, 3_000_000], 7_000_000, 3_000_000),
     },
   ]
 }
@@ -284,21 +284,24 @@ export function defaultWorldCups(leagues: readonly ContinentalLeague[], cups: re
       name: 'Copa Intercontinental',
       world: { every: 1, offset: 0, from: [12, 1] },
       format: 'knockout',
+      // Formato da Copa Intercontinental da FIFA: os campeões da Oceania e da Ásia abrem o torneio; o vencedor enfrenta o da África, e o da América do Norte
+      // enfrenta o da América do Sul; os dois vencedores se encontram e quem passa decide o título contra o campeão da Europa, que entra direto na final.
       entrants: [
-        { source: { type: 'cup', cup: 'cont-eu-1', place: 'winner', latest: true } },
-        { source: { type: 'cup', cup: 'cont-sa-1', place: 'winner', latest: true } },
-        { source: { type: 'cup', cup: 'cont-na-1', place: 'winner', latest: true } },
-        { source: league(first('AF').id, 1) },
-        { source: league(first('AS').id, 1) },
-        { source: league(first('OC').id, 1) },
+        { source: league(first('OC').id, 1), stage: 0 },
+        { source: league(first('AS').id, 1), stage: 0 },
+        { source: league(first('AF').id, 1), stage: 1 },
+        { source: { type: 'cup', cup: 'cont-na-1', place: 'winner', latest: true }, stage: 1 },
+        { source: { type: 'cup', cup: 'cont-sa-1', place: 'winner', latest: true }, stage: 1 },
+        { source: { type: 'cup', cup: 'cont-eu-1', place: 'winner', latest: true }, stage: 3 },
       ],
       stages: [
-        { name: 'Primeira fase', legs: 1, date: [12, 3], neutral: true },
-        { name: 'Semifinais', legs: 1, date: [12, 10], neutral: true },
-        { name: 'Final', legs: 1, date: [12, 17], neutral: true },
+        { name: 'Play-off', legs: 1, date: [12, 2], neutral: true },
+        { name: 'Segunda fase', legs: 1, date: [12, 9], neutral: true },
+        { name: 'Semifinais', legs: 1, date: [12, 16], neutral: true },
+        { name: 'Final', legs: 1, date: [12, 23], neutral: true },
       ],
       seeding: 'seeded',
-      prize: prize([1_500_000, 3_000_000, 5_000_000], 12_000_000, 5_000_000),
+      prize: prize([500_000, 1_000_000, 1_500_000, 3_000_000], 6_000_000, 2_500_000),
     },
     {
       ...common,
@@ -324,7 +327,7 @@ export function defaultWorldCups(leagues: readonly ContinentalLeague[], cups: re
         { name: 'Final', legs: 1, date: [7, 18], neutral: true },
       ],
       seeding: 'ranked',
-      prize: prize([8_000_000, 3_000_000, 5_000_000, 7_000_000, 10_000_000], 30_000_000, 12_000_000),
+      prize: prize([4_000_000, 1_500_000, 2_500_000, 3_500_000, 5_000_000], 15_000_000, 6_000_000),
     },
   ]
 }

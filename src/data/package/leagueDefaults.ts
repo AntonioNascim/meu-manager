@@ -25,9 +25,9 @@ export const COUNTRY_DEFAULTS: Partial<Record<Nationality, { region: Region; eco
   Mexico: { region: 'NA', economy: { revenue: 1, level: 0 }, calendar: { start: [2, 7] } },
   'United States': { region: 'NA', economy: { revenue: 0.9, level: -2 }, calendar: { start: [2, 7] } },
   // África, Ásia e Oceania: só os clubes mais fortes (uma liga de elite por continente, para as copas mundiais), com temporada de agosto a maio.
-  Egypt: { region: 'AF', economy: { revenue: 0.35, level: -3.5 }, calendar: { split: true, start: [8, 22] } },
-  Japan: { region: 'AS', economy: { revenue: 0.7, level: -1.5 }, calendar: { split: true, start: [8, 22] } },
-  Australia: { region: 'OC', economy: { revenue: 0.3, level: -4 }, calendar: { split: true, start: [8, 22] } },
+  Egypt: { region: 'AF', economy: { revenue: 0.35, level: -4.5 }, calendar: { split: true, start: [8, 22] } },
+  Japan: { region: 'AS', economy: { revenue: 0.7, level: -2 }, calendar: { split: true, start: [8, 22] } },
+  Australia: { region: 'OC', economy: { revenue: 0.3, level: -5.5 }, calendar: { split: true, start: [8, 22] } },
 }
 
 /**
