@@ -49,7 +49,7 @@ Dividida em partes, cada uma entregue e testada antes da seguinte:
 - **3B (feita, ver `docs/fase2-proposta.md` seção 18) — Copas e supercopas nacionais** da Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina.
 - **Temporadas por pirâmide (feita, antes da 3C; ver `docs/fase2-proposta.md` seção 19):** cada país com a sua temporada (ano civil ou 2026/27), virada por país, janelas por região e copas dentro da temporada de cada um.
 - **3C — Competições continentais:** Libertadores, Sul-Americana, Champions League, Europa League e Conference League (vagas pelas ligas e pelas copas, fase de liga e grupos, calendário de meio de semana compartilhado com as ligas e copas nacionais).
-- **3D — Ampliar o mundo:** México, Estados Unidos, Holanda e clubes de África, Ásia e Oceania, para a CONCACAF, a Copa Intercontinental, o Mundial de Clubes e a Supercopa dos Países Baixos.
+- **3D (feita, ver `docs/fase2-proposta.md` seção 22) — Ampliar o mundo:** Países Baixos, México, Estados Unidos e uma liga de elite pequena para África, Ásia e Oceania, para a copa da América do Norte, a Copa Intercontinental (todo ano), o Mundial de Clubes (a cada 4 anos, 32 clubes) e a Supercopa dos Países Baixos, tudo como padrão do pacote com nomes genéricos.
 - **Fase futura — Seleções:** Copa do Mundo, Eliminatórias, Eurocopa, Copa América, Copa das Nações Africanas e Copa Asiática (calendário de datas FIFA, convocação e a liberação dos jogadores pelos clubes). Fica depois das fases 4 a 6 ou entre elas, a decidir.
 
 ### Fase 4 — Editor
