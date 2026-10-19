@@ -732,7 +732,7 @@ Cada país passa a ter a sua temporada, com um relógio de mundo só.
 
 **Correções no caminho.** Os laços "simular a temporada e virar" de testes e ferramentas supunham um calendário só; num mundo misto, `simulateToSeasonEnd` + `advanceSeason` deixa os jogos do país que já virou no passado. `simulateLeagueYears`, `packageYears` e o teste do pacote de 15 ligas usam agora `advanceUntil` com `turn`. `advanceUntil` não guarda os jogos do caminho (guardá-los estourou a pilha e acumulava anos de partidas). O mercado não trava mais num evento que o relógio já passou. Ajustes de teste: o treino Leve poupa menos condição (+0,76 contra o Normal) porque as pausas dão descanso a todos; o teste de campeão simplificado × completo usa 8 mundos.
 
-## 20. Fase 3, parte 3C: copas continentais (estado em 18/10/2026)
+## 20. Fase 3, parte 3C: copas continentais (concluída em 18/10/2026)
 
 O motor, o formato e as ferramentas das copas continentais estão descritos em `CLAUDE.md` (parte 3C) e em `docs/formato-pacote.md`. Esta seção guarda o **estado do equilíbrio** na branch `continentais`, para retomar depois.
 
@@ -750,7 +750,9 @@ O motor, o formato e as ferramentas das copas continentais estão descritos em `
 
 **Medições pesadas na nuvem.** O computador de desenvolvimento não aguenta as medições longas (o Claude Code as interrompeu várias vezes por falta de memória). O workflow `.github/workflows/medicao.yml` ("Medições pesadas", `workflow_dispatch`, também na `main` para aparecer na aba Actions) roda no GitHub: `continentais` (sementes separadas por vírgula, uma execução paralela por semente; anos e foco), `test-long`, `ligas` ou `personalizada` (qualquer ferramenta de `tools/`). Escolha a branch `continentais` em "Use workflow from"; o resultado vai para o resumo da execução e para Artifacts (30 dias). **O workflow ainda não foi rodado nem validado no GitHub** (o YAML foi conferido só à mão).
 
-**O que falta**
+**Concluído.** O `test:long` passou pelo workflow (branch `continentais`, depois dos ajustes abaixo) e a parte 3C foi juntada na `main`. Metas finais: cada copa com mais de 40% de campeões diferentes, no máximo 2 títulos seguidos e um clube com até 20% dos títulos (`cont-eu-1`: até 30%, um país até 45%); `cont-sa-1`: Brasil de 40% a 75%, Argentina de 15% a 30% e em segundo, os outros países com pelo menos 1 título em 30; Brasil B e C: até 4 títulos de um clube por 10 temporadas. Itália (2,9 / 6,6) e Alemanha (2,6 / 5,8) ajustadas. Os itens 1 a 5 abaixo ficam como histórico.
+
+**O que faltava (histórico)**
 1. Rodar `continentais` com a semente 23 (e outras) pelo workflow, Brasil como foco, 30 anos. Já medido aqui (30 anos, Brasil como foco), `cont-sa-1`: semente 7 → Brasil 83%, Argentina 13%, outros 3% (fora da meta); semente 11 → Brasil 67%, Argentina 17%, outros 17% (dentro). Maior clube: 4 títulos (13%) nas duas.
 2. **Ajustar o domínio do Brasil e a força da Argentina** na `cont-sa-1`, como se fez com a Inglaterra: ver primeiro os clubes de topo de cada país (adaptar `topClubs` para a América do Sul), a economia de `COUNTRY_DEFAULTS` (Brasil sem `economy`, receita 1; Argentina 0,6 / −1) e a repartição das vagas (raiz da receita). Lembrar de mudar `leagueDefaults.ts` e `scaleWorld.ts` juntos.
 3. Entender os 7 títulos de um clube sul-americano (23%) que reprovaram o `test:long`: `continentalRun` usa outra semente de simulação (`createSeason` com a semente passada) que o teste (`years-7`), então as duas medições não são iguais; o workflow `test-long` mostra o que o teste vê.
