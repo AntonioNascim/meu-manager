@@ -3,8 +3,13 @@ import type { CompetitionId, IsoDate, MatchId, TeamId } from './common'
 /** MVP: só `league`. Depois: `knockout` e `groups+knockout`. */
 export type CompetitionType = 'league'
 
-/** Região da liga: define as janelas de transferência. */
-export type Region = 'BR' | 'SA' | 'EU'
+/** Região da liga: define as janelas de transferência. O Brasil (`BR`) tem janelas próprias mas conta como América do Sul nas copas. */
+export const REGIONS = ['BR', 'SA', 'EU', 'NA', 'AF', 'AS', 'OC'] as const
+export type Region = (typeof REGIONS)[number]
+
+/** Continente de uma região (o Brasil conta como América do Sul): é o que as copas continentais e mundiais usam. */
+export type Continent = Exclude<Region, 'BR'>
+export const continentOf = (region: Region): Continent => (region === 'BR' ? 'SA' : region)
 
 import type { Nationality } from './player'
 import type { ForeignLimit, LeagueEconomy } from './team'

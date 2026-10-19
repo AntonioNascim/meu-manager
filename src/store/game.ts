@@ -33,7 +33,7 @@ import {
   refocus,
   setTeamTactic,
 } from '../engine/season'
-import { pyramidOfCupSpec } from '../engine/cups'
+import { SPLIT_REGIONS, pyramidOfCupSpec } from '../engine/cups'
 import { advanceUntil, cycleOfPyramid, cycleOfTeam, focusPyramid, makeCycle, pyramidFinished, pyramidOfTeamId, seasonLabel } from '../engine/season'
 import type { SeasonEvent, SeasonState, TurnRunner } from '../engine/season'
 import { emptyTraining } from '../engine/types'
@@ -455,7 +455,9 @@ export const userSeasonLabelOf = (game: Game, year: number): string => seasonLab
 export function cupSeasonLabel(game: Game, cupId: string, year: number): string {
   const spec = game.season.cupSpecs?.find((s) => s.id === cupId)
   // Copa continental: a temporada é a do continente (a europeia atravessa o ano).
-  if (spec && spec.country === undefined && spec.region) return seasonLabel({ year, split: spec.region === 'EU' })
+  if (spec && spec.country === undefined && spec.region) return seasonLabel({ year, split: SPLIT_REGIONS.includes(spec.region) })
+  // Copa mundial: a edição é o ano de calendário em que se joga.
+  if (spec?.world) return String(year)
   const pyramid = (spec ? pyramidOfCupSpec(spec, game.season.season.competitions) : undefined) ?? focusPyramid(game.season)
   return seasonLabelOf(game, pyramid, year)
 }
