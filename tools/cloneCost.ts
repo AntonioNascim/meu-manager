@@ -6,7 +6,7 @@ import { buildScaleGame, FULL_WORLD, BRAZIL_ONLY } from '../src/diagnostics/scal
 import { createGame } from '../src/store/game'
 import { runHeavyOp } from '../src/store/heavyOps'
 
-for (const [name, game] of [['mundo padrão (60 clubes)', createGame(7, 'team-imp')], ['Brasil A+B+C (60)', buildScaleGame(BRAZIL_ONLY, 7).game], ['15 ligas (282 clubes)', buildScaleGame(FULL_WORLD, 7, { focus: true }).game]] as const) {
+for (const [name, game] of [['mundo padrão (60 clubes)', createGame(7, 'team-imp')], ['Brasil A+B+C (60)', buildScaleGame(BRAZIL_ONLY, 7).game], ['21 ligas (358 clubes)', buildScaleGame(FULL_WORLD, 7, { focus: true }).game]] as const) {
   const t = performance.now()
   const copy = structuredClone(game)
   const cloneMs = performance.now() - t

@@ -1,5 +1,5 @@
 /**
- * Longo prazo no mundo de 282 clubes (15 ligas): 30 temporadas seguidas com mercado e virada, só o Brasil lance a lance.
+ * Longo prazo no mundo de 358 clubes (21 ligas; o arquivo mantém o nome `world282` por causa do workflow): 30 temporadas seguidas com mercado e virada, só o Brasil lance a lance.
  * Leva ~15 minutos, então fica fora do `npm run test:all`: rode `npm run test:long`. As checagens são `expect.soft`: uma que falha não
  * interrompe as outras, e o relatório mostra todas de uma vez (uma rodada custa ~17 minutos). Os números da última rodada estão na
  * seção 14 de docs/fase2-proposta.md; `node tools/run.mjs leagueRun --clubs 282 --years 30` imprime as tabelas.
@@ -58,12 +58,12 @@ function countBy(values: string[]): Map<string, number> {
   return out
 }
 
-describe(`${YEARS} temporadas no mundo de 282 clubes`, () => {
+describe(`${YEARS} temporadas no mundo de 358 clubes`, () => {
   let runs: LeagueRun[] = []
   let continental: ContinentalRun
   let ids: string[] = []
   beforeAll(() => {
-    // O mundo do jogo: pacote de 15 ligas importado como o jogo importa (calendários de cada país, copas nacionais e continentais).
+    // O mundo do jogo: pacote de 21 ligas importado como o jogo importa (calendários de cada país, copas nacionais, continentais e mundiais).
     const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(7))))
     const world = loadWorld(7, pkg)
     const watched = continentalObserver()
@@ -127,14 +127,16 @@ ${formatDynasties(runs)}
 
   it('copas continentais: campeões variados, sem dinastias, dinheiro limitado e título que dá reputação', () => {
     const cups = [...new Set(continental.editions.map((e) => e.cup))]
-    expect.soft(cups.sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2'])
+    expect.soft(cups.sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-na-1', 'cont-sa-1', 'cont-sa-2', 'world-1', 'world-2'])
     for (const cup of cups) {
       const list = continental.editions.filter((e) => e.cup === cup).sort((a, b) => a.year - b.year)
       const titles = titlesOf(list)
-      expect.soft(list.length, `${cup} edições`).toBeGreaterThanOrEqual(YEARS - 3)
-      expect.soft(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(0.4)
-      // Na copa principal europeia o maior campeão real (Real Madrid) tem ~30% das últimas 30 edições; nas outras o limite é 20%.
-      expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(cup === 'cont-eu-1' ? 0.3 : 0.2)
+      // O Mundial de Clubes é de quatro em quatro anos (2029, 2033...): 6 a 7 edições em 30 temporadas.
+      const mundial = cup === 'world-2'
+      expect.soft(list.length, `${cup} edições`).toBeGreaterThanOrEqual(mundial ? 6 : YEARS - 3)
+      expect.soft(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(mundial ? 0.5 : 0.4)
+      // Na copa principal europeia o maior campeão real (Real Madrid) tem ~30% das últimas 30 edições; no Mundial, 35% de poucas edições; nas outras o limite é 20%.
+      expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(cup === 'cont-eu-1' ? 0.3 : mundial ? 0.35 : 0.2)
       expect.soft(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
     }
     // Nenhum país leva quase tudo da copa principal europeia: nos últimos 30 anos reais a Espanha tem ~13 títulos (43%).
@@ -157,6 +159,18 @@ ${formatDynasties(runs)}
       expect.soft(share('Argentina'), 'cont-sa-1 a Argentina é a segunda').toBeGreaterThanOrEqual(Math.max(0, ...[...byCountry].filter(([c]) => c !== 'Brazil' && c !== 'Argentina').map(([c]) => share(c))))
       expect.soft(Math.round(others * list.length), 'cont-sa-1 títulos dos outros países').toBeGreaterThanOrEqual(1)
     }
+    // Copas mundiais: europeus e sul-americanos ganham mais (realista), mas outros continentes aparecem na Intercontinental e ninguém passa de dois títulos seguidos.
+    for (const cup of ['world-1', 'world-2']) {
+      const list = continental.editions.filter((e) => e.cup === cup)
+      const byContinent = countBy(list.map((e) => e.winnerContinent))
+      const strong = (byContinent.get('EU') ?? 0) + (byContinent.get('SA') ?? 0)
+      expect.soft(strong / list.length, `${cup} fatia de Europa e América do Sul`).toBeGreaterThanOrEqual(0.6)
+      expect.soft(byContinent.size, `${cup} continentes diferentes entre os campeões`).toBeGreaterThanOrEqual(cup === 'world-1' ? 2 : 1)
+      expect.soft(byContinent.get('EU') ?? 0, `${cup} títulos europeus`).toBeGreaterThanOrEqual(1)
+    }
+    const worldShares = continental.money.filter((m) => m.world > 0).map((m) => m.world / Math.max(1, m.revenue))
+    expect.soft(mean(worldShares), 'dinheiro das copas mundiais / receita (média)').toBeLessThan(0.08)
+    expect.soft(Math.max(...worldShares), 'dinheiro das copas mundiais / receita (máximo)').toBeLessThan(0.5)
     const shares = continental.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
     expect.soft(mean(shares), 'dinheiro continental / receita (média)').toBeLessThan(0.08)
     expect.soft(Math.max(...shares), 'dinheiro continental / receita (máximo)').toBeLessThan(0.5)
