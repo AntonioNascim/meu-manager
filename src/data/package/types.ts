@@ -36,8 +36,8 @@ export interface PackageLeague {
   split?: boolean
   /** Mês e dia de referência da primeira rodada (a primeira rodada cai no primeiro sábado a partir daí). Padrão: 11 de abril, o calendário da liga brasileira. */
   start?: [number, number]
-  /** Janelas de transferência: BR, SA ou EU (padrão: a do país). */
-  region?: 'BR' | 'SA' | 'EU'
+  /** Janelas de transferência: BR, SA, EU, NA, AF, AS ou OC (padrão: a do país). */
+  region?: Region
   /** Limite de estrangeiros (jogadores de nacionalidade diferente da do país da liga); sem ele, sem limite. */
   foreignLimit?: { squad?: number; lineup?: number }
 }
@@ -51,6 +51,8 @@ export interface PackageCup {
   /** País da copa (nacional) ou `region` (continental). */
   country?: string
   region?: Region
+  /** Copa mundial (sem país nem região): os anos de calendário em que se joga e a data a partir da qual a edição nasce (`CupSpec.world`). */
+  world?: { every: number; offset: number; from: [number, number] }
   format: CupFormat
   entrants: CupEntrant[]
   groups?: CupGroupsSpec

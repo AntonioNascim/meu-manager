@@ -19,10 +19,10 @@ const specs = world.cups as CupSpec[]
 const spec = (id: string) => specs.find((s) => s.id === id) as CupSpec
 
 describe('copas continentais padrão no pacote', () => {
-  it('há cinco: duas sul-americanas e três europeias, com nomes genéricos', () => {
-    const continental = specs.filter((s) => s.country === undefined)
-    expect(continental.map((s) => s.id)).toEqual(['cont-sa-1', 'cont-sa-2', 'cont-eu-1', 'cont-eu-2', 'cont-eu-3'])
-    for (const s of continental) for (const official of ['Libertadores', 'Sul-Americana', 'Champions', 'Europa League', 'Conference']) expect(s.name).not.toContain(official)
+  it('há seis: duas sul-americanas, três europeias e uma norte-americana, com nomes genéricos', () => {
+    const continental = specs.filter((s) => s.country === undefined && s.region !== undefined)
+    expect(continental.map((s) => s.id)).toEqual(['cont-sa-1', 'cont-sa-2', 'cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-na-1'])
+    for (const s of continental) for (const official of ['Libertadores', 'Sul-Americana', 'Champions', 'Europa League', 'Conference', 'CONCACAF']) expect(s.name).not.toContain(official)
   })
 
   it('o formato segue o pedido: preliminares, grupos e mata-mata na principal da América do Sul; fase de liga na Europa; final em jogo único', () => {
@@ -235,9 +235,9 @@ describe('saves de antes das copas continentais', () => {
     expect(start.cups!.some((c) => c.pyramid === undefined)).toBe(false)
     const turn = (s: SeasonState, pyramid: string) => advanceSeason(s, { createYouth, pyramid, defaultCupSpecs: defaultCupSpecsForCompetitions })
     const later = advanceUntil(start, '2027-01-02', { turn }).state
-    expect(later.cups!.filter((c) => c.pyramid === undefined).map((c) => `${c.id}:${c.year}`).sort()).toEqual(['cont-sa-1:2027', 'cont-sa-2:2027'])
+    expect(later.cups!.filter((c) => c.pyramid === undefined).map((c) => `${c.id}:${c.year}`).sort()).toEqual(['cont-na-1:2027', 'cont-sa-1:2027', 'cont-sa-2:2027'])
     // A Europa só abre a temporada seguinte em 1º de julho: as copas europeias nascem depois da virada dos países de lá.
     const europe = advanceUntil(later, '2027-07-03', { turn }).state
-    expect(europe.cups!.filter((c) => c.pyramid === undefined).map((c) => c.id).sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2'])
+    expect(europe.cups!.filter((c) => c.pyramid === undefined).map((c) => c.id).sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-na-1', 'cont-sa-1', 'cont-sa-2'])
   }, 600_000)
 })

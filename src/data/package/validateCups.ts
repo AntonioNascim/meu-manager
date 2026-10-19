@@ -2,13 +2,14 @@
  * Validação das copas do pacote (`cups`): campos, referências a ligas e a outras copas, datas, e a conta dos clubes: o número de
  * clubes que entra em cada fase precisa levar a uma final de dois.
  */
-import { NATIONALITIES } from '../../engine/types'
-import type { CupSpec } from '../../engine/types'
+import { NATIONALITIES, REGIONS, continentOf } from '../../engine/types'
+import type { CupSpec, Region } from '../../engine/types'
 import { checkBracket, checkPreliminary, stageList } from '../../engine/cups/plan'
 import type { PackageIssueCode } from './types'
 import { TIEBREAKERS } from './types'
 import type { PackageCup } from './types'
 import { normalizeCup } from './cups'
+import { countryRegion } from './continentalCups'
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -16,7 +17,7 @@ const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInt
 const FORMATS = ['knockout', 'groups-knockout', 'league-knockout']
 
 export interface CupValidationContext {
-  leagues: { id: string; country?: string; teams?: number }[]
+  leagues: { id: string; country?: string; teams?: number; level?: number; region?: Region }[]
   countries: Set<string>
   error(code: PackageIssueCode, path: string, detail?: string | number, expected?: string | number): void
   warn(code: PackageIssueCode, path: string, detail?: string | number): void
@@ -31,6 +32,11 @@ const validMonthDay = (v: unknown): v is [number, number] => {
 /** Quantos clubes uma vaga traz (para conferir o chaveamento antes de jogar). */
 function sourceCount(source: Obj, ctx: CupValidationContext, raws: Map<string, Obj>): number {
   if (source.type === 'cup') return 1
+  // Clubes mais fortes de um continente: o pedido, ou todos os de primeira divisão do continente se são menos.
+  if (source.type === 'region') {
+    const available = ctx.leagues.filter((l) => (l.level ?? 1) === 1 && l.country !== undefined && countryRegion(l.country, l.region) === source.region).reduce((n, l) => n + (l.teams ?? 0), 0)
+    return Math.min(source.count as number, available)
+  }
   // Um clube por grupo da outra copa.
   if (source.type === 'cup-group-place') {
     const groups = raws.get(source.cup as string)?.groups
@@ -62,9 +68,32 @@ function checkSource(source: unknown, path: string, ctx: CupValidationContext, c
     }
     return true
   }
+  if (source.type === 'region') {
+    if (typeof source.region !== 'string' || !(REGIONS as readonly string[]).includes(source.region) || continentOf(source.region as Region) !== source.region) {
+      ctx.error('unknown-value', `${path}.region`, String(source.region))
+      return false
+    }
+    if (!isInt(source.count) || source.count < 1 || source.count > 64) {
+      ctx.error('out-of-range', `${path}.count`, String(source.count), '1 a 64')
+      return false
+    }
+    if (source.cup !== undefined && (typeof source.cup !== 'string' || !cupIds.has(source.cup) || source.cup === selfId)) {
+      ctx.error('unknown-reference', `${path}.cup`, String(source.cup))
+      return false
+    }
+    if (source.last !== undefined && (!isInt(source.last) || source.last < 1 || source.last > 20)) {
+      ctx.error('out-of-range', `${path}.last`, String(source.last), '1 a 20')
+      return false
+    }
+    return true
+  }
   if (source.type === 'cup') {
     if (typeof source.cup !== 'string' || !cupIds.has(source.cup) || source.cup === selfId) {
       ctx.error('unknown-reference', `${path}.cup`, String(source.cup))
+      return false
+    }
+    if (source.latest !== undefined && typeof source.latest !== 'boolean') {
+      ctx.error('wrong-type', `${path}.latest`, 'latest')
       return false
     }
     if (source.place !== 'winner' && source.place !== 'runner-up') {
@@ -111,7 +140,12 @@ export function validateCups(input: unknown, ctx: CupValidationContext): void {
     if (typeof raw.name !== 'string' || raw.name === '') err('missing-field', `${path}.name`, 'name')
     if (raw.kind !== undefined && raw.kind !== 'cup' && raw.kind !== 'supercup') err('unknown-value', `${path}.kind`, String(raw.kind))
     if (raw.country !== undefined && (typeof raw.country !== 'string' || !(NATIONALITIES as readonly string[]).includes(raw.country) || !ctx.countries.has(raw.country))) err('unknown-reference', `${path}.country`, String(raw.country))
-    if (raw.region !== undefined && !['BR', 'SA', 'EU'].includes(raw.region as string)) err('unknown-value', `${path}.region`, String(raw.region))
+    if (raw.region !== undefined && !(REGIONS as readonly string[]).includes(raw.region as string)) err('unknown-value', `${path}.region`, String(raw.region))
+    if (raw.world !== undefined) {
+      const w = raw.world
+      if (!isObj(w) || !isInt(w.every) || w.every < 1 || w.every > 20 || !isInt(w.offset) || !validMonthDay(w.from)) err('out-of-range', `${path}.world`, JSON.stringify(w), '{ every: 1–20, offset: ano, from: [mês, dia] }')
+      else if (raw.country !== undefined || raw.region !== undefined) err('wrong-type', `${path}.world`, 'world (sem country nem region)')
+    }
     if (typeof raw.format !== 'string' || !FORMATS.includes(raw.format)) err(raw.format === undefined ? 'missing-field' : 'unknown-value', `${path}.format`, String(raw.format ?? 'format'))
     for (const key of ['seeding', 'homeOfSingleLeg'] as const) {
       const allowed = key === 'seeding' ? ['random', 'seeded', 'ranked'] : ['draw', 'lower-reputation', 'higher-reputation', 'lower-division', 'first-listed']

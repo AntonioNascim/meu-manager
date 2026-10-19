@@ -3,7 +3,7 @@
  * (`countryCups.ts`) que cabem nas ligas dele. Um pacote com `cups: []` (lista vazia) não quer copas, nem as padrão.
  */
 import type { CupSpec, Nationality, Region } from '../../engine/types'
-import { countryRegion, countryRevenue, defaultContinentalCups } from './continentalCups'
+import { countryRegion, countryRevenue, defaultContinentalCups, defaultWorldCups } from './continentalCups'
 import type { ContinentalLeague } from './continentalCups'
 import { normalizeCup } from './cups'
 import { defaultCupsFor } from './countryCups'
@@ -19,7 +19,7 @@ interface PackageLike {
 function fits(cups: PackageCup[], pkg: PackageLike, countries: Iterable<string>): boolean {
   let errors = 0
   validateCups(JSON.parse(JSON.stringify(cups)) as unknown, {
-    leagues: pkg.leagues.map((l) => ({ id: l.id, country: l.country, ...(l.teams !== undefined ? { teams: l.teams } : {}) })),
+    leagues: pkg.leagues.map((l) => ({ id: l.id, country: l.country, level: l.level, ...(l.teams !== undefined ? { teams: l.teams } : {}), ...(l.region ? { region: l.region } : {}) })),
     countries: new Set(countries),
     error: () => {
       errors++
@@ -64,12 +64,18 @@ export function cupsForPackage(pkg: PackageLike): { cups: PackageCup[]; skipped:
       const region = countryRegion(l.country, l.region)
       return region ? [{ id: l.id, country: l.country as Nationality, region, teams: l.teams ?? 0, revenue: countryRevenue(l.country, l.economy?.revenue), ...nationalCupOf(cups, l.country) }] : []
     })
-  for (const region of ['SA', 'EU'] as const) {
+  for (const region of ['SA', 'EU', 'NA'] as const) {
     if (own.some((c) => c.country === undefined && c.region === region)) continue
-    if (members.filter((m) => m.region === region).length < 5) continue
+    if (members.filter((m) => m.region === region).length < (region === 'NA' ? 2 : 5)) continue
     const defaults = defaultContinentalCups(region, members)
     if (defaults && fits([...cups, ...defaults], pkg, new Set(pkg.leagues.map((l) => l.country)))) cups.push(...defaults)
     else skipped.push(region)
+  }
+  // Copas mundiais: precisam das três copas continentais e de clubes em todos os continentes.
+  if (!own.some((c) => c.world !== undefined) && cups.some((c) => c.id === 'cont-na-1')) {
+    const worlds = defaultWorldCups(members, cups)
+    if (worlds && fits([...cups, ...worlds], pkg, new Set(pkg.leagues.map((l) => l.country)))) cups.push(...worlds)
+    else skipped.push('world')
   }
   return { cups, skipped }
 }

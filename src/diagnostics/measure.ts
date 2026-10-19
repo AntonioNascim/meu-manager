@@ -11,7 +11,8 @@ import { makeEnvelope } from '../store/saveFormat'
 import { canCompress } from '../store/compress'
 import { SaveStore } from '../store/saves'
 import type { SaveStats } from '../store/saves'
-import { BRAZIL_ONLY, FULL_WORLD, buildScaleGame } from './scaleWorld'
+import { buildDiagnosticGame } from './scaleGame'
+import { BRAZIL_ONLY, FULL_WORLD } from './scaleWorld'
 import type { LeagueSpec } from './scaleWorld'
 
 /** Metas no aparelho de referência: um Android de entrada (2 a 3 GB de memória, processador de entrada). */
@@ -162,6 +163,9 @@ export interface Measurement {
   clubs: number
   players: number
   matches: number
+  /** Copas da temporada (nacionais, continentais e mundiais) e quantos jogos elas têm. */
+  cups: number
+  cupMatches: number
   genMs: number
   seasonTableMs: number
   advances: number
@@ -208,11 +212,10 @@ export function chromeMemory(): number | null {
 }
 
 export async function measureWorld(options: MeasureOptions): Promise<Measurement> {
-  const specs = WORLD_SPECS[options.world]
   const readMemory = options.readMemory ?? chromeMemory
   const yieldToUi = options.yieldToUi ?? (() => Promise.resolve())
   const wall = performance.now()
-  const built = buildScaleGame(specs, options.seed ?? 7)
+  const built = buildDiagnosticGame(options.world, options.seed ?? 7)
   let game: Game = built.game
   await yieldToUi()
   const s = game.season
@@ -288,6 +291,8 @@ export async function measureWorld(options: MeasureOptions): Promise<Measurement
     clubs: s.teams.length,
     players: s.players.length,
     matches: s.matches.length,
+    cups: game.season.cups?.length ?? 0,
+    cupMatches: game.season.matches.filter((m) => m.cup !== undefined).length,
     genMs: built.genMs,
     seasonTableMs: built.seasonMs,
     advances: clicks.length,
@@ -336,7 +341,7 @@ export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', 
     `Indice de velocidade do processador: ${device.speedIndex ?? 'indisponivel'} (maior = mais rapido)`,
     `Texto do navegador: ${device.userAgent}`,
     '',
-    `Mundo: ${m.world === 'full' ? 'completo (15 ligas)' : 'Brasil A+B+C'} - ${m.clubs} clubes, ${m.players} jogadores, ${m.matches} partidas`,
+    `Mundo: ${m.world === 'full' ? 'completo (21 ligas, com as copas dos países, continentais e mundiais)' : 'Brasil A+B+C, com as copas do Brasil'} - ${m.clubs} clubes, ${m.players} jogadores, ${m.matches} partidas (${m.cupMatches} de ${m.cups} copas)`,
     `Gerar o mundo: ${f0(m.genMs)} ms | Montar a tabela: ${f0(m.seasonTableMs)} ms`,
     m.finished ? `Temporada inteira: ${f1(m.computeSeconds)} s de calculo (${f1(m.wallSeconds)} s no relogio, ${m.advances} avancos) - meta ${T.seasonSeconds} s: ${ok(m.computeSeconds <= T.seasonSeconds)}` : `Medida parcial: ${m.advances} avancos em ${f1(m.computeSeconds)} s (a temporada nao foi ate o fim)`,
     `Primeiro avanco: ${f1(m.firstMs / 1000)} s`,
@@ -356,7 +361,7 @@ export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', 
 // Importar um pacote de dados e começar um jogo (B7)
 // ---------------------------------------------------------------------------
 
-/** Metas no aparelho de referência para importar um pacote do tamanho do plano (15 ligas, 282 clubes) e começar o jogo. */
+/** Metas no aparelho de referência para importar um pacote do tamanho do plano (21 ligas, 358 clubes) e começar o jogo. */
 export const IMPORT_TARGETS = { importSeconds: 5, startSeconds: 3 } as const
 
 export interface ImportMeasurement {

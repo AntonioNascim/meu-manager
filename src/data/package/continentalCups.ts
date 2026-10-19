@@ -225,13 +225,119 @@ function southAmerica(leagues: readonly ContinentalLeague[]): PackageCup[] | und
 }
 
 /**
+ * América do Norte (Fase 3, parte 3D): uma copa de 16 clubes em mata-mata (oitavas a final, ida e volta), com as vagas repartidas entre as
+ * ligas da região pela raiz da receita. Calendário do ano civil, como as ligas dela (fevereiro a maio).
+ */
+function northAmerica(leagues: readonly ContinentalLeague[]): PackageCup[] | undefined {
+  const cap = (l: ContinentalLeague) => Math.max(0, Math.floor(l.teams * 0.5))
+  const slots = allocateSlots(leagues, 16, 2, cap)
+  if (!slots) return undefined
+  return [
+    {
+      kind: 'cup',
+      region: 'NA',
+      awayGoals: false,
+      extraTime: true,
+      penalties: true,
+      discipline: DISCIPLINE,
+      id: 'cont-na-1',
+      name: 'Copa Continental da América do Norte',
+      format: 'knockout',
+      entrants: leagues.flatMap((l) => countryEntrants(l, 1, slots.get(l.id) as number, 0, true)),
+      stages: [
+        { name: 'Oitavas de final', legs: 2, date: [2, 18], legGap: 7 },
+        { name: 'Quartas de final', legs: 2, date: [3, 18], legGap: 7 },
+        { name: 'Semifinais', legs: 2, date: [4, 15], legGap: 7 },
+        { name: 'Final', legs: 2, date: [5, 13], legGap: 7 },
+      ],
+      weekday: 3,
+      seeding: 'seeded',
+      homeOfSingleLeg: 'draw',
+      prize: prize([2_000_000, 3_000_000, 4_000_000, 6_000_000], 14_000_000, 6_000_000),
+    },
+  ]
+}
+
+/** Quantos clubes de primeira divisão cada continente precisa ter para as copas mundiais (o Mundial leva 12, 6, 4, 4, 4 + 1 do país-sede e 1). */
+const WORLD_SLOTS: Record<Exclude<Region, 'BR'>, number> = { EU: 12, SA: 6, NA: 5, AF: 4, AS: 4, OC: 1 }
+
+/**
+ * Copas mundiais padrão (3D): a Copa Intercontinental, todo ano em dezembro, com o campeão de cada continente (Europa, América do Sul e América
+ * do Norte pelas copas continentais; África, Ásia e Oceania pelo campeão da liga de elite da região), e o Mundial de Clubes, de quatro em
+ * quatro anos (2029, 2033...), com 32 clubes em oito grupos e mata-mata: 12 da Europa, 6 da América do Sul, 4 da África, 4 da Ásia, 4 da América
+ * do Norte, 1 da Oceania e 1 do país-sede (o campeão da primeira liga da América do Norte). Cada continente leva os campeões das últimas quatro
+ * edições da copa continental e completa com os clubes mais fortes. `undefined` se faltam as copas continentais de Europa, América do Sul e
+ * América do Norte, ou clubes em algum continente.
+ */
+export function defaultWorldCups(leagues: readonly ContinentalLeague[], cups: readonly Pick<PackageCup, 'id'>[]): PackageCup[] | undefined {
+  const regionLeagues = (region: Region) => leagues.filter((l) => l.region === region).sort((a, b) => a.id.localeCompare(b.id))
+  const has = (id: string) => cups.some((c) => c.id === id)
+  if (!has('cont-eu-1') || !has('cont-sa-1') || !has('cont-na-1')) return undefined
+  const clubs = (region: Region) => regionLeagues(region).reduce((n, l) => n + l.teams, 0)
+  for (const region of Object.keys(WORLD_SLOTS) as (keyof typeof WORLD_SLOTS)[]) if (clubs(region) < WORLD_SLOTS[region]) return undefined
+  const first = (region: Region) => regionLeagues(region)[0] as ContinentalLeague
+  const common = { kind: 'cup' as const, awayGoals: false, extraTime: true, penalties: true, discipline: DISCIPLINE, weekday: 3 as const, homeOfSingleLeg: 'draw' as const }
+  return [
+    {
+      ...common,
+      id: 'world-1',
+      name: 'Copa Intercontinental',
+      world: { every: 1, offset: 0, from: [12, 1] },
+      format: 'knockout',
+      entrants: [
+        { source: { type: 'cup', cup: 'cont-eu-1', place: 'winner', latest: true } },
+        { source: { type: 'cup', cup: 'cont-sa-1', place: 'winner', latest: true } },
+        { source: { type: 'cup', cup: 'cont-na-1', place: 'winner', latest: true } },
+        { source: league(first('AF').id, 1) },
+        { source: league(first('AS').id, 1) },
+        { source: league(first('OC').id, 1) },
+      ],
+      stages: [
+        { name: 'Primeira fase', legs: 1, date: [12, 3], neutral: true },
+        { name: 'Semifinais', legs: 1, date: [12, 10], neutral: true },
+        { name: 'Final', legs: 1, date: [12, 17], neutral: true },
+      ],
+      seeding: 'seeded',
+      prize: prize([1_500_000, 3_000_000, 5_000_000], 12_000_000, 5_000_000),
+    },
+    {
+      ...common,
+      id: 'world-2',
+      name: 'Mundial de Clubes',
+      world: { every: 4, offset: 2025, from: [6, 12] },
+      format: 'groups-knockout',
+      entrants: [
+        { source: { type: 'region', region: 'EU', count: 12, cup: 'cont-eu-1', last: 4 } },
+        { source: { type: 'region', region: 'SA', count: 6, cup: 'cont-sa-1', last: 4 } },
+        { source: { type: 'region', region: 'AF', count: 4 } },
+        { source: { type: 'region', region: 'AS', count: 4 } },
+        { source: { type: 'region', region: 'NA', count: 4, cup: 'cont-na-1', last: 4 } },
+        { source: { type: 'region', region: 'OC', count: 1 } },
+        // O país-sede: o campeão da primeira liga da América do Norte (se já está no Mundial, o melhor clube da região que sobrar).
+        { source: league(first('NA').id, 1), fallback: { type: 'region', region: 'NA', count: 1 } },
+      ],
+      groups: { name: 'Fase de grupos', count: 8, advance: 2, legs: 1, date: [6, 18], gapDays: 6 },
+      stages: [
+        { name: 'Oitavas de final', legs: 1, date: [7, 4], neutral: true },
+        { name: 'Quartas de final', legs: 1, date: [7, 11], neutral: true },
+        { name: 'Semifinais', legs: 1, date: [7, 18], neutral: true },
+        { name: 'Final', legs: 1, date: [7, 25], neutral: true },
+      ],
+      seeding: 'ranked',
+      prize: prize([8_000_000, 3_000_000, 5_000_000, 7_000_000, 10_000_000], 30_000_000, 12_000_000),
+    },
+  ]
+}
+
+/**
  * As copas continentais padrão de uma região, pelas primeiras divisões dos países dela. `undefined` se a região não tem países
- * suficientes (Europa: 5; América do Sul: 5) ou se as vagas não cabem nas ligas.
+ * suficientes (Europa e América do Sul: 5; América do Norte: 2) ou se as vagas não cabem nas ligas.
  */
 export function defaultContinentalCups(region: Region, leagues: readonly ContinentalLeague[]): PackageCup[] | undefined {
   const mine = leagues.filter((l) => l.region === region).sort((a, b) => a.id.localeCompare(b.id))
   if (region === 'EU') return mine.length >= 5 ? europe(mine) : undefined
   if (region === 'SA') return mine.length >= 5 ? southAmerica(mine) : undefined
+  if (region === 'NA') return mine.length >= 2 ? northAmerica(mine) : undefined
   return undefined
 }
 
