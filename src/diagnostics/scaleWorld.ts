@@ -43,8 +43,8 @@ export const FULL_WORLD: LeagueSpec[] = [
   { id: 'ec-1', name: 'Equador', region: 'SA', teams: 16, format: 'double', tier: 1, repTop: 10, repBottom: 3, repCurve: 1.5, economy: { revenue: 0.3, level: -4 } },
   { id: 'en-1', name: 'Inglaterra', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 8, repCurve: 1.7, economy: { revenue: 3.6, level: 7 } },
   { id: 'es-1', name: 'Espanha', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 20, repBottom: 8, repCurve: 2, economy: { revenue: 3.4, level: 7.4 } },
-  { id: 'it-1', name: 'Itália', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 19, repBottom: 7, repCurve: 1.7, economy: { revenue: 2.5, level: 6 } },
-  { id: 'de-1', name: 'Alemanha', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 19, repBottom: 7, repCurve: 1.7, economy: { revenue: 2.8, level: 6 } },
+  { id: 'it-1', name: 'Itália', region: 'EU', teams: 20, format: 'double', tier: 1, repTop: 19, repBottom: 7, repCurve: 1.7, economy: { revenue: 2.9, level: 6.6 } },
+  { id: 'de-1', name: 'Alemanha', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 19, repBottom: 7, repCurve: 1.7, economy: { revenue: 2.6, level: 5.8 } },
   { id: 'fr-1', name: 'França', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 17, repBottom: 6, repCurve: 1.7, economy: { revenue: 1.8, level: 3.5 } },
   { id: 'pt-1', name: 'Portugal', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4, repCurve: 1.7, economy: { revenue: 0.9, level: 2 } },
 ]

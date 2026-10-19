@@ -131,8 +131,8 @@ Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leag
 | `Ecuador` | SA | 0,3 | −4 |
 | `England` | EU | 3,6 | 7 |
 | `Spain` | EU | 3,4 | 7,4 |
-| `Italy` | EU | 2,5 | 6 |
-| `Germany` | EU | 2,8 | 6 |
+| `Italy` | EU | 2,9 | 6,6 |
+| `Germany` | EU | 2,6 | 5,8 |
 | `France` | EU | 1,8 | 3,5 |
 | `Portugal` | EU | 0,9 | 2 |
 

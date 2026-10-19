@@ -133,14 +133,15 @@ ${formatDynasties(runs)}
       const titles = titlesOf(list)
       expect.soft(list.length, `${cup} edições`).toBeGreaterThanOrEqual(YEARS - 3)
       expect.soft(titles.size / list.length, `${cup} campeões diferentes`).toBeGreaterThan(0.4)
-      expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(0.2)
+      // Na copa principal europeia o maior campeão real (Real Madrid) tem ~30% das últimas 30 edições; nas outras o limite é 20%.
+      expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(cup === 'cont-eu-1' ? 0.3 : 0.2)
       expect.soft(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
     }
-    // Nenhum país leva quase tudo da copa principal europeia (a Inglaterra tem mais vagas e clubes mais fortes).
+    // Nenhum país leva quase tudo da copa principal europeia: nos últimos 30 anos reais a Espanha tem ~13 títulos (43%).
     {
       const list = continental.editions.filter((e) => e.cup === 'cont-eu-1')
       const best = Math.max(...countBy(list.map((e) => e.winnerPyramid)).values())
-      expect.soft(best / list.length, 'cont-eu-1 fatia do país que mais ganha').toBeLessThan(0.7)
+      expect.soft(best / list.length, 'cont-eu-1 fatia do país que mais ganha').toBeLessThanOrEqual(0.45)
     }
     // Copa principal sul-americana, como a Libertadores real (os clubes brasileiros ganharam mais da metade das últimas 30 edições): o Brasil
     // fica entre 50% e 75%, a Argentina em segundo com 15% a 30% e os outros países ganham de vez em quando.
