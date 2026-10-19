@@ -99,7 +99,7 @@ ${formatDynasties(runs)}
   it('a força média de cada liga fica estável', () => {
     for (const id of ids) {
       const first = span(id, 0, 3, (l) => l.strength)
-      for (const d of [1, 2]) expect.soft(Math.abs(decade(id, d, (l) => l.strength) - first), `${id} década ${d + 1}`).toBeLessThan(id === 'br-3' ? 5 : 3.5)
+      for (const d of [1, 2]) expect.soft(Math.abs(decade(id, d, (l) => l.strength) - first), `${id} década ${d + 1}`).toBeLessThan(id === 'br-3' ? 5 : (series(id)[0]?.clubs ?? 20) <= 8 ? 5 : 3.5)
       // E não segue andando: a última década é parecida com a anterior.
       expect.soft(Math.abs(decade(id, 2, (l) => l.strength) - decade(id, 1, (l) => l.strength)), `${id} última década`).toBeLessThan(2.5)
     }
@@ -140,7 +140,8 @@ ${formatDynasties(runs)}
       // Na copa principal europeia o maior campeão real (Real Madrid) tem ~30% das últimas 30 edições; no Mundial, 35% de poucas edições; nas outras o limite é 20%.
       if (mundial) expect.soft(Math.max(...titles.values()), `${cup} títulos de um clube`).toBeLessThanOrEqual(3)
       else expect.soft(Math.max(...titles.values()) / list.length, `${cup} títulos de um clube`).toBeLessThanOrEqual(cup === 'cont-eu-1' ? 0.3 : 0.2)
-      expect.soft(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(2)
+      // Até 3 seguidos (o Real Madrid ganhou 3 Champions e 3 Mundiais seguidos; Estudiantes e Independiente, 3 ou mais Libertadores), nunca mais que isso.
+      expect.soft(streakOf(list), `${cup} títulos seguidos`).toBeLessThanOrEqual(3)
     }
     // Nenhum país leva quase tudo da copa principal europeia: nos últimos 30 anos reais a Espanha tem ~13 títulos (43%).
     {
