@@ -138,8 +138,9 @@ describe('uma temporada com as cinco copas (mundo de 282 clubes)', () => {
     const main = cup(state, 'cont-sa-1')
     const team = (id: string) => state.teams.find((t) => t.id === id)!
     const prizes = (id: string) => team(id).finances.ledger.filter((e) => e.category === 'cup-prize' && (e.description ?? '').startsWith(main.name))
-    const champion = prizes(main.winnerId!).reduce((s, e) => s + e.amount, 0)
-    const runnerUp = prizes(main.runnerUpId!).reduce((s, e) => s + e.amount, 0)
+    // O prêmio vale vezes o índice de receita da liga do clube: compara-se em unidades do Brasil.
+    const champion = prizes(main.winnerId!).reduce((s, e) => s + e.amount, 0) / (team(main.winnerId!).economy?.revenue ?? 1)
+    const runnerUp = prizes(main.runnerUpId!).reduce((s, e) => s + e.amount, 0) / (team(main.runnerUpId!).economy?.revenue ?? 1)
     expect(champion).toBeGreaterThan(runnerUp)
     expect(prizes(main.winnerId!).length).toBeGreaterThanOrEqual(4)
     // Quem só jogou os grupos recebeu a participação.

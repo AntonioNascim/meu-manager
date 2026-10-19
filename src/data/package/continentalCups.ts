@@ -78,7 +78,11 @@ function countryEntrants(l: ContinentalLeague, from: number, count: number, stag
  * clube pequeno); `SCALE` leva a média a ~5%, o que não cria clubes que ganham tudo sempre.
  */
 const SCALE = 0.33
-const prize = (perStage: number[], champion: number, runnerUp: number) => ({ perStage: perStage.map((v) => Math.round((v * SCALE) / 100_000) * 100_000), champion: Math.round((champion * SCALE) / 100_000) * 100_000, runnerUp: Math.round((runnerUp * SCALE) / 100_000) * 100_000 })
+/** As copas europeias pagam menos: os gigantes europeus tiravam 34% a 39% da receita delas, contra uns 10% a 20% na vida real. */
+const EUROPE_SCALE = 0.6
+const scaledPrize = (scale: number) => (perStage: number[], champion: number, runnerUp: number) => ({ perStage: perStage.map((v) => Math.round((v * scale) / 100_000) * 100_000), champion: Math.round((champion * scale) / 100_000) * 100_000, runnerUp: Math.round((runnerUp * scale) / 100_000) * 100_000 })
+const prize = scaledPrize(SCALE)
+const europePrize = scaledPrize(SCALE * EUROPE_SCALE)
 
 /** Europa: três copas (24, 16 e 12 clubes). `undefined` se os países da região não têm clubes para as vagas. */
 function europe(leagues: readonly ContinentalLeague[]): PackageCup[] | undefined {
@@ -110,7 +114,7 @@ function europe(leagues: readonly ContinentalLeague[]): PackageCup[] | undefined
       weekday: 3,
       seeding: 'ranked',
       homeOfSingleLeg: 'draw',
-      prize: prize([15_000_000, 3_000_000, 6_000_000, 9_000_000, 14_000_000], 35_000_000, 14_000_000),
+      prize: europePrize([15_000_000, 3_000_000, 6_000_000, 9_000_000, 14_000_000], 35_000_000, 14_000_000),
     },
     {
       ...common,
@@ -129,7 +133,7 @@ function europe(leagues: readonly ContinentalLeague[]): PackageCup[] | undefined
       excludeCups: ['cont-eu-1'],
       seeding: 'ranked',
       homeOfSingleLeg: 'draw',
-      prize: prize([6_000_000, 1_500_000, 3_000_000, 4_500_000, 7_000_000], 15_000_000, 6_000_000),
+      prize: europePrize([6_000_000, 1_500_000, 3_000_000, 4_500_000, 7_000_000], 15_000_000, 6_000_000),
     },
     {
       ...common,
@@ -147,7 +151,7 @@ function europe(leagues: readonly ContinentalLeague[]): PackageCup[] | undefined
       excludeCups: ['cont-eu-1', 'cont-eu-2'],
       seeding: 'ranked',
       homeOfSingleLeg: 'draw',
-      prize: prize([3_000_000, 1_000_000, 2_000_000, 3_500_000], 7_000_000, 3_000_000),
+      prize: europePrize([3_000_000, 1_000_000, 2_000_000, 3_500_000], 7_000_000, 3_000_000),
     },
   ]
 }

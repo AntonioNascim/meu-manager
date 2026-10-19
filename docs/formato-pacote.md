@@ -122,21 +122,21 @@ Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leag
 | País (`id`) | Região | `revenue` | `level` |
 |---|---|---|---|
 | `Brazil` | BR | 1 (referência) | 0 |
-| `Argentina` | SA | 0,6 | −0,5 |
+| `Argentina` | SA | 0,6 | −0,75 |
 | `Uruguay` | SA | 0,3 | −4 |
 | `Paraguay` | SA | 0,25 | −5 |
 | `Chile` | SA | 0,4 | −3 |
 | `Colombia` | SA | 0,45 | −2 |
 | `Peru` | SA | 0,3 | −4 |
 | `Ecuador` | SA | 0,3 | −4 |
-| `England` | EU | 3,6 | 7 |
-| `Spain` | EU | 3,4 | 7,4 |
-| `Italy` | EU | 2,9 | 6,6 |
+| `England` | EU | 3,4 | 6,7 |
+| `Spain` | EU | 3,5 | 7,6 |
+| `Italy` | EU | 3 | 6,8 |
 | `Germany` | EU | 2,5 | 5,4 |
 | `France` | EU | 1,8 | 3,5 |
 | `Portugal` | EU | 0,9 | 2 |
 | `Netherlands` | EU | 1,2 | 2,6 |
-| `Mexico` | NA | 1 | 0 |
+| `Mexico` | NA | 1 | 0,5 |
 | `United States` | NA | 0,9 | −2 |
 | `Egypt` | AF | 0,35 | −4,5 |
 | `Japan` | AS | 0,7 | −2 |
