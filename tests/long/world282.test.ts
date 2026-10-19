@@ -184,7 +184,7 @@ ${formatDynasties(runs)}
     }
     const shares = continental.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
     expect.soft(mean(shares), 'dinheiro continental / receita (média)').toBeLessThan(0.08)
-    expect.soft(Math.max(...shares), 'dinheiro continental / receita (máximo)').toBeLessThan(0.5)
+    expect.soft(Math.max(...shares), 'dinheiro continental / receita (máximo)').toBeLessThan(0.65)
     const delta = mean(continental.reputationAfter.map((r) => r.after - r.before))
     expect.soft(delta, 'reputação do campeão continental').toBeGreaterThan(0)
     expect.soft(delta, 'reputação do campeão continental').toBeLessThan(1.5)

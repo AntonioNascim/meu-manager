@@ -135,6 +135,8 @@ if (process.argv[1]?.includes('continentalRun')) {
   const sorted = [...shares].sort((a, b) => a - b)
   const mean = shares.reduce((a, b) => a + b, 0) / (shares.length || 1)
   console.log(`dinheiro continental / receita (clubes que jogaram): média ${(100 * mean).toFixed(1)}%, mediana ${(100 * (sorted[Math.floor(sorted.length / 2)] ?? 0)).toFixed(1)}%, máximo ${(100 * (sorted[sorted.length - 1] ?? 0)).toFixed(1)}% (${shares.length} clube-temporadas)`)
+  const dependent = run.money.map((m) => ({ ...m, share: (m.continental + m.world) / Math.max(1, m.revenue) })).sort((a, b) => b.share - a.share).slice(0, 8)
+  console.log(`maiores dependências das copas (clube, ano, país, reputação, continental+mundial/receita): ${dependent.map((m) => `${m.teamId.replace('team-', '')} ${m.year} ${m.pyramid} rep${m.reputation} ${(m.continental / 1e6).toFixed(1)}M+${(m.world / 1e6).toFixed(1)}M/${(m.revenue / 1e6).toFixed(0)}M=${(100 * m.share).toFixed(0)}%`).join('; ')}`)
   const worldShares = run.money.filter((m) => m.world > 0).map((m) => m.world / Math.max(1, m.revenue))
   if (worldShares.length > 0) console.log(`dinheiro das copas mundiais / receita (clubes que jogaram): média ${((100 * worldShares.reduce((a, b) => a + b, 0)) / worldShares.length).toFixed(1)}%, máximo ${(100 * Math.max(...worldShares)).toFixed(1)}% (${worldShares.length} clube-temporadas)`)
   const deltas = run.reputationAfter.map((r) => r.after - r.before)

@@ -138,6 +138,11 @@ jobs:
         run: |
           {
             echo "## ${MEDICAO} (semente ${SEMENTE})"
+            echo '### Clubes que mais dependem do dinheiro das copas'
+            echo '```'
+            grep -h 'maiores dependências' resultado/*.txt | sed 's/; /
+   /g' || true
+            echo '```'
             echo '```'
             tail -c 60000 resultado/*.txt || true
             echo '```'

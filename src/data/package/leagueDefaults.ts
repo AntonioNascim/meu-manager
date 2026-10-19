@@ -7,7 +7,7 @@ import type { LeagueEconomy, Nationality, Region } from '../../engine/types'
  */
 export const COUNTRY_DEFAULTS: Partial<Record<Nationality, { region: Region; economy?: LeagueEconomy; calendar: LeagueCalendar }>> = {
   Brazil: { region: 'BR', calendar: { start: [1, 24] } },
-  Argentina: { region: 'SA', economy: { revenue: 0.6, level: -1 }, calendar: { start: [1, 24] } },
+  Argentina: { region: 'SA', economy: { revenue: 0.6, level: -0.5 }, calendar: { start: [1, 24] } },
   Uruguay: { region: 'SA', economy: { revenue: 0.3, level: -4 }, calendar: { start: [1, 24] } },
   Paraguay: { region: 'SA', economy: { revenue: 0.25, level: -5 }, calendar: { start: [1, 24] } },
   Chile: { region: 'SA', economy: { revenue: 0.4, level: -3 }, calendar: { start: [1, 24] } },
@@ -17,7 +17,7 @@ export const COUNTRY_DEFAULTS: Partial<Record<Nationality, { region: Region; eco
   England: { region: 'EU', economy: { revenue: 3.6, level: 7 }, calendar: { split: true, start: [8, 15] } },
   Spain: { region: 'EU', economy: { revenue: 3.4, level: 7.4 }, calendar: { split: true, start: [8, 15] } },
   Italy: { region: 'EU', economy: { revenue: 2.9, level: 6.6 }, calendar: { split: true, start: [8, 15] } },
-  Germany: { region: 'EU', economy: { revenue: 2.6, level: 5.8 }, calendar: { split: true, start: [8, 15] } },
+  Germany: { region: 'EU', economy: { revenue: 2.5, level: 5.4 }, calendar: { split: true, start: [8, 15] } },
   France: { region: 'EU', economy: { revenue: 1.8, level: 3.5 }, calendar: { split: true, start: [8, 15] } },
   Portugal: { region: 'EU', economy: { revenue: 0.9, level: 2 }, calendar: { split: true, start: [8, 15] } },
   Netherlands: { region: 'EU', economy: { revenue: 1.2, level: 2.6 }, calendar: { split: true, start: [8, 15] } },
