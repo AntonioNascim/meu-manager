@@ -264,7 +264,7 @@ const WORLD_SLOTS: Record<Exclude<Region, 'BR'>, number> = { EU: 12, SA: 6, NA: 
 /**
  * Copas mundiais padrão (3D): a Copa Intercontinental, todo ano em dezembro, com o campeão de cada continente (Europa, América do Sul e América
  * do Norte pelas copas continentais; África, Ásia e Oceania pelo campeão da liga de elite da região), e o Mundial de Clubes, de quatro em
- * quatro anos (2029, 2033...), com 32 clubes em oito grupos e mata-mata: 12 da Europa, 6 da América do Sul, 4 da África, 4 da Ásia, 4 da América
+ * quatro anos (2029, 2033...), de junho a meados de julho (depois das finais europeias e antes da abertura das ligas da Europa, da África, da Ásia e da Oceania), com 32 clubes em oito grupos e mata-mata: 12 da Europa, 6 da América do Sul, 4 da África, 4 da Ásia, 4 da América
  * do Norte, 1 da Oceania e 1 do país-sede (o campeão da primeira liga da América do Norte). Cada continente leva os campeões das últimas quatro
  * edições da copa continental e completa com os clubes mais fortes. `undefined` se faltam as copas continentais de Europa, América do Sul e
  * América do Norte, ou clubes em algum continente.
@@ -304,7 +304,7 @@ export function defaultWorldCups(leagues: readonly ContinentalLeague[], cups: re
       ...common,
       id: 'world-2',
       name: 'Mundial de Clubes',
-      world: { every: 4, offset: 2025, from: [6, 12] },
+      world: { every: 4, offset: 2025, from: [6, 1] },
       format: 'groups-knockout',
       entrants: [
         { source: { type: 'region', region: 'EU', count: 12, cup: 'cont-eu-1', last: 4 } },
@@ -316,12 +316,12 @@ export function defaultWorldCups(leagues: readonly ContinentalLeague[], cups: re
         // O país-sede: o campeão da primeira liga da América do Norte (se já está no Mundial, o melhor clube da região que sobrar).
         { source: league(first('NA').id, 1), fallback: { type: 'region', region: 'NA', count: 1 } },
       ],
-      groups: { name: 'Fase de grupos', count: 8, advance: 2, legs: 1, date: [6, 18], gapDays: 6 },
+      groups: { name: 'Fase de grupos', count: 8, advance: 2, legs: 1, date: [6, 6], gapDays: 6 },
       stages: [
-        { name: 'Oitavas de final', legs: 1, date: [7, 4], neutral: true },
-        { name: 'Quartas de final', legs: 1, date: [7, 11], neutral: true },
-        { name: 'Semifinais', legs: 1, date: [7, 18], neutral: true },
-        { name: 'Final', legs: 1, date: [7, 25], neutral: true },
+        { name: 'Oitavas de final', legs: 1, date: [6, 27], neutral: true },
+        { name: 'Quartas de final', legs: 1, date: [7, 4], neutral: true },
+        { name: 'Semifinais', legs: 1, date: [7, 11], neutral: true },
+        { name: 'Final', legs: 1, date: [7, 18], neutral: true },
       ],
       seeding: 'ranked',
       prize: prize([8_000_000, 3_000_000, 5_000_000, 7_000_000, 10_000_000], 30_000_000, 12_000_000),
