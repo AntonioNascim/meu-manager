@@ -5,7 +5,7 @@
  * e pela tela `?diagnostico=1`.
  */
 import { BRAZILIAN_FIRST_NAMES, BRAZILIAN_SURNAMES, SPANISH_FIRST_NAMES, SPANISH_SURNAMES } from '../data/names'
-import { defaultCupsFor } from '../data/package/countryCups'
+import { cupsForPackage } from '../data/package/packageCups'
 import { PACKAGE_FORMAT, PACKAGE_VERSION } from '../data/package/types'
 import type { DataPackage, PackageClub, PackageLeague, PackagePlayer } from '../data/package/types'
 import { createRng } from '../engine/rng'
@@ -125,7 +125,7 @@ export function buildScalePackage(seed = 7): DataPackage {
     leagues,
     clubs,
     players,
-    // As copas padrão de cada país (Brasil, Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina).
-    cups: countries.flatMap((c) => defaultCupsFor(c.id as Nationality, leagues.filter((l) => l.country === c.id))),
+    // As copas padrão de cada país (Brasil, Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina) e as continentais das duas regiões.
+    cups: cupsForPackage({ leagues }).cups,
   }
 }

@@ -55,8 +55,11 @@ export interface PackageCup {
   entrants: CupEntrant[]
   groups?: CupGroupsSpec
   leaguePhase?: CupLeaguePhaseSpec
+  preliminary?: CupStageSpec[]
   stages: CupStageSpec[]
-  seeding?: 'random' | 'seeded'
+  weekday?: 2 | 3 | 4
+  excludeCups?: string[]
+  seeding?: 'random' | 'seeded' | 'ranked'
   homeOfSingleLeg?: CupSpec['homeOfSingleLeg']
   awayGoals?: boolean
   extraTime?: boolean

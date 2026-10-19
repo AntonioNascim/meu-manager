@@ -27,6 +27,15 @@ const easy = (g: Game): Game => ({ ...g, dismissal: undefined, season: { ...g.se
 const describe = (g: Game, title: string) => {
   const s = g.season
   console.log(`\n== ${title} (relógio ${s.season.currentDate}) ==`)
+  for (const c of (s.cups ?? []).filter((x) => x.pyramid === undefined)) {
+    const ms = s.matches.filter((m) => m.competitionId === c.id)
+    const d = ms.map((m) => m.date).sort()
+    const done = ms.filter((m) => m.status === 'finished').length
+    const stages = new Map<number, string[]>()
+    for (const m of ms) stages.set(m.cup?.stage ?? 0, [...(stages.get(m.cup?.stage ?? 0) ?? []), m.date])
+    if (process.env.STAGES) console.log('     fases: ' + [...stages].map(([k, v]) => `${k}:${v.sort()[0]}..${v.sort()[v.length - 1]}`).join(' · '))
+    console.log(`  [continental] ${c.id} ${c.year} ${c.entrants.length} clubes · ${ms.length} jogos (${done} jogados) ${d[0]}..${d[d.length - 1]}${c.winnerId ? ` · campeão ${c.winnerId}` : ''}`)
+  }
   const pyramids = [...new Set(s.season.competitions.map((c) => pyramidOf(c)))]
   for (const p of pyramids) {
     const cycle = cycleOfPyramid(s, p)

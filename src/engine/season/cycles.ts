@@ -84,29 +84,47 @@ export function cycleOfTeam(state: Pick<SeasonState, 'cycles' | 'season' | 'focu
 /** As competições (ligas) de uma pirâmide. */
 export const competitionsOf = (state: Pick<SeasonState, 'season'>, pyramid: string): Competition[] => state.season.competitions.filter((c) => pyramidOf(c) === pyramid)
 
-/** Todos os jogos da pirâmide (ligas e copas) já foram jogados? */
+interface PyramidMatches {
+  /** Jogos da pirâmide (ligas e copas do país) e os das copas continentais de que um clube dela participa. */
+  own: Set<string>
+  continental: Set<string>
+  teams: Set<TeamId>
+}
+
+function pyramidMatches(state: Pick<SeasonState, 'season' | 'cups'>, pyramid: string): PyramidMatches {
+  const comps = competitionsOf(state, pyramid)
+  const own = new Set(comps.map((c) => c.id))
+  const continental = new Set<string>()
+  for (const cup of state.cups ?? []) {
+    if (cup.pyramid === pyramid) own.add(cup.id)
+    else if (cup.pyramid === undefined) continental.add(cup.id)
+  }
+  return { own, continental, teams: new Set(comps.flatMap((c) => c.teamIds)) }
+}
+
+/** Todos os jogos da pirâmide (ligas, copas do país e as continentais de que um clube dela ainda participa) já foram jogados? */
 export function pyramidFinished(state: Pick<SeasonState, 'season' | 'matches' | 'cups'>, pyramid: string): boolean {
-  const ids = new Set(competitionsOf(state, pyramid).map((c) => c.id))
-  for (const cup of state.cups ?? []) if (cup.pyramid === pyramid) ids.add(cup.id)
+  const { own, continental, teams } = pyramidMatches(state, pyramid)
   let any = false
   for (const m of state.matches) {
-    if (!ids.has(m.competitionId)) continue
-    if (m.status !== 'finished') return false
-    any = true
+    if (own.has(m.competitionId)) {
+      if (m.status !== 'finished') return false
+      any = true
+    } else if (m.status !== 'finished' && continental.has(m.competitionId) && (teams.has(m.homeTeamId) || teams.has(m.awayTeamId))) return false
   }
   return any
 }
 
 /** Fase da temporada de uma pirâmide, pelos jogos: antes do primeiro, no meio, depois do último. */
 export function phaseOfPyramid(state: Pick<SeasonState, 'season' | 'matches' | 'cups'>, pyramid: string): SeasonPhase {
-  const ids = new Set(competitionsOf(state, pyramid).map((c) => c.id))
-  for (const cup of state.cups ?? []) if (cup.pyramid === pyramid) ids.add(cup.id)
+  const { own, continental, teams } = pyramidMatches(state, pyramid)
   let finished = 0
   let open = 0
   for (const m of state.matches as readonly Match[]) {
-    if (!ids.has(m.competitionId)) continue
-    if (m.status === 'finished') finished++
-    else open++
+    if (own.has(m.competitionId)) {
+      if (m.status === 'finished') finished++
+      else open++
+    } else if (m.status !== 'finished' && continental.has(m.competitionId) && (teams.has(m.homeTeamId) || teams.has(m.awayTeamId))) open++
   }
   if (open === 0 && finished > 0) return 'end-of-season'
   return finished > 0 ? 'in-season' : 'pre-season'

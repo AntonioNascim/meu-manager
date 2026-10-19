@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { cupMatches, cupStatus, groupTables, leaguePhaseTable, stageList, tiesOfStage } from '../../../engine/cups'
 import type { TieView } from '../../../engine/cups'
 import type { Cup, Match, StandingRow } from '../../../engine/types'
-import { seasonLabelOf, teamById } from '../../../store/game'
+import { cupSeasonLabel, teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { formatDate } from '../../format'
 import { Tabs } from '../../components/ui'
@@ -200,7 +200,12 @@ function Scorers({ game, cup, onTeam }: { game: Game; cup: Cup; onTeam: (id: str
 
 /** Copas: escolha da copa, chaveamento por fase, todos os jogos e artilharia da copa. */
 export function Cups({ game, onTeam }: { game: Game; onTeam: (id: string) => void }) {
-  const cups = game.season.cups ?? []
+  // As copas em que o seu time joga vêm primeiro; depois as do país dele e as outras.
+  const cups = useMemo(() => {
+    const list = game.season.cups ?? []
+    const mine = (c: Cup) => c.entrants.some((e) => e.teamId === game.userTeamId)
+    return [...list].sort((a, b) => Number(mine(b)) - Number(mine(a)))
+  }, [game.season.cups, game.userTeamId])
   const [cupId, setCupId] = useState(() => defaultCup(game)?.id ?? '')
   const [view, setView] = useState<View>('bracket')
   const [openId, setOpenId] = useState<string | null>(null)
@@ -219,7 +224,7 @@ export function Cups({ game, onTeam }: { game: Game; onTeam: (id: string) => voi
           ))}
         </div>
       )}
-      <SectionHeader icon="trophy" title={cup.name} subtitle={`${seasonLabelOf(game, cup.pyramid ?? 'default', cup.year)} · ${winner ? `campeão: ${shortName(winner)}` : `${cup.entrants.length} clubes`}`} tone="gold" />
+      <SectionHeader icon="trophy" title={cup.name} subtitle={`${cupSeasonLabel(game, cup.id, cup.year)} · ${winner ? `campeão: ${shortName(winner)}` : `${cup.entrants.length} clubes`}`} tone="gold" />
       <p className="text-sm text-muted" data-testid="cup-status">
         {cupStatusText(game, cup)}
       </p>

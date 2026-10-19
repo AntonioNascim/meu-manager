@@ -1,4 +1,5 @@
 import { matchLabel } from '../../engine/cups'
+import { CupPathLine } from './standings/CupPath'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_IDS } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
@@ -627,6 +628,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
             </button>
           </p>
         )}
+        {snap.minute === 0 && match?.cup && <CupPathLine game={game} cupId={match.competitionId} />}
         {snap.minute === 0 && match?.cup?.leg === 2 && <FirstLegNote game={game} match={match} />}
         {alert && (
           <p role="alert" className="rounded-lg border border-amber-400/60 bg-amber-950/60 p-2 text-sm font-semibold text-amber-100">

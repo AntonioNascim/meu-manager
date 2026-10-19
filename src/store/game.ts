@@ -454,6 +454,8 @@ export const userSeasonLabelOf = (game: Game, year: number): string => seasonLab
 /** Nome da edição de uma copa (a temporada do país dela). */
 export function cupSeasonLabel(game: Game, cupId: string, year: number): string {
   const spec = game.season.cupSpecs?.find((s) => s.id === cupId)
+  // Copa continental: a temporada é a do continente (a europeia atravessa o ano).
+  if (spec && spec.country === undefined && spec.region) return seasonLabel({ year, split: spec.region === 'EU' })
   const pyramid = (spec ? pyramidOfCupSpec(spec, game.season.season.competitions) : undefined) ?? focusPyramid(game.season)
   return seasonLabelOf(game, pyramid, year)
 }

@@ -467,7 +467,8 @@ export const LEAGUE = {
 
 export const MARKET = {
   /** Rodízio das negociações das ligas fora do foco do técnico: só um em cada tantos clubes age por rodada. */
-  rotation: { outOfFocusEvery: 6 },
+  /** Rodízio das ligas fora do foco: 1 em cada `outOfFocusEvery` clubes negocia por rodada, mas os `alwaysActiveTop` clubes de maior reputação de cada liga negociam sempre (são eles que disputam as copas continentais; sem isso o país do técnico, que negocia o tempo todo, ganhava vantagem sobre os grandes dos outros países). */
+  rotation: { outOfFocusEvery: 6, alwaysActiveTop: 5 },
   /** Valor de mercado: base × e^(perPoint × (força efetiva − referência)), vezes idade e contrato. */
   value: {
     base: 300_000,
@@ -658,6 +659,9 @@ export const OFFSEASON = {
     /** Na primeira divisão, quem fica nela e está acima da média perde reputação mais devagar (nas séries de acesso o puxão é simétrico, para a média delas não andar): os clubes grandes se mantêm grandes (sem isso o topo encolhia 0,3 da distância por ano e as ligas ficavam sem dinastias). */
     tierPullAbove: 0.1,
     champion: 0,
+    /** Reputação a mais (antes de arredondar) para o campeão e o vice de uma copa continental na temporada. */
+    continentalChampion: 0.8,
+    continentalFinalist: 0.35,
     promoted: 1,
     relegated: -1,
   },

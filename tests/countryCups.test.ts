@@ -37,8 +37,8 @@ describe('copas padrão de cada país', () => {
     expect(names).toContain('Supercopa da Alemanha')
   })
 
-  it('o pacote de exemplo das 15 ligas traz as copas dos oito países e é válido', () => {
-    expect(sample.cups!.map((c) => c.id).sort()).toEqual(['cup-ar', 'cup-br', 'cup-de', 'cup-en', 'cup-es', 'cup-fr', 'cup-it', 'cup-pt', 'league-cup-pt', 'supercup-ar', 'supercup-br', 'supercup-de', 'supercup-es', 'supercup-it'])
+  it('o pacote de exemplo das 15 ligas traz as copas dos oito países, as cinco continentais e é válido', () => {
+    expect(sample.cups!.map((c) => c.id).sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2', 'cup-ar', 'cup-br', 'cup-de', 'cup-en', 'cup-es', 'cup-fr', 'cup-it', 'cup-pt', 'league-cup-pt', 'supercup-ar', 'supercup-br', 'supercup-de', 'supercup-es', 'supercup-it'])
     expect(validatePackage(copy()).report.errors).toEqual([])
   })
 

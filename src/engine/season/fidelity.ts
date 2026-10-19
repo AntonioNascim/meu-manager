@@ -25,11 +25,21 @@ export function quickCompetitionIds(state: Pick<SeasonState, 'focus' | 'season'>
 
 const NONE: ReadonlySet<CompetitionId> = new Set()
 
-/** Clubes que estão fora do foco (nas competições simplificadas). */
-export function quickTeamIds(state: Pick<SeasonState, 'focus' | 'season'>): ReadonlySet<TeamId> {
+/**
+ * Clubes que estão fora do foco (nas competições simplificadas) e entram no rodízio do mercado. Os de maior reputação de cada liga ficam de
+ * fora do rodízio: negociam sempre, como os do foco.
+ */
+export function quickTeamIds(state: Pick<SeasonState, 'focus' | 'season' | 'teams'>): ReadonlySet<TeamId> {
   const ids = quickCompetitionIds(state)
   if (ids.size === 0) return new Set()
-  return new Set(state.season.competitions.filter((c) => ids.has(c.id)).flatMap((c) => c.teamIds))
+  const reputation = new Map(state.teams.map((t) => [t.id, t.reputation]))
+  const out = new Set<TeamId>()
+  for (const c of state.season.competitions) {
+    if (!ids.has(c.id)) continue
+    const ranked = [...c.teamIds].sort((a, b) => (reputation.get(b) ?? 0) - (reputation.get(a) ?? 0) || a.localeCompare(b))
+    for (const id of ranked.slice(MARKET.rotation.alwaysActiveTop)) out.add(id)
+  }
+  return out
 }
 
 /** Um jogo de copa é simplificado se nenhum dos dois clubes é da pirâmide do técnico (copas só entre clubes de fora; as do foco, e as que têm um clube dele, são lance a lance). */

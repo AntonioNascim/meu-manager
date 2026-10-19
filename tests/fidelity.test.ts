@@ -45,7 +45,7 @@ describe('foco do técnico', () => {
   it('com foco só a pirâmide do técnico é lance a lance', () => {
     const s = fresh('br')
     expect([...quickCompetitionIds(s)]).toEqual(['uy-1'])
-    expect(quickTeamIds(s).size).toBe(12)
+    expect(quickTeamIds(s).size).toBe(7)
     expect(pyramidOfTeam(s, brazilTeam)).toBe('br')
     expect(pyramidOfTeam(s, uruguayTeam)).toBe('uy')
   })

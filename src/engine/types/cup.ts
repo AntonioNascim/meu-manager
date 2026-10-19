@@ -11,6 +11,12 @@ export type CupEntrantSource =
   | { type: 'league'; league: string; positions?: [number, number] }
   /** Campeão ou vice de outra copa na temporada passada. */
   | { type: 'cup'; cup: string; place: 'winner' | 'runner-up' }
+  /**
+   * Clube que terminou em tal colocação (1 = primeiro) de um grupo da fase de grupos de outra copa **da mesma edição** (os terceiros da
+   * Libertadores caem para a Sul-Americana). Só se conhece quando a fase de grupos da outra copa termina: a vaga entra na fase `stage`
+   * da copa (obrigatório e maior que 0), que espera.
+   */
+  | { type: 'cup-group-place'; cup: string; place: number }
 
 /** Uma vaga na copa: de onde vem o clube, em que fase ele entra e quem ocupa se o primeiro escolhido já está na copa. */
 export interface CupEntrant {
@@ -40,6 +46,8 @@ export interface CupGroupsSpec {
   count: number
   /** Quantos de cada grupo passam. */
   advance: number
+  /** Dos que passam, os `direct` primeiros colocados de cada grupo pulam a primeira fase de mata-mata e entram na seguinte (como os líderes na Sul-Americana). */
+  direct?: number
   /** 1 = só ida, 2 = ida e volta dentro do grupo. */
   legs: 1 | 2
   /** Dia de referência da primeira rodada de grupos; as outras vêm de `gapDays` em `gapDays`. */
@@ -89,10 +97,19 @@ export interface CupSpec {
   entrants: CupEntrant[]
   groups?: CupGroupsSpec
   leaguePhase?: CupLeaguePhaseSpec
+  /** Fases preliminares de mata-mata, jogadas antes dos grupos (só em `groups-knockout`); os vencedores vão para os grupos. */
+  preliminary?: CupStageSpec[]
   /** Fases de mata-mata, da primeira à final. */
   stages: CupStageSpec[]
-  /** Sorteio: aleatório, ou com cabeças de chave (os mais fortes pela reputação são separados e, no mata-mata, ficam com as folgas). */
-  seeding: 'random' | 'seeded'
+  /** Dia da semana dos jogos: 2 terça, 3 quarta (padrão), 4 quinta. */
+  weekday?: 2 | 3 | 4
+  /** Clubes que já estão nestas copas (da mesma edição) não entram nesta: quem se classifica para duas fica com a maior. */
+  excludeCups?: string[]
+  /**
+   * Sorteio: aleatório, ou com cabeças de chave (os mais fortes pela reputação são separados e, no mata-mata, ficam com as folgas).
+   * `ranked`: como `seeded`, mas depois de uma fase de grupos ou de liga os cabeças de chave são os mais bem colocados nela.
+   */
+  seeding: 'random' | 'seeded' | 'ranked'
   /**
    * Mandante do jogo único: sorteado (`draw`; com cabeças de chave, o cabeça de chave), o de menor ou de maior reputação, o clube da divisão
    * inferior (`lower-division`; entre clubes da mesma divisão vale o sorteio) ou o primeiro listado nas vagas (`first-listed`, para supercopas).
@@ -128,6 +145,8 @@ export interface Cup {
   spec: CupSpec
   entrants: { teamId: TeamId; stage: number }[]
   log: CupStageLog[]
+  /** Fases em que já entraram as vagas que dependem de outra copa (`cup-group-place`). */
+  resolved?: number[]
   /** Preenchido quando a copa acaba. */
   winnerId?: TeamId
   runnerUpId?: TeamId

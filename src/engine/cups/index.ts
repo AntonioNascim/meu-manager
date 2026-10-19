@@ -9,16 +9,17 @@ import { leagueRevenue } from '../economy'
 import { recordEntry } from '../finance'
 import { createRng, hashSeed } from '../rng'
 import type { SeasonState } from '../season/calendar'
-import { cycleOfPyramid, focusPyramid } from '../season/cycles'
+import { cycleOfPyramid, focusPyramid, phaseOfPyramid } from '../season/cycles'
 import { pyramidOf } from '../season/fidelity'
 import { WEDNESDAY, addDays, makeDate, onOrAfterWeekday } from '../season/dates'
-import type { Competition, Cup, CupSpec, IsoDate, Match, MatchCupInfo, StandingRow, Team, TeamId } from '../types'
+import type { Competition, Cup, CupSpec, CupStageSpec, IsoDate, Match, MatchCupInfo, StandingRow, Team, TeamId } from '../types'
 import { drawGroups, drawKnockout, drawLeaguePhase, groupRounds } from './draw'
 import { resolveEntrants } from './entrants'
-import { stageList } from './plan'
+import { isContinental, stageList } from './plan'
 import { cupMatches, groupTables, leaguePhaseTable, tiesOfStage } from './tie'
 
 export * from './plan'
+export * from './path'
 export * from './tie'
 export { resolveEntrants } from './entrants'
 
@@ -45,9 +46,29 @@ function busyDays(matches: readonly Match[], teamIds: ReadonlySet<TeamId>): Map<
  * Primeiro dia de jogo da copa: a quarta-feira a partir de `notBefore` em que nenhum dos clubes joga (nem na véspera nem no dia
  * seguinte), então os jogos da copa nunca batem com a liga.
  */
-export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: ReadonlyMap<TeamId, ReadonlySet<IsoDate>>): IsoDate {
+export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: ReadonlyMap<TeamId, ReadonlySet<IsoDate>>, weekday: number = WEDNESDAY, tolerant = false): IsoDate {
   const ids = [...teamIds]
-  let day = onOrAfterWeekday(notBefore, WEDNESDAY)
+  let day = onOrAfterWeekday(notBefore, weekday)
+  if (tolerant) {
+    // Copa com clubes de vários países (as continentais): as rodadas de meio de semana das ligas de seis países cobrem quase todas as semanas, então,
+    // depois de esperar um pouco, vale o dia anterior e aceita-se um jogo colado em outro de alguns clubes (nunca no mesmo dia).
+    for (let week = 0; week < 80; week++, day = addDays(day, 7)) {
+      const tolerance = week < 2 ? 0 : Math.ceil(ids.length * (week < 4 ? 0.15 : week < 6 ? 0.4 : 1))
+      for (const candidate of [day, addDays(day, -1)]) {
+        if (candidate < notBefore) continue
+        let same = 0
+        let adjacent = 0
+        for (const id of ids) {
+          const days = busy.get(id)
+          if (!days) continue
+          if (days.has(candidate)) same++
+          else if (days.has(addDays(candidate, -1)) || days.has(addDays(candidate, 1))) adjacent++
+        }
+        if (same === 0 && adjacent <= tolerance) return candidate
+      }
+    }
+    return day
+  }
   for (let i = 0; i < 80; i++, day = addDays(day, 7)) {
     const free = ids.every((id) => {
       const days = busy.get(id)
@@ -100,6 +121,15 @@ function participantsOf(ctx: Ctx, stage: number): TeamId[] {
   if (stage === 0) return entering
   const previous = list[stage - 1] as (typeof list)[number]
   const base = advancingFrom(ctx, stage - 1)
+  if (previous.kind === 'groups' && (spec.groups?.direct ?? 0) > 0) {
+    // Os líderes dos grupos pulam esta fase: jogam a seguinte, com os vencedores dela.
+    const skip = (spec.groups?.direct ?? 0) * (groupTables(cupMatches(ctx.state.matches, ctx.cup.id), stage - 1).length)
+    return [...base.slice(skip), ...entering]
+  }
+  if (previous.kind === 'knockout' && list[stage - 2]?.kind === 'groups' && (spec.groups?.direct ?? 0) > 0) {
+    const skip = (spec.groups?.direct ?? 0) * (groupTables(cupMatches(ctx.state.matches, ctx.cup.id), stage - 2).length)
+    return [...advancingFrom(ctx, stage - 2).slice(0, skip), ...base, ...entering]
+  }
   if (previous.kind === 'league') {
     // Fase de liga: do `direct`+1º ao `direct`+`playoff`º jogam a primeira fase de mata-mata.
     const lp = spec.leaguePhase as NonNullable<CupSpec['leaguePhase']>
@@ -127,22 +157,28 @@ function payStage(ctx: Ctx, stage: number, teamIds: readonly TeamId[], date: Iso
 function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
   const { cup, state } = ctx
   const spec = cup.spec
-  const split = (cup.pyramid !== undefined && state.cycles[cup.pyramid]?.split) === true
+  // Copa de um país segue a temporada dele; a continental, a do continente (a europeia atravessa o ano).
+  const split = cup.pyramid !== undefined ? state.cycles[cup.pyramid]?.split === true : spec.region === 'EU'
+  const weekday = spec.weekday ?? WEDNESDAY
+  const tolerant = isContinental(spec)
   const descriptor = stageList(spec)[stage] as ReturnType<typeof stageList>[number]
   const participants = participantsOf(ctx, stage)
   const rng = createRng(`${state.market.seed}:${cup.year}:${cup.id}:draw:${stage}`)
-  const seeded = spec.seeding === 'seeded'
-  const strength = strengthOf(ctx)
+  const seeded = spec.seeding !== 'random'
+  const list = stageList(spec)
+  // `ranked`: depois dos grupos ou da fase de liga, o sorteio segue a ordem de chegada (os melhores colocados são os cabeças de chave).
+  const afterPhase = spec.seeding === 'ranked' && stage > 0 && list.slice(0, stage).some((s) => s.kind !== 'knockout')
+  const rankOf = new Map(participants.map((id, i) => [id, participants.length - i]))
+  const strength = afterPhase && descriptor.kind === 'knockout' ? (id: TeamId) => rankOf.get(id) ?? 0 : strengthOf(ctx)
   const busy = busyDays(ctx.matches, new Set(participants))
   const created: Match[] = []
   const round = (cupMatches(ctx.matches, cup.id).reduce((max, m) => Math.max(max, m.round), 0)) + 1
 
   if (descriptor.kind === 'knockout') {
-    const knockoutIndex = stage - (stageList(spec).findIndex((s) => s.kind === 'knockout'))
-    const stageSpec = spec.stages[knockoutIndex] as NonNullable<(typeof spec.stages)[number]>
+    const stageSpec = descriptor.stage as CupStageSpec
     const draw = drawKnockout(participants, seeded, strength, rng)
-    const first = pickCupDay(maxDate(stageAnchor(cup, split, stageSpec.date), notBefore), draw.ties.flatMap((t) => t.teams), busy)
-    const second = stageSpec.legs === 2 ? pickCupDay(addDays(first, stageSpec.legGap ?? CUP.legGapDays), draw.ties.flatMap((t) => t.teams), busy) : undefined
+    const first = pickCupDay(maxDate(stageAnchor(cup, split, stageSpec.date), notBefore), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant)
+    const second = stageSpec.legs === 2 ? pickCupDay(addDays(first, stageSpec.legGap ?? CUP.legGapDays), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant) : undefined
     draw.ties.forEach((tie, i) => {
       let [x, y] = tie.teams
       if (stageSpec.legs === 1) {
@@ -170,7 +206,7 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
     const days = Math.max(...perGroup.map((r) => r.length))
     let notYet = maxDate(stageAnchor(cup, split, g.date), notBefore)
     for (let d = 0; d < days; d++) {
-      const day = pickCupDay(notYet, participants, busy)
+      const day = pickCupDay(notYet, participants, busy, weekday, tolerant)
       notYet = addDays(day, gap)
       perGroup.forEach((rounds, gi) => (rounds[d] ?? []).forEach((f, i) => created.push(mkMatch(ctx, `s${stage}-g${gi + 1}-r${d + 1}-${i + 1}`, f.homeTeamId, f.awayTeamId, day, round + d, { stage, kind: 'group', group: gi + 1 }))))
     }
@@ -182,7 +218,7 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
     const gap = lp.gapDays ?? CUP.groupGapDays
     let notYet = maxDate(stageAnchor(cup, split, lp.date), notBefore)
     draw.matchdays.forEach((fixtures, d) => {
-      const day = pickCupDay(notYet, participants, busy)
+      const day = pickCupDay(notYet, participants, busy, weekday, tolerant)
       notYet = addDays(day, gap)
       fixtures.forEach((f, i) => created.push(mkMatch(ctx, `s${stage}-r${d + 1}-${i + 1}`, f.homeTeamId, f.awayTeamId, day, round + d, { stage, kind: 'league' })))
     })
@@ -213,6 +249,8 @@ export function createCups(state: SeasonState, specs: readonly CupSpec[], only?:
   if (specs.length === 0) return state
   const cups: Cup[] = (state.cups ?? []).filter((c) => only === undefined || c.pyramid !== only)
   for (const spec of specs) {
+    // As copas continentais têm a edição própria (`ensureContinentals`), criada quando todos os países dela já abriram a temporada.
+    if (isContinental(spec)) continue
     const pyramid = pyramidOfCupSpec(spec, state.season.competitions) ?? focusPyramid(state)
     if (only !== undefined && pyramid !== only) continue
     // A copa é da temporada do país dela: o ano da edição e as vagas (colocações da temporada passada) seguem a pirâmide.
@@ -222,6 +260,78 @@ export function createCups(state: SeasonState, specs: readonly CupSpec[], only?:
     cups.push({ id: spec.id, name: spec.name, year, pyramid, spec, entrants, log: [] })
   }
   return progressCups({ ...state, cups, cupSpecs: [...specs] })
+}
+
+/** As pirâmides (países) que dão vagas a uma copa, pelas ligas das vagas. */
+function pyramidsOfSpec(spec: CupSpec, competitions: readonly Pick<Competition, 'id' | 'pyramid'>[]): string[] {
+  const out = new Set<string>()
+  for (const rule of spec.entrants) {
+    for (const source of [rule.source, rule.fallback]) {
+      if (source?.type !== 'league') continue
+      const c = competitions.find((x) => x.id === source.league)
+      if (c) out.add(pyramidOf(c))
+    }
+  }
+  return [...out]
+}
+
+/**
+ * Cria (ou renova) as edições das copas continentais. A edição de um ano só nasce quando todos os países que dão vagas a ela já estão na
+ * temporada desse ano (as colocações finais da temporada passada já valem) e a edição anterior acabou; as copas que ela exclui precisam
+ * ser da mesma edição. Sem nada a fazer devolve o mesmo estado.
+ */
+export function ensureContinentals(state: SeasonState): SeasonState {
+  const specs = (state.cupSpecs ?? []).filter(isContinental)
+  if (specs.length === 0) return state
+  let current = state
+  for (const spec of specs) {
+    const pyramids = pyramidsOfSpec(spec, current.season.competitions)
+    if (pyramids.length === 0) continue
+    const edition = Math.min(...pyramids.map((p) => cycleOfPyramid(current, p).year))
+    const existing = current.cups?.find((c) => c.id === spec.id)
+    if (existing && (existing.year >= edition || existing.winnerId === undefined)) continue
+    // A edição só nasce no começo da temporada: com algum país já jogando a dele (um save antigo, no meio do ano), espera a virada.
+    if (pyramids.some((p) => phaseOfPyramid(current, p) !== 'pre-season')) continue
+    const excluded = new Set<TeamId>()
+    let waiting = false
+    for (const id of spec.excludeCups ?? []) {
+      const other = current.cups?.find((c) => c.id === id)
+      if (!other) continue
+      if (other.year < edition) waiting = true
+      else for (const e of other.entrants) excluded.add(e.teamId)
+    }
+    if (waiting) continue
+    const entrants = resolveEntrants(spec, { year: edition, teams: current.teams, competitions: current.season.competitions, cupHistory: current.cupHistory ?? {}, specs: current.cupSpecs ?? [], excluded })
+    if (entrants.length < 2) continue
+    const cup: Cup = { id: spec.id, name: spec.name, year: edition, spec, entrants, log: [] }
+    // A edição velha sai (com os jogos); a nova entra no lugar dela.
+    const cups = existing ? (current.cups ?? []).map((c) => (c.id === spec.id ? cup : c)) : [...(current.cups ?? []), cup]
+    const matches = existing ? current.matches.filter((m) => m.competitionId !== spec.id) : current.matches
+    current = { ...current, cups, matches }
+  }
+  return current === state ? state : { ...current, season: { ...current.season, matchIds: current.matches.map((m) => m.id) } }
+}
+
+/**
+ * Os clubes que entram na fase `stage` pelos grupos de outra copa (`cup-group-place`). `undefined` = a outra copa ainda não terminou os
+ * grupos: a fase espera. Se a outra copa não existe (ou não tem grupos) a vaga fica vazia.
+ */
+function resolveDeferred(cup: Cup, stage: number, state: Pick<SeasonState, 'cups' | 'matches'>): Cup | undefined {
+  const entrants = [...cup.entrants]
+  for (const rule of cup.spec.entrants) {
+    if (rule.source.type !== 'cup-group-place' || (rule.stage ?? 0) !== stage) continue
+    const other = state.cups?.find((c) => c.id === (rule.source as { cup: string }).cup)
+    const groupsAt = other ? stageList(other.spec).findIndex((s) => s.kind === 'groups') : -1
+    if (!other || groupsAt < 0) continue
+    const matches = cupMatches(state.matches, other.id).filter((m) => m.cup?.stage === groupsAt)
+    if (other.log.length <= groupsAt || matches.length === 0 || matches.some((m) => m.status !== 'finished')) return undefined
+    const place = (rule.source as { place: number }).place
+    for (const table of groupTables(matches, groupsAt)) {
+      const row = table.rows[place - 1]
+      if (row && !entrants.some((e) => e.teamId === row.teamId)) entrants.push({ teamId: row.teamId, stage })
+    }
+  }
+  return { ...cup, entrants, resolved: [...(cup.resolved ?? []), stage] }
 }
 
 /** A pirâmide (país) de uma copa: a da primeira liga que dá vaga a ela. */
@@ -240,7 +350,8 @@ export function pyramidOfCupSpec(spec: CupSpec, competitions: readonly Pick<Comp
  * Anda com as copas: sorteia a primeira fase de quem ainda não começou, e sempre que uma fase termina sorteia a seguinte (ou
  * encerra a copa e premia o campeão). Pode ser chamada a qualquer momento; sem nada a fazer devolve o mesmo estado.
  */
-export function progressCups(state: SeasonState): SeasonState {
+export function progressCups(input: SeasonState): SeasonState {
+  const state = ensureContinentals(input)
   if (!state.cups || state.cups.length === 0) return state
   const teams = new Map(state.teams.map((t) => [t.id, t]))
   let matches = state.matches
@@ -275,8 +386,16 @@ export function progressCups(state: SeasonState): SeasonState {
         break
       }
       if (cup.spec.discipline.clearYellowsAfterStage === last) clearYellows.add(cup.id)
+      // Vagas que dependem dos grupos de outra copa: a fase espera até eles terminarem.
+      if (cup.spec.entrants.some((r) => r.source.type === 'cup-group-place' && (r.stage ?? 0) === last + 1) && !(cup.resolved ?? []).includes(last + 1)) {
+        const found = resolveDeferred(cup, last + 1, { cups: state.cups, matches })
+        if (!found) break
+        ctx.cup.entrants = found.entrants
+        ctx.cup.resolved = found.resolved
+      }
       const lastDate = stageMatches.reduce((d, m) => (m.date > d ? m.date : d), state.season.currentDate)
-      const created = generateStage(ctx, last + 1, addDays(lastDate, CUP.minRestDays))
+      // A fase seguinte nunca cai antes de amanhã (se ela esperou outra copa, o último jogo da anterior já ficou para trás).
+      const created = generateStage(ctx, last + 1, maxDate(addDays(lastDate, CUP.minRestDays), addDays(state.season.currentDate, 2)))
       matches = sortMatches([...matches, ...created])
       cup = ctx.cup
       changed = true
@@ -346,8 +465,9 @@ function rankInLeague(matches: readonly Match[], teamId: TeamId): number {
 export function matchLabel(state: Pick<SeasonState, 'cups' | 'season'>, match: Pick<Match, 'competitionId' | 'round' | 'cup'>): { competition: string; detail: string } {
   if (match.cup) {
     const cup = state.cups?.find((c) => c.id === match.competitionId)
-    const stage = cup ? stageList(cup.spec)[match.cup.stage]?.name : undefined
-    const leg = match.cup.leg === 2 ? ' · volta' : match.cup.leg === 1 && cup?.spec.stages.some((s) => s.name === stage && s.legs === 2) ? ' · ida' : ''
+    const descriptor = cup ? stageList(cup.spec)[match.cup.stage] : undefined
+    const stage = descriptor?.name
+    const leg = match.cup.leg === 2 ? ' · volta' : match.cup.leg === 1 && descriptor?.legs === 2 ? ' · ida' : ''
     const group = match.cup.kind === 'group' ? ` · Grupo ${String.fromCharCode(64 + (match.cup.group ?? 1))}` : ''
     return { competition: cup?.name ?? match.competitionId, detail: `${stage ?? ''}${group}${leg}` }
   }

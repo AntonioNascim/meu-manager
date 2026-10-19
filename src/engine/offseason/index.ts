@@ -17,7 +17,7 @@ import { pyramidOf } from '../season/fidelity'
 import type { SeasonState } from '../season/calendar'
 import { applyBirthdays } from '../season/birthdays'
 import { daysBetween } from '../season/dates'
-import { createCups } from '../cups'
+import { createCups, isContinental } from '../cups'
 import { computeStandings } from '../season/standings'
 import { SQUAD_MAX, SQUAD_MIN } from '../types'
 import type { Competition, CompetitionId, Cup, CupSpec, DepartedPlayer, OffseasonReport, Player, PlayerId, Position, StandingRow, Team, TeamId, YouthRequest } from '../types'
@@ -161,6 +161,13 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
       .forEach(({ t }, i) => rankByReputation.set(t.id, i + 1))
   }
   const reputationChanges: OffseasonReport['reputationChanges'] = {}
+  // O título (e a final) de uma copa continental da temporada dá reputação ao clube.
+  const continental = new Map<TeamId, number>()
+  for (const cup of state.cups ?? []) {
+    if (cup.pyramid !== undefined || cup.winnerId === undefined || cup.year !== year) continue
+    continental.set(cup.winnerId, (continental.get(cup.winnerId) ?? 0) + OFFSEASON.reputation.continentalChampion)
+    if (cup.runnerUpId) continental.set(cup.runnerUpId, (continental.get(cup.runnerUpId) ?? 0) + OFFSEASON.reputation.continentalFinalist)
+  }
   const R = OFFSEASON.reputation
   const reputationRng = rng.fork('reputation')
   let teams: Team[] = state.teams.map((t) => {
@@ -177,7 +184,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
     const mean = landing?.reputationMean ?? R.tierMean[tier] ?? t.reputation
     const pull = tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
-    const pulled = t.reputation + delta + pull * (mean - t.reputation)
+    const pulled = t.reputation + delta + pull * (mean - t.reputation) + (continental.get(t.id) ?? 0)
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId
@@ -366,7 +373,10 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     playerCounter: counter,
   }
   // As copas voltam em cada temporada com as vagas da que acabou (o campeão de cada edição fica no histórico).
-  const specs = state.cupSpecs ?? options.defaultCupSpecs?.(state.season.competitions)
+  const defaults = options.defaultCupSpecs?.(state.season.competitions)
+  let specs = state.cupSpecs ?? defaults
+  // Um save de antes das copas continentais ganha as padrão (se o mundo tem copas e nenhuma é continental): elas nascem quando todos os países abrem a temporada.
+  if (state.cupSpecs && state.cupSpecs.length > 0 && defaults && !state.cupSpecs.some(isContinental)) specs = [...state.cupSpecs, ...defaults.filter(isContinental)]
   if (specs) next = specs.length > 0 ? createCups(next, specs, pyramid) : { ...next, cupSpecs: [] }
   if (state.cups === undefined && next.cups?.length === 0) delete (next as { cups?: Cup[] }).cups
   const focus = focusPyramid(next)

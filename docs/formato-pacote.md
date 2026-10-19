@@ -129,10 +129,10 @@ Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leag
 | `Colombia` | SA | 0,45 | −2 |
 | `Peru` | SA | 0,3 | −4 |
 | `Ecuador` | SA | 0,3 | −4 |
-| `England` | EU | 5 | 8 |
-| `Spain` | EU | 3 | 7 |
-| `Italy` | EU | 2,5 | 6 |
-| `Germany` | EU | 2,8 | 6 |
+| `England` | EU | 3,6 | 7 |
+| `Spain` | EU | 3,4 | 7,4 |
+| `Italy` | EU | 2,9 | 6,6 |
+| `Germany` | EU | 2,6 | 5,8 |
 | `France` | EU | 1,8 | 3,5 |
 | `Portugal` | EU | 0,9 | 2 |
 
@@ -308,7 +308,10 @@ Opcional. Cada item é uma copa ou supercopa. O **nome vem do pacote**: o jogo p
 | `stages` | sim | As fases de **mata-mata**, da primeira à final (abaixo) |
 | `groups` | só em `groups-knockout` | A fase de grupos |
 | `leaguePhase` | só em `league-knockout` | A fase de liga |
-| `seeding` | não | `random` (padrão) ou `seeded` (cabeças de chave) |
+| `preliminary` | só em `groups-knockout` | Fases **preliminares** de mata-mata, jogadas antes dos grupos (mesma forma de `stages`); os vencedores vão para os grupos |
+| `weekday` | não | Dia da semana dos jogos: `2` terça, `3` quarta (padrão) ou `4` quinta |
+| `excludeCups` | não | Ids de copas: quem já está nelas (na mesma edição) não entra nesta; a vaga passa para o próximo colocado da liga |
+| `seeding` | não | `random` (padrão), `seeded` (cabeças de chave pela reputação) ou `ranked` (como `seeded`, mas depois dos grupos ou da fase de liga os cabeças de chave são os mais bem colocados nela) |
 | `homeOfSingleLeg` | não | Quem manda o jogo único: `draw` (padrão: quem o sorteio põe primeiro; com cabeças de chave, o cabeça de chave), `lower-reputation` ou `higher-reputation` (o clube de menor ou de maior reputação), `lower-division` (o clube da divisão inferior joga em casa, como nas copas da Inglaterra, Espanha, Alemanha, França e Portugal; entre clubes da mesma divisão vale o sorteio) ou `first-listed` (o primeiro das vagas, para supercopas) |
 | `awayGoals` | não | Regra do gol fora na ida e volta. **Desligada por padrão** (`false`) |
 | `extraTime` | não | Prorrogação de 30 minutos se o confronto está empatado (padrão `true`) |
@@ -321,8 +324,8 @@ Opcional. Cada item é uma copa ou supercopa. O **nome vem do pacote**: o jogo p
 - **`knockout`**: só mata-mata. As fases de `stages` são jogadas em ordem; cada uma recebe os vencedores da anterior (mais quem
   entra nela pelas vagas).
 - **`groups-knockout`**: uma fase de grupos e depois o mata-mata. Precisa de `groups`:
-  `{ "name": "Fase de grupos", "count": 8, "advance": 2, "legs": 2, "date": [9, 15], "gapDays": 14 }`. `count` grupos de igual
-  tamanho **par**, `advance` passam de cada grupo, `legs` 1 (só ida) ou 2 (ida e volta), as rodadas ficam `gapDays` dias uma da
+  `{ "name": "Fase de grupos", "count": 8, "advance": 2, "direct": 1, "legs": 2, "date": [9, 15], "gapDays": 14 }`. `count` grupos de igual
+  tamanho **par**, `advance` passam de cada grupo (dos quais os `direct` primeiros colocados pulam a primeira fase de mata-mata e entram na seguinte, como os líderes de grupo da copa secundária sul-americana), `legs` 1 (só ida) ou 2 (ida e volta), as rodadas ficam `gapDays` dias uma da
   outra (padrão 7). A primeira fase de `stages` recebe os classificados dos grupos (sorteada como as outras fases, com cabeças de chave pela reputação se `seeding` é `seeded`).
 - **`league-knockout`**: uma fase de liga (tabela única) e depois o mata-mata. Precisa de `leaguePhase`:
   `{ "name": "Fase de liga", "pots": 4, "matchesPerTeam": 8, "date": [9, 10], "gapDays": 7, "direct": 8, "playoff": 16 }`. Os clubes
@@ -349,6 +352,8 @@ copa: com grupos ou fase de liga, o 0 é essa fase e o mata-mata começa no 1; p
   passada** nessas posições (na primeira temporada de um mundo, vale a ordem de reputação).
 - `cup` com `place` `winner` ou `runner-up`: o campeão ou o vice da **edição passada** daquela copa (na primeira temporada, o clube
   mais forte entre os que ela teria). Uma copa não pode citar a si mesma.
+- `cup-group-place`: `{ "type": "cup-group-place", "cup": "cont-sa-1", "place": 3 }` = o clube que terminou em tal colocação de **cada grupo** da fase de grupos de outra copa **da mesma edição** (os terceiros da copa principal caem para a repescagem da secundária). Só se conhece quando os grupos da outra copa terminam, então a vaga precisa ter `stage` 1 ou mais e a fase espera.
+- Colocações de liga (`positions`) repõem quem já está na copa (ou numa copa de `excludeCups`) pelos colocados logo abaixo: a copa mantém o número de clubes.
 - `fallback`: se o clube escolhido já está na copa por outra vaga (o campeão da liga que também ganhou a copa), entra o primeiro da
   vaga reserva.
 
@@ -418,21 +423,30 @@ Simplificações: onde a copa real inclui divisões que o pacote não tem, entra
 
 **Calendário.** Cada país tem a sua temporada (ver "Temporadas por país" abaixo). As copas padrão dos países europeus supõem a temporada que atravessa o ano: janeiro a junho já são do ano seguinte ao da edição (a edição "2026/27" tem a copa de novembro de 2026 a maio de 2027), cada fase na primeira quarta-feira livre. As supercopas de Espanha e Itália são no meio da temporada (janeiro e dezembro) e a da Alemanha, em agosto, antes da liga.
 
+### Copas continentais
+
+Uma copa **sem `country`** e com `region` (`SA` ou `EU`) é continental. A edição de um ano nasce quando todos os países que dão vagas a ela já abriram a temporada daquele ano (as colocações finais da temporada passada já valem) e a edição anterior acabou; saves antigos ganham as continentais na virada, sem mudar a temporada em andamento. Os jogos caem no meio de semana, sem o mesmo dia de outro jogo do clube; quando as ligas ocupam quase toda quarta-feira, depois de esperar algumas semanas aceita-se um jogo colado em outro (nunca no mesmo dia). O título dá reputação ao clube na virada do país dele (campeão +0,8 e finalista +0,35 de reputação, antes de arredondar). A premiação (`prize`) vale em unidades do Brasil e é multiplicada pelo índice de receita da liga do clube, então pesa a mesma fração da receita em qualquer país.
+
+O jogo traz estas cinco como padrão quando o pacote tem 5 países ou mais na região e não define uma continental dela (nomes genéricos; o nome vem do pacote). Os tamanhos são menores que os reais, proporcionais ao mundo: menos da metade dos clubes de primeira divisão de cada região. As vagas de cada país seguem a raiz da receita da liga dele (com mínimo e teto de metade da liga), incluindo o campeão da copa nacional.
+
+| Id | Região | Formato |
+|---|---|---|
+| `cont-sa-1` | América do Sul (e Brasil) | 20 clubes: 2 fases preliminares (4 e 4 clubes), 4 grupos de 4 (ida e volta), quartas, semifinais (ida e volta) e final em jogo único, campo neutro |
+| `cont-sa-2` | América do Sul (e Brasil) | 16 clubes em 4 grupos de 4 (os líderes pulam a repescagem) + os 4 terceiros da principal na repescagem; quartas, semifinais e final em jogo único. Não repete clube da principal |
+| `cont-eu-1` | Europa | 24 clubes, fase de liga de tabela única (4 potes, 8 jogos), 4 direto às quartas, 8 na repescagem (ida e volta), quartas, semifinais e final em jogo único |
+| `cont-eu-2` | Europa | 16 clubes, fase de liga (2 potes, 8 jogos), 4 direto, 8 na repescagem, quartas, semifinais e final; não repete clube da `cont-eu-1`; quinta-feira |
+| `cont-eu-3` | Europa | 12 clubes, fase de liga (2 potes, 4 jogos), 2 direto às semifinais, 4 na repescagem, semifinais e final; não repete clube das outras duas; quinta-feira |
+
 ### Temporadas por país
 
 O relógio do jogo é um só, mas **cada país tem a sua temporada**: a virada (acesso, rebaixamento, evolução, contratos, base, meta da diretoria, finanças e estatísticas), a tabela de jogos e as copas são do país e acontecem no último dia da temporada dele. A temporada aparece como "2026" (ano civil) ou "2026/27" (atravessa o ano). Os contratos terminam no último dia da temporada do clube (31/12 ou 30/6); o `endDate` de um jogador do pacote em 31/12 passa para 30/6 do mesmo ano (no mínimo o fim da primeira temporada) quando o clube é de liga `split`.
 
 | País | Temporada | Primeira rodada (a partir de) |
 |---|---|---|
-| Brasil | ano civil | 24/1 |
-| Argentina | ano civil | 7/2 |
-| Uruguai, Chile, Equador | ano civil | 14/2 |
-| Paraguai | ano civil | 31/1 |
-| Colômbia | ano civil | 24/1 |
-| Peru | ano civil | 7/2 |
-| Inglaterra, França, Portugal | 2026/27 | 8/8 |
-| Espanha | 2026/27 | 15/8 |
-| Itália, Alemanha | 2026/27 | 22/8 |
+| Brasil e América do Sul | ano civil | 24/1 |
+| Europa (Inglaterra, Espanha, Itália, Alemanha, França, Portugal) | 2026/27 | 15/8 |
+
+Os países de um continente abrem no mesmo fim de semana: as rodadas de meio de semana das ligas caem nas mesmas semanas e deixam as outras livres para as copas continentais (um calendário parecido com o real, não o de cada país).
 
 Todas as ligas fazem uma semana de pausa a cada 3 rodadas de fim de semana (fim de ano, datas de seleções). O jogo começa em 1º de janeiro de `startYear` se o técnico escolhe um clube de ano civil e em 1º de julho se escolhe um clube de temporada que atravessa o ano; um país que ainda não abriu a temporada dele nessa data joga a primeira que começa depois.
 
