@@ -175,6 +175,13 @@ ${formatDynasties(runs)}
     const worldShares = continental.money.filter((m) => m.world > 0).map((m) => m.world / Math.max(1, m.revenue))
     expect.soft(mean(worldShares), 'dinheiro das copas mundiais / receita (média)').toBeLessThan(0.08)
     expect.soft(Math.max(...worldShares), 'dinheiro das copas mundiais / receita (máximo)').toBeLessThan(0.5)
+    // Copa norte-americana: os clubes mexicanos ganham a grande maioria das edições (nos últimos 30 anos reais, os americanos só 3 ou 4).
+    {
+      const list = continental.editions.filter((e) => e.cup === 'cont-na-1')
+      const mexico = list.filter((e) => e.winnerPyramid === 'Mexico').length / list.length
+      expect.soft(mexico, 'cont-na-1 fatia do México').toBeGreaterThanOrEqual(0.7)
+      expect.soft(mexico, 'cont-na-1 fatia do México').toBeLessThanOrEqual(0.9)
+    }
     const shares = continental.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))
     expect.soft(mean(shares), 'dinheiro continental / receita (média)').toBeLessThan(0.08)
     expect.soft(Math.max(...shares), 'dinheiro continental / receita (máximo)').toBeLessThan(0.5)

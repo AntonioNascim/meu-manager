@@ -51,8 +51,8 @@ export const FULL_WORLD: LeagueSpec[] = [
   { id: 'fr-1', name: 'França', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 17, repBottom: 6, repCurve: 1.7, economy: { revenue: 1.8, level: 3.5 } },
   { id: 'pt-1', name: 'Portugal', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4, repCurve: 1.7, economy: { revenue: 0.9, level: 2 } },
   { id: 'nl-1', name: 'Países Baixos', region: 'EU', teams: 18, format: 'double', tier: 1, repTop: 15, repBottom: 4, repCurve: 1.7, economy: { revenue: 1.2, level: 2.6 } },
-  { id: 'mx-1', name: 'México', region: 'NA', teams: 18, format: 'double', tier: 1, repTop: 14, repBottom: 4, repCurve: 1, economy: { revenue: 1, level: -0.5 } },
-  { id: 'us-1', name: 'Estados Unidos', region: 'NA', teams: 20, format: 'single', tier: 1, repTop: 13, repBottom: 3, repCurve: 1.5, economy: { revenue: 0.9, level: -1.5 } },
+  { id: 'mx-1', name: 'México', region: 'NA', teams: 18, format: 'double', tier: 1, repTop: 14, repBottom: 4, repCurve: 1, economy: { revenue: 1, level: 0 } },
+  { id: 'us-1', name: 'Estados Unidos', region: 'NA', teams: 20, format: 'single', tier: 1, repTop: 13, repBottom: 3, repCurve: 1.5, economy: { revenue: 0.9, level: -2 } },
   // Ligas de elite: só os clubes mais fortes do continente, para as copas mundiais (África, Ásia e Oceania não têm ligas completas).
   { id: 'af-1', name: 'Elite da África', leagueName: 'Elite da África', region: 'AF', teams: 8, format: 'double', tier: 1, repTop: 13, repBottom: 6, repCurve: 1.3, economy: { revenue: 0.35, level: -4.5 } },
   { id: 'as-1', name: 'Elite da Ásia', leagueName: 'Elite da Ásia', region: 'AS', teams: 8, format: 'double', tier: 1, repTop: 14, repBottom: 6, repCurve: 1.3, economy: { revenue: 0.7, level: -2 } },

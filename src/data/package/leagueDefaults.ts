@@ -22,8 +22,8 @@ export const COUNTRY_DEFAULTS: Partial<Record<Nationality, { region: Region; eco
   Portugal: { region: 'EU', economy: { revenue: 0.9, level: 2 }, calendar: { split: true, start: [8, 15] } },
   Netherlands: { region: 'EU', economy: { revenue: 1.2, level: 2.6 }, calendar: { split: true, start: [8, 15] } },
   // América do Norte: ano civil, de fevereiro a novembro.
-  Mexico: { region: 'NA', economy: { revenue: 1, level: -0.5 }, calendar: { start: [2, 7] } },
-  'United States': { region: 'NA', economy: { revenue: 0.9, level: -1.5 }, calendar: { start: [2, 7] } },
+  Mexico: { region: 'NA', economy: { revenue: 1, level: 0 }, calendar: { start: [2, 7] } },
+  'United States': { region: 'NA', economy: { revenue: 0.9, level: -2 }, calendar: { start: [2, 7] } },
   // África, Ásia e Oceania: só os clubes mais fortes (uma liga de elite por continente, para as copas mundiais), com temporada de agosto a maio.
   Egypt: { region: 'AF', economy: { revenue: 0.35, level: -4.5 }, calendar: { split: true, start: [8, 22] } },
   Japan: { region: 'AS', economy: { revenue: 0.7, level: -2 }, calendar: { split: true, start: [8, 22] } },
