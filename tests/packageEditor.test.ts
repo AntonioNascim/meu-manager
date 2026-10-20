@@ -137,3 +137,12 @@ describe('planilha (CSV)', () => {
     expect(out.pkg.players.filter((p) => p.club === pkg.clubs[1]!.id)).toHaveLength(24)
   })
 })
+
+describe('modelos do editor', () => {
+  it('o mundo de 15 ligas passa na validação e tem 15 ligas', async () => {
+    const { buildScalePackage, FIFTEEN_LEAGUES } = await import('../src/diagnostics/scalePackage')
+    const pkg = buildScalePackage(7, { without: FIFTEEN_LEAGUES, name: 'x' })
+    expect(pkg.leagues).toHaveLength(15)
+    expect(validatePackage(pkg, { maxIssues: 500 }).report.errors).toEqual([])
+  })
+})

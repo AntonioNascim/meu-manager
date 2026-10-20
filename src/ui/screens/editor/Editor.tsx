@@ -41,6 +41,15 @@ export function Editor({ onBack, onPlay }: { onBack: () => void; onPlay: (chosen
   useEffect(() => {
     void refresh()
   }, [refresh])
+  // Atalho de desenvolvimento: /?editor=zero|padrao|15|21 abre o pacote direto.
+  const auto = useRef(import.meta.env.DEV ? new URLSearchParams(window.location.search).get('editor') : null)
+  useEffect(() => {
+    const wanted = { zero: 'blank', padrao: 'default', '15': 'fifteen', '21': 'wide' }[auto.current ?? ''] ?? null
+    auto.current = null
+    const template = TEMPLATES.find((t) => t.id === wanted)
+    if (template) void run('Preparando o pacote…', async () => ({ data: await template.make(), id: null }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const run = async (label: string, make: () => Promise<{ data: DataPackage; id: string | null }>) => {
     setError(null)
@@ -71,6 +80,7 @@ export function Editor({ onBack, onPlay }: { onBack: () => void; onPlay: (chosen
       <Workspace
         key={open.id ?? 'novo'}
         initial={open.data}
+        {...(import.meta.env.DEV ? { initialTab: new URLSearchParams(window.location.search).get('aba') ?? undefined } : {})}
         id={open.id}
         onClose={() => {
           setOpen(null)

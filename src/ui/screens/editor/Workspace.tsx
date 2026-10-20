@@ -28,11 +28,11 @@ const AUTOSAVE_MS = 2000
 const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'pacote'
 
 /** Área de edição de um pacote: abas, desfazer, validação em tempo real, gravação automática no navegador e exportação. */
-export function Workspace({ initial, id: initialId, onClose, onPlay }: { initial: DataPackage; id: string | null; onClose: () => void; onPlay: (chosen: EditedPackage) => void }) {
+export function Workspace({ initial, id: initialId, onClose, onPlay, initialTab }: { initial: DataPackage; id: string | null; onClose: () => void; onPlay: (chosen: EditedPackage) => void; initialTab?: string | undefined }) {
   const editor = useEditor(initial)
   const { pkg } = editor
   const validation = useValidation(pkg)
-  const [tab, setTab] = useState<TabId>('package')
+  const [tab, setTab] = useState<TabId>((['leagues', 'clubs', 'players', 'cups', 'sheets', 'issues'] as const).find((t) => t === initialTab) ?? 'package')
   const [selected, setSelected] = useState<Selected>(NONE)
   const [playerList, setPlayerList] = useState<PlayerList>('players')
   const [clubFilter, setClubFilter] = useState<string | null>(null)
