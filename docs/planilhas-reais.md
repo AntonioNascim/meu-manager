@@ -48,6 +48,20 @@ Para importar: Editor › *Planilhas* › importe `<liga>-clubes.csv` e depois `
 
 Cuidados com a rede: `User-Agent` com identificação e contato, uma consulta por vez, pausa entre elas, espera e nova tentativa em 429/503 (`Retry-After`) e `maxlag`. Não baixa escudos nem fotos. Nada do Transfermarkt nem de outros sites.
 
+## Ajustes automáticos para o pacote passar na validação
+
+O script resolve sozinho o que dá, para o rascunho `pacote-real.json` chegar a **0 erros** na validação do jogo (os números de cada rodada estão no relatório):
+
+- **Mais de 30 jogadores:** os jovens de 15 a 19 anos passam para a **base** do clube (`<liga>-base.csv`; até 15 por clube; os menos conhecidos e os últimos da tabela primeiro). Se ainda passar de 30, os menos conhecidos (sem artigo na Wikipedia) ficam **livres no mercado** (linhas com `club` vazio em `<liga>-jogadores.csv`), sem deixar o clube com menos de 2 goleiros. Cada caso entra na `revisao.csv`.
+- **Menos de 18 jogadores (ou nenhum elenco):** o clube é completado até 20 com jogadores **gerados** (nome sorteado do banco de nomes do jogo, posição pela necessidade do elenco, 17 a 35 anos), marcados com `generated` = `sim` na planilha e `generated: true` no pacote; o editor mostra "gerado" na lista e uma caixa para desmarcar quando o jogador for trocado pelo real. Entram na `revisao.csv` e nas tarefas.
+- **Posições genéricas** ("defensor", "meio-campista", "atacante", ou sem posição): são distribuídas dentro de cada elenco pela necessidade de um time real (3 goleiros, 2 laterais de cada lado, 4 zagueiros, 2 volantes, 3 meias, 2 meias ofensivos, 2 pontas de cada lado e 3 centroavantes, `TARGET` em `tools/realdata/squadPlan.ts`), na ordem da tabela do clube e usando o pé para o lado (canhoto à esquerda, destro à direita). Só os jogadores **com artigo na Wikipedia** ficam marcados para revisão.
+- **Cores:** as que o Wikidata não tem vêm do desenho da camisa no quadro do clube na Wikipedia em inglês (`body1`, `shorts1`, `socks1`, `leftarm1` do `Infobox football club`).
+- **Estádio e cidade:** se o Wikidata não tem, vale o texto `ground` do quadro do clube ("Estádio, Cidade"); se nada serve, entra um nome provisório ("Estádio <clube>", cidade = nome do clube) e o caso vai para as tarefas, porque a validação exige os dois campos.
+
+### Tarefas manuais (`tarefas/`)
+
+`tarefas/<liga>-tarefas.csv`, uma planilha por liga para dividir entre os sócios: o que não deu para resolver sozinho. Colunas: `tipo` (Clube, Elenco, Jogador conhecido), `clube`, `jogador`, `id`, `campo`, `situacao`, `valor_provisorio`, `valor_correto` (para preencher), `onde_procurar` e `feito`. Entram: estádio, cidade, capacidade e cores que ainda faltam; clubes com elenco gerado ou sem elenco; e, de cada clube, os **8 jogadores mais conhecidos** (mais páginas do Wikidata em outras línguas) com posição incerta. Os demais casos continuam só na `revisao.csv`.
+
 ## O que costuma ficar faltando (veja o relatório)
 
 - **Data de nascimento ausente em todas as fontes:** não trava a importação. O jogador recebe uma data **estimada**: pelo ano, quando a fonte só tem o ano (1º de julho), ou pela média de idade do elenco do clube (média das idades conhecidas, com uma variação fixa de até 3 anos para cima ou para baixo por jogador, só para não ficarem todos com a mesma idade; sem 5 idades conhecidas no clube vale a média da liga). Fica marcada: coluna `birthEstimated` = `sim` na planilha, `birthEstimated: true` no pacote e "(estimada)" na lista do editor, com uma caixa para desmarcar quando conferir a data (mudar a data também tira a marca). Todos entram na `revisao.csv`.
