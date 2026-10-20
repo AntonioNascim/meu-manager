@@ -12,6 +12,11 @@ import type { DataPackage, PackageIssue, PackageIssueCode, PackageReport } from 
 export const SUPPORTED = { maxDivisions: 3, minTeams: 4, maxTeams: 40 } as const
 
 const MAX_ISSUES = 60
+
+export interface ValidateOptions {
+  /** Quantos erros listar antes de só contar (padrão 60; o editor pede mais para mostrar todos). */
+  maxIssues?: number
+}
 const FOOTS = ['right', 'left', 'both'] as const
 
 type Obj = Record<string, unknown>
@@ -22,8 +27,9 @@ class Collector {
   errors: PackageIssue[] = []
   warnings: PackageIssue[] = []
   more = 0
+  constructor(private readonly max: number = MAX_ISSUES) {}
   error(code: PackageIssueCode, path: string, detail?: string | number, expected?: string | number) {
-    if (this.errors.length >= MAX_ISSUES) {
+    if (this.errors.length >= this.max) {
       this.more++
       return
     }
@@ -121,8 +127,8 @@ function checkPlayer(c: Collector, p: unknown, path: string, clubIds: Set<string
  * Valida o conteúdo de um pacote. Os erros impedem o uso; os avisos só informam. Nesta fase o jogo aceita um país com
  * duas divisões de 20 times: pacote com mais ligas recebe `unsupported-leagues`.
  */
-export function validatePackage(input: unknown): { pkg?: DataPackage; report: PackageReport } {
-  const c = new Collector()
+export function validatePackage(input: unknown, options: ValidateOptions = {}): { pkg?: DataPackage; report: PackageReport } {
+  const c = new Collector(options.maxIssues)
   const done = (): { pkg?: DataPackage; report: PackageReport & { more: number } } => ({ report: { errors: c.errors, warnings: c.warnings, more: c.more } })
   if (!isObj(input)) {
     c.error('not-object', '$')

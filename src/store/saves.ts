@@ -330,6 +330,13 @@ export class SaveStore {
     return row
   }
 
+  /** Grava um pacote sob um id escolhido (o editor sobrescreve o pacote que está editando). */
+  async putPackage(id: string, data: DataPackage, at: Date = new Date()): Promise<PackageRow> {
+    const row: PackageRow = { id, name: data.name, importedAt: at.toISOString(), clubs: data.clubs.length, players: data.players.length, data }
+    await this.db().packages.put(row)
+    return row
+  }
+
   /** Pacotes importados neste navegador, do mais recente ao mais antigo (sem ler o conteúdo de cada um para a lista, só o resumo). */
   async listPackages(): Promise<Omit<PackageRow, 'data'>[]> {
     const rows = await this.db().packages.toArray()
@@ -368,6 +375,7 @@ export const firstEmptySlot = () => main.firstEmptySlot()
 export const loadEnvelope = (slot: number) => main.loadEnvelope(slot)
 export const storedBytes = (slot: number) => main.storedBytes(slot)
 export const savePackage = (data: DataPackage, at?: Date) => main.savePackage(data, at)
+export const putPackage = (id: string, data: DataPackage, at?: Date) => main.putPackage(id, data, at)
 export const listPackages = () => main.listPackages()
 export const loadPackage = (id: string) => main.loadPackage(id)
 export const deletePackage = (id: string) => main.deletePackage(id)
