@@ -57,6 +57,8 @@ Dividida em partes, cada uma entregue e testada antes da seguinte:
 - Exportar o pacote editado (arquivo que o usuário guarda ou compartilha por conta própria).
 
 ### Fase 5 — Pacote real a partir dos elencos da Wikipedia, embutido no jogo
+
+> **Pendências herdadas da 3D** (detalhes em `docs/fase2-proposta.md`, seção 22): recalibrar o equilíbrio entre países nas copas europeias (sensível a ajustes pequenos; medir sempre as sementes 7, 11 e 23) e a queda de reputação dos clubes grandes (gigantes reais devem continuar gigantes por décadas).
 - Ferramenta **separada do jogo e fora do site** que lê elencos da Wikipedia e monta um pacote no formato da Fase 1, sem atributos (o jogo gera os atributos).
 - Os **créditos da licença** (Wikipedia, CC BY-SA) acompanham o pacote (campo `credits` do formato) e aparecem no jogo ao importar e na tela de informações.
 - O pacote gerado é **embutido no jogo** (a pasta `dados-reais/` sai do `.gitignore` quando ele estiver pronto), com os cuidados das "Decisões de modelo": escudos gerados, nomes genéricos de campeonatos, tela de créditos, aviso de jogo independente e opção de mundo fictício.
