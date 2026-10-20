@@ -66,7 +66,7 @@ export function clubsQuery(qids: readonly string[], languages: string, wikiLang?
 
 /** Quais dos itens são clubes de futebol (classe "clube de futebol" ou subclasse), para separar clubes de cidades, estádios e pessoas. */
 export function clubFilterQuery(qids: readonly string[]): string {
-  return `SELECT ?c WHERE { VALUES ?c { ${values(qids)} } ?c wdt:P31/wdt:P279* wd:Q476028 . FILTER NOT EXISTS { ?c wdt:P576 ?dissolved } }`
+  return `SELECT ?c WHERE { VALUES ?c { ${values(qids)} } ?c wdt:P31/wdt:P279* ?kind . VALUES ?kind { wd:Q476028 wd:Q847017 wd:Q12973014 } . FILTER NOT EXISTS { ?c wdt:P576 ?dissolved } }`
 }
 
 export function playersQuery(qids: readonly string[], languages: string): string {

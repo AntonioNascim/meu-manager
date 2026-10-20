@@ -60,8 +60,8 @@ const FIXED: Record<string, string[]> = {
 /** Idioma da Wikipedia local de cada país (pelo prefixo do id da liga). Estados Unidos e as ligas de elite ficam só com o inglês. */
 const WIKI_LANG: Record<string, string> = { br: "pt", ar: "es", uy: "es", py: "es", cl: "es", co: "es", ec: "es", mx: "es", es: "es", pt: "pt", de: "de", it: "it", fr: "fr", nl: "nl" }
 
-/** Número real de clubes da liga na temporada, quando diferente do mundo fictício do jogo (Argentina com 28; MLS com 30, contando os canadenses). */
-const REAL_TEAMS: Record<string, number> = { "ar-1": 28, "us-1": 30 }
+/** Número real de clubes da liga na temporada, quando diferente do mundo fictício do jogo (Argentina e MLS com 30; a MLS conta os clubes canadenses). */
+const REAL_TEAMS: Record<string, number> = { "ar-1": 30, "us-1": 30 }
 
 export const REAL_LEAGUES: RealLeague[] = FULL_WORLD.map((spec) => {
   const country = COUNTRY_OF_PYRAMID[spec.id.split('-')[0] as string] as Nationality
