@@ -19,6 +19,8 @@ export interface ClubInfo {
   sitelinks: number
   /** Título do artigo na Wikipedia em inglês. */
   enTitle?: string
+  /** Título do artigo na Wikipedia do idioma do país (espanhol, português...), quando a liga usa uma. */
+  localTitle?: string
 }
 
 export interface PlayerInfo {
@@ -44,8 +46,8 @@ export async function sparql(fetcher: Fetcher, query: string): Promise<Row[]> {
 const values = (qids: readonly string[]): string => qids.map((q) => `wd:${q}`).join(' ')
 
 /** `languages`: ordem de preferência dos nomes (Brasil: `pt,en`; demais países: `en,pt`). */
-export function clubsQuery(qids: readonly string[], languages: string): string {
-  return `SELECT ?c ?name ?short ?sl ?venueName ?cap ?capWhen ?capRank ?hqName ?vlocName ?hex ?enTitle WHERE {
+export function clubsQuery(qids: readonly string[], languages: string, wikiLang?: string): string {
+  return `SELECT ?c ?name ?short ?sl ?venueName ?cap ?capWhen ?capRank ?hqName ?vlocName ?hex ?enTitle ?localTitle WHERE {
   VALUES ?c { ${values(qids)} }
   ?c wikibase:sitelinks ?sl .
   OPTIONAL { ?c wdt:P1813 ?short . FILTER(STRLEN(?short) = 3) }
@@ -57,6 +59,7 @@ export function clubsQuery(qids: readonly string[], languages: string): string {
   OPTIONAL { ?c wdt:P159 ?hq }
   OPTIONAL { { ?c wdt:P6364 ?col } UNION { ?c wdt:P462 ?col } ?col wdt:P465 ?hex }
   OPTIONAL { ?art schema:about ?c ; schema:isPartOf <https://en.wikipedia.org/> ; schema:name ?enTitle }
+  ${wikiLang ? `OPTIONAL { ?lart schema:about ?c ; schema:isPartOf <https://${wikiLang}.wikipedia.org/> ; schema:name ?localTitle }` : ""}
   SERVICE wikibase:label { bd:serviceParam wikibase:language "${languages}". ?c rdfs:label ?name. ?venue rdfs:label ?venueName. ?hq rdfs:label ?hqName. ?vloc rdfs:label ?vlocName }
 }`
 }
@@ -110,6 +113,7 @@ export function aggregateClubRows(rows: readonly Row[]): Map<string, ClubInfo> {
       if (row.venueName) (venues.get(row.venueName) ?? venues.set(row.venueName, []).get(row.venueName) ?? []).push(row)
       if (!club.city) club.city = row.hqName ?? undefined
       if (!club.enTitle && row.enTitle) club.enTitle = row.enTitle
+      if (!club.localTitle && row.localTitle) club.localTitle = row.localTitle
     }
     // Vários estádios atuais: fica o de maior capacidade (o principal).
     let best: { name: string; capacity?: number; rows: Row[] } | undefined
@@ -166,9 +170,9 @@ export async function fetchFootballClubs(fetcher: Fetcher, qids: readonly string
   return found
 }
 
-export async function fetchClubs(fetcher: Fetcher, qids: readonly string[], languages: string): Promise<Map<string, ClubInfo>> {
+export async function fetchClubs(fetcher: Fetcher, qids: readonly string[], languages: string, wikiLang?: string): Promise<Map<string, ClubInfo>> {
   const clubs = new Map<string, ClubInfo>()
-  for (const batch of chunks(qids, 25)) for (const [qid, club] of aggregateClubRows(await sparql(fetcher, clubsQuery(batch, languages)))) clubs.set(qid, club)
+  for (const batch of chunks(qids, 25)) for (const [qid, club] of aggregateClubRows(await sparql(fetcher, clubsQuery(batch, languages, wikiLang)))) clubs.set(qid, club)
   return clubs
 }
 

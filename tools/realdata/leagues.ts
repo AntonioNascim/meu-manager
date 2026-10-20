@@ -25,6 +25,8 @@ export interface RealLeague {
   fixedClubs?: string[]
   /** Ordem de preferência dos idiomas dos nomes no Wikidata. */
   languages: string
+  /** Wikipedia no idioma do país, para completar elencos e posições (espanhol, português, alemão, italiano, francês, neerlandês). */
+  wikiLang?: string
 }
 
 const TITLES: Record<string, { season: 'year' | 'split'; titles: string[] }> = {
@@ -55,6 +57,12 @@ const FIXED: Record<string, string[]> = {
   'oc-1': ['Q630544', 'Q330143', 'Q748725', 'Q815890'],
 }
 
+/** Idioma da Wikipedia local de cada país (pelo prefixo do id da liga). Estados Unidos e as ligas de elite ficam só com o inglês. */
+const WIKI_LANG: Record<string, string> = { br: "pt", ar: "es", uy: "es", py: "es", cl: "es", co: "es", ec: "es", mx: "es", es: "es", pt: "pt", de: "de", it: "it", fr: "fr", nl: "nl" }
+
+/** Número real de clubes da liga na temporada, quando diferente do mundo fictício do jogo (Argentina com 28; MLS com 30, contando os canadenses). */
+const REAL_TEAMS: Record<string, number> = { "ar-1": 28, "us-1": 30 }
+
 export const REAL_LEAGUES: RealLeague[] = FULL_WORLD.map((spec) => {
   const country = COUNTRY_OF_PYRAMID[spec.id.split('-')[0] as string] as Nationality
   const fixed = FIXED[spec.id]
@@ -63,11 +71,12 @@ export const REAL_LEAGUES: RealLeague[] = FULL_WORLD.map((spec) => {
     spec,
     id: spec.id,
     country,
-    expected: spec.teams,
+    expected: REAL_TEAMS[spec.id] ?? spec.teams,
     seasonTitles: titles?.titles ?? [],
     season: titles?.season ?? 'split',
     ...(fixed ? { fixedClubs: fixed } : {}),
     languages: country === 'Brazil' ? 'pt,en' : 'en,pt',
+    ...(WIKI_LANG[spec.id.split("-")[0] as string] ? { wikiLang: WIKI_LANG[spec.id.split("-")[0] as string] } : {}),
   }
 })
 

@@ -59,25 +59,35 @@ describe('planilhas dos elencos reais', () => {
     expect(new Set(clubs.rows.map((r) => r.value.abbreviation)).size).toBe(2)
   })
 
-  it('a planilha de jogadores é aceita pelo editor, menos quem está sem data de nascimento', () => {
+  it('a planilha de jogadores é aceita inteira pelo editor, com as datas ausentes estimadas e marcadas', () => {
     const withClubs = { ...pkg, clubs: clubs.rows.map((r) => r.value) } as DataPackage
     const parsed = parsePlayersCsv(sheets.playersCsv, withClubs)
     expect(parsed.total).toBe(21)
-    // Só os dois sem nascimento (um só com o ano, outro sem artigo) falham (campo obrigatório vazio); os atributos ficam em branco para o jogo gerar.
-    expect(parsed.issues).toHaveLength(2)
-    expect(parsed.issues[0]).toMatchObject({ column: 'birthDate', code: 'missing-field' })
+    expect(parsed.issues).toEqual([])
+    // Os atributos ficam em branco para o jogo gerar.
     const first = parsed.rows[0]?.value
     expect(first?.attributes).toBeUndefined()
     expect(first?.potential).toBeUndefined()
     expect(first?.club).toBe('wd-Q1')
+    const estimated = parsed.rows.filter((r) => r.value.birthEstimated)
+    expect(estimated.map((r) => r.value.name).sort()).toEqual(['Fulano Sem Link', 'Jogador Q100'])
+    expect(parsed.rows.filter((r) => !r.value.birthEstimated).every((r) => r.value.birthDate === '2000-05-17')).toBe(true)
+  })
+
+  it('a data estimada pelo ano é 1º de julho; a sem ano usa a média de idade do elenco', () => {
+    const rows = parsePlayersCsv(sheets.playersCsv, { ...pkg, clubs: clubs.rows.map((r) => r.value) } as DataPackage).rows.map((r) => r.value)
+    expect(rows.find((p) => p.name === 'Jogador Q100')?.birthDate).toBe('1999-07-01')
+    const age = new Date().getFullYear() - Number(rows.find((p) => p.name === 'Fulano Sem Link')?.birthDate.slice(0, 4))
+    // Elenco de 2000-05-17: a média é de 26 anos e a data estimada fica a até 3 anos dela.
+    expect(Math.abs(age - (new Date().getFullYear() - 2000))).toBeLessThanOrEqual(3)
   })
 
   it('usa o país e o setor da tabela quando o jogador não tem artigo', () => {
-    const lines = sheets.playersCsv.split('\r\n')
-    const line = lines.find((l) => l.includes('Fulano Sem Link')) ?? ''
+    const line = sheets.playersCsv.split('\r\n').find((l) => l.includes('Fulano Sem Link')) ?? ''
     const cells = line.split(';')
-    expect(cells[4]).toBe('Argentina')
-    expect(cells[5]).toBe('ST')
+    expect(cells[5]).toBe('Argentina')
+    expect(cells[6]).toBe('ST')
+    expect(cells[4]).toBe('sim')
     expect(cells[0]).toMatch(/^wp-Q1-/)
   })
 
@@ -87,6 +97,7 @@ describe('planilhas dos elencos reais', () => {
     expect(kinds).toContain('club-no-colors')
     expect(kinds).toContain('squad-small')
     expect(kinds).toContain('player-birth-imprecise')
+    expect(kinds).toContain('player-no-birthdate')
     expect(kinds).toContain('player-no-wikidata')
     expect(kinds).toContain('player-position')
     expect(kinds).toContain('player-duplicate')
@@ -94,7 +105,7 @@ describe('planilhas dos elencos reais', () => {
   })
 
   it('o relatório e a lista de revisão trazem os casos', () => {
-    const report = buildReport([sheets], { date: '2026-10-20', articles: [], seasons: [], network: 3, cached: 1 })
+    const report = buildReport([sheets], { date: '2026-10-20', articles: [], seasons: [], local: [], network: 3, cached: 1 })
     expect(report).toContain('Elenco pequeno demais')
     expect(report).toContain('Remo')
     const review = reviewCsv(sheets.issues)

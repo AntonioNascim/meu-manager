@@ -3,7 +3,7 @@
  * Fontes: Wikidata (dados em domínio público) e Wikipedia (lista de clubes da temporada e elencos atuais, com créditos).
  *
  * Uso: node tools/run.mjs buildRealSheets [--liga br-1,en-1] [--saida dados-reais/planilhas] [--atualizar]
- *        [--contato "email ou site"] [--max-clubes N] [--pausa 1500] [--data 2026-10-20]
+ *        [--contato "email ou site"] [--max-clubes N] [--pausa 1500] [--data 2026-10-20] [--sem-local]
  *
  * - Sem `--liga`, faz as 21 ligas do mundo ampliado. Os atributos ficam em branco: o jogo gera.
  * - As respostas da rede ficam em `<saida>/.cache`; rodar de novo reaproveita o que já foi baixado (continua de onde parou).
@@ -17,6 +17,7 @@ import type { LeagueSheets } from './realdata/assemble'
 import { Fetcher } from './realdata/http'
 import { REAL_LEAGUES } from './realdata/leagues'
 import { collectLeague } from './realdata/pipeline'
+import { buildRealPackage, leagueDefinitions } from './realdata/packageOut'
 import { buildCredits, buildReport, reviewCsv } from './realdata/report'
 import type { RunInfo } from './realdata/report'
 
@@ -51,14 +52,15 @@ const fetcher = new Fetcher({
 })
 
 const leagues = REAL_LEAGUES.filter((l) => wanted.length === 0 || wanted.includes(l.id))
-const run: RunInfo = { date: today.toISOString().slice(0, 10), articles: [], seasons: [], network: 0, cached: 0 }
+const run: RunInfo = { date: today.toISOString().slice(0, 10), articles: [], seasons: [], local: [], network: 0, cached: 0 }
 const state = newAssembleState()
 const sheets: LeagueSheets[] = []
 
 for (const league of leagues) {
   try {
-    const collected = await collectLeague(league, { fetcher, today, ...(maxClubs !== undefined ? { maxClubs } : {}), log })
+    const collected = await collectLeague(league, { fetcher, today, ...(maxClubs !== undefined ? { maxClubs } : {}), noLocal: has('sem-local'), log })
     for (const article of collected.articles) if (!run.articles.some((a) => a.title === article.title)) run.articles.push(article)
+    run.local.push({ league: league.id, ...collected.local })
     if (collected.season) run.seasons.push({ league: league.id, ...collected.season })
     const result = assembleLeague(collected.input, state)
     sheets.push(result)
@@ -73,7 +75,13 @@ for (const league of leagues) {
 
 run.network = fetcher.stats.network
 run.cached = fetcher.stats.cached
+// Ligas com o número real de clubes e o rascunho do pacote inteiro (validado como o jogo valida na importação).
+writeFileSync(join(out, 'ligas-reais.json'), JSON.stringify(leagueDefinitions(sheets), null, 2))
+const credits = buildCredits(run)
+const built = buildRealPackage(sheets, credits.trim(), today.getFullYear())
+run.validation = { errors: built.errors, warnings: built.warnings, byCode: built.byCode, rejected: built.rejected }
+writeFileSync(join(out, 'pacote-real.json'), JSON.stringify(built.pkg))
 writeFileSync(join(out, 'relatorio.md'), buildReport(sheets, run))
 writeFileSync(join(out, 'revisao.csv'), reviewCsv(sheets.flatMap((s) => s.issues)))
-writeFileSync(join(out, 'creditos.txt'), buildCredits(run))
+writeFileSync(join(out, 'creditos.txt'), credits)
 log(`\nPronto. Planilhas, relatorio.md, revisao.csv e creditos.txt em ${out}`)

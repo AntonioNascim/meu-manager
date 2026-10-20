@@ -40,7 +40,7 @@ export interface CsvIssue {
 }
 
 export const PLAYER_COLUMNS = [
-  'id', 'name', 'nickname', 'birthDate', 'nationality', 'position', 'secondaryPositions', 'foot', 'club', 'clubName',
+  'id', 'name', 'nickname', 'birthDate', 'birthEstimated', 'nationality', 'position', 'secondaryPositions', 'foot', 'club', 'clubName',
   ...ATTRIBUTE_NAMES, 'potential', 'consistency', 'injuryProneness', 'professionalism', 'salary', 'contractEnd', 'releaseClause',
 ] as const
 
@@ -112,7 +112,7 @@ export function playersToCsv(pkg: DataPackage, list: PlayerList, options: Player
       const gen = options.fillGenerated && !(p.attributes && p.potential !== undefined && p.hidden && p.contract) ? suggestPlayerData(pkg, p) : undefined
       const merged = { attributes: p.attributes ?? gen?.attributes, potential: p.potential ?? gen?.potential, hidden: p.hidden ?? gen?.hidden, contract: p.contract ?? gen?.contract }
       return [
-        p.id, p.name, p.nickname, p.birthDate, p.nationality, p.position, p.secondaryPositions ? (p.secondaryPositions.length > 0 ? p.secondaryPositions.join('|') : '-') : '', p.foot, p.club, p.club ? clubName.get(p.club) : '',
+        p.id, p.name, p.nickname, p.birthDate, p.birthEstimated ? 'sim' : '', p.nationality, p.position, p.secondaryPositions ? (p.secondaryPositions.length > 0 ? p.secondaryPositions.join('|') : '-') : '', p.foot, p.club, p.club ? clubName.get(p.club) : '',
         ...ATTRIBUTE_NAMES.map((a) => merged.attributes?.[a]),
         merged.potential, merged.hidden?.consistency, merged.hidden?.injuryProneness, merged.hidden?.professionalism,
         merged.contract?.salary, merged.contract?.endDate, merged.contract?.releaseClause,
@@ -245,6 +245,7 @@ export function parsePlayersCsv(text: string, pkg: DataPackage): CsvParsed<Packa
     const player: PackagePlayer = { name: name ?? '', birthDate: birthDate ?? '', nationality: nationality as Nationality, position: position as Position }
     const id = r.text('id', false)
     if (id) player.id = id
+    if (/^(sim|s|1|true|yes|x|estimada)$/i.test(r.raw('birthEstimated'))) player.birthEstimated = true
     const nickname = r.text('nickname', false)
     if (nickname) player.nickname = nickname
     const rawSecondary = r.raw('secondaryPositions')

@@ -115,6 +115,8 @@ export interface PackagePlayer {
   nickname?: string
   /** AAAA-MM-DD. */
   birthDate: string
+  /** `true` quando a data é uma estimativa (idade aproximada ou média do elenco), a conferir. O jogo trata como uma data qualquer. */
+  birthEstimated?: boolean
   nationality: Nationality
   position: Position
   secondaryPositions?: Position[]
