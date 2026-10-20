@@ -14,6 +14,7 @@
     "analyze": "node tools/run.mjs analyze",
     "analyze:grid": "node tools/run.mjs gridSearch",
     "analyze:quick": "node tools/run.mjs quickCompare",
+    "dados:planilhas": "node tools/run.mjs buildRealSheets",
     "typecheck": "tsc -b --noEmit"
   },
   "type": "module",
