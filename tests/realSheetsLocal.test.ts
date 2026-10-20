@@ -112,6 +112,13 @@ describe('junção dos elencos', () => {
     expect(merged.entries.at(-1)).toEqual({ display: 'Novo Jogador', lang: 'es', title: 'Novo Jogador', number: 7, nat: 'Chile', pos: 'FW' })
   })
 
+  it('a tabela local não passa de 30 jogadores quando é a única fonte', () => {
+    const many = Array.from({ length: 70 }, (_, i) => ({ display: `Jogador ${i}`, title: `Jogador ${i}` }))
+    const merged = mergeSquads([], many, 'es')
+    expect(merged.entries).toHaveLength(30)
+    expect(merged.added).toBe(30)
+  })
+
   it('sem elenco em inglês, o elenco local vira o elenco', () => {
     const merged = mergeSquads([], [{ display: 'A', title: 'A' }, { display: 'B' }], 'pt')
     expect(merged.entries.map((e) => e.display)).toEqual(['A', 'B'])

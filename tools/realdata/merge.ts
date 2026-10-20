@@ -36,6 +36,9 @@ export interface MergeResult {
   enriched: number
 }
 
+/** Elenco máximo do pacote: a tabela local, quando é a única fonte, não passa disso (as tabelas costumam trazer também emprestados e base). */
+export const MAX_SQUAD = 30
+
 export function mergeSquads(english: readonly SquadEntry[], local: readonly LocalEntry[], lang: string, wanted = 18): MergeResult {
   const used = new Set<number>()
   let enriched = 0
@@ -54,7 +57,7 @@ export function mergeSquads(english: readonly SquadEntry[], local: readonly Loca
   let added = 0
   if (entries.length < wanted) {
     local.forEach((l, i) => {
-      if (used.has(i)) return
+      if (used.has(i) || entries.length >= MAX_SQUAD) return
       const entry: SquadEntry = { display: l.display, lang }
       if (l.title) entry.title = l.title
       if (l.number !== undefined) entry.number = l.number
