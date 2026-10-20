@@ -44,14 +44,14 @@ describe('nacionalidades do mundo todo', () => {
     expect(validatePackage(pkg).report.errors.map((e) => e.code)).toContain('unknown-value')
 
     const mexico = JSON.parse(JSON.stringify(buildScalePackage(7))) as DataPackage
-    mexico.countries.push({ id: 'Mexico', name: 'México' })
+    mexico.countries.push({ id: 'Morocco', name: 'Marrocos' })
     const league = mexico.leagues.find((l) => l.id === 'py-1')!
-    league.country = 'Mexico'
+    league.country = 'Morocco'
     const result = validatePackage(mexico).report
     expect(result.errors).toEqual([])
     const warning = result.warnings.find((w) => w.code === 'league-defaults-missing')!
     expect(warning).toBeDefined()
-    expect(packageIssueText(warning)).toContain('Mexico')
+    expect(packageIssueText(warning)).toContain('Morocco')
     league.economy = { revenue: 0.7, level: -1 }
     expect(validatePackage(mexico).report.warnings.some((w) => w.code === 'league-defaults-missing')).toBe(false)
   })

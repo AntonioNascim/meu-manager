@@ -49,7 +49,7 @@ Dividida em partes, cada uma entregue e testada antes da seguinte:
 - **3B (feita, ver `docs/fase2-proposta.md` seção 18) — Copas e supercopas nacionais** da Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina.
 - **Temporadas por pirâmide (feita, antes da 3C; ver `docs/fase2-proposta.md` seção 19):** cada país com a sua temporada (ano civil ou 2026/27), virada por país, janelas por região e copas dentro da temporada de cada um.
 - **3C — Competições continentais:** Libertadores, Sul-Americana, Champions League, Europa League e Conference League (vagas pelas ligas e pelas copas, fase de liga e grupos, calendário de meio de semana compartilhado com as ligas e copas nacionais).
-- **3D — Ampliar o mundo:** México, Estados Unidos, Holanda e clubes de África, Ásia e Oceania, para a CONCACAF, a Copa Intercontinental, o Mundial de Clubes e a Supercopa dos Países Baixos.
+- **3D (feita, ver `docs/fase2-proposta.md` seção 22) — Ampliar o mundo:** Países Baixos, México, Estados Unidos e uma liga de elite pequena para África, Ásia e Oceania, para a copa da América do Norte, a Copa Intercontinental (todo ano), o Mundial de Clubes (a cada 4 anos, 32 clubes) e a Supercopa dos Países Baixos, tudo como padrão do pacote com nomes genéricos.
 - **Fase futura — Seleções:** Copa do Mundo, Eliminatórias, Eurocopa, Copa América, Copa das Nações Africanas e Copa Asiática (calendário de datas FIFA, convocação e a liberação dos jogadores pelos clubes). Fica depois das fases 4 a 6 ou entre elas, a decidir.
 
 ### Fase 4 — Editor
@@ -57,6 +57,8 @@ Dividida em partes, cada uma entregue e testada antes da seguinte:
 - Exportar o pacote editado (arquivo que o usuário guarda ou compartilha por conta própria).
 
 ### Fase 5 — Pacote real a partir dos elencos da Wikipedia, embutido no jogo
+
+> **Pendências herdadas da 3D** (detalhes em `docs/fase2-proposta.md`, seção 22): recalibrar o equilíbrio entre países nas copas europeias (sensível a ajustes pequenos; medir sempre as sementes 7, 11 e 23) e a queda de reputação dos clubes grandes (gigantes reais devem continuar gigantes por décadas).
 - Ferramenta **separada do jogo e fora do site** que lê elencos da Wikipedia e monta um pacote no formato da Fase 1, sem atributos (o jogo gera os atributos).
 - Os **créditos da licença** (Wikipedia, CC BY-SA) acompanham o pacote (campo `credits` do formato) e aparecem no jogo ao importar e na tela de informações.
 - O pacote gerado é **embutido no jogo** (a pasta `dados-reais/` sai do `.gitignore` quando ele estiver pronto), com os cuidados das "Decisões de modelo": escudos gerados, nomes genéricos de campeonatos, tela de créditos, aviso de jogo independente e opção de mundo fictício.

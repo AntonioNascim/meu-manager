@@ -1,5 +1,5 @@
 import type { MatchId, TeamId } from './common'
-import type { Region } from './competition'
+import type { Continent, Region } from './competition'
 import type { Nationality } from './player'
 
 /** Formato da copa: só mata-mata, grupos seguidos de mata-mata, ou uma fase de liga (tabela única) seguida de mata-mata. */
@@ -9,8 +9,14 @@ export type CupFormat = 'knockout' | 'groups-knockout' | 'league-knockout'
 export type CupEntrantSource =
   /** Clubes de uma liga: com `positions` ([de, até] inclusive), os que terminaram a temporada passada nessas posições; sem, todos os que estão na liga hoje. */
   | { type: 'league'; league: string; positions?: [number, number] }
-  /** Campeão ou vice de outra copa na temporada passada. */
-  | { type: 'cup'; cup: string; place: 'winner' | 'runner-up' }
+  /** Campeão ou vice de outra copa na temporada passada (ou, com `latest`, da última edição terminada: as copas mundiais). */
+  | { type: 'cup'; cup: string; place: 'winner' | 'runner-up'; latest?: boolean }
+  /**
+   * Os `count` clubes mais fortes de um continente (pela força do elenco): primeiro os campeões distintos das últimas `last` edições de `cup`
+   * (os mais recentes antes) e o resto das vagas pelos mais fortes que ainda não estão na copa. Sem histórico (primeiras temporadas), todos
+   * saem pela força. É a vaga de cada continente no Mundial de Clubes.
+   */
+  | { type: 'region'; region: Continent; count: number; cup?: string; last?: number }
   /**
    * Clube que terminou em tal colocação (1 = primeiro) de um grupo da fase de grupos de outra copa **da mesma edição** (os terceiros da
    * Libertadores caem para a Sul-Americana). Só se conhece quando a fase de grupos da outra copa termina: a vaga entra na fase `stage`
@@ -93,6 +99,11 @@ export interface CupSpec {
   /** Copa de um país (a pirâmide dele) ou de uma região (continental). */
   country?: Nationality
   region?: Region
+  /**
+   * Copa mundial (Copa Intercontinental, Mundial de Clubes): sem país nem região, joga-se nos anos de calendário `year` com
+   * `(year − offset) % every === 0`; a edição nasce a partir de `from` (mês e dia) desse ano, com os campeões mais recentes de cada continente. `pause`: nesse período do ano da edição as ligas de ano civil não marcam rodadas (os jogos da copa cabem sem conflito).
+   */
+  world?: { every: number; offset: number; from: [number, number]; pause?: { from: [number, number]; to: [number, number] } }
   format: CupFormat
   entrants: CupEntrant[]
   groups?: CupGroupsSpec

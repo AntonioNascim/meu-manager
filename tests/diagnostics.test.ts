@@ -60,9 +60,9 @@ describe('diagnóstico: medição', () => {
     expect(formatReport(device, m)).toContain('o navegador nao permite medir')
   })
 
-  it('o mundo completo tem 282 clubes em 15 ligas', () => {
-    expect(FULL_WORLD).toHaveLength(15)
-    expect(FULL_WORLD.reduce((n, l) => n + l.teams, 0)).toBe(282)
+  it('o mundo completo tem 358 clubes em 21 ligas', () => {
+    expect(FULL_WORLD).toHaveLength(21)
+    expect(FULL_WORLD.reduce((n, l) => n + l.teams, 0)).toBe(358)
   })
 })
 
@@ -72,6 +72,6 @@ describe('diagnóstico: tela', () => {
     const { createElement } = await import('react')
     const { Diagnostics } = await import('../src/ui/screens/Diagnostics')
     const html = renderToStaticMarkup(createElement(Diagnostics))
-    for (const text of ['Diagnóstico de desempenho', 'Medir uma temporada inteira', 'Medida rápida (10 avanços)', '282 clubes', 'Android de entrada', 'Nome do aparelho']) expect(html).toContain(text)
+    for (const text of ['Diagnóstico de desempenho', 'Medir uma temporada inteira', 'Medida rápida (10 avanços)', '358 clubes', 'Android de entrada', 'Nome do aparelho']) expect(html).toContain(text)
   })
 })

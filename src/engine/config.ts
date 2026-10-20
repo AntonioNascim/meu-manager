@@ -1,5 +1,5 @@
 /** Constantes de balanceamento do motor. Mexer só aqui, nunca espalhado pelo código. */
-import type { PlayStyle, Position } from './types'
+import type { PlayStyle, Position, Region } from './types'
 
 /** Escala dos atributos visíveis, ocultos e da força geral (inteiros). A reputação dos times continua de 1 a 20. */
 export const ATTRIBUTE_MIN = 1
@@ -517,7 +517,24 @@ export const MARKET = {
         { name: 'mid-year', start: [1, 1], end: [1, 31] },
         { name: 'pre-season', start: [7, 1], end: [8, 31] },
       ],
-    } as Record<'BR' | 'SA' | 'EU', readonly { name: 'pre-season' | 'mid-year'; start: readonly [number, number]; end: readonly [number, number] | null }[]>,
+      // América do Norte (ano civil, como a MLS): até o fim de fevereiro e julho a meados de agosto. África, Ásia e Oceania seguem o calendário europeu.
+      NA: [
+        { name: 'pre-season', start: [1, 1], end: [2, 28] },
+        { name: 'mid-year', start: [7, 1], end: [8, 15] },
+      ],
+      AF: [
+        { name: 'mid-year', start: [1, 1], end: [1, 31] },
+        { name: 'pre-season', start: [7, 1], end: [8, 31] },
+      ],
+      AS: [
+        { name: 'mid-year', start: [1, 1], end: [1, 31] },
+        { name: 'pre-season', start: [7, 1], end: [8, 31] },
+      ],
+      OC: [
+        { name: 'mid-year', start: [1, 1], end: [1, 31] },
+        { name: 'pre-season', start: [7, 1], end: [8, 31] },
+      ],
+    } as Record<Region, readonly { name: 'pre-season' | 'mid-year'; start: readonly [number, number]; end: readonly [number, number] | null }[]>,
     /** A IA negocia a cada tantos dias dentro da janela. */
     tickDays: 7,
     /** Dias até a resposta a uma proposta do jogador. */

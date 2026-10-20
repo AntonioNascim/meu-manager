@@ -11,11 +11,11 @@ import { createRng, hashSeed } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { cycleOfPyramid, focusPyramid, phaseOfPyramid } from '../season/cycles'
 import { pyramidOf } from '../season/fidelity'
-import { WEDNESDAY, addDays, makeDate, onOrAfterWeekday } from '../season/dates'
+import { WEDNESDAY, addDays, makeDate, onOrAfterWeekday, weekday as dayOfWeek } from '../season/dates'
 import type { Competition, Cup, CupSpec, CupStageSpec, IsoDate, Match, MatchCupInfo, StandingRow, Team, TeamId } from '../types'
 import { drawGroups, drawKnockout, drawLeaguePhase, groupRounds } from './draw'
 import { resolveEntrants } from './entrants'
-import { isContinental, stageList } from './plan'
+import { SPLIT_REGIONS, isContinental, isWorld, stageList } from './plan'
 import { cupMatches, groupTables, leaguePhaseTable, tiesOfStage } from './tie'
 
 export * from './plan'
@@ -50,6 +50,27 @@ export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: 
   const ids = [...teamIds]
   let day = onOrAfterWeekday(notBefore, weekday)
   if (tolerant) {
+    // Primeiro procura, por até 10 semanas, um dia de terça a quinta em que nenhum clube joga nem na véspera nem no dia seguinte (copas com
+    // clubes de vários países: as ligas ocupam muita quarta-feira, mas a terça ou a quinta costuma estar livre). Só se não achar aceita jogo colado.
+    let bestDay: IsoDate | undefined
+    let bestAdjacent = Infinity
+    for (let week = 0, base = day; week < 10; week++, base = addDays(base, 7)) {
+      for (const candidate of [base, addDays(base, -1), addDays(base, 1)]) {
+        if (candidate < notBefore || dayOfWeek(candidate) < 2 || dayOfWeek(candidate) > 4) continue
+        let same = 0
+        let adjacent = 0
+        for (const id of ids) {
+          const days = busy.get(id)
+          if (!days) continue
+          if (days.has(candidate)) same++
+          else if (days.has(addDays(candidate, -1)) || days.has(addDays(candidate, 1))) adjacent++
+        }
+        if (same > 0) continue
+        if (adjacent === 0) return candidate
+        if (adjacent < bestAdjacent) (bestAdjacent = adjacent), (bestDay = candidate)
+      }
+    }
+    if (bestDay !== undefined && bestAdjacent <= Math.ceil(ids.length * 0.15)) return bestDay
     // Copa com clubes de vários países (as continentais): as rodadas de meio de semana das ligas de seis países cobrem quase todas as semanas, então,
     // depois de esperar um pouco, vale o dia anterior e aceita-se um jogo colado em outro de alguns clubes (nunca no mesmo dia).
     for (let week = 0; week < 80; week++, day = addDays(day, 7)) {
@@ -158,9 +179,9 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
   const { cup, state } = ctx
   const spec = cup.spec
   // Copa de um país segue a temporada dele; a continental, a do continente (a europeia atravessa o ano).
-  const split = cup.pyramid !== undefined ? state.cycles[cup.pyramid]?.split === true : spec.region === 'EU'
+  const split = cup.pyramid !== undefined ? state.cycles[cup.pyramid]?.split === true : spec.region !== undefined && SPLIT_REGIONS.includes(spec.region)
   const weekday = spec.weekday ?? WEDNESDAY
-  const tolerant = isContinental(spec)
+  const tolerant = isContinental(spec) || isWorld(spec)
   const descriptor = stageList(spec)[stage] as ReturnType<typeof stageList>[number]
   const participants = participantsOf(ctx, stage)
   const rng = createRng(`${state.market.seed}:${cup.year}:${cup.id}:draw:${stage}`)
@@ -249,8 +270,8 @@ export function createCups(state: SeasonState, specs: readonly CupSpec[], only?:
   if (specs.length === 0) return state
   const cups: Cup[] = (state.cups ?? []).filter((c) => only === undefined || c.pyramid !== only)
   for (const spec of specs) {
-    // As copas continentais têm a edição própria (`ensureContinentals`), criada quando todos os países dela já abriram a temporada.
-    if (isContinental(spec)) continue
+    // As copas continentais e mundiais têm a edição própria (`ensureContinentals`, `ensureWorldCups`).
+    if (isContinental(spec) || isWorld(spec)) continue
     const pyramid = pyramidOfCupSpec(spec, state.season.competitions) ?? focusPyramid(state)
     if (only !== undefined && pyramid !== only) continue
     // A copa é da temporada do país dela: o ano da edição e as vagas (colocações da temporada passada) seguem a pirâmide.
@@ -301,10 +322,37 @@ export function ensureContinentals(state: SeasonState): SeasonState {
       else for (const e of other.entrants) excluded.add(e.teamId)
     }
     if (waiting) continue
-    const entrants = resolveEntrants(spec, { year: edition, teams: current.teams, competitions: current.season.competitions, cupHistory: current.cupHistory ?? {}, specs: current.cupSpecs ?? [], excluded })
+    const entrants = resolveEntrants(spec, { year: edition, teams: current.teams, competitions: current.season.competitions, cupHistory: current.cupHistory ?? {}, specs: current.cupSpecs ?? [], excluded, players: current.players })
     if (entrants.length < 2) continue
     const cup: Cup = { id: spec.id, name: spec.name, year: edition, spec, entrants, log: [] }
     // A edição velha sai (com os jogos); a nova entra no lugar dela.
+    const cups = existing ? (current.cups ?? []).map((c) => (c.id === spec.id ? cup : c)) : [...(current.cups ?? []), cup]
+    const matches = existing ? current.matches.filter((m) => m.competitionId !== spec.id) : current.matches
+    current = { ...current, cups, matches }
+  }
+  return current === state ? state : { ...current, season: { ...current.season, matchIds: current.matches.map((m) => m.id) } }
+}
+
+/**
+ * Cria as edições das copas mundiais (Copa Intercontinental, Mundial de Clubes). A edição de um ano de calendário nasce no primeiro dia de jogos
+ * a partir de `world.from` desse ano, com os campeões mais recentes de cada continente (a última edição terminada de cada copa continental, a
+ * última temporada das ligas pequenas). Só nasce se a edição anterior acabou. Sem nada a fazer devolve o mesmo estado.
+ */
+export function ensureWorldCups(state: SeasonState): SeasonState {
+  const specs = (state.cupSpecs ?? []).filter(isWorld)
+  if (specs.length === 0) return state
+  const today = state.season.currentDate
+  const year = Number(today.slice(0, 4))
+  let current = state
+  for (const spec of specs) {
+    const world = spec.world as NonNullable<CupSpec['world']>
+    if (((year - world.offset) % world.every + world.every) % world.every !== 0) continue
+    if (today < makeDate(year, world.from[0], world.from[1])) continue
+    const existing = current.cups?.find((c) => c.id === spec.id)
+    if (existing && (existing.year >= year || existing.winnerId === undefined)) continue
+    const entrants = resolveEntrants(spec, { year, teams: current.teams, competitions: current.season.competitions, cupHistory: current.cupHistory ?? {}, specs: current.cupSpecs ?? [], players: current.players })
+    if (entrants.length < 2) continue
+    const cup: Cup = { id: spec.id, name: spec.name, year, spec, entrants, log: [] }
     const cups = existing ? (current.cups ?? []).map((c) => (c.id === spec.id ? cup : c)) : [...(current.cups ?? []), cup]
     const matches = existing ? current.matches.filter((m) => m.competitionId !== spec.id) : current.matches
     current = { ...current, cups, matches }
@@ -351,7 +399,7 @@ export function pyramidOfCupSpec(spec: CupSpec, competitions: readonly Pick<Comp
  * encerra a copa e premia o campeão). Pode ser chamada a qualquer momento; sem nada a fazer devolve o mesmo estado.
  */
 export function progressCups(input: SeasonState): SeasonState {
-  const state = ensureContinentals(input)
+  const state = ensureWorldCups(ensureContinentals(input))
   if (!state.cups || state.cups.length === 0) return state
   const teams = new Map(state.teams.map((t) => [t.id, t]))
   let matches = state.matches

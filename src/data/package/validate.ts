@@ -1,5 +1,5 @@
 import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../../engine/config'
-import { ATTRIBUTE_NAMES, NATIONALITIES, POSITIONS } from '../../engine/types'
+import { ATTRIBUTE_NAMES, NATIONALITIES, POSITIONS, REGIONS } from '../../engine/types'
 import type { Attributes, Region } from '../../engine/types'
 import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
 import { COUNTRY_DEFAULTS } from './leagueDefaults'
@@ -193,7 +193,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
     if (league.start !== undefined && !(Array.isArray(league.start) && league.start.length === 2 && isInt(league.start[0]) && isInt(league.start[1]) && league.start[0] >= 1 && league.start[0] <= 12 && league.start[1] >= 1 && league.start[1] <= 31)) c.error('bad-date', `${path}.start`, JSON.stringify(league.start))
     if (league.split !== undefined && typeof league.split !== 'boolean') c.error('unknown-value', `${path}.split`, String(league.split))
     if (league.rounds !== undefined && league.rounds !== 1 && league.rounds !== 2) c.error('unknown-value', `${path}.rounds`, String(league.rounds))
-    if (league.region !== undefined && !['BR', 'SA', 'EU'].includes(league.region as string)) c.error('unknown-value', `${path}.region`, String(league.region))
+    if (league.region !== undefined && !(REGIONS as readonly string[]).includes(league.region as string)) c.error('unknown-value', `${path}.region`, String(league.region))
     if (league.foreignLimit !== undefined) {
       const f = league.foreignLimit
       if (!isObj(f)) c.error('wrong-type', `${path}.foreignLimit`, 'foreignLimit')
@@ -205,7 +205,7 @@ export function validatePackage(input: unknown): { pkg?: DataPackage; report: Pa
     if (id === undefined) return
     if (leagueIds.has(id)) c.error('duplicate-id', `${path}.id`, id)
     leagueIds.add(id)
-    leagues.push({ id, ...(country !== undefined ? { country } : {}), ...(level !== undefined ? { level } : {}), ...(teams !== undefined ? { teams } : {}), ...(promotion !== undefined ? { promotion } : {}), ...(relegation !== undefined ? { relegation } : {}), ...(typeof league.region === 'string' && ['BR', 'SA', 'EU'].includes(league.region) ? { region: league.region as Region } : {}), ...(isObj(league.economy) && typeof league.economy.revenue === 'number' ? { economy: { revenue: league.economy.revenue } } : {}), path })
+    leagues.push({ id, ...(country !== undefined ? { country } : {}), ...(level !== undefined ? { level } : {}), ...(teams !== undefined ? { teams } : {}), ...(promotion !== undefined ? { promotion } : {}), ...(relegation !== undefined ? { relegation } : {}), ...(typeof league.region === 'string' && (REGIONS as readonly string[]).includes(league.region) ? { region: league.region as Region } : {}), ...(isObj(league.economy) && typeof league.economy.revenue === 'number' ? { economy: { revenue: league.economy.revenue } } : {}), path })
   })
 
   // Clubes

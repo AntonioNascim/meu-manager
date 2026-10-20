@@ -164,7 +164,8 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
   // O título (e a final) de uma copa continental da temporada dá reputação ao clube.
   const continental = new Map<TeamId, number>()
   for (const cup of state.cups ?? []) {
-    if (cup.pyramid !== undefined || cup.winnerId === undefined || cup.year !== year) continue
+    // Só as continentais: o título mundial já vem do continental, e contar de novo reforçaria o mesmo campeão.
+    if (cup.pyramid !== undefined || cup.winnerId === undefined || cup.year !== year || !isContinental(cup.spec)) continue
     continental.set(cup.winnerId, (continental.get(cup.winnerId) ?? 0) + OFFSEASON.reputation.continentalChampion)
     if (cup.runnerUpId) continental.set(cup.runnerUpId, (continental.get(cup.runnerUpId) ?? 0) + OFFSEASON.reputation.continentalFinalist)
   }
@@ -335,7 +336,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     ...(c.reputationMean !== undefined ? { reputationMean: c.reputationMean } : {}),
   }))
   const upcoming = nextCycle(cycle)
-  const built = buildPyramid({ seed: state.market.seed, cycle: upcoming, setups, rng: createRng(`${state.market.seed}:${upcoming.year}:calendar${isMulti ? `:${pyramid}` : ''}`) })
+  const built = buildPyramid({ seed: state.market.seed, cycle: upcoming, setups, ...(state.cupSpecs ? { cupSpecs: state.cupSpecs } : {}), rng: createRng(`${state.market.seed}:${upcoming.year}:calendar${isMulti ? `:${pyramid}` : ''}`) })
   const replaced = new Map(built.competitions.map((c) => [c.id, c]))
   const oldIds = new Set(competitions.map((c) => c.id))
   for (const cup of state.cups ?? []) if (cup.pyramid === pyramid) oldIds.add(cup.id)

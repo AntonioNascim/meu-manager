@@ -14,8 +14,8 @@ import { COUNTRY_OF_PYRAMID, FULL_WORLD, buildScaleWorld } from './scaleWorld'
 
 /** País de cada liga do mundo de teste (a pirâmide é o prefixo do id). */
 const COUNTRY_OF = COUNTRY_OF_PYRAMID
-const COUNTRY_NAME: Partial<Record<Nationality, string>> = { Brazil: 'Brasil', Argentina: 'Argentina', Uruguay: 'Uruguai', Paraguay: 'Paraguai', Chile: 'Chile', Colombia: 'Colômbia', Peru: 'Peru', Ecuador: 'Equador', England: 'Inglaterra', Spain: 'Espanha', Italy: 'Itália', Germany: 'Alemanha', France: 'França', Portugal: 'Portugal' }
-const SPANISH_SPEAKING: readonly Nationality[] = ['Argentina', 'Uruguay', 'Paraguay', 'Chile', 'Colombia', 'Peru', 'Ecuador', 'Spain']
+const COUNTRY_NAME: Partial<Record<Nationality, string>> = { Brazil: 'Brasil', Argentina: 'Argentina', Uruguay: 'Uruguai', Paraguay: 'Paraguai', Chile: 'Chile', Colombia: 'Colômbia', Peru: 'Peru', Ecuador: 'Equador', England: 'Inglaterra', Spain: 'Espanha', Italy: 'Itália', Germany: 'Alemanha', France: 'França', Portugal: 'Portugal', Netherlands: 'Países Baixos', Mexico: 'México', 'United States': 'Estados Unidos', Egypt: 'Egito', Japan: 'Japão', Australia: 'Austrália' }
+const SPANISH_SPEAKING: readonly Nationality[] = ['Argentina', 'Uruguay', 'Paraguay', 'Chile', 'Colombia', 'Peru', 'Ecuador', 'Spain', 'Mexico']
 
 /** Limites de estrangeiros do exemplo (para testar a regra; os demais países não têm limite). */
 const FOREIGN_LIMITS: Record<string, PackageLeague['foreignLimit']> = { 'ar-1': { squad: 6 }, 'it-1': { lineup: 8 }, 'en-1': { squad: 17 }, 'es-1': { lineup: 9 } }
@@ -60,7 +60,7 @@ export function buildScalePackage(seed = 7): DataPackage {
     const isBrazil = country === 'Brazil'
     return {
       id: spec.id,
-      name: isBrazil ? spec.name.replace('Brasil ', 'Série ') : `Liga ${COUNTRY_NAME[country]}`,
+      name: isBrazil ? spec.name.replace('Brasil ', 'Série ') : (spec.leagueName ?? `Liga ${COUNTRY_NAME[country]}`),
       country,
       level: spec.tier,
       teams: spec.teams,
@@ -118,14 +118,14 @@ export function buildScalePackage(seed = 7): DataPackage {
   return {
     format: PACKAGE_FORMAT,
     version: PACKAGE_VERSION,
-    name: 'Mundo fictício com 15 ligas (exemplo)',
+    name: 'Mundo fictício com 21 ligas (exemplo)',
     startYear: 2026,
     credits: 'Pacote de exemplo gerado pelo próprio jogo: clubes, cidades e jogadores inventados, sem dados reais. Atributos, contratos, táticas e finanças ficam por conta do jogo.',
     countries,
     leagues,
     clubs,
     players,
-    // As copas padrão de cada país (Brasil, Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina) e as continentais das duas regiões.
+    // As copas padrão de cada país (Brasil, Inglaterra, Espanha, Itália, Alemanha, França, Portugal, Países Baixos e Argentina), as continentais das três regiões e as mundiais.
     cups: cupsForPackage({ leagues }).cups,
   }
 }

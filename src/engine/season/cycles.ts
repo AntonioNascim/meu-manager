@@ -97,7 +97,8 @@ function pyramidMatches(state: Pick<SeasonState, 'season' | 'cups'>, pyramid: st
   const continental = new Set<string>()
   for (const cup of state.cups ?? []) {
     if (cup.pyramid === pyramid) own.add(cup.id)
-    else if (cup.pyramid === undefined) continental.add(cup.id)
+    // As copas mundiais não seguram a virada do país: o clube que ainda joga uma delas segue jogando depois da virada.
+    else if (cup.pyramid === undefined && cup.spec.world === undefined) continental.add(cup.id)
   }
   return { own, continental, teams: new Set(comps.flatMap((c) => c.teamIds)) }
 }

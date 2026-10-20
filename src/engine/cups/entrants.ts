@@ -2,18 +2,22 @@
  * Quem joga cada copa na temporada: as vagas do pacote (`CupSpec.entrants`) viram clubes, a partir da classificação final da
  * temporada passada (histórico dos clubes), do campeão da outra copa (`cupHistory`) e, na primeira temporada, da reputação.
  */
-import type { Competition, CupEntrantSource, CupHistory, CupSpec, Team, TeamId } from '../types'
+import { playerOverall } from '../overall'
+import type { Competition, Continent, CupEntrantSource, CupHistory, CupSpec, Player, Team, TeamId } from '../types'
+import { continentOf } from '../types'
 import { seedOrder } from './draw'
 
 export interface EntrantContext {
   year: number
   teams: readonly Team[]
-  competitions: readonly Pick<Competition, 'id' | 'tier' | 'teamIds' | 'pyramid'>[]
+  competitions: readonly Pick<Competition, 'id' | 'tier' | 'teamIds' | 'pyramid' | 'region'>[]
   cupHistory: CupHistory
   /** Todas as copas, para resolver "campeão da copa X" na primeira temporada (sem histórico) pelos clubes que ela teria. */
   specs: readonly CupSpec[]
   /** Clubes que já estão em outras copas da mesma edição (`CupSpec.excludeCups`): não entram nesta. */
   excluded?: ReadonlySet<TeamId>
+  /** Jogadores do mundo: as vagas por continente (`region`) ordenam os clubes pela força do elenco; sem eles, pela reputação. */
+  players?: readonly Player[]
 }
 
 const byReputation = (ctx: EntrantContext) => {
@@ -60,7 +64,9 @@ function leagueFilled(source: Extract<CupEntrantSource, { type: 'league' }>, ctx
 }
 
 function cupSource(source: Extract<CupEntrantSource, { type: 'cup' }>, ctx: EntrantContext, depth: number): TeamId[] {
-  const entry = (ctx.cupHistory[source.cup] ?? []).find((h) => h.year === ctx.year - 1)
+  const history = ctx.cupHistory[source.cup] ?? []
+  // `latest`: a última edição terminada, seja de que ano for (as copas mundiais juntam copas de calendários diferentes).
+  const entry = source.latest ? history.reduce<(typeof history)[number] | undefined>((last, h) => (last === undefined || h.year > last.year ? h : last), undefined) : history.find((h) => h.year === ctx.year - 1)
   if (entry) {
     const id = source.place === 'winner' ? entry.winnerId : entry.runnerUpId
     return id ? [id] : []
@@ -74,10 +80,46 @@ function cupSource(source: Extract<CupEntrantSource, { type: 'cup' }>, ctx: Entr
   return pick ? [pick] : []
 }
 
+/** Força de cada clube: média dos 14 melhores do elenco (reputação, se o contexto não traz os jogadores). */
+function strengthOf(ctx: EntrantContext): (id: TeamId) => number {
+  if (!ctx.players) return byReputation(ctx)
+  const bySquad = new Map<TeamId, number[]>()
+  for (const p of ctx.players) if (p.teamId) bySquad.set(p.teamId, [...(bySquad.get(p.teamId) ?? []), playerOverall(p)])
+  const value = new Map<TeamId, number>()
+  for (const [id, list] of bySquad) {
+    const best = list.sort((a, b) => b - a).slice(0, 14)
+    value.set(id, best.reduce((sum, v) => sum + v, 0) / Math.max(1, best.length))
+  }
+  return (id) => value.get(id) ?? 0
+}
+
+/** Os clubes de primeira divisão de um continente. */
+function clubsOfContinent(continent: Continent, ctx: EntrantContext): TeamId[] {
+  return ctx.competitions.filter((c) => c.tier === 1 && continentOf(c.region ?? 'BR') === continent).flatMap((c) => c.teamIds)
+}
+
+/** Vaga por continente: campeões recentes da copa continental e, para completar, os clubes mais fortes que ainda não estão na copa. */
+function regionSource(source: Extract<CupEntrantSource, { type: 'region' }>, ctx: EntrantContext, taken: ReadonlySet<TeamId>): TeamId[] {
+  const mine = new Set(clubsOfContinent(source.region, ctx))
+  const out: TeamId[] = []
+  if (source.cup && source.last) {
+    const recent = [...(ctx.cupHistory[source.cup] ?? [])].sort((a, b) => b.year - a.year).slice(0, source.last)
+    for (const h of recent) if (out.length < source.count && mine.has(h.winnerId) && !taken.has(h.winnerId) && !out.includes(h.winnerId)) out.push(h.winnerId)
+  }
+  const strength = strengthOf(ctx)
+  for (const id of seedOrder([...mine].filter((id) => !taken.has(id) && !out.includes(id)), strength)) {
+    if (out.length >= source.count) break
+    out.push(id)
+  }
+  return out
+}
+
 function fromSource(source: CupEntrantSource, ctx: EntrantContext, depth: number): TeamId[] {
   if (source.type === 'league') return leagueSource(source, ctx)
   // Os classificados pelos grupos de outra copa só se conhecem quando eles terminam: entram depois (`progressCups`).
   if (source.type === 'cup-group-place') return []
+  // Sem `taken` a vaga por continente não se completa: quem a resolve de verdade é `resolveEntrants`.
+  if (source.type === 'region') return regionSource(source, ctx, new Set())
   return cupSource(source, ctx, depth)
 }
 
@@ -87,7 +129,7 @@ export function resolveEntrants(spec: CupSpec, ctx: EntrantContext, depth = 0): 
   const out: { teamId: TeamId; stage: number }[] = []
   for (const rule of spec.entrants) {
     const stage = rule.stage ?? 0
-    const candidatesOf = (source: CupEntrantSource) => (source.type === 'league' && source.positions ? leagueFilled(source, ctx, taken) : fromSource(source, ctx, depth).filter((id) => !taken.has(id)))
+    const candidatesOf = (source: CupEntrantSource) => (source.type === 'league' && source.positions ? leagueFilled(source, ctx, taken) : source.type === 'region' ? regionSource(source, ctx, taken) : fromSource(source, ctx, depth).filter((id) => !taken.has(id)))
     let candidates = candidatesOf(rule.source)
     // Vaga que repete clube (ex.: o campeão da liga também ganhou a copa): o primeiro da vaga reserva ocupa o lugar.
     if (candidates.length === 0 && rule.fallback) candidates = candidatesOf(rule.fallback).slice(0, 1)

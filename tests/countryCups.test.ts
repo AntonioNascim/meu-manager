@@ -17,8 +17,8 @@ const sample = buildScalePackage(7)
 const copy = () => JSON.parse(JSON.stringify(sample)) as DataPackage
 
 describe('copas padrão de cada país', () => {
-  it('há copas padrão para Brasil, Inglaterra, Espanha, Itália, Alemanha, França, Portugal e Argentina', () => {
-    expect([...COUNTRIES_WITH_CUPS].sort()).toEqual(['Argentina', 'Brazil', 'England', 'France', 'Germany', 'Italy', 'Portugal', 'Spain'])
+  it('há copas padrão para Brasil, Inglaterra, Espanha, Itália, Alemanha, França, Portugal, Países Baixos e Argentina', () => {
+    expect([...COUNTRIES_WITH_CUPS].sort()).toEqual(['Argentina', 'Brazil', 'England', 'France', 'Germany', 'Italy', 'Netherlands', 'Portugal', 'Spain'])
     const ids = (country: Parameters<typeof defaultCupsFor>[0]) => defaultCupsFor(country, [{ id: 'x-1', level: 1 }]).map((c) => c.id)
     expect(ids('England')).toEqual(['cup-en'])
     expect(ids('Spain')).toEqual(['cup-es', 'supercup-es'])
@@ -26,6 +26,7 @@ describe('copas padrão de cada país', () => {
     expect(ids('Germany')).toEqual(['cup-de', 'supercup-de'])
     expect(ids('France')).toEqual(['cup-fr'])
     expect(ids('Portugal')).toEqual(['cup-pt', 'league-cup-pt'])
+    expect(ids('Netherlands')).toEqual(['cup-nl', 'supercup-nl'])
     expect(ids('Argentina')).toEqual(['cup-ar', 'supercup-ar'])
     expect(defaultCupsFor('Uruguay', [{ id: 'uy-1', level: 1 }])).toEqual([])
   })
@@ -37,8 +38,8 @@ describe('copas padrão de cada país', () => {
     expect(names).toContain('Supercopa da Alemanha')
   })
 
-  it('o pacote de exemplo das 15 ligas traz as copas dos oito países, as cinco continentais e é válido', () => {
-    expect(sample.cups!.map((c) => c.id).sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-sa-1', 'cont-sa-2', 'cup-ar', 'cup-br', 'cup-de', 'cup-en', 'cup-es', 'cup-fr', 'cup-it', 'cup-pt', 'league-cup-pt', 'supercup-ar', 'supercup-br', 'supercup-de', 'supercup-es', 'supercup-it'])
+  it('o pacote de exemplo das 21 ligas traz as copas dos nove países, as seis continentais, as duas mundiais e é válido', () => {
+    expect(sample.cups!.map((c) => c.id).sort()).toEqual(['cont-eu-1', 'cont-eu-2', 'cont-eu-3', 'cont-na-1', 'cont-sa-1', 'cont-sa-2', 'cup-ar', 'cup-br', 'cup-de', 'cup-en', 'cup-es', 'cup-fr', 'cup-it', 'cup-nl', 'cup-pt', 'league-cup-pt', 'supercup-ar', 'supercup-br', 'supercup-de', 'supercup-es', 'supercup-it', 'supercup-nl', 'world-1', 'world-2'])
     expect(validatePackage(copy()).report.errors).toEqual([])
   })
 
@@ -55,10 +56,12 @@ describe('copas padrão de cada país', () => {
     expect(shape('cup-de')).toMatchObject({ clubs: 18, byes: 14, firstRound: 2 })
     expect(shape('cup-fr')).toMatchObject({ clubs: 18, byes: 14, firstRound: 2 })
     expect(shape('cup-pt')).toMatchObject({ clubs: 18, byes: 14, firstRound: 2 })
+    expect(shape('cup-nl')).toMatchObject({ clubs: 18, byes: 14, firstRound: 2 })
     expect(shape('cup-ar')).toMatchObject({ clubs: 28, byes: 4, firstRound: 12 })
     expect(shape('cup-br')).toMatchObject({ clubs: 60, byes: 4, firstRound: 28 })
     expect(shape('supercup-es').clubs).toBe(4)
     expect(shape('supercup-de').clubs).toBe(2)
+    expect(shape('supercup-nl').clubs).toBe(2)
     // Os cabeças de chave (os melhores) folgam.
     const england = start.cups!.find((c) => c.id === 'cup-en')!
     const rep = new Map(world.teams.map((t) => [t.id, t.reputation]))

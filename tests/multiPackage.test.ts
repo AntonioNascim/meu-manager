@@ -27,12 +27,12 @@ const world = loadWorld(7, pkg)
 const teamIn = (leagueId: string) => world.competitions!.find((c) => c.id === leagueId)!.teams[0]!
 
 describe('pacote com vários países', () => {
-  it('o pacote de exemplo das 15 ligas é válido, sem atributos nem contratos', () => {
+  it('o pacote de exemplo das 21 ligas é válido, sem atributos nem contratos', () => {
     const r = validatePackage(pkg).report
     expect(r.errors).toEqual([])
-    expect(pkg.leagues).toHaveLength(15)
-    expect(pkg.countries).toHaveLength(13)
-    expect(pkg.clubs).toHaveLength(282)
+    expect(pkg.leagues).toHaveLength(21)
+    expect(pkg.countries).toHaveLength(19)
+    expect(pkg.clubs).toHaveLength(358)
     expect(pkg.players.every((p) => p.attributes === undefined && p.contract === undefined)).toBe(true)
   })
 
@@ -83,8 +83,8 @@ describe('pacote com vários países', () => {
 describe('mundo montado de um pacote com várias ligas', () => {
   it('cada país vira uma pirâmide com as suas divisões, e a economia vem do país quando o pacote não diz', () => {
     const comps = world.competitions!
-    expect(comps).toHaveLength(15)
-    expect(new Set(comps.map((c) => c.pyramid)).size).toBe(13)
+    expect(comps).toHaveLength(21)
+    expect(new Set(comps.map((c) => c.pyramid)).size).toBe(19)
     const england = teamIn('en-1')
     expect(england.economy).toEqual(COUNTRY_DEFAULTS.England!.economy)
     expect(england.country).toBe('England')
@@ -123,7 +123,7 @@ describe('mundo montado de um pacote com várias ligas', () => {
     const england = teamIn('en-1')
     let game = createGame(7, england.id, { world, dataPackage: pkg })
     expect(game.season.focus).toBe('England')
-    expect(game.season.season.competitions).toHaveLength(15)
+    expect(game.season.season.competitions).toHaveLength(21)
     expect(userCompetition(game).id).toBe('en-1')
     game = playPendingAuto(advanceToMatchday(game))
     expect(game.season.season.currentDate > '2026-01-01').toBe(true)
@@ -134,7 +134,7 @@ describe('mundo montado de um pacote com várias ligas', () => {
 describe('escolha do país, da liga e do clube', () => {
   it('lista países, divisões e clubes do mundo', () => {
     const choices = worldChoices(world)
-    expect(choices).toHaveLength(13)
+    expect(choices).toHaveLength(19)
     expect(choices[0]).toMatchObject({ country: 'Brazil' })
     expect(choices[0]!.divisions.map((d) => d.name)).toEqual(['Série A', 'Série B', 'Série C'])
     expect(choices.find((c) => c.country === 'England')!.divisions[0]!.teams).toHaveLength(20)
@@ -235,13 +235,13 @@ describe('limite de estrangeiros', () => {
 })
 
 describe('medida de importação (?diagnostico=1)', () => {
-  it('mede ler, validar, montar o mundo e começar o jogo com o pacote de 15 ligas', async () => {
+  it('mede ler, validar, montar o mundo e começar o jogo com o pacote de 21 ligas', async () => {
     const m = await measureImport(JSON.stringify(pkg), { label: 'teste', readMs: 5, saveStore: null })
-    expect(m).toMatchObject({ clubs: 282, leagues: 15, countries: 13, errors: 0 })
+    expect(m).toMatchObject({ clubs: 358, leagues: 21, countries: 19, errors: 0 })
     expect(m.worldMs).toBeGreaterThan(0)
     expect(m.importMs).toBeGreaterThanOrEqual(m.parseMs + m.validateMs + m.worldMs)
     const text = formatImportReport(m)
-    expect(text).toContain('15 ligas')
+    expect(text).toContain('21 ligas')
     expect(text).toContain('Importar (tudo acima)')
     expect(text).toContain('Comecar o jogo')
     expect(text).toContain('Primeiro avanco')

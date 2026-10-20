@@ -1,14 +1,16 @@
 /**
  * Medição de escala (Fase 2, parte A): um mundo fictício do tamanho do plano (Brasil A/B/C, seis ligas da América do
- * Sul, seis da Europa) jogado lance a lance pelo mesmo caminho do jogo (`advanceToMatchday` + `playPendingAuto`).
+ * Sul, sete da Europa, México, Estados Unidos e as ligas de elite de África, Ásia e Oceania) jogado lance a lance pelo mesmo caminho do jogo (`advanceToMatchday` + `playPendingAuto`).
  * Mede tempo por avanço e por temporada, memória, tamanho e tempo do save. Não altera o jogo.
  *
- * Uso: node --expose-gc tools/run.mjs worldScale [--world full|base|brazil] [--seed 7] [--offseason] [--focus]
+ * Uso: node --expose-gc tools/run.mjs worldScale [--world full|base|brazil] [--seed 7] [--offseason] [--focus] [--classic]
+ * (o mundo `full` é o pacote de exemplo pelo caminho do jogo, com foco no Brasil e todas as copas; `--classic` volta ao mundo sem copas)
  * Com --focus só a pirâmide do técnico (Brasil) é lance a lance; as outras ligas usam o resultado simplificado e o rodízio do mercado.
  */
 import os from 'node:os'
 import { gzipSync } from 'node:zlib'
 import { playerOverall } from '../src/engine/overall'
+import { buildDiagnosticGame } from '../src/diagnostics/scaleGame'
 import { BRAZIL_ONLY, FULL_WORLD, buildScaleGame } from '../src/diagnostics/scaleWorld'
 import type { LeagueSpec } from '../src/diagnostics/scaleWorld'
 import { simulateMatch } from '../src/engine/match'
@@ -135,9 +137,10 @@ function quickSimBench(game: Game): void {
   console.log(`resultado simplificado: ${(ms * 1000).toFixed(0)} µs por partida (com a força recalculada a cada jogo), ${(goals / matches.length).toFixed(2)} gols por jogo`)
 }
 
-function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason: boolean, focus: boolean) {
+function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason: boolean, focus: boolean, real = false) {
   const heapBase = heap()
-  const built = specs ? buildScaleGame(specs, seed, { focus }) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
+  // `real`: o pacote de exemplo (21 ligas) pelo caminho do jogo, com calendários de cada país e todas as copas (a tela ?diagnostico=1 mede o mesmo).
+  const built = real ? buildDiagnosticGame('full', seed) : specs ? buildScaleGame(specs, seed, { focus }) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
   let game = built.game
   // A diretoria não demite (no mundo sintético isso já foi feito na criação).
   game = { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === game.userTeamId ? { ...t, objective: { targetPosition: 20, sackingPosition: 20 } } : t)) } }
@@ -217,4 +220,5 @@ const offseason = args.includes('--offseason')
 const focus = args.includes('--focus')
 if (which === 'base') run('Mundo atual (Série A + B, 40 clubes)', null, seed, offseason, false)
 else if (which === 'brazil') run('Brasil A + B + C (60 clubes)', BRAZIL_ONLY, seed, offseason, focus)
-else run('Mundo do plano (15 ligas)', FULL_WORLD, seed, offseason, focus)
+else if (args.includes('--classic')) run('Mundo do plano (21 ligas, sem copas nem calendários próprios)', FULL_WORLD, seed, offseason, focus)
+else run('Mundo do plano (21 ligas, 358 clubes, com copas e calendários)', FULL_WORLD, seed, offseason, true, true)

@@ -267,6 +267,26 @@ const BUILDERS: Partial<Record<Nationality, Builder>> = {
     },
   ],
 
+  // Países Baixos (3D): copa em jogo único (o clube de divisão inferior joga em casa), final neutra; a supercopa junta o campeão da liga (mandante) e o da copa, antes da temporada.
+  Netherlands: (leagues) => [
+    nationalCup({
+      id: 'cup-nl',
+      name: 'Copa dos Países Baixos',
+      country: 'Netherlands',
+      leagues,
+      home: 'lower-division',
+      stages: [
+        { name: 'Primeira fase', legs: 1, date: [10, 28] },
+        { name: 'Oitavas de final', legs: 1, date: [12, 16] },
+        { name: 'Quartas de final', legs: 1, date: [2, 3] },
+        { name: 'Semifinais', legs: 1, date: [3, 17] },
+        { name: 'Final', legs: 1, date: [4, 22], neutral: true },
+      ],
+      prize: prize([70_000, 140_000, 300_000, 600_000, 1_100_000], 3_000_000, 1_200_000),
+    }),
+    twoClubSupercup('supercup-nl', 'Supercopa dos Países Baixos', 'Netherlands', top(leagues), 'cup-nl', [8, 2], { neutral: false, extraTime: true, home: 'first-listed' }),
+  ],
+
   // Argentina: copa em jogos únicos em campo neutro, com os pênaltis direto depois do empate (sem prorrogação); supercopa do campeão da liga contra o da copa, em campo neutro.
   Argentina: (leagues) => [
     nationalCup({

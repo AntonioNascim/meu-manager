@@ -6,6 +6,12 @@ import type { CupSpec, CupStageSpec } from '../types'
 
 export const isContinental = (spec: Pick<CupSpec, 'country' | 'region'>): boolean => spec.country === undefined && spec.region !== undefined
 
+/** Copa mundial (Copa Intercontinental, Mundial de Clubes): sem país nem região, com os anos de edição em `world`. */
+export const isWorld = (spec: Pick<CupSpec, 'world'>): boolean => spec.world !== undefined
+
+/** Regiões cuja temporada atravessa o ano (agosto a maio): a edição de uma copa continental delas começa num ano e termina no seguinte. */
+export const SPLIT_REGIONS: readonly string[] = ['EU', 'AF', 'AS', 'OC']
+
 export interface StageDescriptor {
   kind: 'groups' | 'league' | 'knockout'
   name: string

@@ -14,6 +14,7 @@ on:
           - continentais
           - test-long
           - ligas
+          - mundo-ampliado
           - personalizada
       sementes:
         description: "continentais: sementes separadas por vírgula (uma execução em paralelo para cada)"
@@ -111,6 +112,14 @@ jobs:
             ligas)
               node --expose-gc tools/run.mjs leagueRun --clubs 282 --years "$ANOS" | tee resultado/ligas.txt
               ;;
+            mundo-ampliado)
+              # 3D: tempo, memória e save do mundo de 358 clubes, calendário das copas novas e campeões das copas mundiais (use 12 anos ou mais para ver o Mundial de 2029 e 2033).
+              node --expose-gc tools/run.mjs worldScale --world full --focus --live --offseason | tee resultado/1-worldScale.txt
+              node --expose-gc tools/run.mjs saveWorld --world full | tee resultado/2-saveWorld.txt
+              node --expose-gc tools/run.mjs memRun --years 6 | tee resultado/3-memRun.txt
+              node --expose-gc tools/run.mjs worldCups --until 2027-01-03 | tee resultado/4-worldCups.txt
+              node --expose-gc tools/run.mjs continentalRun --years "$ANOS" --seed 7 --focus "$FOCO" | tee resultado/5-copas-mundiais.txt
+              ;;
             personalizada)
               # Sem aspas de propósito: os argumentos já foram conferidos (só letras, números e . _ , = : -).
               node --expose-gc tools/run.mjs "$FERRAMENTA" $ARGUMENTOS | tee "resultado/$FERRAMENTA.txt"
@@ -129,6 +138,10 @@ jobs:
         run: |
           {
             echo "## ${MEDICAO} (semente ${SEMENTE})"
+            echo '### Clubes que mais dependem do dinheiro das copas'
+            echo '```'
+            grep -h 'maiores dependências' resultado/*.txt | tr ';' '\012' || true
+            echo '```'
             echo '```'
             tail -c 60000 resultado/*.txt || true
             echo '```'

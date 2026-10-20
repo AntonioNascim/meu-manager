@@ -46,13 +46,13 @@ export function Diagnostics() {
     setRunning(true)
     setImportReport('')
     setCopied(false)
-    setProgress(source === 'generated' ? 'Gerando o pacote de 15 ligas...' : 'Lendo o arquivo...')
+    setProgress(source === 'generated' ? 'Gerando o pacote de 21 ligas...' : 'Lendo o arquivo...')
     const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
     await tick()
     try {
       let text: string
       let readMs: number | undefined
-      let label = 'gerado na tela (15 ligas, exemplo)'
+      let label = 'gerado na tela (21 ligas, exemplo)'
       if (source === 'generated') {
         text = JSON.stringify(buildScalePackage(7))
       } else {
@@ -86,7 +86,7 @@ export function Diagnostics() {
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-bg p-4">
       <h1 className="title text-2xl">Diagnóstico de desempenho</h1>
       <p className="text-sm text-muted">
-        Gera um mundo de teste do tamanho do plano (282 clubes) e mede neste aparelho. Também mede o tempo de salvar a cada avanço e o tamanho do save, num banco temporário: não mexe nos seus jogos salvos. Aparelho de referência: {REFERENCE_TARGETS.device}.
+        Gera um mundo de teste do tamanho do plano (358 clubes em 21 ligas, com as copas dos países, as continentais e as mundiais) e mede neste aparelho. Também mede o tempo de salvar a cada avanço e o tamanho do save, num banco temporário: não mexe nos seus jogos salvos. Aparelho de referência: {REFERENCE_TARGETS.device}.
       </p>
 
       <section className="rounded-xl border border-line bg-surface p-3 text-sm">
@@ -119,7 +119,7 @@ export function Diagnostics() {
         <div className="flex gap-2" role="radiogroup" aria-label="Mundo de teste">
           {(['full', 'brazil'] as const).map((w) => (
             <button key={w} type="button" role="radio" aria-checked={world === w} disabled={running} onClick={() => setWorld(w)} className={`min-h-12 flex-1 rounded-lg border px-3 text-sm ${world === w ? 'border-accent text-accent' : 'border-line text-muted'}`}>
-              {w === 'full' ? '282 clubes (15 ligas)' : 'Brasil A+B+C (60)'}
+              {w === 'full' ? '358 clubes (21 ligas)' : 'Brasil A+B+C (60)'}
             </button>
           ))}
         </div>
@@ -138,7 +138,7 @@ export function Diagnostics() {
         <h2 className="title text-base">Importar um pacote de dados</h2>
         <p className="text-sm text-muted">Mede ler, validar, guardar e montar o mundo de um pacote e começar um jogo com ele. Não mexe nos pacotes nem nos jogos guardados.</p>
         <button type="button" disabled={running} onClick={() => void runImport('generated')} className="min-h-12 rounded-lg border border-line px-4 disabled:opacity-50">
-          Medir com o pacote de exemplo (15 ligas)
+          Medir com o pacote de exemplo (21 ligas)
         </button>
         <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-line px-4 text-center text-sm">
           Medir com um arquivo do aparelho (.json)

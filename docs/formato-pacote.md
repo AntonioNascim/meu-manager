@@ -95,7 +95,7 @@ divisão só é uma liga **fechada** (ninguém sobe nem cai).
 | `rounds` | não | `1` = turno único, `2` = turno e returno (padrão) |
 | `start` | não | `[mês, dia]` de referência da primeira rodada da liga (cai no primeiro sábado a partir daí). Padrão: o do país (tabela do calendário abaixo) |
 | `split` | não | `true` = a temporada atravessa o ano (agosto a maio; vai de 1º de julho a 30 de junho e os contratos terminam em 30/6); `false` = ano civil (1º/1 a 31/12). Padrão: o do país (Europa sim; Brasil e América do Sul não) |
-| `region` | não | Janelas de transferência: `BR` (janeiro até a véspera da 1ª rodada e julho), `SA` (janeiro a 15/3 e julho), `EU` (janeiro e julho a agosto). Padrão: a do país (ver tabela) |
+| `region` | não | Janelas de transferência: `BR` (janeiro até a véspera da 1ª rodada e julho), `SA` (janeiro a 15/3 e julho), `EU` (janeiro e julho a agosto), `NA` (janeiro a fevereiro e julho a 15/8) e `AF`, `AS`, `OC` (como a Europa). É também o continente da liga nas copas continentais e mundiais (`BR` conta como `SA`). Padrão: a do país (ver tabela) |
 | `economy` | não | Economia da liga (ver abaixo). Padrão: a do país |
 | `foreignLimit` | não | Limite de estrangeiros (ver abaixo). Padrão: sem limite |
 | `tiebreakers` | não | Só a ordem padrão é usada; outra ordem gera um aviso e é ignorada |
@@ -117,24 +117,30 @@ Exemplo de país com três divisões (Brasil): `br-1` (`promotion: 0`, `relegati
 - `level` (−15 a 15): quantos **pontos de força** os titulares da liga têm a mais (ou a menos) que os do Brasil. Usado ao gerar
   jogadores sem atributos e a base. O jogador sem atributos de um clube inglês nasce mais forte que o de um paraguaio.
 
-Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leagueDefaults.ts`). Um país que **não está nesta tabela** (México, Estados Unidos, Japão...) não tem padrão: a liga usa a economia do Brasil e as janelas da Europa, e a validação dá o aviso "Não há economia padrão para o país"; preencha `economy` e `region` da liga para tratar disso:
+Sem `economy`, valem os padrões calibrados para o país (`src/data/package/leagueDefaults.ts`). Um país que **não está nesta tabela** (Arábia Saudita, Marrocos, Canadá...) não tem padrão: a liga usa a economia do Brasil e as janelas da Europa, e a validação dá o aviso "Não há economia padrão para o país"; preencha `economy` e `region` da liga para tratar disso:
 
 | País (`id`) | Região | `revenue` | `level` |
 |---|---|---|---|
 | `Brazil` | BR | 1 (referência) | 0 |
-| `Argentina` | SA | 0,6 | −1 |
+| `Argentina` | SA | 0,6 | −0,75 |
 | `Uruguay` | SA | 0,3 | −4 |
 | `Paraguay` | SA | 0,25 | −5 |
 | `Chile` | SA | 0,4 | −3 |
 | `Colombia` | SA | 0,45 | −2 |
 | `Peru` | SA | 0,3 | −4 |
 | `Ecuador` | SA | 0,3 | −4 |
-| `England` | EU | 3,6 | 7 |
-| `Spain` | EU | 3,4 | 7,4 |
-| `Italy` | EU | 2,9 | 6,6 |
-| `Germany` | EU | 2,6 | 5,8 |
+| `England` | EU | 3,3 | 6,5 |
+| `Spain` | EU | 3,6 | 7,8 |
+| `Italy` | EU | 3 | 6,8 |
+| `Germany` | EU | 2,5 | 5,4 |
 | `France` | EU | 1,8 | 3,5 |
 | `Portugal` | EU | 0,9 | 2 |
+| `Netherlands` | EU | 1,2 | 2,6 |
+| `Mexico` | NA | 1 | 0,5 |
+| `United States` | NA | 0,9 | −2 |
+| `Egypt` | AF | 0,35 | −4,5 |
+| `Japan` | AS | 0,7 | −2 |
+| `Australia` | OC | 0,3 | −5,5 |
 
 As divisões de baixo já são mais pobres que a principal por regra do jogo (a 2ª divisão tem 15% da receita da 1ª e a 3ª, 6%; a
 3ª paga 60% do salário; o nível dos jogadores cai por divisão): **não** coloque isso em `economy`, que é a economia **do país**.
@@ -352,6 +358,8 @@ copa: com grupos ou fase de liga, o 0 é essa fase e o mata-mata começa no 1; p
   passada** nessas posições (na primeira temporada de um mundo, vale a ordem de reputação).
 - `cup` com `place` `winner` ou `runner-up`: o campeão ou o vice da **edição passada** daquela copa (na primeira temporada, o clube
   mais forte entre os que ela teria). Uma copa não pode citar a si mesma.
+- `cup` com `"latest": true`: o campeão (ou vice) da **última edição terminada**, seja de que ano for. É o que as copas mundiais usam, porque juntam copas de calendários diferentes.
+- `region`: `{ "type": "region", "region": "EU", "count": 12, "cup": "cont-eu-1", "last": 4 }` = os `count` clubes mais fortes (pela média dos 14 melhores jogadores) de **primeira divisão** de um continente (`SA`, `EU`, `NA`, `AF`, `AS` ou `OC`): primeiro os campeões distintos das últimas `last` edições de `cup` (os mais recentes antes) e o resto das vagas pelos mais fortes que ainda não estão na copa. Sem `cup` e `last`, só a força. Se o continente tem menos clubes que `count`, a vaga traz todos. A conta do chaveamento usa esse número.
 - `cup-group-place`: `{ "type": "cup-group-place", "cup": "cont-sa-1", "place": 3 }` = o clube que terminou em tal colocação de **cada grupo** da fase de grupos de outra copa **da mesma edição** (os terceiros da copa principal caem para a repescagem da secundária). Só se conhece quando os grupos da outra copa terminam, então a vaga precisa ter `stage` 1 ou mais e a fase espera.
 - Colocações de liga (`positions`) repõem quem já está na copa (ou numa copa de `excludeCups`) pelos colocados logo abaixo: a copa mantém o número de clubes.
 - `fallback`: se o clube escolhido já está na copa por outra vaga (o campeão da liga que também ganhou a copa), entra o primeiro da
@@ -417,6 +425,7 @@ Quando um pacote tem um país com liga e **nenhuma copa dele** em `cups`, o jogo
 | Alemanha | `cup-de` (sempre jogo único, divisão inferior em casa, final neutra), `supercup-de` (campeão da liga recebe o da copa) |
 | França | `cup-fr` (jogo único, divisão inferior em casa, final neutra) |
 | Portugal | `cup-pt` (como a Espanha), `league-cup-pt` (16 primeiros da liga, 4 grupos de 4, semifinais e final neutras) |
+| Países Baixos | `cup-nl` (jogo único, divisão inferior em casa, final neutra), `supercup-nl` (campeão da liga recebe o da copa, em agosto, antes da liga) |
 | Argentina | `cup-ar` (jogos únicos em campo neutro, sem prorrogação: empate vai direto aos pênaltis), `supercup-ar` (campeão da liga × campeão da copa, neutro, sem prorrogação) |
 
 Simplificações: onde a copa real inclui divisões que o pacote não tem, entram só os clubes que existem, e os melhores (cabeças de chave) folgam na primeira fase para o chaveamento fechar. Na supercopa, se o campeão ou o finalista da copa já está entre os primeiros da liga, entra o próximo da liga.
@@ -425,9 +434,9 @@ Simplificações: onde a copa real inclui divisões que o pacote não tem, entra
 
 ### Copas continentais
 
-Uma copa **sem `country`** e com `region` (`SA` ou `EU`) é continental. A edição de um ano nasce quando todos os países que dão vagas a ela já abriram a temporada daquele ano (as colocações finais da temporada passada já valem) e a edição anterior acabou; saves antigos ganham as continentais na virada, sem mudar a temporada em andamento. Os jogos caem no meio de semana, sem o mesmo dia de outro jogo do clube; quando as ligas ocupam quase toda quarta-feira, depois de esperar algumas semanas aceita-se um jogo colado em outro (nunca no mesmo dia). O título dá reputação ao clube na virada do país dele (campeão +0,8 e finalista +0,35 de reputação, antes de arredondar). A premiação (`prize`) vale em unidades do Brasil e é multiplicada pelo índice de receita da liga do clube, então pesa a mesma fração da receita em qualquer país.
+Uma copa **sem `country`** e com `region` (`SA`, `EU` ou `NA`) é continental. A edição de um ano nasce quando todos os países que dão vagas a ela já abriram a temporada daquele ano (as colocações finais da temporada passada já valem) e a edição anterior acabou; saves antigos ganham as continentais na virada, sem mudar a temporada em andamento. Os jogos caem no meio de semana, sem o mesmo dia de outro jogo do clube; quando as ligas ocupam quase toda quarta-feira, depois de esperar algumas semanas aceita-se um jogo colado em outro (nunca no mesmo dia). O título dá reputação ao clube na virada do país dele (campeão +0,8 e finalista +0,35 de reputação, antes de arredondar). A premiação (`prize`) vale em unidades do Brasil e é multiplicada pelo índice de receita da liga do clube, então pesa a mesma fração da receita em qualquer país.
 
-O jogo traz estas cinco como padrão quando o pacote tem 5 países ou mais na região e não define uma continental dela (nomes genéricos; o nome vem do pacote). Os tamanhos são menores que os reais, proporcionais ao mundo: menos da metade dos clubes de primeira divisão de cada região. As vagas de cada país seguem a raiz da receita da liga dele (com mínimo e teto de metade da liga), incluindo o campeão da copa nacional.
+O jogo traz estas seis como padrão quando o pacote tem 5 países ou mais na região (2 na América do Norte) e não define uma continental dela (nomes genéricos; o nome vem do pacote). Os tamanhos são menores que os reais, proporcionais ao mundo: menos da metade dos clubes de primeira divisão de cada região. As vagas de cada país seguem a raiz da receita da liga dele (com mínimo e teto de metade da liga), incluindo o campeão da copa nacional.
 
 | Id | Região | Formato |
 |---|---|---|
@@ -436,6 +445,20 @@ O jogo traz estas cinco como padrão quando o pacote tem 5 países ou mais na re
 | `cont-eu-1` | Europa | 24 clubes, fase de liga de tabela única (4 potes, 8 jogos), 4 direto às quartas, 8 na repescagem (ida e volta), quartas, semifinais e final em jogo único |
 | `cont-eu-2` | Europa | 16 clubes, fase de liga (2 potes, 8 jogos), 4 direto, 8 na repescagem, quartas, semifinais e final; não repete clube da `cont-eu-1`; quinta-feira |
 | `cont-eu-3` | Europa | 12 clubes, fase de liga (2 potes, 4 jogos), 2 direto às semifinais, 4 na repescagem, semifinais e final; não repete clube das outras duas; quinta-feira |
+| `cont-na-1` | América do Norte | 16 clubes (as vagas repartidas entre as ligas da região pela raiz da receita: 8 do México e 8 dos Estados Unidos no mundo de teste) em mata-mata: oitavas, quartas, semifinais e final, tudo em ida e volta, de fevereiro a maio (ano civil) |
+
+### Copas mundiais
+
+Uma copa **sem `country` e sem `region`**, com `world`, é mundial: `"world": { "every": 4, "offset": 2025, "from": [6, 1] }` = joga-se nos anos de calendário com `(ano − offset)` divisível por `every` (`every: 1` = todo ano) e a edição nasce no primeiro dia de jogos a partir de `from` (mês e dia) desse ano, com as vagas resolvidas naquele momento (por isso as vagas costumam usar `cup` com `latest` e `region`). A edição anterior precisa ter acabado. Os jogos seguem as regras das continentais (meio de semana, sem o mesmo dia de outro jogo do clube, tolerância de jogo colado depois de algumas semanas) e o título dá reputação como o das continentais. A edição é identificada pelo ano de calendário ("2029").
+
+O jogo traz estas duas como padrão quando o pacote tem as três copas continentais (`cont-eu-1`, `cont-sa-1` e `cont-na-1`) e clubes de primeira divisão em todos os continentes (Europa 12, América do Sul 6, América do Norte 5, África 4, Ásia 4 e Oceania 1); senão elas ficam de fora e a importação mostra `cup-defaults-skipped` (`world`). Nomes genéricos.
+
+| Id | Formato |
+|---|---|
+| `world-1` (todo ano, a partir de 1º de dezembro) | 6 clubes, no formato da FIFA, jogo único em campo neutro: Oceania × Ásia (play-off); o vencedor × África e América do Norte × América do Sul (segunda fase); os dois vencedores (semifinais); o vencedor decide o título contra o campeão da Europa, que entra direto na final. Os clubes são os campeões mais recentes das copas continentais e os campeões das ligas de elite de África, Ásia e Oceania. Quartas-feiras de dezembro (terça a quinta) |
+| `world-2` (a cada 4 anos: 2029, 2033..., a partir de 1º de junho) | 32 clubes: 12 da Europa, 6 da América do Sul, 4 da África, 4 da Ásia, 4 da América do Norte, 1 da Oceania e o país-sede (o campeão da primeira liga da América do Norte). Cada continente leva os campeões das últimas 4 edições da copa continental e completa pelos mais fortes. 8 grupos de 4 (turno único), oitavas, quartas, semifinais e final em jogo único neutro, de junho a 18 de julho (antes da abertura das ligas da Europa, da África, da Ásia e da Oceania; as ligas de ano civil seguem jogando) |
+
+**África, Ásia e Oceania sem ligas completas.** O mundo de teste leva só os clubes mais fortes desses continentes, uma liga de elite por continente (8, 8 e 4 clubes, `country` Egito, Japão e Austrália, sem acesso nem rebaixamento, temporada de agosto a maio). Eles passam pela mesma virada de temporada que qualquer clube (elenco, evolução, contratos, base, finanças), então ficam vivos e coerentes sem criar as ligas inteiras. Um pacote real pode trazer ligas completas desses países: as copas mundiais usam os clubes mais fortes de primeira divisão do continente, sejam quantos forem.
 
 ### Temporadas por país
 
@@ -444,13 +467,15 @@ O relógio do jogo é um só, mas **cada país tem a sua temporada**: a virada (
 | País | Temporada | Primeira rodada (a partir de) |
 |---|---|---|
 | Brasil e América do Sul | ano civil | 24/1 |
-| Europa (Inglaterra, Espanha, Itália, Alemanha, França, Portugal) | 2026/27 | 15/8 |
+| Europa (Inglaterra, Espanha, Itália, Alemanha, França, Portugal, Países Baixos) | 2026/27 | 15/8 |
+| América do Norte (México, Estados Unidos) | ano civil | 7/2 |
+| África, Ásia e Oceania (ligas de elite) | 2026/27 | 22/8 |
 
 Os países de um continente abrem no mesmo fim de semana: as rodadas de meio de semana das ligas caem nas mesmas semanas e deixam as outras livres para as copas continentais (um calendário parecido com o real, não o de cada país).
 
 Todas as ligas fazem uma semana de pausa a cada 3 rodadas de fim de semana (fim de ano, datas de seleções). O jogo começa em 1º de janeiro de `startYear` se o técnico escolhe um clube de ano civil e em 1º de julho se escolhe um clube de temporada que atravessa o ano; um país que ainda não abriu a temporada dele nessa data joga a primeira que começa depois.
 
-**Janelas de transferência por região** (cada clube segue a da região da liga dele): `BR` janeiro até a véspera da 1ª rodada e julho; `SA` janeiro a 15/3 e julho; `EU` janeiro e julho a agosto. A janela de verão europeia cai no meio da temporada brasileira.
+**Janelas de transferência por região** (cada clube segue a da região da liga dele): `BR` janeiro até a véspera da 1ª rodada e julho; `SA` janeiro a 15/3 e julho; `EU` janeiro e julho a agosto; `NA` janeiro a fevereiro e julho a 15/8; `AF`, `AS` e `OC` como a Europa. A janela de verão europeia cai no meio da temporada brasileira.
 
 ### Validação
 

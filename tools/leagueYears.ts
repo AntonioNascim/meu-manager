@@ -195,23 +195,29 @@ export function simulateLeagueYears(init: LeagueInit, years: number, observe?: {
     if (index + 1 < years) starts.set(pyramid, beginSeason(turned.state, pyramid))
     return turned
   }
-  // Até 30 de junho do ano seguinte ao último: todos os países já viraram `years` vezes (os da Europa viram em 30/6).
+  // Até o fim de julho do ano seguinte ao último: todos os países já viraram `years` vezes (os da Europa viram em 30/6, ou poucos dias depois quando uma final continental atrasa).
   const split = state.season.competitions.some((c) => c.split)
-  advanceUntil(state, split ? `${init.year + years}-06-30` : `${init.year + years - 1}-12-31`, { market: true, turn })
+  advanceUntil(state, split ? `${init.year + years}-07-31` : `${init.year + years - 1}-12-31`, { market: true, turn })
   // Mantém a ordem das ligas do mundo em cada ano.
   const order = new Map(state.season.competitions.map((c, i) => [c.id, i]))
   for (const run of runs) run.leagues.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
   return runs
 }
 
+/** Os ids das ligas de todos os anos (uma liga pode faltar num ano, por exemplo se o país dela ainda não virou a temporada na data final). */
+export const leagueIds = (runs: LeagueRun[]): string[] => [...new Set(runs.flatMap((r) => r.leagues.map((l) => l.id)))]
+
+/** A série de uma liga: um valor por ano em que ela foi medida. */
+export const seriesOf = (runs: LeagueRun[], id: string): LeagueYear[] => runs.flatMap((r) => r.leagues.filter((l) => l.id === id))
+
 const money = (x: number) => (x >= 1e6 ? `${(x / 1e6).toFixed(1)}M` : `${(x / 1e3).toFixed(0)}k`)
 
 /** Uma tabela por liga: ano a ano. */
 export function formatLeagueYears(runs: LeagueRun[]): string {
-  const ids = runs[0]?.leagues.map((l) => l.id) ?? []
+  const ids = leagueIds(runs)
   const out: string[] = []
   for (const id of ids) {
-    const rows = runs.map((r) => ({ year: r.year, l: r.leagues.find((x) => x.id === id) as LeagueYear }))
+    const rows = runs.flatMap((r) => r.leagues.filter((x) => x.id === id).map((l) => ({ year: r.year, l })))
     out.push(`\n${rows[0]?.l.name} (${rows[0]?.l.clubs} clubes)`, 'ano   força  reput  top40  saldo/rec(máx) vermelho  folha/rec  receita  venda/rec(méd/máx) compra/rec(méd/máx)  chegam  saem')
     for (const { year, l } of rows) {
       out.push(
@@ -224,8 +230,8 @@ export function formatLeagueYears(runs: LeagueRun[]): string {
 
 /** Resumo de uma linha por liga: média dos primeiros e dos últimos 3 anos. */
 export function formatLeagueSummary(runs: LeagueRun[]): string {
-  const ids = runs[0]?.leagues.map((l) => l.id) ?? []
-  const take = (id: string, from: number, to: number) => runs.slice(from, to).map((r) => r.leagues.find((x) => x.id === id) as LeagueYear)
+  const ids = leagueIds(runs)
+  const take = (id: string, from: number, to: number) => runs.slice(from, to).flatMap((r) => r.leagues.filter((x) => x.id === id))
   return ids
     .map((id) => {
       const early = take(id, 0, 3)
@@ -251,9 +257,9 @@ export const championPoints38 = (l: Pick<LeagueYear, 'championPoints' | 'champio
 
 /** Campeões de cada liga: pontos, e dinastias em blocos de `block` temporadas. */
 export function dynastiesOf(runs: LeagueRun[], highPoints = 92, block = 10): Dynasty[] {
-  const ids = runs[0]?.leagues.map((l) => l.id) ?? []
+  const ids = leagueIds(runs)
   return ids.map((id) => {
-    const rows = runs.map((r) => r.leagues.find((x) => x.id === id) as LeagueYear)
+    const rows = seriesOf(runs, id)
     const blocks: Dynasty['blocks'] = []
     for (let i = 0; i + block <= rows.length; i += block) {
       const part = rows.slice(i, i + block)
@@ -273,16 +279,16 @@ export function dynastiesOf(runs: LeagueRun[], highPoints = 92, block = 10): Dyn
 
 /** Tendência por liga: força, melhores jogadores, craques e idade nos três anos iniciais, no meio e nos finais. */
 export function formatTrend(runs: LeagueRun[]): string {
-  const ids = runs[0]?.leagues.map((l) => l.id) ?? []
+  const ids = leagueIds(runs)
   const n = runs.length
   const mid = Math.floor(n / 2)
   const spans: [number, number][] = [[0, 3], [mid - 1, mid + 2], [n - 3, n]]
-  const avg = (id: string, [a, b]: [number, number], pick: (l: LeagueYear) => number) => mean(runs.slice(a, b).map((r) => pick(r.leagues.find((x) => x.id === id) as LeagueYear)))
+  const avg = (id: string, [a, b]: [number, number], pick: (l: LeagueYear) => number) => mean(runs.slice(a, b).flatMap((r) => r.leagues.filter((x) => x.id === id).map(pick)))
   const trio = (id: string, pick: (l: LeagueYear) => number, d = 1) => spans.map((s) => avg(id, s, pick).toFixed(d)).join(' → ')
   return ids
     .map((id) => {
-      const name = runs[0]?.leagues.find((l) => l.id === id)?.name ?? id
-      return `${name.padEnd(12)} força ${trio(id, (l) => l.strength)} | top40 ${trio(id, (l) => l.top40)} | craques ${trio(id, (l) => l.stars)} | idade ${trio(id, (l) => l.meanAge)} | folha/rec ${trio(id, (l) => 100 * l.payrollShare, 0)}% | negócios/clube ${trio(id, (l) => l.dealsPerClub)} | valor do elenco/rec ${trio(id, (l) => l.squadValueShare)} | saldo/teto méd ${trio(id, (l) => l.meanCeilingShare, 2)} máx ${Math.max(...runs.map((r) => (r.leagues.find((x) => x.id === id) as LeagueYear).maxCeilingShare)).toFixed(2)} | receita real/esperada ${trio(id, (l) => l.revenueVsExpected, 2)} | saldo/rec máx ${Math.max(...runs.map((r) => (r.leagues.find((x) => x.id === id) as LeagueYear).maxBalanceYears)).toFixed(2)} | vermelho ${runs.reduce((s, r) => s + (r.leagues.find((x) => x.id === id) as LeagueYear).negativeEver, 0)}`
+      const name = seriesOf(runs, id)[0]?.name ?? id
+      return `${name.padEnd(12)} força ${trio(id, (l) => l.strength)} | top40 ${trio(id, (l) => l.top40)} | craques ${trio(id, (l) => l.stars)} | idade ${trio(id, (l) => l.meanAge)} | folha/rec ${trio(id, (l) => 100 * l.payrollShare, 0)}% | negócios/clube ${trio(id, (l) => l.dealsPerClub)} | valor do elenco/rec ${trio(id, (l) => l.squadValueShare)} | saldo/teto méd ${trio(id, (l) => l.meanCeilingShare, 2)} máx ${Math.max(...seriesOf(runs, id).map((l) => l.maxCeilingShare)).toFixed(2)} | receita real/esperada ${trio(id, (l) => l.revenueVsExpected, 2)} | saldo/rec máx ${Math.max(...seriesOf(runs, id).map((l) => l.maxBalanceYears)).toFixed(2)} | vermelho ${seriesOf(runs, id).reduce((s, l) => s + l.negativeEver, 0)}`
     })
     .join('\n')
 }
