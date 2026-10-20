@@ -50,7 +50,15 @@ Dividida em partes, cada uma entregue e testada antes da seguinte:
 - **Temporadas por pirâmide (feita, antes da 3C; ver `docs/fase2-proposta.md` seção 19):** cada país com a sua temporada (ano civil ou 2026/27), virada por país, janelas por região e copas dentro da temporada de cada um.
 - **3C — Competições continentais:** Libertadores, Sul-Americana, Champions League, Europa League e Conference League (vagas pelas ligas e pelas copas, fase de liga e grupos, calendário de meio de semana compartilhado com as ligas e copas nacionais).
 - **3D (feita, ver `docs/fase2-proposta.md` seção 22) — Ampliar o mundo:** Países Baixos, México, Estados Unidos e uma liga de elite pequena para África, Ásia e Oceania, para a copa da América do Norte, a Copa Intercontinental (todo ano), o Mundial de Clubes (a cada 4 anos, 32 clubes) e a Supercopa dos Países Baixos, tudo como padrão do pacote com nomes genéricos.
-- **Fase futura — Seleções:** Copa do Mundo, Eliminatórias, Eurocopa, Copa América, Copa das Nações Africanas e Copa Asiática (calendário de datas FIFA, convocação e a liberação dos jogadores pelos clubes). Fica depois das fases 4 a 6 ou entre elas, a decidir.
+- **Atualização pós-lançamento — Seleções:** Copa do Mundo, Eliminatórias, Eurocopa, Copa América, Copa das Nações Africanas e Copa Asiática (calendário de datas FIFA, convocação e a liberação dos jogadores pelos clubes). **Decidido: vem depois do lançamento público, como atualização**; os dados das seleções vão no pacote.
+
+## Ordem atual (a 3D está concluída)
+
+1. **Fase 4** — editor.
+2. **Fase 5** — pacote real embutido, já com as pendências de calibragem da seção 22 do `docs/fase2-proposta.md`.
+3. **Fase 6** — modo online gratuito, com ligas entre jogadores.
+4. **Preparação para o lançamento** (etapa abaixo) e **lançamento público**.
+5. **Atualização pós-lançamento:** seleções.
 
 ### Fase 4 — Editor
 - Editor dentro do jogo para ajustar atributos, potencial, posições e dados de jogadores e clubes, salvo junto com o pacote no navegador.
@@ -112,3 +120,22 @@ Arquivo JSON:
 - Gratuito, como o resto do jogo. Ligas em que vários jogadores comandam clubes do mesmo mundo.
 - Aproveita o que já existe: **simulação determinística por semente** (os resultados podem ser conferidos e reproduzidos), **`Game` serializável** e **motor puro** que pode rodar no servidor.
 - **Custo de servidor a planejar** antes de começar (contas, ligas, armazenamento, tráfego, moderação), junto com a decisão adiada sobre monetização.
+
+**Como deve funcionar:**
+- **Sem e-mail nem senha.** O jogador entra direto.
+- **Criar liga:** botão "Criar nova liga"; o criador escolhe entre **liga aberta** (qualquer um entra) e **liga só para amigos**, e convida por **link ou código**.
+- **Identidade anônima por aparelho**, com um **apelido**. Um **código de recuperação** leva a identidade para outro aparelho.
+- **Moderação:** o criador da liga pode **remover participantes**; os apelidos passam por um **filtro simples**.
+
+**Pontos a decidir antes de começar:**
+1. **Serviço de servidor** a usar e **quanto custa conforme o número de jogadores** (estimativa por faixas: dezenas, centenas, milhares).
+2. **Sincronização das ligas:** quem avança o calendário, como os jogadores de uma mesma liga ficam em dia e o que acontece com quem não joga.
+3. **Proteção contra trapaça**, usando a simulação determinística por semente (o servidor reconfere os resultados e as decisões que alteram o estado).
+4. **Aviso de privacidade simples**, explicando o que o jogo guarda (identidade anônima, apelido, ligas, saves) e por quanto tempo.
+
+## Preparação para o lançamento (depois da Fase 6, antes do lançamento público)
+
+- **Tela de créditos** (incluindo a atribuição da Wikipedia, CC BY-SA).
+- **Aviso de que o jogo é independente**, sem ligação com clubes, jogadores, ligas ou federações.
+- **Conferência de desempenho em celulares simples** (abertura, avanço de dias, virada de temporada, tamanho do save).
+- **Teste fechado** com algumas pessoas, antes de abrir ao público.
