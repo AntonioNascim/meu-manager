@@ -22,6 +22,8 @@ npm run dados:planilhas -- --contato "seu@email.com"
 
 Uma rodada completa leva de 20 a 40 minutos (umas 600 consultas, uma por vez). As respostas ficam em `<saida>/.cache`: se a rodada for interrompida, rode de novo e ela continua de onde parou, sem repetir consultas. Para atualizar os elencos, rode com `--atualizar`: os **ids dos clubes e dos jogadores são estáveis** (vêm do Wikidata), então importar a planilha nova no editor **atualiza** os registros em vez de duplicar.
 
+Para conferir as planilhas com o mesmo leitor de CSV do editor (linhas aceitas por liga e erros): `node tools/run.mjs checkRealSheets`. O esperado são só datas de nascimento em branco.
+
 ## O que sai
 
 Em `dados-reais/planilhas/` (ou na pasta de `--saida`):
