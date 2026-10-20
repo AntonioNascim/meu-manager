@@ -234,7 +234,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         issue(wd?.birthYear ? 'player-birth-imprecise' : 'player-no-birthdate', wd?.birthYear ? `só o ano de nascimento (${wd.birthYear}); data em branco` : 'sem data de nascimento; data em branco', { club: name, player: label, id: pid })
       }
 
-      const nickname = wd?.name && !same(entry.display, wd.name) ? entry.display : wd?.nickname
+      const nickname = wd?.name && entry.display.length < wd.name.length && !same(entry.display, wd.name) ? entry.display : wd?.nickname
       const row: Record<string, string | number | undefined> = {
         id: pid,
         name: label,

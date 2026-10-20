@@ -123,6 +123,24 @@ describe('tabela de elenco da Wikipedia', () => {
 })
 
 describe('clubes da temporada', () => {
+  it('a tabela de estádios vale mais que a seção Teams, que traz os rebaixados do ano anterior', () => {
+    const rows = Array.from({ length: 8 }, (_, i) => `|-\n| [[Club ${i}]] || [[Town ${i}]] || [[Ground ${i}]]`).join('\n')
+    const page = `==Teams==
+{| class="wikitable"
+! Relegated
+|-
+| [[Relegated FC]]
+|}
+==Stadiums and locations==
+{|
+${rows}
+|}
+`
+    const titles = parseSeasonLinks(page).map((l) => l.title)
+    expect(titles).toContain('Club 0')
+    expect(titles).not.toContain('Relegated FC')
+  })
+
   it('lê só as linhas de tabela das seções de clubes', () => {
     const page = `
 ==Teams==

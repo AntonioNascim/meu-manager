@@ -187,15 +187,26 @@ export function parseSquad(wikitext: string): { entries: SquadEntry[]; section?:
 const TEAMS_SECTION =
   /^(teams|participating (teams|clubs)|clubs|participants|stadiums and locations|stadiums|locations|venues|teams and locations|league teams|member clubs|clubs and locations|teams and stadiums|clubs and stadiums|stadia and locations|stadiums and personnel|current clubs)$/i
 
-/** Links da lista de clubes de uma página da temporada: só linhas de tabela e de lista das seções de clubes. */
-export function parseSeasonLinks(wikitext: string): WikiLink[] {
+const VENUE_SECTION = /stadi|location|venue/i
+
+function linksOfSections(sections: { title: string; body: string }[]): WikiLink[] {
   const links: WikiLink[] = []
-  for (const section of sectionsOf(wikitext)) {
-    if (!TEAMS_SECTION.test(section.title)) continue
+  for (const section of sections) {
     for (const line of section.body.split(/\r?\n/)) {
       if (!/^\s*[|!*{]/.test(line)) continue
       for (const link of allLinks(line)) if (!links.some((l) => l.title === link.title)) links.push(link)
     }
   }
   return links
+}
+
+/**
+ * Links da lista de clubes de uma página da temporada (só linhas de tabela e de lista das seções de clubes). A tabela de estádios e
+ * cidades tem uma linha por participante; a seção "Teams" costuma trazer também os rebaixados da temporada anterior, por isso a de
+ * estádios vale mais quando existe.
+ */
+export function parseSeasonLinks(wikitext: string): WikiLink[] {
+  const sections = sectionsOf(wikitext).filter((s) => TEAMS_SECTION.test(s.title))
+  const venues = linksOfSections(sections.filter((s) => VENUE_SECTION.test(s.title)))
+  return venues.length >= 8 ? venues : linksOfSections(sections)
 }
