@@ -16,6 +16,8 @@ export interface FetcherOptions {
   refresh: boolean
   /** Pausa, em milissegundos, depois de cada consulta à rede. */
   pauseMs: number
+  /** Espera inicial entre tentativas depois de um erro do servidor (dobra a cada tentativa). Padrão: 5 s. */
+  retryBaseMs?: number
   /** Para os testes: troca o `fetch`. */
   fetchImpl?: typeof fetch
   log?: (message: string) => void
@@ -50,7 +52,7 @@ export class Fetcher {
       return JSON.parse(readFileSync(file, 'utf8')) as T
     }
     const fetchImpl = this.options.fetchImpl ?? fetch
-    let wait = 5000
+    let wait = this.options.retryBaseMs ?? 5000
     for (let attempt = 1; attempt <= 6; attempt++) {
       const gap = this.lastRequestAt + this.options.pauseMs - Date.now()
       if (gap > 0) await sleep(gap)
@@ -71,7 +73,7 @@ export class Fetcher {
       if (status >= 200 && status < 300) {
         // O MediaWiki devolve 200 com `error.code = maxlag` quando os servidores estão atrasados: espera e tenta de novo.
         if (/"code"\s*:\s*"maxlag"/.test(text.slice(0, 400))) {
-          await sleep(Math.max(retryAfter, 5000))
+          await sleep(Math.max(retryAfter, this.options.retryBaseMs ?? 5000))
           continue
         }
         const json = JSON.parse(text) as T
