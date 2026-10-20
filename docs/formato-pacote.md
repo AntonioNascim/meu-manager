@@ -255,7 +255,7 @@ a torcida e a meta da diretoria a partir da reputação e da posição do clube 
 O sorteio de um jogador sem atributos parte **só da identidade dele** (`name`, `birthDate`, `nationality`, `position`), então
 o mesmo jogador tem sempre os mesmos atributos, e mudar o clube dele muda só o **nível** (a reputação do clube, a divisão e a
 economia da liga). Idade, salário (pela força e pela economia da liga) e contrato (1 a 4 anos a partir de `startYear`) também
-são derivados. Dá para montar o pacote real **sem atributos** e ajustar os craques depois (o editor de dados é uma fase futura do plano).
+são derivados. Dá para montar o pacote real **sem atributos** e ajustar os craques depois no editor do jogo (seção “Editor de pacotes”).
 
 ### Mundo mínimo
 
@@ -503,6 +503,29 @@ não precisa deles. Pacotes com mais de um país nunca precisam: o jogo deriva t
   jogador pesa o nível da liga. As janelas seguem a `region` de cada liga.
 - Se o clube não tem jogadores da casa suficientes para cumprir `foreignLimit.lineup`, o jogo escala os que houver (o limite é
   cumprido até onde o elenco permite).
+
+## Editor de pacotes (Fase 4)
+
+**Menu inicial › Editor** abre um pacote para editar dentro do jogo, sem mexer nos saves. Código: operações puras em `src/data/package/edit/` (`ops.ts`, `suggest.ts`, `history.ts`, `csv.ts`) e telas em `src/ui/screens/editor/`.
+
+- **O que abre:** o mundo padrão (Brasil, 3 divisões), o mundo de 15 ligas, o mundo ampliado (21 ligas), um pacote do zero (um país, uma liga e quatro clubes com elenco), um arquivo `.json` ou um pacote já guardado no navegador. Os pacotes editados ficam na mesma tabela `packages` do IndexedDB dos pacotes importados (`putPackage`); a gravação é automática, 2 segundos depois da última edição. Um arquivo com erros também abre: é justamente para consertar.
+- **Abas:** *Pacote* (nome, ano, créditos, países, base), *Ligas* (nome, país, número de times, acesso e rebaixamento ligados, turnos, temporada, região, primeira rodada, economia, limite de estrangeiros), *Clubes* (nome, sigla, cores com o escudo gerado ao vivo, cidade, estado, estádio, capacidade, reputação, liga; criar clube já cria um elenco de 24 jogadores; apagar solta os jogadores como livres), *Jogadores* (elenco e base, com busca e filtros por clube, posição, nacionalidade e força), *Copas* (formato, vagas, fases, grupos, fase de liga, preliminares, regras, disciplina, premiação e o JSON da copa), *Planilhas* e *Problemas*.
+- **Jogadores:** todos os campos do pacote. “Gerar automaticamente” preenche atributos, potencial, ocultos e contrato pela posição, idade e nível do clube (reputação, divisão e economia da liga): é o mesmo que o jogo gera ao importar sem atributos (`suggestPlayerData`), e dá para ajustar à mão depois. “Deixar o jogo gerar” remove os campos. Trocar o clube de um jogador transfere. Mexer em um atributo de quem não tem atributos fixa os valores gerados.
+- **Validação em tempo real:** a mesma `validatePackage` da importação (com até 500 erros listados), por entidade (caixa vermelha no detalhe, bolinha na lista) e na aba *Problemas*, com o botão que leva ao lugar. O botão *Novo jogo com este pacote* só liga quando não há erros.
+- **Desfazer e refazer:** botões e Ctrl+Z / Ctrl+Y; edições seguidas no mesmo campo viram um passo só.
+- **Exportar:** botão *Exportar .json* (o mesmo formato deste arquivo).
+
+### Planilhas (CSV)
+
+Aba *Planilhas*: exporta e importa **jogadores** (elenco ou base) e **clubes** em CSV, uma linha por jogador ou clube, com os mesmos campos do pacote, para editar em massa no Excel ou no Google Planilhas. Serve para dividir o pacote real por liga: exporte uma liga, edite, importe de volta.
+
+- **Arquivo:** exporta com `;` e BOM UTF-8 (o Excel em português abre certo); lê `;`, `,` ou tab. Datas `AAAA-MM-DD` ou `DD/MM/AAAA`. Coluna `id` liga a linha ao registro: id que existe atualiza, id novo ou vazio cria (jogadores sem id recebem um antes de exportar). `clubName` e `leagueName` são só para ler e a importação os ignora; colunas desconhecidas são ignoradas com um aviso.
+- **Colunas dos jogadores:** `id`, `name`, `nickname`, `birthDate`, `nationality`, `position`, `secondaryPositions` (separadas por `|`; `-` = nenhuma de propósito; vazio = o jogo sorteia), `foot`, `club` (id do clube; vazio = livre), `clubName`, os 16 atributos (`passing`, `finishing`, `dribbling`, `crossing`, `tackling`, `heading`, `ballControl`, `pace`, `stamina`, `strength`, `vision`, `positioning`, `decisions`, `determination`, `reflexes`, `rushingOut`), `potential`, `consistency`, `injuryProneness`, `professionalism`, `salary`, `contractEnd`, `releaseClause`. Obrigatórias: `name`, `birthDate`, `nationality`, `position`.
+- **Colunas dos clubes:** `id`, `name`, `abbreviation`, `color1`, `color2`, `city`, `state`, `stadiumName`, `stadiumCapacity`, `reputation`, `league` (id da liga), `leagueName`. Obrigatórias: `name`, `league`.
+- **Célula vazia** em campo opcional: o jogo gera o valor. Atributos: ou os 16 preenchidos, ou todos vazios. Contrato: `salary`, `contractEnd` e `releaseClause` juntos. Ocultos: os três juntos.
+- **Exportar por liga:** o escopo escolhido leva os clubes da liga e os jogadores desses clubes. “Preencher com os valores que o jogo geraria” leva atributos, potencial, ocultos e contrato gerados para quem ainda não os tem, prontos para ajustar. Há também planilhas em branco, só com o cabeçalho.
+- **Erros por linha:** a importação mostra cada problema com a linha da planilha (o cabeçalho é a 1) e a coluna: campo obrigatório vazio, número inválido ou fora de 1 a 100, data inválida, valor desconhecido (posição, pé, nacionalidade), cor inválida, id ou sigla repetidos na planilha, clube ou liga que não existe (importe os clubes antes dos jogadores), atributos incompletos, mais de 2 posições secundárias. Com erros, *Importar tudo* fica desligado; *Importar só as N linhas corretas* aplica as boas.
+- **Remover o que não está na planilha** (opcional): jogadores dos clubes que aparecem na planilha e não têm linha nela; clubes das ligas que aparecem e não têm linha (os jogadores deles ficam livres). Depois de importar, o número de times de cada liga acompanha os clubes e a validação aponta o que ainda falta (elenco de 18 a 30, goleiro...).
 
 ## Erros comuns
 

@@ -4,6 +4,8 @@
  * Os `Record` abaixo fazem o TypeScript acusar rótulo faltando quando um valor novo é criado.
  */
 import type { PackageIssue } from '../data/package/types'
+import type { CsvIssue } from '../data/package/edit/csv'
+import type { CupEntrantSource, CupFormat, CupSpec, Region } from '../engine/types'
 import { COUNTRY_INFO } from './countries'
 import type {
   BoardStatus,
@@ -391,5 +393,65 @@ export function packageIssueText(issue: PackageIssue): string {
     case 'cup-bracket': return `A copa em ${path} não fecha o chaveamento: ${detail}.`
     case 'cup-groups': return `Fase de grupos ou de liga da copa em ${path}: ${detail}.`
     case 'tiebreakers-unsupported': return `Os critérios de desempate de ${path} são diferentes dos do jogo e serão ignorados: vale a ordem padrão.`
+  }
+}
+
+/** Região das janelas de transferência e das copas continentais. */
+export const REGION_LABELS: Record<Region, string> = {
+  BR: 'Brasil',
+  SA: 'América do Sul',
+  EU: 'Europa',
+  NA: 'América do Norte',
+  AF: 'África',
+  AS: 'Ásia',
+  OC: 'Oceania',
+}
+
+export const CUP_FORMAT_LABELS: Record<CupFormat, string> = {
+  knockout: 'Mata-mata',
+  'groups-knockout': 'Grupos e mata-mata',
+  'league-knockout': 'Fase de liga e mata-mata',
+}
+
+export const CUP_SEEDING_LABELS: Record<NonNullable<CupSpec['seeding']>, string> = {
+  random: 'Sorteio livre',
+  seeded: 'Cabeças de chave pela reputação',
+  ranked: 'Cabeças de chave pela fase anterior',
+}
+
+export const CUP_HOME_LABELS: Record<NonNullable<CupSpec['homeOfSingleLeg']>, string> = {
+  draw: 'Sorteio',
+  'lower-reputation': 'Menor reputação',
+  'higher-reputation': 'Maior reputação',
+  'lower-division': 'Divisão inferior',
+  'first-listed': 'Primeiro listado',
+}
+
+export const CUP_SOURCE_LABELS: Record<CupEntrantSource['type'], string> = {
+  league: 'Clubes de uma liga',
+  cup: 'Campeão ou vice de outra copa',
+  region: 'Mais fortes de um continente',
+  'cup-group-place': 'Colocados dos grupos de outra copa',
+}
+
+/** Mensagem de um problema de uma planilha (CSV) de jogadores ou clubes; a linha é a da planilha. */
+export function csvIssueText(issue: CsvIssue): string {
+  const where = issue.line > 0 ? `Linha ${issue.line}${issue.column ? `, coluna "${issue.column}"` : ''}: ` : ''
+  switch (issue.code) {
+    case 'empty-file': return 'A planilha está vazia.'
+    case 'missing-column': return `Falta a coluna "${issue.column}" no cabeçalho (primeira linha).`
+    case 'bad-quote': return 'Há aspas sem fechar: algum campo ficou aberto.'
+    case 'missing-field': return `${where}campo obrigatório vazio.`
+    case 'bad-number': return `${where}"${issue.detail}" não é um número inteiro.`
+    case 'out-of-range': return `${where}valor fora do permitido: ${issue.detail}.`
+    case 'unknown-value': return `${where}valor desconhecido: "${issue.detail}".`
+    case 'bad-date': return `${where}data inválida "${issue.detail}" (use AAAA-MM-DD ou DD/MM/AAAA).`
+    case 'bad-color': return `${where}cor inválida "${issue.detail}" (use #rrggbb).`
+    case 'duplicate-id': return `${where}id repetido na planilha: ${issue.detail}.`
+    case 'unknown-club': return `${where}o clube "${issue.detail}" não existe no pacote (importe os clubes antes).`
+    case 'unknown-league': return `${where}a liga "${issue.detail}" não existe no pacote.`
+    case 'attributes-incomplete': return `${where}atributos incompletos (${issue.detail}): preencha os 16 ou deixe todos vazios.`
+    case 'too-many-positions': return `${where}no máximo 2 posições secundárias (veio ${issue.detail}).`
+    case 'duplicate-abbreviation': return `${where}sigla repetida na planilha: ${issue.detail}.`
   }
 }
