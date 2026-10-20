@@ -19,7 +19,7 @@ type View = 'menu' | 'new' | 'load' | 'package' | 'editor'
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
   // Em desenvolvimento, /?editor=zero|padrao|15|21 abre o editor direto (&aba=leagues|clubs|players|cups|sheets|issues).
-  const [view, setView] = useState<View>(() => (import.meta.env.DEV && new URLSearchParams(window.location.search).get('editor') ? 'editor' : 'menu'))
+  const [view, setView] = useState<View>(() => (import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('editor') ? 'editor' : 'menu'))
   const [slots, setSlots] = useState<(SaveSummary | null)[] | null>(null)
   const [latest, setLatest] = useState<SaveSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
