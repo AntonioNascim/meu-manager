@@ -25,9 +25,13 @@ const PLACE_END = ['verde', 'mar', 'real', 'norte', 'sul', 'claro', 'alvo', 'nov
 const CLUB_KIND = ['Futebol Clube', 'Atlético', 'Sporting', 'Esporte Clube', 'United', 'Deportivo', 'Athletic']
 const PALETTE = ['#c8102e', '#111111', '#f2f2f2', '#0b3d91', '#1b7f3b', '#f2b705', '#6a1b9a', '#ee7203', '#00a3c4', '#7a1f1f']
 
-export function buildScalePackage(seed = 7): DataPackage {
+/** Ligas do mundo de 15 ligas (antes de Países Baixos, México, Estados Unidos e das ligas de elite da África, Ásia e Oceania). */
+export const FIFTEEN_LEAGUES: readonly string[] = ['nl-1', 'mx-1', 'us-1', 'af-1', 'as-1', 'oc-1']
+
+export function buildScalePackage(seed = 7, options: { without?: readonly string[]; name?: string } = {}): DataPackage {
+  const specs = FULL_WORLD.filter((l) => !(options.without ?? []).includes(l.id))
   const rng = createRng(`scale-package:${seed}`)
-  const world = buildScaleWorld(FULL_WORLD, seed)
+  const world = buildScaleWorld(specs, seed)
   const usedNames = new Set<string>()
   const usedAbbreviations = new Set<string>()
   const usedPlaces = new Set<string>()
@@ -53,9 +57,9 @@ export function buildScalePackage(seed = 7): DataPackage {
     }
   }
 
-  const leagues: PackageLeague[] = FULL_WORLD.map((spec) => {
+  const leagues: PackageLeague[] = specs.map((spec) => {
     const country = COUNTRY_OF[spec.id.split('-')[0] as string] as Nationality
-    const sameCountry = FULL_WORLD.filter((l) => l.id.startsWith(spec.id.split('-')[0] as string))
+    const sameCountry = specs.filter((l) => l.id.startsWith(spec.id.split('-')[0] as string))
     const lowest = Math.max(...sameCountry.map((l) => l.tier))
     const isBrazil = country === 'Brazil'
     return {
@@ -118,7 +122,7 @@ export function buildScalePackage(seed = 7): DataPackage {
   return {
     format: PACKAGE_FORMAT,
     version: PACKAGE_VERSION,
-    name: 'Mundo fictício com 21 ligas (exemplo)',
+    name: options.name ?? 'Mundo fictício com 21 ligas (exemplo)',
     startYear: 2026,
     credits: 'Pacote de exemplo gerado pelo próprio jogo: clubes, cidades e jogadores inventados, sem dados reais. Atributos, contratos, táticas e finanças ficam por conta do jogo.',
     countries,

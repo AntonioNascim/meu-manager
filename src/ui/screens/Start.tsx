@@ -12,8 +12,9 @@ import { downloadText } from '../download'
 import { ImportPackage } from './ImportPackage'
 import type { ChosenPackage } from './ImportPackage'
 import { NewGame } from './NewGame'
+import { Editor } from './editor/Editor'
 
-type View = 'menu' | 'new' | 'load' | 'package'
+type View = 'menu' | 'new' | 'load' | 'package' | 'editor'
 
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
@@ -100,6 +101,7 @@ export function Start() {
   }
 
   if (view === 'new') return <NewGame slots={slots} {...(dataPackage ? { dataPackage } : {})} onBack={() => { setDataPackage(undefined); setView('menu'); void refresh() }} />
+  if (view === 'editor') return <Editor onBack={() => setView('menu')} onPlay={(chosen) => { setDataPackage(chosen); setView('new') }} />
   if (view === 'package') return <ImportPackage onBack={() => setView('menu')} onUse={(chosen) => { setDataPackage(chosen); setView('new') }} />
 
   return (
@@ -127,6 +129,9 @@ export function Start() {
           </Button>
           <Button className="w-full" variant="secondary" onClick={() => setView('package')}>
             Novo jogo com pacote de dados
+          </Button>
+          <Button className="w-full" variant="secondary" onClick={() => setView('editor')}>
+            Editor
           </Button>
           <Button className="w-full" variant="secondary" disabled={!latest} onClick={() => setView('load')}>
             Carregar
