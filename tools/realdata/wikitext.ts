@@ -184,8 +184,7 @@ export function parseSquad(wikitext: string): { entries: SquadEntry[]; section?:
   return { entries: [] }
 }
 
-const TEAMS_SECTION =
-  /^(teams|participating (teams|clubs)|clubs|participants|stadiums and locations|stadiums|locations|venues|teams and locations|league teams|member clubs|clubs and locations|teams and stadiums|clubs and stadiums|stadia and locations|stadiums and personnel|current clubs)$/i
+const TEAMS_SECTION = /^(teams|participating (teams|clubs)|clubs|participants|member clubs|current clubs|league teams)$|stadi|location|venue/i
 
 const VENUE_SECTION = /stadi|location|venue/i
 
