@@ -173,7 +173,7 @@ describe('data de nascimento estimada no pacote e no CSV', () => {
 })
 
 describe('ligas com o número real de clubes', () => {
-  const sheet = (leagueId: string, clubs: number): LeagueSheets => ({ leagueId, clubsCsv: '', playersCsv: '', issues: [], stats: { clubs, expected: clubs, players: 0, smallest: 0, largest: 0, estimated: 0, reviewPositions: 0 } })
+  const sheet = (leagueId: string, clubs: number): LeagueSheets => ({ leagueId, clubsCsv: "", playersCsv: "", academyCsv: "", issues: [], stats: { clubs, expected: clubs, players: 0, smallest: 0, largest: 0, estimated: 0, reviewPositions: 0, distributed: 0, toAcademy: 0, freed: 0, generated: 0, colorsFromKit: 0 } })
 
   it('usa o número de clubes achado em cada liga, turno único onde for o caso', () => {
     const leagues = leagueDefinitions([sheet('br-1', 20), sheet('br-3', 20), sheet('ar-1', 28), sheet('us-1', 30), sheet('en-1', 20)])

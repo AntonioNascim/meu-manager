@@ -9,7 +9,7 @@ import type { LocalEntry } from './localSquad'
 import { mergeSquads } from './merge'
 import { articleUrl, fetchPages, fetchSquadHtml } from './wikipedia'
 import { fetchClubs, fetchFootballClubs, fetchPlayers } from './wikidata'
-import { parseSeasonLinkGroups, parseSquad } from './wikitext'
+import { parseClubInfobox, parseSeasonLinkGroups, parseSquad } from './wikitext'
 import type { WikiLink } from './wikitext'
 
 export interface CollectOptions {
@@ -113,6 +113,10 @@ export async function collectLeague(league: RealLeague, options: CollectOptions)
   for (const club of clubs) {
     const page = club.articleTitle ? pages.get(club.articleTitle) : undefined
     if (!page?.wikitext) continue
+    // Quadro do clube: cores do uniforme e texto do estádio (completam o que o Wikidata não tem).
+    const box = parseClubInfobox(page.wikitext)
+    if (box.kit.length > 0) club.kit = box.kit
+    if (box.ground) club.ground = box.ground
     const squad = parseSquad(page.wikitext)
     if (squad.entries.length > 0) {
       squads.set(club.info.qid, { entries: squad.entries, ...(squad.section ? { section: squad.section } : {}) })

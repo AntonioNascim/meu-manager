@@ -22,6 +22,10 @@ const KIND_TEXT: Record<IssueKind, string> = {
   'club-missing-season': 'Temporada da liga não encontrada',
   'squad-missing': 'Clube sem elenco na Wikipedia',
   'squad-small': 'Elenco pequeno demais (menos de 18)',
+  'player-to-academy': 'Jovem que passou para a base (elenco com mais de 30)',
+  'player-freed': 'Jogador que ficou livre no mercado (elenco com mais de 30)',
+  'player-generated': 'Jogador gerado para completar o elenco (trocar por um real)',
+  'squad-generated': 'Clube com elenco completado por jogadores gerados',
   'squad-large': 'Elenco grande demais (mais de 30)',
   'club-no-colors': 'Cores ausentes ou incompletas',
   'club-no-stadium': 'Clube sem estádio',
@@ -62,7 +66,13 @@ export function buildReport(sheets: readonly LeagueSheets[], run: RunInfo): stri
     const note = season ? (season.previous ? ` (temporada anterior: ${season.title})` : '') : ''
     lines.push(`| ${s.leagueId}${note} | ${s.stats.clubs} | ${s.stats.expected} | ${s.stats.players} | ${s.stats.smallest} | ${s.stats.largest} | ${s.stats.estimated} | ${s.stats.reviewPositions} | ${local ? `${local.clubs} / ${local.added}` : '—'} | ${s.issues.length} |`)
   }
-  lines.push('', `Total: ${sheets.reduce((n, s) => n + s.stats.clubs, 0)} clubes e ${sheets.reduce((n, s) => n + s.stats.players, 0)} jogadores.`, '')
+  const sum = (pick: (s: LeagueSheets) => number): number => sheets.reduce((n, s) => n + pick(s), 0)
+  lines.push('', `Total: ${sum((s) => s.stats.clubs)} clubes e ${sum((s) => s.stats.players)} jogadores no elenco principal ou livres, mais ${sum((s) => s.stats.toAcademy)} na base.`, '')
+
+  lines.push('## Ajustes automáticos para o pacote passar na validação', '', '| Liga | Para a base | Livres no mercado | Gerados | Posições distribuídas | Posições a revisar (com artigo) | Clubes com cores do uniforme | Tarefas manuais |', '|---|---:|---:|---:|---:|---:|---:|---:|')
+  for (const s of sheets) lines.push(`| ${s.leagueId} | ${s.stats.toAcademy} | ${s.stats.freed} | ${s.stats.generated} | ${s.stats.distributed} | ${s.stats.reviewPositions} | ${s.stats.colorsFromKit} | ${taskRows(s.issues).length} |`)
+  lines.push(`| **total** | ${sum((s) => s.stats.toAcademy)} | ${sum((s) => s.stats.freed)} | ${sum((s) => s.stats.generated)} | ${sum((s) => s.stats.distributed)} | ${sum((s) => s.stats.reviewPositions)} | ${sum((s) => s.stats.colorsFromKit)} | ${sum((s) => taskRows(s.issues).length)} |`, '')
+  lines.push('Elencos com mais de 30: os jovens de 15 a 19 anos passam para a base (até 15 por clube, os menos conhecidos primeiro); se ainda passar de 30, os menos conhecidos (sem artigo na Wikipedia) ficam livres no mercado. Elencos com menos de 18 são completados com jogadores gerados (coluna `generated`). Posições genéricas da fonte são distribuídas pela necessidade de um time real (goleiros, laterais dos dois lados, zagueiros, volantes, meias, pontas e atacantes); só os jogadores com artigo na Wikipedia ficam marcados para revisão.', '')
 
   if (run.validation) {
     const v = run.validation
@@ -102,4 +112,35 @@ export function buildCredits(run: RunInfo): string {
     ...run.articles.map((a) => `- ${a.title} — ${a.url}`),
   ]
   return `${lines.join('\n')}\n`
+}
+
+/** Tipos de aviso que viram tarefa manual, com o campo e onde procurar. */
+const TASK_KINDS: Partial<Record<IssueKind, { type: string; where: string }>> = {
+  'club-no-colors': { type: 'Clube', where: 'Quadro do clube na Wikipedia, site oficial do clube (cores do uniforme)' },
+  'club-no-stadium': { type: 'Clube', where: 'Wikipedia do clube (estádio)' },
+  'club-no-city': { type: 'Clube', where: 'Wikipedia do clube (cidade)' },
+  'club-no-capacity': { type: 'Clube', where: 'Wikipedia do estádio (capacidade)' },
+  'club-bad-capacity': { type: 'Clube', where: 'Wikipedia do estádio (capacidade entre 500 e 300.000)' },
+  'squad-generated': { type: 'Elenco', where: 'Wikipedia do clube, site oficial (elenco atual); ver revisao.csv para os jogadores gerados' },
+  'squad-missing': { type: 'Elenco', where: 'Wikipedia do clube, site oficial (elenco atual)' },
+  'player-position': { type: 'Jogador conhecido', where: 'Wikipedia do jogador, site do clube (posição exata)' },
+}
+
+/** Quantos jogadores de posição incerta entram na lista de tarefas de cada clube: os mais conhecidos (mais páginas no Wikidata). */
+export const POSITION_TASKS_PER_CLUB = 8
+
+export function taskRows(issues: readonly Issue[]): (string | undefined)[][] {
+  const famous = new Set<Issue>()
+  const byClub = new Map<string, Issue[]>()
+  for (const i of issues) if (i.kind === 'player-position') (byClub.get(i.club ?? '') ?? byClub.set(i.club ?? '', []).get(i.club ?? '') ?? []).push(i)
+  for (const list of byClub.values()) for (const i of [...list].sort((a, b) => (b.fame ?? 0) - (a.fame ?? 0) || (a.player ?? '').localeCompare(b.player ?? '')).slice(0, POSITION_TASKS_PER_CLUB)) famous.add(i)
+  return issues
+    .filter((i) => TASK_KINDS[i.kind] && (i.kind !== 'player-position' || famous.has(i)) && !(i.kind === 'squad-missing' && issues.some((x) => x.kind === 'squad-generated' && x.id === i.id)))
+    .sort((a, b) => (TASK_KINDS[a.kind]?.type ?? '').localeCompare(TASK_KINDS[b.kind]?.type ?? '') || (a.club ?? '').localeCompare(b.club ?? '') || (a.player ?? '').localeCompare(b.player ?? ''))
+    .map((i) => [TASK_KINDS[i.kind]?.type, i.club, i.player, i.id, i.field ?? '', i.detail, i.current, '', TASK_KINDS[i.kind]?.where, ''])
+}
+
+/** Planilha de tarefas manuais de uma liga (para dividir entre sócios): o que não deu para resolver sozinho. */
+export function tasksCsv(issues: readonly Issue[]): string {
+  return toCsv(['tipo', 'clube', 'jogador', 'id', 'campo', 'situacao', 'valor_provisorio', 'valor_correto', 'onde_procurar', 'feito'], taskRows(issues))
 }

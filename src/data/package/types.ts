@@ -117,6 +117,8 @@ export interface PackagePlayer {
   birthDate: string
   /** `true` quando a data é uma estimativa (idade aproximada ou média do elenco), a conferir. O jogo trata como uma data qualquer. */
   birthEstimated?: boolean
+  /** `true` quando o jogador foi gerado para completar um elenco e deve ser trocado por um real. O jogo trata como qualquer jogador. */
+  generated?: boolean
   nationality: Nationality
   position: Position
   secondaryPositions?: Position[]

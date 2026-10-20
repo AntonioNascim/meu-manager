@@ -41,7 +41,7 @@ export interface CsvIssue {
 
 export const PLAYER_COLUMNS = [
   'id', 'name', 'nickname', 'birthDate', 'birthEstimated', 'nationality', 'position', 'secondaryPositions', 'foot', 'club', 'clubName',
-  ...ATTRIBUTE_NAMES, 'potential', 'consistency', 'injuryProneness', 'professionalism', 'salary', 'contractEnd', 'releaseClause',
+  ...ATTRIBUTE_NAMES, 'potential', 'consistency', 'injuryProneness', 'professionalism', 'salary', 'contractEnd', 'releaseClause', 'generated',
 ] as const
 
 export const CLUB_COLUMNS = ['id', 'name', 'abbreviation', 'color1', 'color2', 'city', 'state', 'stadiumName', 'stadiumCapacity', 'reputation', 'league', 'leagueName'] as const
@@ -115,7 +115,7 @@ export function playersToCsv(pkg: DataPackage, list: PlayerList, options: Player
         p.id, p.name, p.nickname, p.birthDate, p.birthEstimated ? 'sim' : '', p.nationality, p.position, p.secondaryPositions ? (p.secondaryPositions.length > 0 ? p.secondaryPositions.join('|') : '-') : '', p.foot, p.club, p.club ? clubName.get(p.club) : '',
         ...ATTRIBUTE_NAMES.map((a) => merged.attributes?.[a]),
         merged.potential, merged.hidden?.consistency, merged.hidden?.injuryProneness, merged.hidden?.professionalism,
-        merged.contract?.salary, merged.contract?.endDate, merged.contract?.releaseClause,
+        merged.contract?.salary, merged.contract?.endDate, merged.contract?.releaseClause, p.generated ? 'sim' : '',
       ]
     })
   return toCsv(PLAYER_COLUMNS, rows)
@@ -246,6 +246,7 @@ export function parsePlayersCsv(text: string, pkg: DataPackage): CsvParsed<Packa
     const id = r.text('id', false)
     if (id) player.id = id
     if (/^(sim|s|1|true|yes|x|estimada)$/i.test(r.raw('birthEstimated'))) player.birthEstimated = true
+    if (/^(sim|s|1|true|yes|x|gerado)$/i.test(r.raw('generated'))) player.generated = true
     const nickname = r.text('nickname', false)
     if (nickname) player.nickname = nickname
     const rawSecondary = r.raw('secondaryPositions')

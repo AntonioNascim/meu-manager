@@ -221,3 +221,31 @@ export function parseSeasonLinks(wikitext: string): WikiLink[] {
   const { primary, secondary } = parseSeasonLinkGroups(wikitext)
   return primary.length >= 8 ? primary : [...primary, ...secondary]
 }
+
+export interface ClubInfobox {
+  /** Cores do uniforme principal (`#rrggbb`), do desenho da camisa: corpo, calção, meias e manga. */
+  kit: string[]
+  /** Estádio e cidade como o quadro escreve (`ground`), sem links. */
+  ground?: string
+}
+
+function hexOf(text: string | undefined): string | undefined {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})\b/i.exec((text ?? '').trim())
+  if (!m) return undefined
+  const h = (m[1] as string).toLowerCase()
+  return `#${h.length === 3 ? [...h].map((c) => c + c).join('') : h}`
+}
+
+/** Quadro do clube (`Infobox football club`): as cores do uniforme principal e o texto do estádio. */
+export function parseClubInfobox(wikitext: string): ClubInfobox {
+  const box = templatesOf(wikitext, /^infobox football club$/i)[0]
+  const out: ClubInfobox = { kit: [] }
+  if (!box) return out
+  for (const key of ['body1', 'shorts1', 'socks1', 'leftarm1', 'rightarm1', 'body', 'shorts', 'socks', 'leftarm']) {
+    const hex = hexOf(box.params.get(key))
+    if (hex && !out.kit.includes(hex)) out.kit.push(hex)
+  }
+  const ground = box.params.get('ground')
+  if (ground) out.ground = cleanText(ground.replace(/<br\s*\/?>/gi, ', '))
+  return out
+}

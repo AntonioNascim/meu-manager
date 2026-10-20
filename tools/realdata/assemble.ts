@@ -6,6 +6,11 @@ import { CLUB_COLUMNS, PLAYER_COLUMNS, toCsv } from '../../src/data/package/edit
 import type { Foot, Nationality, Position } from '../../src/engine/types'
 import { isUnitedKingdom, toNationality } from './nationality'
 import { guessPositions, parseCoarse } from './positions'
+import type { PositionGuess } from './positions'
+import { distributePositions, missingPositions, trimSquad } from './squadPlan'
+import { makePlayer } from '../../src/data/package/edit/ops'
+import { createRng } from '../../src/engine/rng'
+import type { DataPackage } from '../../src/data/package/types'
 import type { RealLeague } from './leagues'
 import type { ClubInfo, PlayerInfo } from './wikidata'
 import type { SquadEntry } from './wikitext'
@@ -27,6 +32,10 @@ export type IssueKind =
   | 'player-nationality'
   | 'player-no-wikidata'
   | 'player-duplicate'
+  | 'player-to-academy'
+  | 'player-freed'
+  | 'player-generated'
+  | 'squad-generated'
 
 export interface Issue {
   league: string
@@ -36,6 +45,11 @@ export interface Issue {
   /** Id do registro na planilha. */
   id?: string
   detail: string
+  /** Campo a corrigir à mão (estádio, cidade, cores, posição...) e o valor provisório que ficou na planilha. */
+  field?: string
+  current?: string
+  /** Quanto o jogador é conhecido (páginas do Wikidata em outras línguas): ordena as tarefas de posição. */
+  fame?: number
 }
 
 export interface ClubSource {
@@ -44,6 +58,10 @@ export interface ClubSource {
   displayName?: string
   /** Artigo do clube usado para o elenco (créditos). */
   articleTitle?: string
+  /** Cores do uniforme principal no quadro do clube na Wikipedia em inglês. */
+  kit?: string[]
+  /** Texto do estádio no quadro do clube ("Estádio, Cidade"). */
+  ground?: string
 }
 
 export interface SquadSource {
@@ -73,13 +91,23 @@ export interface SheetStats {
   smallest: number
   largest: number
   estimated: number
+  /** Posições a revisar (só jogadores com artigo na Wikipedia). */
   reviewPositions: number
+  /** Jogadores com a posição distribuída pela necessidade do elenco. */
+  distributed: number
+  toAcademy: number
+  freed: number
+  generated: number
+  /** Clubes que ganharam cores do desenho do uniforme. */
+  colorsFromKit: number
 }
 
 export interface LeagueSheets {
   leagueId: string
   clubsCsv: string
   playersCsv: string
+  /** Base dos clubes (jovens que passaram do limite do elenco). */
+  academyCsv: string
   issues: Issue[]
   stats: SheetStats
 }
@@ -93,7 +121,13 @@ export interface AssembleState {
 interface Draft {
   row: Record<string, string | number | undefined>
   club: string
+  clubQid: string
   clubName: string
+  guess: PositionGuess
+  /** Tem artigo na Wikipedia (jogador mais conhecido). */
+  article: boolean
+  fame: number
+  foot?: Foot
   player: string
   id: string
   /** Data completa vinda das fontes. */
@@ -185,6 +219,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
   const { league } = input
   const issues: Issue[] = [...(input.notes ?? [])]
   const issue = (kind: IssueKind, detail: string, extra: Partial<Issue> = {}): void => void issues.push({ league: league.id, kind, detail, ...extra })
+  const today = input.today ?? new Date()
 
   const ranked = [...input.clubs].sort((a, b) => b.info.sitelinks - a.info.sitelinks || a.info.name.localeCompare(b.info.name))
   const rankOf = new Map(ranked.map((c, i) => [c.info.qid, i]))
@@ -192,38 +227,46 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
 
   const clubRows: (string | number | undefined)[][] = []
   const drafts: Draft[] = []
-  let smallest = Infinity
-  let largest = 0
-  let estimated = 0
-  let reviewPositions = 0
-  let players = 0
+  const clubName = new Map<string, string>()
+  let colorsFromKit = 0
 
   for (const source of [...input.clubs].sort((a, b) => a.info.name.localeCompare(b.info.name))) {
     const { info } = source
     const name = source.displayName ?? info.name
     const id = clubId(info.qid)
+    clubName.set(id, name)
     const abbreviation = pickAbbreviation(name, info.shortNames, state.abbreviations)
-    const colors = pickColors(info.colors)
-    if (colors.length === 0) issue('club-no-colors', 'sem cores no Wikidata (o jogo usa vermelho e branco)', { club: name, id })
-    else if (colors.length === 1) issue('club-no-colors', `só uma cor no Wikidata (${colors[0]}); a segunda fica branca`, { club: name, id })
-    if (!info.venue) issue('club-no-stadium', 'sem estádio no Wikidata', { club: name, id })
+
+    // Cores: as do Wikidata; as que faltam vêm do desenho da camisa no quadro do clube na Wikipedia em inglês.
+    const fromWikidata = pickColors(info.colors)
+    const colors = [...new Set([...fromWikidata, ...(source.kit ?? [])])].slice(0, 2)
+    if (colors.length > fromWikidata.length) colorsFromKit++
+    if (colors.length === 0) issue('club-no-colors', 'sem cores no Wikidata nem no quadro do uniforme (o jogo usa vermelho e branco)', { club: name, id, field: 'cores', current: '' })
+    else if (colors.length === 1) issue('club-no-colors', `só uma cor achada (${colors[0]}); a segunda fica branca`, { club: name, id, field: 'cor 2', current: colors[0] as string })
+
+    // Estádio e cidade: Wikidata; senão o texto do quadro do clube ("Estádio, Cidade"); senão um nome provisório (a validação exige os dois).
+    const ground = (source.ground ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+    let stadium = info.venue ?? ground[0]
+    let city = info.city ?? (ground.length > 1 ? ground[ground.length - 1] : undefined)
+    if (!stadium) {
+      stadium = `Estádio ${name}`
+      issue('club-no-stadium', 'estádio não encontrado; nome provisório', { club: name, id, field: 'estádio', current: stadium })
+    }
+    if (!city) {
+      city = name
+      issue('club-no-city', 'cidade não encontrada; usado o nome do clube como provisório', { club: name, id, field: 'cidade', current: city })
+    }
     let capacity = info.capacity
-    if (info.venue && capacity === undefined) issue('club-no-capacity', 'sem capacidade do estádio (o jogo usa 20.000)', { club: name, id })
-    if (capacity !== undefined && (capacity < 500 || capacity > 300_000)) {
-      issue('club-bad-capacity', `capacidade ${capacity} fora de 500 a 300.000; deixada em branco`, { club: name, id })
+    if (capacity === undefined) issue('club-no-capacity', 'sem capacidade do estádio (o jogo usa 20.000)', { club: name, id, field: 'capacidade', current: '' })
+    else if (capacity < 500 || capacity > 300_000) {
+      issue('club-bad-capacity', `capacidade ${capacity} fora de 500 a 300.000; deixada em branco`, { club: name, id, field: 'capacidade', current: String(capacity) })
       capacity = undefined
     }
-    if (!info.city) issue('club-no-city', 'sem cidade no Wikidata', { club: name, id })
-    clubRows.push([id, name, abbreviation, colors[0], colors[1], info.city, '', info.venue, capacity, provisionalReputation(rankOf.get(info.qid) ?? 0, input.clubs.length, league), league.id, league.spec.name])
+    clubRows.push([id, name, abbreviation, colors[0], colors[1], city, '', stadium, capacity, provisionalReputation(rankOf.get(info.qid) ?? 0, input.clubs.length, league), league.id, league.spec.name])
 
     const squad = input.squads.get(info.qid)
-    if (!squad || squad.entries.length === 0) {
-      issue('squad-missing', 'nenhum elenco encontrado na Wikipedia', { club: name, id })
-      smallest = 0
-      continue
-    }
-    let kept = 0
-    for (const entry of squad.entries) {
+    if (!squad || squad.entries.length === 0) issue('squad-missing', 'nenhum elenco encontrado na Wikipedia', { club: name, id })
+    for (const entry of squad?.entries ?? []) {
       const articleQid = entry.title ? input.articleToQid.get(articleKey(entry)) : undefined
       const wd = articleQid ? input.players.get(articleQid) : undefined
       const pid = playerId(articleQid, info.qid, entry.display)
@@ -233,15 +276,10 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         continue
       }
       state.playerIds.add(pid)
-      kept++
       if (!articleQid) issue('player-no-wikidata', 'sem artigo na Wikipedia; só nome, país e setor da tabela do clube', { club: name, player: label, id: pid })
 
       const foot = wd?.foot ? FOOT[wd.foot] : undefined
       const guess = guessPositions(wd?.positions ?? [], parseCoarse(entry.pos), foot, entry.localPosition)
-      if (guess.review.length > 0) {
-        reviewPositions++
-        issue('player-position', `${guess.review.join('; ')} → ${guess.primary}`, { club: name, player: label, id: pid })
-      }
 
       let nationality: Nationality | undefined = toNationality(entry.nat)
       if (!nationality) {
@@ -257,7 +295,6 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         issue('player-nationality', `país não encontrado (${entry.nat ?? wd?.nationalities.join('/') ?? 'sem dado'}); usado o da liga`, { club: name, player: label, id: pid })
       }
 
-
       const nickname = wd?.name && entry.display.length < wd.name.length && !same(entry.display, wd.name) ? entry.display : wd?.nickname
       const row: Record<string, string | number | undefined> = {
         id: pid,
@@ -271,17 +308,12 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         club: id,
         clubName: name,
       }
-      drafts.push({ row, club: id, clubName: name, player: label, id: pid, ...(wd?.birthDate ? { known: wd.birthDate } : {}), ...(wd?.birthYear !== undefined ? { year: wd.birthYear } : {}) })
+      drafts.push({ row, club: id, clubQid: info.qid, clubName: name, player: label, id: pid, guess, known: wd?.birthDate, ...(wd?.birthYear !== undefined ? { year: wd.birthYear } : {}), article: articleQid !== undefined, fame: wd?.sitelinks ?? 0, ...(foot ? { foot } : {}) })
     }
-    players += kept
-    smallest = Math.min(smallest, kept)
-    largest = Math.max(largest, kept)
-    if (kept < 18) issue('squad-small', `${kept} jogadores (o pacote exige de 18 a 30)`, { club: name, id })
-    if (kept > 30) issue('squad-large', `${kept} jogadores (o pacote aceita no máximo 30)`, { club: name, id })
   }
 
   // Datas ausentes em todas as fontes: estimadas pela idade aproximada (só o ano) ou pela média de idade do elenco, e marcadas como estimadas.
-  const today = input.today ?? new Date()
+  let estimated = 0
   const ages = new Map<string, number[]>()
   const leagueAges: number[] = []
   for (const d of drafts) {
@@ -310,13 +342,97 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
     d.row.birthDate = date
     d.row.birthEstimated = 'sim'
   }
-  const playerRows = drafts.map((d) => PLAYER_COLUMNS.map((column) => d.row[column]))
+
+  // Por clube: posições, excesso de jogadores e elencos curtos.
+  const main: Draft[] = []
+  const academy: Draft[] = []
+  const free: Draft[] = []
+  const generated: Record<string, string | number | undefined>[] = []
+  let distributed = 0
+  let reviewPositions = 0
+  const byClub = new Map<string, Draft[]>()
+  for (const d of drafts) (byClub.get(d.club) ?? byClub.set(d.club, []).get(d.club) ?? []).push(d)
+  const generationContext = { startYear: today.getFullYear() } as unknown as DataPackage
+  let smallest = Infinity
+  let largest = 0
+
+  for (const source of [...input.clubs].sort((a, b) => a.info.name.localeCompare(b.info.name))) {
+    const id = clubId(source.info.qid)
+    const name = clubName.get(id) as string
+    const list = byClub.get(id) ?? []
+
+    // Posições genéricas distribuídas conforme a necessidade de um time real.
+    const planned = distributePositions(list.map((d) => ({ position: d.guess.primary, generic: d.guess.review.length > 0, ...(d.foot ? { foot: d.foot } : {}) })))
+    list.forEach((d, i) => {
+      const position = planned[i] as Position
+      d.row.position = position
+      d.row.secondaryPositions = d.guess.secondary.filter((p) => p !== position && (p === 'GK') === (position === 'GK')).join('|')
+      if (d.guess.review.length === 0) return
+      distributed++
+      // Só os jogadores com artigo na Wikipedia (os mais conhecidos) ficam marcados para revisão.
+      if (d.article) {
+        reviewPositions++
+        issue('player-position', `${d.guess.review.join('; ')} → ${position} (distribuída pela necessidade do elenco)`, { club: name, player: d.player, id: d.id, field: 'posição', current: position, fame: d.fame })
+      }
+    })
+
+    // Mais de 30: jovens para a base, o resto dos menos conhecidos para o mercado.
+    const trimmed = trimSquad(list.map((d) => ({ position: d.row.position as Position, age: ageOn(d.row.birthDate as string, today), known: d.article })))
+    for (const i of trimmed.academy) {
+      const d = list[i] as Draft
+      academy.push(d)
+      issue('player-to-academy', `elenco com ${list.length} jogadores; passou para a base`, { club: name, player: d.player, id: d.id })
+    }
+    for (const i of trimmed.free) {
+      const d = list[i] as Draft
+      d.row.club = ''
+      d.row.clubName = ''
+      free.push(d)
+      issue('player-freed', `elenco com ${list.length} jogadores; ficou livre no mercado`, { club: name, player: d.player, id: d.id })
+    }
+    const kept = trimmed.keep.map((i) => list[i] as Draft)
+    main.push(...kept)
+
+    // Menos de 18: completa com jogadores gerados, para trocar pelos reais depois.
+    let size = kept.length
+    if (size < 18) {
+      const positions = missingPositions(kept.map((d) => d.row.position as Position), Math.max(20, 18))
+      const rng = createRng(`gen:${source.info.qid}`)
+      positions.forEach((position, n) => {
+        const made = makePlayer(generationContext, rng, position, league.country, id, `gen-${source.info.qid}-${n + 1}`)
+        generated.push({ id: made.id, name: made.name, birthDate: made.birthDate, nationality: made.nationality, position, club: id, clubName: name, generated: 'sim' })
+        issue('player-generated', `jogador gerado (${position}) para completar o elenco; trocar por um real`, { club: name, player: made.name, id: made.id })
+      })
+      issue('squad-generated', `${kept.length} jogadores reais; completado com ${positions.length} gerados`, { club: name, id, field: 'elenco', current: String(kept.length) })
+      size += positions.length
+    }
+    smallest = Math.min(smallest, size)
+    largest = Math.max(largest, size)
+    if (size < 18) issue('squad-small', `${size} jogadores (o pacote exige de 18 a 30)`, { club: name, id })
+  }
+
+  const csvRows = (list: readonly Draft[]) => list.map((d) => PLAYER_COLUMNS.map((column) => d.row[column]))
+  const generatedRows = generated.map((row) => PLAYER_COLUMNS.map((column) => row[column]))
 
   return {
     leagueId: league.id,
     clubsCsv: toCsv(CLUB_COLUMNS, clubRows),
-    playersCsv: toCsv(PLAYER_COLUMNS, playerRows),
+    playersCsv: toCsv(PLAYER_COLUMNS, [...csvRows(main), ...generatedRows, ...csvRows(free)]),
+    academyCsv: toCsv(PLAYER_COLUMNS, csvRows(academy)),
     issues,
-    stats: { clubs: input.clubs.length, expected: league.expected, players, smallest: Number.isFinite(smallest) ? smallest : 0, largest, estimated, reviewPositions },
+    stats: {
+      clubs: input.clubs.length,
+      expected: league.expected,
+      players: main.length + generated.length + free.length,
+      smallest: Number.isFinite(smallest) ? smallest : 0,
+      largest,
+      estimated,
+      reviewPositions,
+      distributed,
+      toAcademy: academy.length,
+      freed: free.length,
+      generated: generated.length,
+      colorsFromKit,
+    },
   }
 }
