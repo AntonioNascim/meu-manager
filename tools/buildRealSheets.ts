@@ -18,7 +18,7 @@ import { Fetcher } from './realdata/http'
 import { REAL_LEAGUES } from './realdata/leagues'
 import { collectLeague } from './realdata/pipeline'
 import { buildRealPackage, leagueDefinitions } from './realdata/packageOut'
-import { buildCredits, buildReport, reviewCsv } from './realdata/report'
+import { buildCredits, buildReport, reviewCsv, tasksCsv } from './realdata/report'
 import type { RunInfo } from './realdata/report'
 
 const args = process.argv.slice(2)
@@ -66,6 +66,9 @@ for (const league of leagues) {
     sheets.push(result)
     writeFileSync(join(out, `${league.id}-clubes.csv`), result.clubsCsv)
     writeFileSync(join(out, `${league.id}-jogadores.csv`), result.playersCsv)
+    writeFileSync(join(out, `${league.id}-base.csv`), result.academyCsv)
+    mkdirSync(join(out, 'tarefas'), { recursive: true })
+    writeFileSync(join(out, 'tarefas', `${league.id}-tarefas.csv`), tasksCsv(result.issues))
     log(`${league.id}: ${result.stats.clubs}/${result.stats.expected} clubes, ${result.stats.players} jogadores, ${result.issues.length} avisos`)
   } catch (error) {
     console.error(`${league.id}: falhou (${error instanceof Error ? error.message : String(error)}). Rode de novo: o que já foi baixado fica no cache.`)

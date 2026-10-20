@@ -59,8 +59,14 @@ export function buildRealPackage(sheets: readonly LeagueSheets[], credits: strin
     rejected += parsed.total - parsed.rows.length
     players.push(...parsed.rows.map((r) => r.value))
   }
+  const academy: PackagePlayer[] = []
+  for (const sheet of sheets) {
+    const parsed = parsePlayersCsv(sheet.academyCsv, withClubs)
+    rejected += parsed.total - parsed.rows.length
+    academy.push(...parsed.rows.map((r) => r.value))
+  }
   const countries = [...new Set(leagues.map((l) => l.country))].map((id) => ({ id: id as never, name: COUNTRY_NAME[id as never] ?? id }))
-  const pkg = { format: PACKAGE_FORMAT, version: PACKAGE_VERSION, name: 'Mundo real (rascunho das planilhas)', startYear, credits, countries, leagues, clubs, players } as unknown as DataPackage
+  const pkg = { format: PACKAGE_FORMAT, version: PACKAGE_VERSION, name: 'Mundo real (rascunho das planilhas)', startYear, credits, countries, leagues, clubs, players, ...(academy.length > 0 ? { academy } : {}) } as unknown as DataPackage
   const { report } = validatePackage(pkg, { maxIssues: 100_000 })
   const byCode: Record<string, number> = {}
   for (const issue of report.errors) byCode[issue.code] = (byCode[issue.code] ?? 0) + 1

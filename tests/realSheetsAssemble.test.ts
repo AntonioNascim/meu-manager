@@ -62,7 +62,7 @@ describe('planilhas dos elencos reais', () => {
   it('a planilha de jogadores é aceita inteira pelo editor, com as datas ausentes estimadas e marcadas', () => {
     const withClubs = { ...pkg, clubs: clubs.rows.map((r) => r.value) } as DataPackage
     const parsed = parsePlayersCsv(sheets.playersCsv, withClubs)
-    expect(parsed.total).toBe(21)
+    expect(parsed.total).toBe(41)
     expect(parsed.issues).toEqual([])
     // Os atributos ficam em branco para o jogo gerar.
     const first = parsed.rows[0]?.value
@@ -71,7 +71,7 @@ describe('planilhas dos elencos reais', () => {
     expect(first?.club).toBe('wd-Q1')
     const estimated = parsed.rows.filter((r) => r.value.birthEstimated)
     expect(estimated.map((r) => r.value.name).sort()).toEqual(['Fulano Sem Link', 'Jogador Q100'])
-    expect(parsed.rows.filter((r) => !r.value.birthEstimated).every((r) => r.value.birthDate === '2000-05-17')).toBe(true)
+    expect(parsed.rows.filter((r) => !r.value.birthEstimated && !r.value.generated).every((r) => r.value.birthDate === '2000-05-17')).toBe(true)
   })
 
   it('a data estimada pelo ano é 1º de julho; a sem ano usa a média de idade do elenco', () => {
@@ -95,18 +95,19 @@ describe('planilhas dos elencos reais', () => {
     const kinds = sheets.issues.map((i) => i.kind)
     expect(kinds).toContain('club-count')
     expect(kinds).toContain('club-no-colors')
-    expect(kinds).toContain('squad-small')
+    expect(kinds).toContain('squad-generated')
+    expect(kinds).toContain('player-generated')
     expect(kinds).toContain('player-birth-imprecise')
     expect(kinds).toContain('player-no-birthdate')
     expect(kinds).toContain('player-no-wikidata')
     expect(kinds).toContain('player-position')
     expect(kinds).toContain('player-duplicate')
-    expect(sheets.stats).toMatchObject({ clubs: 2, expected: 20, players: 21, smallest: 0 })
+    expect(sheets.stats).toMatchObject({ clubs: 2, expected: 20, players: 41, smallest: 20 })
   })
 
   it('o relatório e a lista de revisão trazem os casos', () => {
     const report = buildReport([sheets], { date: '2026-10-20', articles: [], seasons: [], local: [], network: 3, cached: 1 })
-    expect(report).toContain('Elenco pequeno demais')
+    expect(report).toContain('completado por jogadores gerados')
     expect(report).toContain('Remo')
     const review = reviewCsv(sheets.issues)
     expect(review.split('\r\n').length).toBeGreaterThan(sheets.issues.length)
@@ -119,7 +120,7 @@ describe('planilhas dos elencos reais', () => {
     const b = assembleLeague(input(), state)
     expect(a.issues.some((i) => i.kind === 'player-duplicate')).toBe(true)
     // Segunda passada: todos os jogadores já existem e os clubes ganham siglas diferentes.
-    expect(b.stats.players).toBe(0)
+    expect(b.issues.filter((i) => i.kind === 'player-duplicate').length).toBeGreaterThan(0)
     const abbreviations = [...a.clubsCsv.split('\r\n'), ...b.clubsCsv.split('\r\n')].filter((l) => l.startsWith('wd-')).map((l) => l.split(';')[2])
     expect(new Set(abbreviations).size).toBe(abbreviations.length)
   })

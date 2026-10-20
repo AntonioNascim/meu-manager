@@ -92,6 +92,7 @@ function checkPlayer(c: Collector, p: unknown, path: string, clubIds: Set<string
   const birth = text(c, p, 'birthDate', path)
   if (birth !== undefined && !validDate(birth)) c.error('bad-date', `${path}.birthDate`, birth)
   if (p.birthEstimated !== undefined && typeof p.birthEstimated !== 'boolean') c.error('wrong-type', `${path}.birthEstimated`, 'birthEstimated')
+  if (p.generated !== undefined && typeof p.generated !== 'boolean') c.error('wrong-type', `${path}.generated`, 'generated')
   const nationality = text(c, p, 'nationality', path)
   if (nationality !== undefined && !(NATIONALITIES as readonly string[]).includes(nationality)) c.error('unknown-value', `${path}.nationality`, nationality)
   const position = text(c, p, 'position', path)
