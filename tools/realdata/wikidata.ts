@@ -34,6 +34,8 @@ export interface PlayerInfo {
   positions: string[]
   foot?: 'right' | 'left' | 'both'
   nickname?: string
+  /** Número de páginas do item em outras línguas: mede o quanto o jogador é conhecido. */
+  sitelinks?: number
 }
 
 export const qidOf = (uri: string): string => uri.slice(uri.lastIndexOf('/') + 1)
@@ -70,8 +72,9 @@ export function clubFilterQuery(qids: readonly string[]): string {
 }
 
 export function playersQuery(qids: readonly string[], languages: string): string {
-  return `SELECT ?p ?name ?birth ?prec ?natn ?posn ?footn ?nick WHERE {
+  return `SELECT ?p ?name ?sl ?birth ?prec ?natn ?posn ?footn ?nick WHERE {
   VALUES ?p { ${values(qids)} }
+  OPTIONAL { ?p wikibase:sitelinks ?sl }
   OPTIONAL { ?p p:P569/psv:P569 [ wikibase:timeValue ?birth ; wikibase:timePrecision ?prec ] }
   OPTIONAL { ?p wdt:P27 ?nat . ?nat rdfs:label ?natn . FILTER(LANG(?natn) = "en") }
   OPTIONAL { ?p wdt:P413 ?pos . ?pos rdfs:label ?posn . FILTER(LANG(?posn) = "en") }
@@ -147,6 +150,7 @@ export function aggregatePlayerRows(rows: readonly Row[]): Map<string, PlayerInf
     let player = players.get(qid)
     if (!player) players.set(qid, (player = { qid, nationalities: [], positions: [] }))
     if (row.name && !/^Q\d+$/.test(row.name)) player.name = row.name
+    if (row.sl && player.sitelinks === undefined) player.sitelinks = Number(row.sl)
     if (row.birth && !player.birthDate) {
       const match = /^(-?\d{4,})-(\d{2})-(\d{2})T/.exec(row.birth)
       if (match) {

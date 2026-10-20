@@ -236,6 +236,15 @@ describe('montagem com os ajustes automáticos', () => {
   })
 })
 
+describe('tarefas de posição', () => {
+  it('só os 8 jogadores mais conhecidos de cada clube entram na lista de tarefas', () => {
+    const issues: Issue[] = Array.from({ length: 20 }, (_, i) => ({ league: 'br-1', kind: 'player-position', club: 'Clube', player: `J${i}`, id: `wd-Q${i}`, detail: 'x', field: 'posição', current: 'CB', fame: i }))
+    const rows = taskRows(issues)
+    expect(rows).toHaveLength(8)
+    expect(new Set(rows.map((r) => r[2]))).toEqual(new Set(['J19', 'J18', 'J17', 'J16', 'J15', 'J14', 'J13', 'J12']))
+  })
+})
+
 describe('jogador gerado no CSV e no pacote', () => {
   const pkg = {
     format: 'meu-manager-package',

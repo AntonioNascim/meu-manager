@@ -48,6 +48,8 @@ export interface Issue {
   /** Campo a corrigir à mão (estádio, cidade, cores, posição...) e o valor provisório que ficou na planilha. */
   field?: string
   current?: string
+  /** Quanto o jogador é conhecido (páginas do Wikidata em outras línguas): ordena as tarefas de posição. */
+  fame?: number
 }
 
 export interface ClubSource {
@@ -124,6 +126,7 @@ interface Draft {
   guess: PositionGuess
   /** Tem artigo na Wikipedia (jogador mais conhecido). */
   article: boolean
+  fame: number
   foot?: Foot
   player: string
   id: string
@@ -305,7 +308,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         club: id,
         clubName: name,
       }
-      drafts.push({ row, club: id, clubQid: info.qid, clubName: name, player: label, id: pid, guess, known: wd?.birthDate, ...(wd?.birthYear !== undefined ? { year: wd.birthYear } : {}), article: articleQid !== undefined, ...(foot ? { foot } : {}) })
+      drafts.push({ row, club: id, clubQid: info.qid, clubName: name, player: label, id: pid, guess, known: wd?.birthDate, ...(wd?.birthYear !== undefined ? { year: wd.birthYear } : {}), article: articleQid !== undefined, fame: wd?.sitelinks ?? 0, ...(foot ? { foot } : {}) })
     }
   }
 
@@ -369,7 +372,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
       // Só os jogadores com artigo na Wikipedia (os mais conhecidos) ficam marcados para revisão.
       if (d.article) {
         reviewPositions++
-        issue('player-position', `${d.guess.review.join('; ')} → ${position} (distribuída pela necessidade do elenco)`, { club: name, player: d.player, id: d.id, field: 'posição', current: position })
+        issue('player-position', `${d.guess.review.join('; ')} → ${position} (distribuída pela necessidade do elenco)`, { club: name, player: d.player, id: d.id, field: 'posição', current: position, fame: d.fame })
       }
     })
 
