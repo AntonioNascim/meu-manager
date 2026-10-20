@@ -129,6 +129,8 @@ if (process.argv[1]?.includes('continentalRun')) {
     const byContinent = new Map<string, number>()
     for (const e of list) byContinent.set(e.winnerContinent, (byContinent.get(e.winnerContinent) ?? 0) + 1)
     console.log(`${cup}: por continente ${[...byContinent].map(([k, v]) => `${k} ${v}`).join(', ')}`)
+    const top = Math.max(...titles.values())
+    if (cup === 'cont-eu-1' && top / list.length > 0.3) { console.log(`ALERTA ${cup}: um clube ganhou ${top} de ${list.length} edições (${(100 * top / list.length).toFixed(0)}%), acima de 30%`); process.exitCode = 1 }
     console.log(`${cup}: ${list.length} edições, ${titles.size} campeões diferentes, máximo ${Math.max(...titles.values())} títulos, seguidos: ${list.reduce((best, e, i) => (i > 0 && list[i - 1]!.winnerId === e.winnerId ? best + 1 : best), 0)} repetições em sequência; por país: ${[...byCountry].map(([k, v]) => `${k} ${v}`).join(', ')}`)
   }
   const shares = run.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))

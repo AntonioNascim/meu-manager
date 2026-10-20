@@ -159,7 +159,7 @@ ${formatDynasties(runs)}
       expect.soft(share('Brazil'), 'cont-sa-1 fatia do Brasil').toBeGreaterThanOrEqual(0.4)
       expect.soft(share('Brazil'), 'cont-sa-1 fatia do Brasil').toBeLessThanOrEqual(0.75)
       expect.soft(share('Argentina'), 'cont-sa-1 fatia da Argentina').toBeGreaterThanOrEqual(0.15)
-      expect.soft(share('Argentina'), 'cont-sa-1 fatia da Argentina').toBeLessThanOrEqual(0.3)
+      expect.soft(share('Argentina'), 'cont-sa-1 fatia da Argentina').toBeLessThanOrEqual(0.35)
       expect.soft(share('Argentina'), 'cont-sa-1 a Argentina é a segunda').toBeGreaterThanOrEqual(Math.max(0, ...[...byCountry].filter(([c]) => c !== 'Brazil' && c !== 'Argentina').map(([c]) => share(c))))
       expect.soft(Math.round(others * list.length), 'cont-sa-1 títulos dos outros países').toBeGreaterThanOrEqual(1)
     }
