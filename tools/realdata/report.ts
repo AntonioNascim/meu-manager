@@ -9,12 +9,16 @@ export interface RunInfo {
   articles: { title: string; url: string }[]
   /** Temporada achada para cada liga (e se foi a anterior). */
   seasons: { league: string; title: string; previous: boolean }[]
+  /** Uso da Wikipedia no idioma do país, por liga. */
+  local: { league: string; clubs: number; added: number; enriched: number }[]
+  /** Validação do rascunho do pacote (ligas, clubes e jogadores juntos). */
+  validation?: { errors: number; warnings: number; byCode: Record<string, number>; rejected: number }
   network: number
   cached: number
 }
 
 const KIND_TEXT: Record<IssueKind, string> = {
-  'club-count': 'Número de clubes diferente do jogo',
+  'club-count': 'Número de clubes diferente do número real da liga',
   'club-missing-season': 'Temporada da liga não encontrada',
   'squad-missing': 'Clube sem elenco na Wikipedia',
   'squad-small': 'Elenco pequeno demais (menos de 18)',
@@ -24,8 +28,8 @@ const KIND_TEXT: Record<IssueKind, string> = {
   'club-no-capacity': 'Estádio sem capacidade',
   'club-bad-capacity': 'Capacidade fora do que o jogo aceita',
   'club-no-city': 'Clube sem cidade',
-  'player-no-birthdate': 'Jogador sem data de nascimento',
-  'player-birth-imprecise': 'Data de nascimento imprecisa (só o ano)',
+  'player-no-birthdate': 'Data de nascimento estimada pela média de idade do elenco (sem data em nenhuma fonte)',
+  'player-birth-imprecise': 'Data de nascimento estimada pelo ano (a fonte só tem o ano)',
   'player-position': 'Posição incerta (escolhida a mais provável)',
   'player-nationality': 'Nacionalidade incerta',
   'player-no-wikidata': 'Jogador sem artigo na Wikipedia (só nome, país e setor)',
@@ -51,13 +55,21 @@ export function buildReport(sheets: readonly LeagueSheets[], run: RunInfo): stri
   lines.push('Fontes: clubes e jogadores do **Wikidata** (domínio público); lista dos clubes da temporada e elencos atuais da **Wikipedia** (CC BY-SA 4.0; créditos em `creditos.txt`). Atributos em branco: o jogo gera.', '')
   lines.push('A **reputação** dos clubes é provisória: ordem da fama do clube (número de páginas do Wikidata) sobre a escada de reputação da liga no mundo fictício. Revise antes de usar.', '')
 
-  lines.push('## Resumo por liga', '', '| Liga | Clubes | No jogo | Jogadores | Menor elenco | Maior elenco | Sem nascimento | Posições a revisar | Avisos |', '|---|---:|---:|---:|---:|---:|---:|---:|---:|')
+  lines.push('## Resumo por liga', '', '| Liga | Clubes | Número real | Jogadores | Menor elenco | Maior elenco | Datas estimadas | Posições a revisar | Wikipedia local (clubes / jogadores acrescentados) | Avisos |', '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|')
   for (const s of sheets) {
     const season = run.seasons.find((x) => x.league === s.leagueId)
+    const local = run.local.find((x) => x.league === s.leagueId)
     const note = season ? (season.previous ? ` (temporada anterior: ${season.title})` : '') : ''
-    lines.push(`| ${s.leagueId}${note} | ${s.stats.clubs} | ${s.stats.expected} | ${s.stats.players} | ${s.stats.smallest} | ${s.stats.largest} | ${s.stats.noBirthdate} | ${s.stats.reviewPositions} | ${s.issues.length} |`)
+    lines.push(`| ${s.leagueId}${note} | ${s.stats.clubs} | ${s.stats.expected} | ${s.stats.players} | ${s.stats.smallest} | ${s.stats.largest} | ${s.stats.estimated} | ${s.stats.reviewPositions} | ${local ? `${local.clubs} / ${local.added}` : '—'} | ${s.issues.length} |`)
   }
   lines.push('', `Total: ${sheets.reduce((n, s) => n + s.stats.clubs, 0)} clubes e ${sheets.reduce((n, s) => n + s.stats.players, 0)} jogadores.`, '')
+
+  if (run.validation) {
+    const v = run.validation
+    lines.push('## Validação do rascunho do pacote (`pacote-real.json`)', '', `${v.errors} erros e ${v.warnings} avisos na mesma validação da importação do jogo; ${v.rejected} linhas das planilhas recusadas pelo leitor de CSV.`, '')
+    for (const [code, n] of Object.entries(v.byCode).sort((a, b) => b[1] - a[1])) lines.push(`- ${code}: ${n}`)
+    lines.push('')
+  }
 
   lines.push('## O que ficou faltando ou duvidoso', '', 'A lista completa, uma linha por caso, está em `revisao.csv`.', '')
   for (const kind of ORDER) {

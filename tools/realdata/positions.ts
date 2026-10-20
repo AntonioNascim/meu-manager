@@ -64,7 +64,7 @@ export function genericPosition(text: string, foot?: Foot): Position | undefined
  * Junta as posições do Wikidata e a sigla da Wikipedia. A sigla da Wikipedia (mantida pela comunidade do clube, sempre atual) manda no
  * setor; o Wikidata só vale quando cai no mesmo setor.
  */
-export function guessPositions(wikidata: readonly string[], coarse: Coarse | undefined, foot?: Foot): PositionGuess {
+export function guessPositions(wikidata: readonly string[], coarse: Coarse | undefined, foot?: Foot, local?: Position): PositionGuess {
   const specific: Position[] = []
   const generic: Position[] = []
   for (const text of wikidata) {
@@ -83,6 +83,7 @@ export function guessPositions(wikidata: readonly string[], coarse: Coarse | und
   if (specific.length > 0 && matching.length === 0 && coarse) review.push(`posição do Wikidata (${specific.join('/')}) diverge da tabela do clube (${coarse})`)
   let primary: Position
   if (matching.length > 0) primary = matching[0] as Position
+  else if (local && inSector(local)) primary = local
   else if (specific.length > 0 && !coarse) primary = specific[0] as Position
   else {
     const generics = generic.filter(inSector)
@@ -94,7 +95,7 @@ export function guessPositions(wikidata: readonly string[], coarse: Coarse | und
     } else if (generic.length > 0) (primary = generic[0] as Position), review.push(`fonte só diz a posição genérica; escolhida ${primary}`)
     else (primary = 'CM'), review.push('sem posição na fonte; escolhida CM')
   }
-  const secondary = [...matching, ...generic.filter(inSector)].filter((p, i, all) => p !== primary && all.indexOf(p) === i && (primary === 'GK') === (p === 'GK')).slice(0, 2)
+  const secondary = [...matching, ...(local ? [local] : []), ...generic.filter(inSector)].filter((p, i, all) => p !== primary && all.indexOf(p) === i && (primary === 'GK') === (p === 'GK')).slice(0, 2)
   return { primary, secondary, review }
 }
 

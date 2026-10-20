@@ -60,6 +60,8 @@ export interface LeagueInput {
   players: Map<string, PlayerInfo>
   /** Artigo → item do Wikidata, dos jogadores da tabela. */
   articleToQid: Map<string, string>
+  /** Data de referência das idades (padrão: hoje). */
+  today?: Date
   /** Avisos da busca dos clubes (temporada não achada, contagem...). */
   notes?: Issue[]
 }
@@ -70,7 +72,7 @@ export interface SheetStats {
   players: number
   smallest: number
   largest: number
-  noBirthdate: number
+  estimated: number
   reviewPositions: number
 }
 
@@ -86,6 +88,32 @@ export interface LeagueSheets {
 export interface AssembleState {
   abbreviations: Set<string>
   playerIds: Set<string>
+}
+
+interface Draft {
+  row: Record<string, string | number | undefined>
+  club: string
+  clubName: string
+  player: string
+  id: string
+  /** Data completa vinda das fontes. */
+  known?: string
+  /** Só o ano de nascimento. */
+  year?: number
+}
+
+/** Chave do artigo do jogador no mapa artigo → item do Wikidata (os da Wikipedia local levam a língua na frente). */
+export const articleKey = (entry: { title?: string; lang?: string }): string => (entry.lang && entry.lang !== 'en' ? `${entry.lang}:${entry.title ?? ''}` : (entry.title ?? ''))
+
+function hashOf(text: string): number {
+  let h = 2166136261
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+/** Idade em anos (decimal) de quem nasceu em `birth` (AAAA-MM-DD) na data `on`. */
+function ageOn(birth: string, on: Date): number {
+  return (on.getTime() - new Date(`${birth}T12:00:00Z`).getTime()) / (365.25 * 24 * 3600 * 1000)
 }
 
 export const newAssembleState = (): AssembleState => ({ abbreviations: new Set(), playerIds: new Set() })
@@ -160,13 +188,13 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
 
   const ranked = [...input.clubs].sort((a, b) => b.info.sitelinks - a.info.sitelinks || a.info.name.localeCompare(b.info.name))
   const rankOf = new Map(ranked.map((c, i) => [c.info.qid, i]))
-  if (input.clubs.length !== league.expected) issue('club-count', `${input.clubs.length} clubes encontrados; a liga tem ${league.expected} no jogo`)
+  if (input.clubs.length !== league.expected) issue('club-count', `${input.clubs.length} clubes encontrados; o número real da liga é ${league.expected}`)
 
   const clubRows: (string | number | undefined)[][] = []
-  const playerRows: (string | number | undefined)[][] = []
+  const drafts: Draft[] = []
   let smallest = Infinity
   let largest = 0
-  let noBirthdate = 0
+  let estimated = 0
   let reviewPositions = 0
   let players = 0
 
@@ -196,7 +224,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
     }
     let kept = 0
     for (const entry of squad.entries) {
-      const articleQid = entry.title ? input.articleToQid.get(entry.title) : undefined
+      const articleQid = entry.title ? input.articleToQid.get(articleKey(entry)) : undefined
       const wd = articleQid ? input.players.get(articleQid) : undefined
       const pid = playerId(articleQid, info.qid, entry.display)
       const label = wd?.name ?? entry.display
@@ -209,7 +237,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
       if (!articleQid) issue('player-no-wikidata', 'sem artigo na Wikipedia; só nome, país e setor da tabela do clube', { club: name, player: label, id: pid })
 
       const foot = wd?.foot ? FOOT[wd.foot] : undefined
-      const guess = guessPositions(wd?.positions ?? [], parseCoarse(entry.pos), foot)
+      const guess = guessPositions(wd?.positions ?? [], parseCoarse(entry.pos), foot, entry.localPosition)
       if (guess.review.length > 0) {
         reviewPositions++
         issue('player-position', `${guess.review.join('; ')} → ${guess.primary}`, { club: name, player: label, id: pid })
@@ -229,10 +257,6 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         issue('player-nationality', `país não encontrado (${entry.nat ?? wd?.nationalities.join('/') ?? 'sem dado'}); usado o da liga`, { club: name, player: label, id: pid })
       }
 
-      if (!wd?.birthDate) {
-        noBirthdate++
-        issue(wd?.birthYear ? 'player-birth-imprecise' : 'player-no-birthdate', wd?.birthYear ? `só o ano de nascimento (${wd.birthYear}); data em branco` : 'sem data de nascimento; data em branco', { club: name, player: label, id: pid })
-      }
 
       const nickname = wd?.name && entry.display.length < wd.name.length && !same(entry.display, wd.name) ? entry.display : wd?.nickname
       const row: Record<string, string | number | undefined> = {
@@ -247,7 +271,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         club: id,
         clubName: name,
       }
-      playerRows.push(PLAYER_COLUMNS.map((column) => row[column]))
+      drafts.push({ row, club: id, clubName: name, player: label, id: pid, ...(wd?.birthDate ? { known: wd.birthDate } : {}), ...(wd?.birthYear !== undefined ? { year: wd.birthYear } : {}) })
     }
     players += kept
     smallest = Math.min(smallest, kept)
@@ -256,11 +280,43 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
     if (kept > 30) issue('squad-large', `${kept} jogadores (o pacote aceita no máximo 30)`, { club: name, id })
   }
 
+  // Datas ausentes em todas as fontes: estimadas pela idade aproximada (só o ano) ou pela média de idade do elenco, e marcadas como estimadas.
+  const today = input.today ?? new Date()
+  const ages = new Map<string, number[]>()
+  const leagueAges: number[] = []
+  for (const d of drafts) {
+    if (!d.known) continue
+    const age = ageOn(d.known, today)
+    ;(ages.get(d.club) ?? ages.set(d.club, []).get(d.club) ?? []).push(age)
+    leagueAges.push(age)
+  }
+  const mean = (list: readonly number[]): number | undefined => (list.length >= 5 ? list.reduce((a, b) => a + b, 0) / list.length : undefined)
+  const leagueMean = mean(leagueAges) ?? 26
+  for (const d of drafts) {
+    if (d.known) continue
+    estimated++
+    const hash = hashOf(d.id)
+    let date: string
+    if (d.year !== undefined) {
+      date = `${d.year}-07-01`
+      issue('player-birth-imprecise', `só o ano de nascimento (${d.year}); data estimada em ${date}`, { club: d.clubName, player: d.player, id: d.id })
+    } else {
+      const base = mean(ages.get(d.club) ?? []) ?? leagueMean
+      const age = Math.max(17, Math.round(base) + (hash % 7) - 3)
+      const year = today.getFullYear() - age
+      date = `${year}-${String(1 + ((hash >>> 3) % 12)).padStart(2, '0')}-${String(1 + ((hash >>> 7) % 28)).padStart(2, '0')}`
+      issue('player-no-birthdate', `sem data em nenhuma fonte; estimada pela média de idade do elenco (${base.toFixed(1)} anos): ${date}`, { club: d.clubName, player: d.player, id: d.id })
+    }
+    d.row.birthDate = date
+    d.row.birthEstimated = 'sim'
+  }
+  const playerRows = drafts.map((d) => PLAYER_COLUMNS.map((column) => d.row[column]))
+
   return {
     leagueId: league.id,
     clubsCsv: toCsv(CLUB_COLUMNS, clubRows),
     playersCsv: toCsv(PLAYER_COLUMNS, playerRows),
     issues,
-    stats: { clubs: input.clubs.length, expected: league.expected, players, smallest: Number.isFinite(smallest) ? smallest : 0, largest, noBirthdate, reviewPositions },
+    stats: { clubs: input.clubs.length, expected: league.expected, players, smallest: Number.isFinite(smallest) ? smallest : 0, largest, estimated, reviewPositions },
   }
 }

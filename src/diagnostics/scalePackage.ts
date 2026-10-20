@@ -14,11 +14,11 @@ import { COUNTRY_OF_PYRAMID, FULL_WORLD, buildScaleWorld } from './scaleWorld'
 
 /** País de cada liga do mundo de teste (a pirâmide é o prefixo do id). */
 const COUNTRY_OF = COUNTRY_OF_PYRAMID
-const COUNTRY_NAME: Partial<Record<Nationality, string>> = { Brazil: 'Brasil', Argentina: 'Argentina', Uruguay: 'Uruguai', Paraguay: 'Paraguai', Chile: 'Chile', Colombia: 'Colômbia', Peru: 'Peru', Ecuador: 'Equador', England: 'Inglaterra', Spain: 'Espanha', Italy: 'Itália', Germany: 'Alemanha', France: 'França', Portugal: 'Portugal', Netherlands: 'Países Baixos', Mexico: 'México', 'United States': 'Estados Unidos', Egypt: 'Egito', Japan: 'Japão', Australia: 'Austrália' }
+export const COUNTRY_NAME: Partial<Record<Nationality, string>> = { Brazil: 'Brasil', Argentina: 'Argentina', Uruguay: 'Uruguai', Paraguay: 'Paraguai', Chile: 'Chile', Colombia: 'Colômbia', Peru: 'Peru', Ecuador: 'Equador', England: 'Inglaterra', Spain: 'Espanha', Italy: 'Itália', Germany: 'Alemanha', France: 'França', Portugal: 'Portugal', Netherlands: 'Países Baixos', Mexico: 'México', 'United States': 'Estados Unidos', Egypt: 'Egito', Japan: 'Japão', Australia: 'Austrália' }
 const SPANISH_SPEAKING: readonly Nationality[] = ['Argentina', 'Uruguay', 'Paraguay', 'Chile', 'Colombia', 'Peru', 'Ecuador', 'Spain', 'Mexico']
 
 /** Limites de estrangeiros do exemplo (para testar a regra; os demais países não têm limite). */
-const FOREIGN_LIMITS: Record<string, PackageLeague['foreignLimit']> = { 'ar-1': { squad: 6 }, 'it-1': { lineup: 8 }, 'en-1': { squad: 17 }, 'es-1': { lineup: 9 } }
+export const FOREIGN_LIMITS: Record<string, PackageLeague['foreignLimit']> = { 'ar-1': { squad: 6 }, 'it-1': { lineup: 8 }, 'en-1': { squad: 17 }, 'es-1': { lineup: 9 } }
 
 const PLACE_START = ['Vila', 'Monte', 'Porto', 'Santa', 'Nova', 'Campo', 'Rio', 'Lago', 'Serra', 'Bela', 'Alto', 'Forte', 'Pedra', 'Ponte']
 const PLACE_END = ['verde', 'mar', 'real', 'norte', 'sul', 'claro', 'alvo', 'novo', 'branco', 'velho', 'bravo', 'fundo']

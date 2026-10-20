@@ -1,3 +1,5 @@
+import type { Position } from '../../src/engine/types'
+
 /** Leitura do texto wiki da Wikipedia: tabelas de elenco dos clubes e lista de clubes da temporada de uma liga. Funções puras. */
 
 export interface WikiLink {
@@ -19,6 +21,10 @@ export interface SquadEntry {
   pos?: string
   /** Observação da tabela (capitão, emprestado...). */
   note?: string
+  /** Língua da Wikipedia de onde o jogador veio (ausente = inglês). */
+  lang?: string
+  /** Posição exata que a tabela da Wikipedia local traz (zagueiro, volante, ponta...). */
+  localPosition?: Position
 }
 
 const LINK = /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g
@@ -200,12 +206,18 @@ function linksOfSections(sections: { title: string; body: string }[]): WikiLink[
 }
 
 /**
- * Links da lista de clubes de uma página da temporada (só linhas de tabela e de lista das seções de clubes). A tabela de estádios e
- * cidades tem uma linha por participante; a seção "Teams" costuma trazer também os rebaixados da temporada anterior, por isso a de
- * estádios vale mais quando existe.
+ * Links da lista de clubes de uma página da temporada (só linhas de tabela e de lista das seções de clubes), em dois grupos: a tabela
+ * de estádios e cidades (`primary`, uma linha por participante) e as demais seções de clubes (`secondary`, que costumam trazer
+ * também os rebaixados da temporada anterior; só entram quando a primeira não basta).
  */
-export function parseSeasonLinks(wikitext: string): WikiLink[] {
+export function parseSeasonLinkGroups(wikitext: string): { primary: WikiLink[]; secondary: WikiLink[] } {
   const sections = sectionsOf(wikitext).filter((s) => TEAMS_SECTION.test(s.title))
-  const venues = linksOfSections(sections.filter((s) => VENUE_SECTION.test(s.title)))
-  return venues.length >= 8 ? venues : linksOfSections(sections)
+  const primary = linksOfSections(sections.filter((s) => VENUE_SECTION.test(s.title)))
+  const secondary = linksOfSections(sections.filter((s) => !VENUE_SECTION.test(s.title))).filter((l) => !primary.some((p) => p.title === l.title))
+  return { primary, secondary }
+}
+
+export function parseSeasonLinks(wikitext: string): WikiLink[] {
+  const { primary, secondary } = parseSeasonLinkGroups(wikitext)
+  return primary.length >= 8 ? primary : [...primary, ...secondary]
 }

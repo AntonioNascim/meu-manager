@@ -8,7 +8,7 @@ import { GOALKEEPER_ATTRIBUTES, MENTAL_ATTRIBUTES, NATIONALITIES, PHYSICAL_ATTRI
 import type { AttributeName, Foot, Nationality, Position } from '../../../engine/types'
 import { ATTRIBUTE_LABELS, FOOT_LABELS, NATIONALITY_LABELS, POSITION_LABELS, POSITION_SHORT_LABELS } from '../../labels'
 import { Flag } from '../../theme/PlayerBits'
-import { DateField, NumberField, SelectField, Section, SmallButton, TextField, inputClass } from './fields'
+import { CheckField, DateField, NumberField, SelectField, Section, SmallButton, TextField, inputClass } from './fields'
 import { EntityIssues, IssueDot, ListRow, MasterDetail } from './parts'
 import type { TabProps } from './parts'
 
@@ -122,7 +122,7 @@ export function PlayersTab(props: TabProps) {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold">{p.nickname ? `${p.nickname} (${p.name})` : p.name}</span>
                 <span className="text-xs text-muted">
-                  {POSITION_SHORT_LABELS[p.position]} · {ageOn(p.birthDate, `${startYear}-01-01`)} anos · {club?.abbreviation ?? 'Livre'}
+                  {POSITION_SHORT_LABELS[p.position]} · {ageOn(p.birthDate, `${startYear}-01-01`)} anos{p.birthEstimated ? ' (estimada)' : ''} · {club?.abbreviation ?? 'Livre'}
                 </span>
               </span>
               <span className="title w-9 text-right text-xl">{Math.round(playerStrength(pkg, p))}</span>
@@ -178,7 +178,8 @@ export function PlayersTab(props: TabProps) {
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField label="Nome completo" value={player.name} onChange={(name) => patch({ name }, 'name')} />
             <TextField label="Apelido" value={player.nickname} onChange={(nickname) => patch({ nickname }, 'nickname')} />
-            <DateField label="Nascimento" value={player.birthDate} onChange={(d) => d && patch({ birthDate: d }, 'birth')} hint={`${ageOn(player.birthDate || `${startYear}-01-01`, `${startYear}-01-01`)} anos em 1º de janeiro de ${startYear}`} />
+            <DateField label="Nascimento" value={player.birthDate} onChange={(d) => d && patch({ birthDate: d, birthEstimated: undefined }, 'birth')} hint={`${ageOn(player.birthDate || `${startYear}-01-01`, `${startYear}-01-01`)} anos em 1º de janeiro de ${startYear}${player.birthEstimated ? ' · data estimada, a conferir' : ''}`} />
+            {player.birthEstimated && <CheckField label="Data de nascimento estimada" checked onChange={(v) => !v && patch({ birthEstimated: undefined }, 'birth-estimated')} hint="Desmarque quando conferir a data. Mudar a data também tira a marca." />}
             <SelectField<Nationality> label="Nacionalidade" value={player.nationality} options={NATIONALITY_OPTIONS} onChange={(n) => n && patch({ nationality: n }, 'nat')} />
             <SelectField<Position> label="Posição principal" value={player.position} options={POSITION_OPTIONS} onChange={(v) => v && patch({ position: v }, 'position')} />
             <SelectField<Foot> label="Pé" value={player.foot} empty="Automático" options={(['right', 'left', 'both'] as const).map((f) => ({ id: f, label: FOOT_LABELS[f] }))} onChange={(foot) => patch({ foot }, 'foot')} />
