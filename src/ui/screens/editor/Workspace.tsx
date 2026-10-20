@@ -93,23 +93,29 @@ export function Workspace({ initial, id: initialId, onClose, onPlay, initialTab 
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-[96rem] flex-col bg-bg px-3 pb-10 text-slate-100 sm:px-5" data-testid="editor">
-      <header className="sticky top-0 z-20 -mx-3 space-y-2 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur sm:-mx-5 sm:px-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="min-h-10 rounded-lg px-3 text-xs font-bold uppercase tracking-wider text-muted hover:bg-surface" onClick={() => void leave()}>
+      <header className="-mx-3 space-y-2 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur sm:sticky sm:top-0 sm:z-20 sm:-mx-5 sm:px-5">
+        <div className="flex items-center gap-2">
+          <button type="button" className="min-h-10 shrink-0 rounded-lg px-3 text-xs font-bold uppercase tracking-wider text-muted hover:bg-surface" onClick={() => void leave()}>
             ← Sair
           </button>
-          <div className="min-w-0 flex-1">
-            <div className="title truncate text-xl">{pkg.name}</div>
-            <div className="text-xs text-muted">
-              {pkg.clubs.length} clubes · {pkg.players.length} jogadores · {pkg.leagues.length} ligas
-              <span className="ml-2">{status === 'saving' ? '· salvando…' : status === 'saved' ? '· salvo neste navegador' : status === 'error' ? <span className="text-loss">· não salvou</span> : '· alterações não salvas'}</span>
-            </div>
+          <div className="title min-w-0 flex-1 truncate text-xl" title={pkg.name}>
+            {pkg.name}
           </div>
+        </div>
+        <div className="text-xs text-muted">
+          {pkg.clubs.length} clubes · {pkg.players.length} jogadores · {pkg.leagues.length} ligas
+          <span className="ml-2">{status === 'saving' ? '· salvando…' : status === 'saved' ? '· salvo neste navegador' : status === 'error' ? <span className="text-loss">· não salvou</span> : '· alterações não salvas'}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <SmallButton disabled={!editor.canUndo} onClick={editor.undo} title="Desfazer (Ctrl+Z)">
-            ↶ Desfazer
+            <span aria-hidden>↶</span>
+            <span className="hidden sm:inline"> Desfazer</span>
+            <span className="sr-only sm:hidden">Desfazer</span>
           </SmallButton>
           <SmallButton disabled={!editor.canRedo} onClick={editor.redo} title="Refazer (Ctrl+Y)">
-            ↷ Refazer
+            <span aria-hidden>↷</span>
+            <span className="hidden sm:inline"> Refazer</span>
+            <span className="sr-only sm:hidden">Refazer</span>
           </SmallButton>
           <button type="button" onClick={() => setTab('issues')} className={`min-h-10 rounded-lg px-3 text-sm font-bold ring-1 ${validation.pending ? 'text-muted ring-line' : valid ? 'bg-win/10 text-win ring-win/40' : 'bg-loss/10 text-loss ring-loss/40'}`}>
             {validation.pending ? 'Conferindo…' : valid ? '✓ Válido' : `${errorCount} erro(s)`}
@@ -119,10 +125,11 @@ export function Workspace({ initial, id: initialId, onClose, onPlay, initialTab 
               downloadText(`${slug(pkg.name)}.json`, JSON.stringify(pkg))
             }}
           >
-            Exportar .json
+            Exportar
           </SmallButton>
           <Button className="!min-h-10 !px-4 text-sm" disabled={!valid} onClick={() => void play()}>
-            Novo jogo com este pacote
+            <span className="sm:hidden">Novo jogo</span>
+            <span className="hidden sm:inline">Novo jogo com este pacote</span>
           </Button>
         </div>
         <TopTabs

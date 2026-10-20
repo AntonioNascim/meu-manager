@@ -19,7 +19,6 @@ import type { MarketTab } from './screens/Market'
 import { Finance } from './screens/Finance'
 import { Dashboard } from './screens/Dashboard'
 import { MatchScreen } from './screens/Match'
-import { PwaBanner } from './components/PwaBanner'
 import { Start } from './screens/Start'
 import { Squad } from './screens/Squad'
 import type { SquadTab } from './screens/Squad'
@@ -63,10 +62,7 @@ export function App() {
   }
   if (!game) {
     return (
-      <>
-        <PwaBanner />
-        <Start />
-      </>
+      <Start />
     )
   }
 

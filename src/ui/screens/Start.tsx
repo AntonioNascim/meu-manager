@@ -5,6 +5,7 @@ import { markSaved } from '../../store/autosave'
 import { openGame } from '../../store/gameStore'
 import { exportSlot, importSave, parseSaveFile } from '../../store/saveFile'
 import { deleteSlot, latestSlot, listSlots, loadSlot } from '../../store/saves'
+import { PwaBanner } from '../components/PwaBanner'
 import { SlotInfo } from '../components/SlotInfo'
 import { SlotPicker } from '../components/SlotPicker'
 import { Button, Card } from '../components/ui'
@@ -106,7 +107,9 @@ export function Start() {
   if (view === 'package') return <ImportPackage onBack={() => setView('menu')} onUse={(chosen) => { setDataPackage(chosen); setView('new') }} />
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-bg px-4 py-8 text-slate-100">
+    <>
+      <PwaBanner />
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-bg px-4 py-8 text-slate-100">
       <div className="flex flex-col items-center gap-3 pb-3 text-center">
         <img src="icons/icon-192.png" alt="" width={72} height={72} className="rounded-2xl" />
         <h1 className="title text-6xl">Meu Manager</h1>
@@ -183,6 +186,7 @@ export function Start() {
       {message && <p className="text-center text-sm text-win">{message}</p>}
       {error && <p className="text-center text-sm text-loss">{error}</p>}
       {imported !== null && <SlotPicker title="Em qual espaço guardar o save importado?" slots={slots} onCancel={() => setImported(null)} onPick={(slot) => void finishImport(slot)} />}
-    </div>
+      </div>
+    </>
   )
 }

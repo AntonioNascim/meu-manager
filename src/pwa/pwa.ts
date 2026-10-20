@@ -47,6 +47,9 @@ export function initPwa(): void {
   const standalone = isStandalone()
   update({ standalone, iosHint: !standalone && isIosSafari() })
 
+  // Em desenvolvimento, &instalar=1 simula o pedido de instalação do navegador (para ver a faixa).
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('instalar')) update({ canInstall: true })
+
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault()
     deferredPrompt = event as BeforeInstallPromptEvent
