@@ -38,6 +38,7 @@ const KIND_TEXT: Record<IssueKind, string> = {
   'player-nationality': 'Nacionalidade incerta',
   'player-no-wikidata': 'Jogador sem artigo na Wikipedia (só nome, país e setor)',
   'player-duplicate': 'Jogador em dois elencos (mantido o primeiro)',
+  'player-not-person': 'Linha do elenco que não é um jogador (patrocinador ou cidade); descartada',
 }
 
 const ORDER = Object.keys(KIND_TEXT) as IssueKind[]
@@ -132,10 +133,10 @@ export const POSITION_TASKS_PER_CLUB = 8
 export function taskRows(issues: readonly Issue[]): (string | undefined)[][] {
   const famous = new Set<Issue>()
   const byClub = new Map<string, Issue[]>()
-  for (const i of issues) if (i.kind === 'player-position') (byClub.get(i.club ?? '') ?? byClub.set(i.club ?? '', []).get(i.club ?? '') ?? []).push(i)
+  for (const i of issues) if (i.kind === 'player-position' && !i.resolved) (byClub.get(i.club ?? '') ?? byClub.set(i.club ?? '', []).get(i.club ?? '') ?? []).push(i)
   for (const list of byClub.values()) for (const i of [...list].sort((a, b) => (b.fame ?? 0) - (a.fame ?? 0) || (a.player ?? '').localeCompare(b.player ?? '')).slice(0, POSITION_TASKS_PER_CLUB)) famous.add(i)
   return issues
-    .filter((i) => TASK_KINDS[i.kind] && (i.kind !== 'player-position' || famous.has(i)) && !(i.kind === 'squad-missing' && issues.some((x) => x.kind === 'squad-generated' && x.id === i.id)))
+    .filter((i) => !i.resolved && TASK_KINDS[i.kind] && (i.kind !== 'player-position' || famous.has(i)) && !(i.kind === 'squad-missing' && issues.some((x) => x.kind === 'squad-generated' && x.id === i.id)))
     .sort((a, b) => (TASK_KINDS[a.kind]?.type ?? '').localeCompare(TASK_KINDS[b.kind]?.type ?? '') || (a.club ?? '').localeCompare(b.club ?? '') || (a.player ?? '').localeCompare(b.player ?? ''))
     .map((i) => [TASK_KINDS[i.kind]?.type, i.club, i.player, i.id, i.field ?? '', i.detail, i.current, '', TASK_KINDS[i.kind]?.where, ''])
 }

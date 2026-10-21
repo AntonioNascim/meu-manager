@@ -32,6 +32,7 @@ export type IssueKind =
   | 'player-nationality'
   | 'player-no-wikidata'
   | 'player-duplicate'
+  | 'player-not-person'
   | 'player-to-academy'
   | 'player-freed'
   | 'player-generated'
@@ -50,6 +51,8 @@ export interface Issue {
   current?: string
   /** Quanto o jogador é conhecido (páginas do Wikidata em outras línguas): ordena as tarefas de posição. */
   fame?: number
+  /** Resolvida por uma correção guardada (`correcoes.json`): sai da lista de tarefas. */
+  resolved?: boolean
 }
 
 export interface ClubSource {
@@ -110,6 +113,8 @@ export interface LeagueSheets {
   academyCsv: string
   issues: Issue[]
   stats: SheetStats
+  /** Fama de cada jogador (páginas do Wikidata em outras línguas), por id: o sinal de qualidade dos atributos (`attributes.ts`). Gerados não entram. */
+  fame: Record<string, number>
 }
 
 /** Estado compartilhado entre as ligas: siglas e ids não podem se repetir no pacote inteiro. */
@@ -149,6 +154,13 @@ function hashOf(text: string): number {
 function ageOn(birth: string, on: Date): number {
   return (on.getTime() - new Date(`${birth}T12:00:00Z`).getTime()) / (365.25 * 24 * 3600 * 1000)
 }
+
+/** Item do Wikidata sem nascimento, país, posição nem pé: não parece uma pessoa. */
+const hasNoPersonData = (wd: PlayerInfo): boolean => !wd.birthDate && wd.birthYear === undefined && wd.nationalities.length === 0 && wd.positions.length === 0 && !wd.foot
+/** Páginas a partir das quais um item sem dados de pessoa é descartado (jogador de verdade sem nenhum dado quase não tem páginas em outras línguas). */
+const NOT_PERSON_SITELINKS = 12
+/** Itens sem dados de pessoa num mesmo elenco a partir dos quais a tabela toda é descartada como patrocinadores ou cidades. */
+const BOGUS_TABLE_ENTRIES = 8
 
 export const newAssembleState = (): AssembleState => ({ abbreviations: new Set(), playerIds: new Set() })
 
@@ -266,11 +278,22 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
 
     const squad = input.squads.get(info.qid)
     if (!squad || squad.entries.length === 0) issue('squad-missing', 'nenhum elenco encontrado na Wikipedia', { club: name, id })
+    const bogusTable = (squad?.entries ?? []).filter((e) => {
+      const q = e.title ? input.articleToQid.get(articleKey(e)) : undefined
+      const info = q ? input.players.get(q) : undefined
+      return info !== undefined && hasNoPersonData(info)
+    }).length >= BOGUS_TABLE_ENTRIES
     for (const entry of squad?.entries ?? []) {
       const articleQid = entry.title ? input.articleToQid.get(articleKey(entry)) : undefined
       const wd = articleQid ? input.players.get(articleQid) : undefined
       const pid = playerId(articleQid, info.qid, entry.display)
       const label = wd?.name ?? entry.display
+      // Link da tabela que não leva a uma pessoa (patrocinador, cidade, clube): o item não tem nascimento, país, posição nem pé e é conhecido
+      // demais para ser um jogador sem dados, ou a tabela inteira é de itens assim (uma lista de patrocinadores lida como elenco).
+      if (wd && hasNoPersonData(wd) && ((wd.sitelinks ?? 0) >= NOT_PERSON_SITELINKS || bogusTable)) {
+        issue('player-not-person', 'o link da tabela do elenco não leva a um jogador (patrocinador, cidade ou clube); descartado', { club: name, player: label, id: pid })
+        continue
+      }
       if (state.playerIds.has(pid)) {
         issue('player-duplicate', 'já está no elenco de outro clube (emprestado?); mantido o primeiro', { club: name, player: label, id: pid })
         continue
@@ -414,8 +437,12 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
   const csvRows = (list: readonly Draft[]) => list.map((d) => PLAYER_COLUMNS.map((column) => d.row[column]))
   const generatedRows = generated.map((row) => PLAYER_COLUMNS.map((column) => row[column]))
 
+  const fame: Record<string, number> = {}
+  for (const d of [...main, ...academy, ...free]) fame[d.id] = d.fame
+
   return {
     leagueId: league.id,
+    fame,
     clubsCsv: toCsv(CLUB_COLUMNS, clubRows),
     playersCsv: toCsv(PLAYER_COLUMNS, [...csvRows(main), ...generatedRows, ...csvRows(free)]),
     academyCsv: toCsv(PLAYER_COLUMNS, csvRows(academy)),

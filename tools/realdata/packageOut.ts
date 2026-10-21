@@ -8,11 +8,19 @@ import { PACKAGE_FORMAT, PACKAGE_VERSION } from '../../src/data/package/types'
 import type { DataPackage, PackageClub, PackageLeague, PackagePlayer } from '../../src/data/package/types'
 import { validatePackage } from '../../src/data/package/validate'
 import { COUNTRY_NAME, FOREIGN_LIMITS } from '../../src/diagnostics/scalePackage'
-import type { LeagueSheets } from './assemble'
 import { REAL_LEAGUES } from './leagues'
 
+/** O que o pacote precisa de cada liga: as três planilhas e quantos clubes ela tem. */
+export interface PackageSheet {
+  leagueId: string
+  clubsCsv: string
+  playersCsv: string
+  academyCsv: string
+  stats: { clubs: number }
+}
+
 /** Ligas do pacote, com `teams` igual ao número de clubes achados em cada uma. */
-export function leagueDefinitions(sheets: readonly LeagueSheets[]): PackageLeague[] {
+export function leagueDefinitions(sheets: readonly Pick<PackageSheet, 'leagueId' | 'stats'>[]): PackageLeague[] {
   const found = new Map(sheets.map((s) => [s.leagueId, s.stats.clubs]))
   return REAL_LEAGUES.filter((l) => found.has(l.id)).map((league) => {
     const sameCountry = REAL_LEAGUES.filter((l) => l.id.startsWith(league.id.split('-')[0] as string))
@@ -42,7 +50,7 @@ export interface BuiltPackage {
   byCode: Record<string, number>
 }
 
-export function buildRealPackage(sheets: readonly LeagueSheets[], credits: string, startYear: number): BuiltPackage {
+export function buildRealPackage(sheets: readonly PackageSheet[], credits: string, startYear: number): BuiltPackage {
   const leagues = leagueDefinitions(sheets)
   const skeleton = { leagues, clubs: [], players: [] } as unknown as DataPackage
   const clubs: PackageClub[] = []

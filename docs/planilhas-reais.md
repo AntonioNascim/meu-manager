@@ -62,6 +62,40 @@ O script resolve sozinho o que dá, para o rascunho `pacote-real.json` chegar a 
 
 `tarefas/<liga>-tarefas.csv`, uma planilha por liga para dividir entre os sócios: o que não deu para resolver sozinho. Colunas: `tipo` (Clube, Elenco, Jogador conhecido), `clube`, `jogador`, `id`, `campo`, `situacao`, `valor_provisorio`, `valor_correto` (para preencher), `onde_procurar` e `feito`. Entram: estádio, cidade, capacidade e cores que ainda faltam; clubes com elenco gerado ou sem elenco; e, de cada clube, os **8 jogadores mais conhecidos** (mais páginas do Wikidata em outras línguas) com posição incerta. Os demais casos continuam só na `revisao.csv`.
 
+## Aplicar as tarefas preenchidas (`npm run dados:aplicar`)
+
+1. Cada sócio pega uma planilha de `tarefas/` (uma por liga), abre no Google Planilhas e preenche **`valor_correto`** e marca **`feito`** (`sim`, `x`, `ok`, `feito` ou a caixa de seleção `TRUE`).
+2. Baixa como CSV (*Arquivo › Fazer download › Valores separados por vírgula*) e coloca em `dados-reais/planilhas/tarefas-feitas/` (o nome do arquivo não importa; pode haver vários).
+3. `npm run dados:aplicar` (ou `-- --simular` para só conferir, sem gravar; `-- --resumo` para ver também o top 20 e o top 10 de clubes). Sai uma linha por tarefa, com o número da linha da planilha: `OK` (com o valor novo e o antigo), `ERRO` (com o motivo) ou `AVISO` (valor preenchido, mas `feito` sem marcar: ignorada). O mesmo texto fica em `ultima-aplicacao.txt`. Código de saída 1 se alguma linha marcada deu erro. Só entram as linhas com `feito`; as outras ficam como estão.
+
+Valores aceitos por `campo`:
+
+| Campo | Valor correto |
+|---|---|
+| `posição` | sigla do jogo (`CB`, `ST`...) ou da interface (`ZAG`, `ATA`...); a primeira é a principal e até 2 a mais viram secundárias (`ZAG VOL`, `LD / PD`). Goleiro não combina com linha. |
+| `cores` / `cor 1` / `cor 2` | código da cor (`#cc0000`, `cc0000` ou `c00`); `cores` leva as duas separadas por espaço. |
+| `estádio`, `cidade` | texto. |
+| `capacidade` | número de 500 a 300.000 (`45.000` e `45 000` valem). |
+| `força`, `potencial` | 1 a 100 (planilha `conferencia/top-300-jogadores.csv`): os atributos do jogador são gerados de novo para dar essa força. |
+| `elenco` | não se aplica por aqui: trocar ou acrescentar jogadores é no editor ou em `<liga>-jogadores.csv`; marcar `feito` só registra. |
+
+**As correções não se perdem.** Cada correção boa fica em `correcoes.json` (pasta de saída; por id do clube ou jogador e campo; a mais nova substitui a antiga). Toda rodada do `npm run dados:planilhas` (inclusive `--atualizar`, depois de uma janela de transferências) reescreve as planilhas do zero e **reaplica as correções no fim**; as tarefas que elas resolveram não voltam para `tarefas/`. Se o jogador saiu do elenco, a correção dele fica guardada sem efeito e a etapa final avisa ("correções guardadas que não acharam o registro"). Faça cópia de `correcoes.json` junto com as planilhas.
+
+## Atributos pela fama (Fase 5C)
+
+Os atributos dos jogadores reais (e potencial, consistência, propensão a lesão e profissionalismo) são gerados no fim de cada rodada e gravados nas colunas dos CSV de jogadores e da base (`realdata/attributes.ts`); o editor mostra e deixa ajustar. A conta, para cada jogador:
+
+1. **Nível do clube:** o mesmo do jogo (`clubLevel`: reputação do clube, divisão e economia da liga), com um pequeno ajuste por liga para os clubes grandes da Espanha, Inglaterra, Alemanha e França ficarem no mesmo patamar (`leagueAdjust`).
+2. **Ordem por fama dentro do clube:** goleiros e jogadores de linha em separado, ordenados pelo número de páginas do Wikidata em outras línguas (com um ruído: fama não é qualidade). Os 10 (1 no gol) primeiros são titulares, em volta do nível do clube; os demais são reservas, 9 pontos abaixo, como no mundo fictício. Quem não tem artigo (fama 0) fica no fim.
+3. **Fama absoluta:** a partir de ~20 páginas a fama diz a qualidade por si só (`qualityCurve`: 20 páginas ≈ 64, 50 ≈ 80, 100 ≈ 89, 230 ≈ 95) e pesa de 0 a 90% na força-alvo no lugar do clube. A fama é de carreira, então perde 1,8 ponto por ano depois dos 31 anos e cai um pouco para quem joga em clube abaixo do nível 74 (já passou do auge). Jovens valem menos que o nome sugere, até os 21.
+4. **Atributos:** a geração do jogo (`generateAttributes`, com as curvas de idade) é repetida com o mesmo sorteio (id do jogador) até a força geral na posição bater na força-alvo; o potencial segue a regra do jogo (jovens crescem) com um pouco mais de teto para os jovens famosos.
+
+Resultado esperado (veja `conferencia/distribuicao.md`): ~7 jogadores com força 85 ou mais no mundo e nenhum de 90; ~60 com 80 ou mais; os melhores clubes de cada liga com os melhores elencos (Real Madrid e Barcelona no topo, o melhor clube da Série A brasileira com ~70). A calibragem fica em `REAL_ATTRIBUTES`; depois de mexer, `npm run dados:finalizar` refaz tudo em segundos, sem rede, e imprime a distribuição, o top 20 e o top 10 de clubes.
+
+**Conferência à mão:** `conferencia/top-300-jogadores.csv` (os 300 mais fortes do mundo; jogadores gerados não entram) e `conferencia/forca-dos-clubes.csv` (todos os clubes por força: média dos 14 melhores). A primeira tem as colunas das tarefas: quem achar uma força errada preenche `valor_correto` (1 a 100) e marca `feito`, baixa o CSV para `tarefas-feitas/` e roda `dados:aplicar`. Dá para pedir também um `potencial` acrescentando uma linha com `campo` = `potencial`.
+
+**Linhas que não são jogadores:** alguns elencos da Wikipedia local trazem patrocinadores ou cidades como se fossem jogadores. O item do Wikidata sem nascimento, país, posição nem pé que tem 12 páginas ou mais (ou 8 ou mais num mesmo elenco) é descartado e vai para a `revisao.csv` (`player-not-person`).
+
 ## O que costuma ficar faltando (veja o relatório)
 
 - **Data de nascimento ausente em todas as fontes:** não trava a importação. O jogador recebe uma data **estimada**: pelo ano, quando a fonte só tem o ano (1º de julho), ou pela média de idade do elenco do clube (média das idades conhecidas, com uma variação fixa de até 3 anos para cima ou para baixo por jogador, só para não ficarem todos com a mesma idade; sem 5 idades conhecidas no clube vale a média da liga). Fica marcada: coluna `birthEstimated` = `sim` na planilha, `birthEstimated: true` no pacote e "(estimada)" na lista do editor, com uma caixa para desmarcar quando conferir a data (mudar a data também tira a marca). Todos entram na `revisao.csv`.
@@ -71,6 +105,8 @@ O script resolve sozinho o que dá, para o rascunho `pacote-real.json` chegar a 
 - **Número de clubes diferente do número real da liga:** o relatório mostra a diferença. O número real de cada liga fica em `tools/realdata/leagues.ts` (`REAL_TEAMS`: Argentina e MLS com 30 em 2026; as demais seguem o mundo ampliado) e `ligas-reais.json` usa os clubes achados.
 
 ## Código
+
+Fase 5B/5C: `tools/applyRealTasks.ts` e `tools/finalizeRealSheets.ts` (linhas de comando), `realdata/corrections.ts` (correções e leitura das tarefas), `realdata/attributes.ts` (atributos pela fama) e `realdata/finalize.ts` (etapa final a partir dos arquivos). Testes: `tests/realSheetsCorrections.test.ts`, `tests/realAttributes.test.ts`.
 
 `tools/buildRealSheets.ts` (linha de comando) e `tools/realdata/`: `leagues.ts` (ligas e títulos dos artigos), `http.ts` (rede, pausas, cache), `wikipedia.ts` e `wikidata.ts` (consultas), `wikitext.ts` (tabelas de elenco e listas de clubes em texto wiki), `localSquad.ts` (elenco em HTML da Wikipedia local), `merge.ts` (junta o elenco inglês e o local), `packageOut.ts` (ligas e rascunho do pacote), `positions.ts` e `nationality.ts` (conversões), `assemble.ts` (linhas das planilhas e avisos), `report.ts` (relatório, revisão e créditos), `pipeline.ts` (uma liga de ponta a ponta). Testes: `tests/realSheetsParse.test.ts`, `tests/realSheetsAssemble.test.ts` (sem rede).
 

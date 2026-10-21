@@ -54,38 +54,50 @@ const SEPARATOR = ';'
 // Leitura e escrita do CSV
 
 /** Separa o texto em linhas de células (aspas duplas, `""` dentro de aspas, quebras de linha dentro de aspas). */
-export function parseCsv(input: string): { delimiter: string; rows: string[][]; badQuote: boolean } {
+export function parseCsv(input: string): { delimiter: string; rows: string[][]; badQuote: boolean; lines: number[] } {
   const text = input.replace(/^﻿/, '')
   const firstLine = text.split(/\r?\n/, 1)[0] ?? ''
   const counts = [';', ',', '\t'].map((d) => ({ d, n: firstLine.split(d).length - 1 })).sort((a, b) => b.n - a.n)
   const delimiter = (counts[0] as { d: string; n: number }).n > 0 ? (counts[0] as { d: string }).d : SEPARATOR
   const rows: string[][] = []
+  /** Linha da planilha (a 1ª é o cabeçalho) em que começa cada linha lida: as totalmente vazias são puladas, mas contam. */
+  const lines: number[] = []
   let row: string[] = []
   let cell = ''
   let quoted = false
   let badQuote = false
+  let lineNo = 1
+  let rowLine = 1
+  const endRow = (): void => {
+    row.push(cell)
+    cell = ''
+    if (row.some((c) => c.trim() !== '')) (rows.push(row), lines.push(rowLine))
+    row = []
+  }
   for (let i = 0; i < text.length; i++) {
     const ch = text[i] as string
     if (quoted) {
       if (ch === '"') {
         if (text[i + 1] === '"') (cell += '"'), i++
         else quoted = false
-      } else cell += ch
+      } else {
+        if (ch === '\n') lineNo++
+        cell += ch
+      }
     } else if (ch === '"') {
       if (cell === '') quoted = true
       else cell += ch
     } else if (ch === delimiter) (row.push(cell), (cell = ''))
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++
-      row.push(cell)
-      cell = ''
-      rows.push(row)
-      row = []
+      endRow()
+      lineNo++
+      rowLine = lineNo
     } else cell += ch
   }
   if (quoted) badQuote = true
-  if (cell !== '' || row.length > 0) (row.push(cell), rows.push(row))
-  return { delimiter, rows: rows.filter((r) => r.some((c) => c.trim() !== '')), badQuote }
+  if (cell !== '' || row.length > 0) endRow()
+  return { delimiter, rows, badQuote, lines }
 }
 
 const quote = (v: string): string => (/[";\n\r]/.test(v) || v !== v.trim() ? `"${v.replace(/"/g, '""')}"` : v)

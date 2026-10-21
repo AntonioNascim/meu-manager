@@ -9,6 +9,8 @@
  * - As respostas da rede ficam em `<saida>/.cache`; rodar de novo reaproveita o que já foi baixado (continua de onde parou).
  *   Para atualizar os elencos depois de uma janela de transferências, rode com `--atualizar` (baixa tudo de novo).
  * - `dados-reais/` está no .gitignore: nada disso entra no repositório.
+ * - As correções feitas à mão (`npm run dados:aplicar`, guardadas em `<saida>/correcoes.json`) são reaplicadas no fim de toda rodada, e as tarefas
+ *   que elas resolveram não voltam para `tarefas/`. No fim, os atributos são gerados pela fama dos jogadores (`realdata/attributes.ts`).
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -17,7 +19,9 @@ import type { LeagueSheets } from './realdata/assemble'
 import { Fetcher } from './realdata/http'
 import { REAL_LEAGUES } from './realdata/leagues'
 import { collectLeague } from './realdata/pipeline'
-import { buildRealPackage, leagueDefinitions } from './realdata/packageOut'
+import { loadCorrections, isTaskDone } from './realdata/corrections'
+import { CHECK_DIR, distributionMarkdown, finalizeOutput, loadFame, saveFame, summaryText } from './realdata/finalize'
+import { leagueDefinitions } from './realdata/packageOut'
 import { buildCredits, buildReport, reviewCsv, tasksCsv } from './realdata/report'
 import type { RunInfo } from './realdata/report'
 
@@ -55,6 +59,8 @@ const leagues = REAL_LEAGUES.filter((l) => wanted.length === 0 || wanted.include
 const run: RunInfo = { date: today.toISOString().slice(0, 10), articles: [], seasons: [], local: [], network: 0, cached: 0 }
 const state = newAssembleState()
 const sheets: LeagueSheets[] = []
+const fame: Record<string, number> = {}
+const corrections = loadCorrections(out)
 
 for (const league of leagues) {
   try {
@@ -63,7 +69,10 @@ for (const league of leagues) {
     run.local.push({ league: league.id, ...collected.local })
     if (collected.season) run.seasons.push({ league: league.id, ...collected.season })
     const result = assembleLeague(collected.input, state)
+    // Tarefas que as correções guardadas já resolveram não voltam para a lista.
+    for (const issue of result.issues) if (issue.id && issue.field && isTaskDone(corrections, issue.id, issue.field)) issue.resolved = true
     sheets.push(result)
+    Object.assign(fame, result.fame)
     writeFileSync(join(out, `${league.id}-clubes.csv`), result.clubsCsv)
     writeFileSync(join(out, `${league.id}-jogadores.csv`), result.playersCsv)
     writeFileSync(join(out, `${league.id}-base.csv`), result.academyCsv)
@@ -76,15 +85,20 @@ for (const league of leagues) {
   }
 }
 
+// A fama fica de lado para a geração dos atributos; uma rodada de poucas ligas não apaga a das outras.
+const previous = loadFame(out)
+saveFame(out, { date: run.date, fame: { ...previous.fame, ...fame } })
 run.network = fetcher.stats.network
 run.cached = fetcher.stats.cached
 // Ligas com o número real de clubes e o rascunho do pacote inteiro (validado como o jogo valida na importação).
 writeFileSync(join(out, 'ligas-reais.json'), JSON.stringify(leagueDefinitions(sheets), null, 2))
 const credits = buildCredits(run)
-const built = buildRealPackage(sheets, credits.trim(), today.getFullYear())
-run.validation = { errors: built.errors, warnings: built.warnings, byCode: built.byCode, rejected: built.rejected }
-writeFileSync(join(out, 'pacote-real.json'), JSON.stringify(built.pkg))
+writeFileSync(join(out, 'creditos.txt'), credits)
+// Correções à mão, atributos pela fama, rascunho do pacote (validado) e planilhas de conferência.
+const finalized = finalizeOutput(out, log)
+run.validation = finalized.validation
+writeFileSync(join(out, CHECK_DIR, 'distribuicao.md'), distributionMarkdown(finalized))
 writeFileSync(join(out, 'relatorio.md'), buildReport(sheets, run))
 writeFileSync(join(out, 'revisao.csv'), reviewCsv(sheets.flatMap((s) => s.issues)))
-writeFileSync(join(out, 'creditos.txt'), credits)
-log(`\nPronto. Planilhas, relatorio.md, revisao.csv e creditos.txt em ${out}`)
+log(summaryText(finalized))
+log(`\nPronto. Planilhas, relatorio.md, revisao.csv, creditos.txt e conferencia/ em ${out}`)
