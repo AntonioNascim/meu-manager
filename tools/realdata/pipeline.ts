@@ -7,6 +7,7 @@ import type { RealLeague } from './leagues'
 import { parseSquadHtml } from './localSquad'
 import type { LocalEntry } from './localSquad'
 import { mergeSquads } from './merge'
+import { fetchViews, MIN_FAME_FOR_VIEWS } from './pageviews'
 import { articleUrl, fetchPages, fetchSquadHtml } from './wikipedia'
 import { fetchClubs, fetchFootballClubs, fetchPlayers } from './wikidata'
 import { parseClubInfobox, parseSeasonLinkGroups, parseSquad } from './wikitext'
@@ -19,6 +20,8 @@ export interface CollectOptions {
   maxClubs?: number
   /** Não consulta a Wikipedia local (só a em inglês). */
   noLocal?: boolean
+  /** Consulta as visualizações recentes das páginas (API de pageviews). Sem isto, só a fama de carreira. */
+  viewsFetcher?: Fetcher
   log: (message: string) => void
 }
 
@@ -149,12 +152,25 @@ export async function collectLeague(league: RealLeague, options: CollectOptions)
   const englishTitles = [...new Set(entries.filter((e) => e.title && !e.lang).map((e) => e.title as string))]
   log(`${league.id}: ${englishTitles.length} jogadores com artigo; buscando os dados no Wikidata`)
   const articleToQid = new Map<string, string>()
-  for (const [title, page] of await fetchPages(fetcher, englishTitles, { content: false })) if (page.qid) articleToQid.set(title, page.qid)
+  /** Título canónico (depois dos redirecionamentos) do artigo em inglês de cada jogador, para as visualizações. */
+  const canonical = new Map<string, string>()
+  for (const [title, page] of await fetchPages(fetcher, englishTitles, { content: false })) {
+    if (!page.qid) continue
+    articleToQid.set(title, page.qid)
+    if (!page.missing) canonical.set(page.qid, page.title)
+  }
   if (lang) {
     const localTitles = [...new Set(entries.filter((e) => e.title && e.lang === lang).map((e) => e.title as string))]
     for (const [title, page] of await fetchPages(fetcher, localTitles, { content: false, lang })) if (page.qid) articleToQid.set(articleKey({ title, lang }), page.qid)
   }
   const players = await fetchPlayers(fetcher, [...new Set(articleToQid.values())], league.languages)
 
-  return { input: { league, clubs, squads, players, articleToQid, notes, today: options.today }, articles, local, ...(season ? { season } : {}) }
+  let views: Map<string, number> | undefined
+  if (options.viewsFetcher) {
+    const wanted = new Map([...canonical].filter(([qid]) => (players.get(qid)?.sitelinks ?? 0) >= MIN_FAME_FOR_VIEWS))
+    log(`${league.id}: visualizações recentes de ${wanted.size} páginas`)
+    views = await fetchViews(options.viewsFetcher, wanted, options.today, log)
+  }
+
+  return { input: { league, clubs, squads, players, articleToQid, notes, today: options.today, ...(views ? { views } : {}) }, articles, local, ...(season ? { season } : {}) }
 }

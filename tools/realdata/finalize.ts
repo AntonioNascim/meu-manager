@@ -11,7 +11,7 @@ import { overallForPosition } from '../../src/engine/overall'
 import { ageOn } from '../../src/engine/season/dates'
 import { ATTRIBUTE_NAMES } from '../../src/engine/types'
 import type { Attributes, Nationality, Position } from '../../src/engine/types'
-import { generateLeagueAttributes } from './attributes'
+import { blendFame, generateLeagueAttributes } from './attributes'
 import type { GeneratedPlayer, Override, RosterClub, RosterPlayer } from './attributes'
 import { loadCorrections, patchSheet, readSheet, writeSheet } from './corrections'
 import type { Correction, Sheet } from './corrections'
@@ -23,6 +23,8 @@ import type { PackageSheet } from './packageOut'
 export interface FameFile {
   date: string
   fame: Record<string, number>
+  /** Visualizações da página nos últimos 3 meses (`pageviews.ts`), por id; só de quem teve a página consultada. */
+  views?: Record<string, number>
 }
 
 export const FAME_FILE = 'fama.json'
@@ -35,7 +37,7 @@ export function loadFame(dir: string): FameFile {
   const file = join(dir, FAME_FILE)
   if (!existsSync(file)) return { date: new Date().toISOString().slice(0, 10), fame: {} }
   const parsed = JSON.parse(readFileSync(file, 'utf8')) as Partial<FameFile>
-  return { date: parsed.date ?? new Date().toISOString().slice(0, 10), fame: parsed.fame ?? {} }
+  return { date: parsed.date ?? new Date().toISOString().slice(0, 10), fame: parsed.fame ?? {}, ...(parsed.views ? { views: parsed.views } : {}) }
 }
 
 export function saveFame(dir: string, file: FameFile): void {
@@ -53,6 +55,8 @@ export interface RankedPlayer {
   overall: number
   potential: number
   fame: number
+  /** Visualizações da página nos últimos 3 meses (vazio = não consultada). */
+  views: number | undefined
   /** A força vem de uma correção à mão. */
   corrected: boolean
 }
@@ -80,6 +84,8 @@ export interface FinalizeResult {
   leagueStrength: { league: string; top: number; median: number; bottom: number }[]
   /** Correções guardadas que não acharam o registro nas planilhas (saiu do elenco?). */
   orphans: Correction[]
+  /** Ajuste das visualizações recentes à fama de carreira (regressão), quando há visualizações. */
+  viewsFit?: { intercept: number; slope: number; n: number; r: number }
 }
 
 const num = (text: string | undefined): number => Number(text ?? 0)
@@ -110,7 +116,9 @@ function writeGenerated(row: Record<string, string>, made: GeneratedPlayer): voi
 export function finalizeOutput(dir: string, log: (message: string) => void = () => {}): FinalizeResult {
   const corrections = loadCorrections(dir)
   const overrides = overridesOf(corrections)
-  const { date, fame } = loadFame(dir)
+  const { date, fame: careerFame, views } = loadFame(dir)
+  const blended = blendFame(careerFame, views)
+  const fame = blended.fame
   const startYear = Number(date.slice(0, 4))
   const packageSheets: PackageSheet[] = []
   const ranked: RankedPlayer[] = []
@@ -150,7 +158,7 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
       const generated = /^(sim|s|1|true)$/i.test(row.generated ?? '')
       if (row.club) (byClub.get(row.club) ?? byClub.set(row.club, []).get(row.club) ?? []).push({ name: row.name as string, overall })
       if (generated) continue
-      ranked.push({ rank: 0, id: row.id as string, name: row.name as string, league: league.id, club: row.club ? (clubName.get(row.club) ?? '') : '(livre)', position: row.position as Position, age: ageOn(row.birthDate as string, `${startYear}-01-01`), overall, potential: num(row.potential), fame: fame[row.id as string] ?? 0, corrected: overrides.get(row.id as string)?.overall !== undefined })
+      ranked.push({ rank: 0, id: row.id as string, name: row.name as string, league: league.id, club: row.club ? (clubName.get(row.club) ?? '') : '(livre)', position: row.position as Position, age: ageOn(row.birthDate as string, `${startYear}-01-01`), overall, potential: num(row.potential), fame: careerFame[row.id as string] ?? 0, views: views?.[row.id as string], corrected: overrides.get(row.id as string)?.overall !== undefined })
     }
     const strengths: number[] = []
     for (const club of clubSheet.rows) {
@@ -189,6 +197,7 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
     distribution,
     leagueStrength,
     orphans: corrections.filter((c) => !seen.has(c.id)),
+    ...(blended.fit ? { viewsFit: blended.fit } : {}),
   }
 }
 
@@ -199,9 +208,9 @@ function writeCheckSheets(dir: string, top: readonly RankedPlayer[], clubs: read
   mkdirSync(join(dir, CHECK_DIR), { recursive: true })
   const rows = top.map((p) => {
     const fixed = overrides.get(p.id)?.overall
-    return [p.rank, 'Força', p.league, p.club, p.name, p.id, POSITION_NAME[p.position], p.age, Math.round(p.potential), p.fame, 'força', `nº ${p.rank} do mundo; força geral na posição (1 a 100). Craque do mundo: 85 ou mais`, Math.round(p.overall), fixed !== undefined ? fixed : '', 'Conferir pelo desempenho, prêmios e a fama do jogador; só preencher se achar a força errada', fixed !== undefined ? 'sim' : '']
+    return [p.rank, 'Força', p.league, p.club, p.name, p.id, POSITION_NAME[p.position], p.age, Math.round(p.potential), p.fame, p.views ?? '', 'força', `nº ${p.rank} do mundo; força geral na posição (1 a 100). Craque do mundo: 85 ou mais`, Math.round(p.overall), fixed !== undefined ? fixed : '', 'Conferir pelo desempenho, prêmios e a fama do jogador; só preencher se achar a força errada', fixed !== undefined ? 'sim' : '']
   })
-  writeFileSync(join(dir, CHECK_DIR, 'top-300-jogadores.csv'), toCsv(['ranking', 'tipo', 'liga', 'clube', 'jogador', 'id', 'posicao', 'idade', 'potencial', 'fama', 'campo', 'situacao', 'valor_provisorio', 'valor_correto', 'onde_procurar', 'feito'], rows))
+  writeFileSync(join(dir, CHECK_DIR, 'top-300-jogadores.csv'), toCsv(['ranking', 'tipo', 'liga', 'clube', 'jogador', 'id', 'posicao', 'idade', 'potencial', 'fama', 'visualizacoes_3_meses', 'campo', 'situacao', 'valor_provisorio', 'valor_correto', 'onde_procurar', 'feito'], rows))
   writeFileSync(join(dir, CHECK_DIR, 'forca-dos-clubes.csv'), toCsv(['ranking', 'liga', 'clube', 'forca_14_melhores', 'melhor_jogador', 'forca_do_melhor', 'reputacao'], clubs.map((c) => [c.rank, c.league, c.name, c.strength.toFixed(1), c.best, Math.round(c.bestOverall), c.reputation])))
 }
 
@@ -217,9 +226,10 @@ export function distributionMarkdown(result: FinalizeResult): string {
 export function summaryText(result: FinalizeResult, players = 20, clubs = 10): string {
   const pad = (text: string | number, n: number): string => String(text).padEnd(n)
   const lines = ['', 'Distribuição de força (jogadores com clube): ' + result.distribution.map((d) => `${d.threshold}+: ${d.count}`).join(' · '), '', `Top ${players} jogadores`]
-  for (const p of result.topPlayers.slice(0, players)) lines.push(`  ${pad(p.rank, 3)} ${pad(p.name, 28)} ${pad(p.club, 24)} ${pad(p.league, 5)} ${pad(p.position, 3)} ${p.age} anos  força ${p.overall.toFixed(1)}  pot ${p.potential}  fama ${p.fame}`)
+  for (const p of result.topPlayers.slice(0, players)) lines.push(`  ${pad(p.rank, 3)} ${pad(p.name, 28)} ${pad(p.club, 24)} ${pad(p.league, 5)} ${pad(p.position, 3)} ${p.age} anos  força ${p.overall.toFixed(1)}  pot ${p.potential}  fama ${p.fame}  visualizações ${p.views ?? '—'}`)
   lines.push('', `Top ${clubs} clubes (média dos ${CLUB_STRENGTH_PLAYERS} melhores)`)
   for (const c of result.topClubs.slice(0, clubs)) lines.push(`  ${pad(c.rank, 3)} ${pad(c.name, 28)} ${pad(c.league, 5)} força ${c.strength.toFixed(1)}  melhor: ${c.best} (${Math.round(c.bestOverall)})`)
+  if (result.viewsFit) lines.push('', `Visualizações recentes × fama de carreira: ${result.viewsFit.n} jogadores, correlação ${result.viewsFit.r.toFixed(2)} (a fama de agora mistura as duas)`)
   const v = result.validation
   lines.push('', `Validação do pacote-real.json: ${v.errors} erros, ${v.warnings} avisos, ${v.rejected} linhas recusadas`)
   if (result.orphans.length > 0) lines.push(`Atenção: ${result.orphans.length} correções guardadas não acharam o registro nas planilhas (o jogador saiu do elenco?): ${result.orphans.slice(0, 5).map((c) => `${c.player ?? c.club ?? c.id} (${c.field})`).join(', ')}${result.orphans.length > 5 ? '…' : ''}`)

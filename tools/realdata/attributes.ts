@@ -8,6 +8,9 @@
  *   força-alvo (`fameWeight`, até 85%) no lugar do clube: um craque num clube fraco continua craque e um craque num clube grande não vira
  *   super-craque por somar os dois. A fama é de carreira, então o jogador com mais de 31 anos perde parte dela (`fameAge`).
  *
+ * A fama de carreira é misturada com as **visualizações recentes** da página do jogador na Wikipedia (`blendFame`): quem está em alta agora
+ * sobe e quem só vive da carreira desce.
+ *
  * A força-alvo sai daí e `generateAttributes` (a mesma geração do jogo) é repetida, com o mesmo sorteio, até a força na posição bater no alvo.
  * Tudo é determinístico: o sorteio vem do id do jogador, então rodar de novo dá os mesmos atributos. Uma força ou um potencial corrigidos
  * à mão (`overrides`) trocam o alvo. Funções puras.
@@ -37,7 +40,7 @@ export const REAL_ATTRIBUTES = {
   academyPenalty: 5,
   /** Quem ainda cresce vale menos que o nome sugere, e quem passou dos 34 já perdeu parte do que tinha. */
   youth: { untilAge: 21, perYear: 1.2 },
-  old: { fromAge: 34, perYear: 1.0 },
+  old: { fromAge: 31, perYear: 1.0 },
   /** Teto da força-alvo (acima disso só por correção à mão). */
   maxTarget: 94,
   /**
@@ -48,7 +51,9 @@ export const REAL_ATTRIBUTES = {
   /** Peso da fama absoluta na força-alvo: 0 até `from` páginas, sobe até `max` em `to` páginas (o resto é o clube e a ordem no elenco). */
   fameWeight: { from: 20, to: 70, max: 0.9 },
   /** A fama é de carreira: depois dos `fromAge` anos a qualidade que ela indica cai `perYear` por ano. */
-  fameAge: { fromAge: 31, perYear: 1.8 },
+  fameAge: { fromAge: 31, perYear: 3 },
+  /** Peso das visualizações recentes na fama (0 = só a carreira, 1 = só o momento), na escala logarítmica. */
+  viewsBlend: 0.5,
   /** Quem joga num clube mais fraco que `level` está, em média, abaixo da fama que tem (já passou do auge, ou nunca chegou lá): a qualidade da fama cai `perPoint` por ponto de diferença. */
   weakClub: { level: 74, perPoint: 0.35 },
   /**
@@ -80,6 +85,41 @@ export function fameQuality(fame: number, age: number): number {
 export function fameWeight(fame: number): number {
   const { from, to, max } = REAL_ATTRIBUTES.fameWeight
   return clamp((fame - from) / (to - from), 0, 1) * max
+}
+
+/**
+ * Fama de agora: mistura, na escala logarítmica, a fama de carreira (páginas do Wikidata) com a fama que a visibilidade recente da página
+ * costuma indicar. A segunda sai de uma regressão (nos jogadores que têm as duas medidas) da fama de carreira sobre as visualizações
+ * dos últimos meses, então um jogador com muito mais visualizações do que a carreira prevê sobe, e com muito menos desce. Quem não tem
+ * visualizações consultadas fica com a fama de carreira.
+ */
+export function blendFame(fame: Readonly<Record<string, number>>, views: Readonly<Record<string, number>> | undefined, blend: number = REAL_ATTRIBUTES.viewsBlend): { fame: Record<string, number>; fit?: { intercept: number; slope: number; n: number; r: number } } {
+  if (!views) return { fame: { ...fame } }
+  const ids = Object.keys(views).filter((id) => (fame[id] ?? 0) >= 5)
+  const xs = ids.map((id) => Math.log2(1 + (views[id] as number)))
+  const ys = ids.map((id) => Math.log2(1 + (fame[id] as number)))
+  const n = ids.length
+  if (n < 30) return { fame: { ...fame } }
+  const mx = xs.reduce((a, b) => a + b, 0) / n
+  const my = ys.reduce((a, b) => a + b, 0) / n
+  let sxy = 0
+  let sxx = 0
+  let syy = 0
+  for (let i = 0; i < n; i++) {
+    sxy += ((xs[i] as number) - mx) * ((ys[i] as number) - my)
+    sxx += ((xs[i] as number) - mx) ** 2
+    syy += ((ys[i] as number) - my) ** 2
+  }
+  const slope = sxy / sxx
+  const intercept = my - slope * mx
+  const out: Record<string, number> = { ...fame }
+  for (const id of Object.keys(views)) {
+    const career = Math.log2(1 + (fame[id] ?? 0))
+    if ((fame[id] ?? 0) < 5) continue
+    const moment = Math.max(0, intercept + slope * Math.log2(1 + (views[id] as number)))
+    out[id] = Math.max(0, 2 ** ((1 - blend) * career + blend * moment) - 1)
+  }
+  return { fame: out, fit: { intercept, slope, n, r: sxy / Math.sqrt(sxx * syy) } }
 }
 
 export interface RosterPlayer {

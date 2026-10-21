@@ -30,7 +30,7 @@ export class Fetcher {
   /** Quantas respostas vieram da rede e quantas do cache (vai para o relatório). */
   stats = { network: 0, cached: 0 }
 
-  constructor(private readonly options: FetcherOptions) {
+  constructor(readonly options: FetcherOptions) {
     mkdirSync(options.cacheDir, { recursive: true })
   }
 

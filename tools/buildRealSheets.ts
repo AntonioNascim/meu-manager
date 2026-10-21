@@ -4,6 +4,7 @@
  *
  * Uso: node tools/run.mjs buildRealSheets [--liga br-1,en-1] [--saida dados-reais/planilhas] [--atualizar]
  *        [--contato "email ou site"] [--max-clubes N] [--pausa 1500] [--data 2026-10-20] [--sem-local]
+ *        [--sem-visualizacoes] [--pausa-visualizacoes 120]
  *
  * - Sem `--liga`, faz as 21 ligas do mundo ampliado. Os atributos ficam em branco: o jogo gera.
  * - As respostas da rede ficam em `<saida>/.cache`; rodar de novo reaproveita o que já foi baixado (continua de onde parou).
@@ -55,16 +56,20 @@ const fetcher = new Fetcher({
   log,
 })
 
+// Visualizações recentes das páginas (API de pageviews da Wikimedia): consultas mais rápidas que as do Wikidata, uma de cada vez.
+const viewsFetcher = has('sem-visualizacoes') ? undefined : new Fetcher({ userAgent: fetcher.options.userAgent, cacheDir: join(out, '.cache'), refresh: has('atualizar'), pauseMs: Number(opt('pausa-visualizacoes', '120')), log })
+
 const leagues = REAL_LEAGUES.filter((l) => wanted.length === 0 || wanted.includes(l.id))
 const run: RunInfo = { date: today.toISOString().slice(0, 10), articles: [], seasons: [], local: [], network: 0, cached: 0 }
 const state = newAssembleState()
 const sheets: LeagueSheets[] = []
 const fame: Record<string, number> = {}
+const views: Record<string, number> = {}
 const corrections = loadCorrections(out)
 
 for (const league of leagues) {
   try {
-    const collected = await collectLeague(league, { fetcher, today, ...(maxClubs !== undefined ? { maxClubs } : {}), noLocal: has('sem-local'), log })
+    const collected = await collectLeague(league, { fetcher, ...(viewsFetcher ? { viewsFetcher } : {}), today, ...(maxClubs !== undefined ? { maxClubs } : {}), noLocal: has('sem-local'), log })
     for (const article of collected.articles) if (!run.articles.some((a) => a.title === article.title)) run.articles.push(article)
     run.local.push({ league: league.id, ...collected.local })
     if (collected.season) run.seasons.push({ league: league.id, ...collected.season })
@@ -73,6 +78,7 @@ for (const league of leagues) {
     for (const issue of result.issues) if (issue.id && issue.field && isTaskDone(corrections, issue.id, issue.field)) issue.resolved = true
     sheets.push(result)
     Object.assign(fame, result.fame)
+    Object.assign(views, result.views)
     writeFileSync(join(out, `${league.id}-clubes.csv`), result.clubsCsv)
     writeFileSync(join(out, `${league.id}-jogadores.csv`), result.playersCsv)
     writeFileSync(join(out, `${league.id}-base.csv`), result.academyCsv)
@@ -87,7 +93,7 @@ for (const league of leagues) {
 
 // A fama fica de lado para a geração dos atributos; uma rodada de poucas ligas não apaga a das outras.
 const previous = loadFame(out)
-saveFame(out, { date: run.date, fame: { ...previous.fame, ...fame } })
+saveFame(out, { date: run.date, fame: { ...previous.fame, ...fame }, ...(viewsFetcher || previous.views ? { views: { ...previous.views, ...views } } : {}) })
 run.network = fetcher.stats.network
 run.cached = fetcher.stats.cached
 // Ligas com o número real de clubes e o rascunho do pacote inteiro (validado como o jogo valida na importação).

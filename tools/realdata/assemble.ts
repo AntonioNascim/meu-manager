@@ -81,6 +81,8 @@ export interface LeagueInput {
   players: Map<string, PlayerInfo>
   /** Artigo → item do Wikidata, dos jogadores da tabela. */
   articleToQid: Map<string, string>
+  /** Visualizações recentes da página de cada jogador (item do Wikidata → total dos últimos 3 meses), quando foram consultadas. */
+  views?: Map<string, number>
   /** Data de referência das idades (padrão: hoje). */
   today?: Date
   /** Avisos da busca dos clubes (temporada não achada, contagem...). */
@@ -115,6 +117,8 @@ export interface LeagueSheets {
   stats: SheetStats
   /** Fama de cada jogador (páginas do Wikidata em outras línguas), por id: o sinal de qualidade dos atributos (`attributes.ts`). Gerados não entram. */
   fame: Record<string, number>
+  /** Visualizações recentes da página (últimos 3 meses), por id; só de quem teve a página consultada. */
+  views?: Record<string, number>
 }
 
 /** Estado compartilhado entre as ligas: siglas e ids não podem se repetir no pacote inteiro. */
@@ -132,6 +136,8 @@ interface Draft {
   /** Tem artigo na Wikipedia (jogador mais conhecido). */
   article: boolean
   fame: number
+  /** Visualizações recentes da página (últimos 3 meses). */
+  views?: number
   foot?: Foot
   player: string
   id: string
@@ -331,7 +337,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         club: id,
         clubName: name,
       }
-      drafts.push({ row, club: id, clubQid: info.qid, clubName: name, player: label, id: pid, guess, known: wd?.birthDate, ...(wd?.birthYear !== undefined ? { year: wd.birthYear } : {}), article: articleQid !== undefined, fame: wd?.sitelinks ?? 0, ...(foot ? { foot } : {}) })
+      drafts.push({ row, club: id, clubQid: info.qid, clubName: name, player: label, id: pid, guess, known: wd?.birthDate, ...(wd?.birthYear !== undefined ? { year: wd.birthYear } : {}), article: articleQid !== undefined, fame: wd?.sitelinks ?? 0, ...(articleQid && input.views?.has(articleQid) ? { views: input.views.get(articleQid) as number } : {}), ...(foot ? { foot } : {}) })
     }
   }
 
@@ -438,11 +444,16 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
   const generatedRows = generated.map((row) => PLAYER_COLUMNS.map((column) => row[column]))
 
   const fame: Record<string, number> = {}
-  for (const d of [...main, ...academy, ...free]) fame[d.id] = d.fame
+  const views: Record<string, number> = {}
+  for (const d of [...main, ...academy, ...free]) {
+    fame[d.id] = d.fame
+    if (d.views !== undefined) views[d.id] = d.views
+  }
 
   return {
     leagueId: league.id,
     fame,
+    views,
     clubsCsv: toCsv(CLUB_COLUMNS, clubRows),
     playersCsv: toCsv(PLAYER_COLUMNS, [...csvRows(main), ...generatedRows, ...csvRows(free)]),
     academyCsv: toCsv(PLAYER_COLUMNS, csvRows(academy)),
