@@ -47,7 +47,7 @@ export const REAL_ATTRIBUTES = {
    * Qualidade que a fama sozinha indica: (páginas no Wikidata, força geral), interpolado linearmente. Poucos jogadores passam de 60 páginas
    * no mundo inteiro, e esses são os craques.
    */
-  qualityCurve: [[20, 64], [35, 73], [50, 80], [70, 85], [100, 89], [150, 92], [230, 95]] as readonly (readonly [number, number])[],
+  qualityCurve: [[20, 66], [35, 77], [50, 83], [70, 87], [100, 91], [150, 93], [230, 95]] as readonly (readonly [number, number])[],
   /** Peso da fama absoluta na força-alvo: 0 até `from` páginas, sobe até `max` em `to` páginas (o resto é o clube e a ordem no elenco). */
   fameWeight: { from: 20, to: 70, max: 0.9 },
   /** A fama é de carreira: depois dos `fromAge` anos a qualidade que ela indica cai `perYear` por ano. */
