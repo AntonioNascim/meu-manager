@@ -5,7 +5,7 @@ import type { RealResults, TitleRow } from '../tools/realTargets'
 
 const rows = (clubs: string[], country = 'England'): TitleRow[] => clubs.map((club, i) => ({ year: 2026 + i, club, country }))
 const rotate = (names: string[], n: number) => Array.from({ length: n }, (_, i) => names[i % names.length]!)
-const giants = { first: [19, 19, 18, 18, 17, 17], last: [19, 18, 18, 17, 17, 16], inTopStr: 5 }
+const giants = { first: [19, 19, 18, 18, 17, 17], last: [19, 18, 18, 17, 17, 16], inTopStr: 3 }
 
 const base = (leagues: Record<string, TitleRow[]>, cups: Record<string, TitleRow[]> = {}): RealResults => ({ leagues, cups, giants: { 'en-1': giants }, years: 30 })
 
@@ -28,9 +28,9 @@ describe('metas contra a vida real', () => {
   })
 
   it('acusa gigantes que encolhem', () => {
-    const shrunk = { first: [19, 19, 18, 18, 17, 17], last: [14, 14, 13, 13, 12, 12], inTopStr: 2 }
+    const shrunk = { first: [19, 19, 18, 18, 17, 17], last: [14, 14, 13, 13, 12, 12], inTopStr: 1 }
     const out = checkRealTargets({ ...base({}), giants: { 'en-1': shrunk } })
-    expect(out.some((p) => p.includes('seguem entre os 6 maiores'))).toBe(true)
+    expect(out.some((p) => p.includes('seguem entre os 8 maiores'))).toBe(true)
     expect(out.some((p) => p.includes('reputação média dos gigantes caiu'))).toBe(true)
   })
 

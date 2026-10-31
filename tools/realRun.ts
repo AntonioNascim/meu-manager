@@ -11,7 +11,7 @@ import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
 import type { World } from '../src/data/generateWorld'
 import { playerOverall } from '../src/engine/overall'
-import { pyramidOf } from '../src/engine/season'
+import { computeStandings, pyramidOf } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
 import { continentalObserver } from './continentalRun'
 import type { ContinentalRun } from './continentalRun'
@@ -34,6 +34,8 @@ export interface RealSimulation {
   continental: ContinentalRun
   /** Reputação e força de cada clube da primeira divisão, ano a ano, por liga. */
   trail: Map<string, TrailRow[]>
+  /** Estrelas que o freio contra dinastias tirou do campeão, por liga (transferências do dia da virada que saíram do campeão para um clube da mesma liga). */
+  raids: Map<string, number>
   nameOf: Map<string, string>
   countryOf: Map<string, string>
   years: number
@@ -50,6 +52,8 @@ export function simulateReal(years: number, seed: number, focus = 'Brazil'): Rea
   for (const c of world.competitions ?? []) for (const t of c.teams) countryOf.set(t.id, c.country ?? c.id)
 
   const trail = new Map<string, TrailRow[]>()
+  const raids = new Map<string, number>()
+  const champions = new Map<string, { league: string; teams: ReadonlySet<string> }>()
   const watched = continentalObserver()
   const observer = {
     before(s: SeasonState, pyramid: string) {
@@ -58,6 +62,8 @@ export function simulateReal(years: number, seed: number, focus = 'Brazil'): Rea
       const byId = new Map(s.players.map((p) => [p.id, p]))
       for (const comp of s.season.competitions) {
         if (pyramidOf(comp) !== pyramid || comp.tier !== 1) continue
+        const champion = computeStandings(comp.teamIds, s.matches.filter((m) => m.competitionId === comp.id))[0]?.teamId
+        if (champion) champions.set(champion, { league: comp.id, teams: new Set(comp.teamIds) })
         for (const id of comp.teamIds) {
           const t = s.teams.find((x) => x.id === id)!
           const xi = t.tactic.startingXI.map((pid) => byId.get(pid)!).filter(Boolean)
@@ -65,7 +71,15 @@ export function simulateReal(years: number, seed: number, focus = 'Brazil'): Rea
         }
       }
     },
-    after: watched.observer.after,
+    after(next: SeasonState, pyramid: string) {
+      watched.observer.after(next, pyramid)
+      for (const h of next.market.history) {
+        if (h.date !== next.season.currentDate || h.kind !== 'purchase' || !h.fromTeamId) continue
+        const info = champions.get(h.fromTeamId)
+        if (info?.teams.has(h.toTeamId)) raids.set(info.league, (raids.get(info.league) ?? 0) + 1)
+      }
+      champions.clear()
+    },
   }
   const t0 = Date.now()
   const runs = simulateLeagueYears(
@@ -73,7 +87,7 @@ export function simulateReal(years: number, seed: number, focus = 'Brazil'): Rea
     years,
     observer,
   )
-  return { world, runs, continental: watched.run, trail, nameOf, countryOf, years, seconds: Math.round((Date.now() - t0) / 1000) }
+  return { world, runs, continental: watched.run, trail, raids, nameOf, countryOf, years, seconds: Math.round((Date.now() - t0) / 1000) }
 }
 
 /** Campeões de cada liga (com mais de 4 clubes), de cada copa continental ou mundial, e a trajetória dos 6 gigantes de cada liga. */
@@ -96,9 +110,10 @@ export function summarizeReal(sim: RealSimulation, only: readonly string[] = [])
     const lastYear = Math.max(...rows.map((r) => r.year))
     const rank = (list: TrailRow[]) => [...list].sort((a, b) => b.rep - a.rep || b.str - a.str)
     const big = rank(rows.filter((r) => r.year === firstYear)).slice(0, 6).map((r) => r.id)
-    const topNow = new Set(rank(rows.filter((r) => r.year === lastYear)).slice(0, 6).map((r) => r.id))
+    // Os 3 maiores do começo continuam entre os 8 maiores no fim (a escada de reputação é achatada no meio, então o 6º lugar varia à toa).
+    const topNow = new Set(rank(rows.filter((r) => r.year === lastYear)).slice(0, 8).map((r) => r.id))
     const at = (y: number) => big.map((id) => rows.find((r) => r.id === id && r.year === y)?.rep ?? 0)
-    giants[comp] = { first: at(firstYear), last: at(lastYear), inTopStr: big.filter((id) => topNow.has(id)).length }
+    giants[comp] = { first: at(firstYear), last: at(lastYear), inTopStr: big.slice(0, 3).filter((id) => topNow.has(id)).length }
   }
   return { leagues, cups, giants, years: sim.years }
 }
@@ -149,9 +164,11 @@ if (process.argv[1]?.includes('realRun')) {
       const r = big.map((id) => rows.find((x) => x.id === id && x.year === firstYear + d)).filter(Boolean) as TrailRow[]
       return `+${d}a rep ${(r.reduce((s, x) => s + x.rep, 0) / (r.length || 1)).toFixed(1)} força ${(r.reduce((s, x) => s + x.str, 0) / (r.length || 1)).toFixed(1)}`
     })
-    console.log(`${comp.padEnd(5)} ${line.join(' | ')} | dos 6 gigantes de ${firstYear}, ${results.giants[comp]?.inTopStr ?? '?'} seguem entre os 6 de maior reputação em ${lastYear} | ${big.map((id) => nameOf.get(id)).join(', ')}`)
+    console.log(`${comp.padEnd(5)} ${line.join(' | ')} | dos 3 maiores de ${firstYear}, ${results.giants[comp]?.inTopStr ?? '?'} seguem entre os 8 de maior reputação em ${lastYear} | ${big.map((id) => nameOf.get(id)).join(', ')}`)
   }
 
+  console.log(`
+Freio contra dinastias: estrelas levadas do campeão por liga: ${[...sim.raids].sort().map(([k, v]) => `${k} ${v}`).join(', ') || 'nenhuma'}`)
   const problems = checkRealTargets(results, only)
   console.log(`\n## Metas contra a vida real (referências em tools/realTargets.ts; ${Object.keys(REAL_LEAGUE_REFERENCE).length} ligas e ${Object.keys(REAL_CUP_REFERENCE).length} copas${years < 20 ? '; só valem com 20 temporadas ou mais' : ''})`)
   console.log(problems.length === 0 ? 'Todas as metas foram cumpridas.' : problems.map((p) => `ALERTA ${p}`).join('\n'))

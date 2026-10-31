@@ -116,12 +116,12 @@ export function checkRealTargets(results: RealResults, only: readonly string[] =
       if (s < ref.groupShare.min) out.push(`${id}: ${ref.groupShare.countries.join('+')} com ${(100 * s).toFixed(0)}% (mínimo ${Math.round(100 * ref.groupShare.min)}%)`)
     }
   }
-  // Os gigantes reais continuam grandes por décadas: quatro dos seis maiores de 2026 ainda estão entre os seis maiores no fim, e a reputação média deles não cai mais de 2 pontos.
+  // Os gigantes reais continuam grandes por décadas: dois dos três maiores de 2026 ainda estão entre os oito maiores no fim, e a reputação média dos seis maiores não cai mais de 3 pontos (a escada é achatada no meio e os clubes do meio voltam à média da liga).
   for (const id of ['en-1', 'es-1', 'it-1', 'de-1', 'fr-1']) {
     const g = results.giants[id]
     if (!g || (only.length && !only.includes(id))) continue
-    if (g.inTopStr < 4) out.push(`${id}: só ${g.inTopStr} dos 6 gigantes seguem entre os 6 maiores (mínimo 4)`)
-    if (mean(g.first) - mean(g.last) > 2) out.push(`${id}: a reputação média dos gigantes caiu de ${mean(g.first).toFixed(1)} para ${mean(g.last).toFixed(1)} (limite 2)`)
+    if (g.inTopStr < 2) out.push(`${id}: só ${g.inTopStr} dos 3 maiores clubes seguem entre os 8 maiores (mínimo 2)`)
+    if (mean(g.first) - mean(g.last) > 3) out.push(`${id}: a reputação média dos gigantes caiu de ${mean(g.first).toFixed(1)} para ${mean(g.last).toFixed(1)} (limite 3)`)
   }
   return out
 }

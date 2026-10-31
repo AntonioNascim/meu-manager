@@ -4,7 +4,7 @@
  * Funções puras: recebem a temporada encerrada e devolvem a nova, mais um relatório do que aconteceu.
  */
 import { ACADEMY, FINANCE, MARKET, OFFSEASON } from '../config'
-import { lineupForeign } from '../foreign'
+import { lineupForeign, squadForeignBlocked } from '../foreign'
 import { defaultTicketPrice, monthlyPayroll, summarizeLedger, sustainablePayroll } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
 import { playerOverall } from '../overall'
@@ -191,7 +191,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     // Com prestígio (mundo real), quem fica na divisão volta ao prestígio dele (os gigantes se mantêm); quem muda de divisão segue a regra da média.
     const anchored = t.prestige !== undefined && tier === t.tier
     const pull = anchored ? R.prestigePull : tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
-    const target = anchored ? (t.prestige as number) : mean
+    const target = anchored ? (tier === 1 ? (t.prestige as number) : Math.min(t.prestige as number, mean + R.prestigeAboveTier)) : mean
     const pulled = t.reputation + delta + pull * (target - t.reputation) + (continental.get(t.id) ?? 0)
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
@@ -277,9 +277,14 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     const positions = deficits.slice(0, count)
     while (positions.length < count) positions.push(youthRng.pick(EXTRA_POSITIONS))
     const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), ...(team.country ? { country: team.country } : {}), positions, year: nextYear, ...(split ? { split } : {}) }, youthRng, taken)
+    const incoming: Player[] = []
     for (const p of made) {
       taken.add(p.name)
-      players.push({ ...p, id: `player-${++counter}`, teamId: team.id })
+      // Limite de estrangeiros do elenco: o jovem que chegaria acima dele nasce no país do clube (a base de cada país tem uma fatia de estrangeiros).
+      const blocked = squadForeignBlocked(team, squad, p, incoming)
+      const youngster = { ...p, id: `player-${++counter}`, teamId: team.id, ...(blocked ? { nationality: team.country ?? 'Brazil' } : {}) }
+      incoming.push(youngster)
+      players.push(youngster)
     }
     youth[team.id] = made.length
   }

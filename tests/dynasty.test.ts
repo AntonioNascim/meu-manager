@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { generateWorld } from '../src/data/generateWorld'
 import { DYNASTY } from '../src/engine/config'
-import { dynastyRaids, raidsFor, titlesInWindow } from '../src/engine/offseason'
+import { continentalTitles, dynastyRaids, raidsFor, titlesInWindow } from '../src/engine/offseason'
 import { playerOverall } from '../src/engine/overall'
 import { computeStandings, createSeason, simulateToSeasonEnd } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
@@ -39,6 +39,18 @@ describe('freio contra dinastias', () => {
     expect(titlesInWindow({ history }, true)).toBe(3)
     expect(titlesInWindow({ history }, false)).toBe(2)
     expect(titlesInWindow({ history: [] }, true)).toBe(1)
+  })
+
+  it('conta os títulos de copas continentais nas últimas edições, inclusive a que acabou de terminar', () => {
+    const spec = { id: 'cont-x-1', region: 'EU' } as never
+    const state = {
+      cupSpecs: [spec],
+      cups: [{ id: 'cont-x-1', spec, year: 2026, winnerId: 'a' }],
+      cupHistory: { 'cont-x-1': [{ year: 2020, winnerId: 'a' }, { year: 2023, winnerId: 'a' }, { year: 2024, winnerId: 'b' }, { year: 2025, winnerId: 'a' }] },
+    } as never
+    // Janela de 5 edições até 2026: 2022 a 2026. Do 'a': 2023, 2025 e a de 2026 (ainda fora do histórico); 2020 já saiu da janela.
+    expect(continentalTitles(state, 'a', 2026)).toBe(3)
+    expect(continentalTitles(state, 'b', 2026)).toBe(1)
   })
 
   it('o campeão de poucos títulos não perde ninguém', () => {
