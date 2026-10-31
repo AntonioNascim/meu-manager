@@ -60,7 +60,7 @@ O script resolve sozinho o que dá, para o rascunho `pacote-real.json` chegar a 
 
 ### Tarefas manuais (`tarefas/`)
 
-`tarefas/<liga>-tarefas.csv`, uma planilha por liga para dividir entre os sócios: o que não deu para resolver sozinho. Colunas: `tipo` (Clube, Elenco, Jogador conhecido), `clube`, `jogador`, `id`, `campo`, `situacao`, `valor_provisorio`, `valor_correto` (para preencher), `onde_procurar` e `feito`. Entram: estádio, cidade, capacidade e cores que ainda faltam; clubes com elenco gerado ou sem elenco; e, de cada clube, os **8 jogadores mais conhecidos** (mais páginas do Wikidata em outras línguas) com posição incerta. Os demais casos continuam só na `revisao.csv`.
+`tarefas/<liga>-tarefas.csv`, uma planilha por liga para dividir entre os sócios: o que não deu para resolver sozinho. Colunas: `tipo` (Clube, Elenco), `clube`, `jogador`, `id`, `campo`, `situacao`, `valor_provisorio`, `valor_correto` (para preencher), `onde_procurar` e `feito`. Entram: estádio, cidade, capacidade e cores que ainda faltam; clubes com elenco gerado ou sem elenco; e clubes sem elenco. **Posição incerta não gera mais tarefa:** as posições já revisadas ficam em `correcoes.json` e os demais jogadores seguem com a posição automática (a que for mais provável, distribuída pela necessidade do elenco), que só aparece na `revisao.csv`.
 
 ## Aplicar as tarefas preenchidas (`npm run dados:aplicar`)
 
@@ -96,7 +96,17 @@ Resultado esperado (veja `conferencia/distribuicao.md`): ~9 jogadores com força
 
 **Conferência à mão:** `conferencia/top-300-jogadores.csv` (os 300 mais fortes do mundo; jogadores gerados não entram) e `conferencia/forca-dos-clubes.csv` (todos os clubes por força: média dos 14 melhores). A primeira tem as colunas das tarefas: quem achar uma força errada preenche `valor_correto` (1 a 100) e marca `feito`, baixa o CSV para `tarefas-feitas/` e roda `dados:aplicar`. Dá para pedir também um `potencial` acrescentando uma linha com `campo` = `potencial`.
 
-**Linhas que não são jogadores:** alguns elencos da Wikipedia local trazem patrocinadores ou cidades como se fossem jogadores. O item do Wikidata sem nascimento, país, posição nem pé que tem 12 páginas ou mais (ou 8 ou mais num mesmo elenco) é descartado e vai para a `revisao.csv` (`player-not-person`).
+**Linhas que não são jogadores (patrocinadores, clubes, cidades):** alguns elencos da Wikipedia trazem patrocinadores ou cidades como se fossem jogadores (no Deportes Limache entraram "Claus-7", "OneFit" e "Training Deportes"). O link da tabela leva a um item do Wikidata; se o item não tem nascimento, país, posição nem pé, a coleta pergunta ao Wikidata o que ele é (`instância de`, `fetchKinds`). **Só fica se for um ser humano** (jogador de item novo, ainda sem dados); marca, clube, cidade e qualquer outra coisa são descartados e vão para a `revisao.csv` (`player-not-person`). O número de páginas (12 ou mais) e o elenco inteiro de itens assim (8 ou mais) só valem como reserva quando a coleta é antiga e não tem essa informação. **Página de homônimos** ligada a um jogador real (Francisco Gómez, José Torres, Alex Silva): o jogador fica com os dados da tabela, mas sem o id nem a fama do item errado (`player-wrong-item`).
+
+**Nomes dos jogadores.** O jogo mostra sempre o **nome pelo qual o jogador é conhecido** (o apelido: Gabigol, Marquinhos, Paulinho, Dodô) e guarda o **nome completo** como informação do jogador (`nickname` mostrado nas listas e no jogo; `name` aparece no detalhe do jogador). Regras da coleta (`resolveName` em `tools/realdata/assemble.ts`):
+
+1. O rótulo do Wikidata só vale se tem uma palavra em comum com o nome da tabela ou com o título do artigo, ou se pelo menos 2 línguas o repetem. Isso pega vandalismo do Wikidata (o item do Phil Foden chegou a ter o rótulo "Federico Messiano" em inglês); a coleta busca os rótulos em várias línguas (`fetchLabels`).
+2. Se o rótulo não vale, vale o nome que a maioria das línguas repete (2 ou mais). Se um é o nome de registro e o outro uma palavra só (Marcus Vinicius Oliveira Alencar / Marquinhos, ou Gabigol / Gabriel Barbosa), o nome completo vai em `name` e a palavra curta em `nickname`.
+3. Sem maioria, o rótulo fica só se parece um nome completo (duas palavras ou mais, todas com inicial maiúscula, sem número nem palavra repetida: `looksLikeFullName`); senão vale o nome da tabela ("putaso monterito", "Hélio 67 naldo", "ayoub koujil koujil" não passam).
+4. Quando o nome da tabela é mais curto que o nome completo, ele vira o `nickname`. O desambiguador no fim do rótulo ("Paulinho (futebolista, 1995)") é cortado (`withoutDisambiguation`).
+5. Coleta antiga, sem os rótulos em outras línguas: vale o rótulo como antes.
+
+Limite conhecido: um rótulo errado que 2 ou mais línguas repetem (outra pessoa de verdade) não é detectado sem checar o clube no Wikidata.
 
 ## O que costuma ficar faltando (veja o relatório)
 

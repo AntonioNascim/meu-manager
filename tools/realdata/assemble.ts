@@ -177,7 +177,7 @@ const NOT_PERSON_SITELINKS = 12
  * item do Phil Foden): vale o rótulo que a maioria das línguas repete, ou, sem maioria, o nome da tabela. Sem os rótulos em outras línguas
  * (coleta antiga), vale o rótulo como antes.
  */
-export function resolveName(wd: PlayerInfo, entry: { display: string; title?: string }): { name: string } {
+export function resolveName(wd: PlayerInfo, entry: { display: string; title?: string }): { name: string; nickname?: string } {
   const name = wd.name as string
   const words = (text: string): string[] => strip(text).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 2)
   const mine = words(name)
@@ -190,7 +190,28 @@ export function resolveName(wd: PlayerInfo, entry: { display: string; title?: st
   }
   if ((counts.get(strip(name).toLowerCase().replace(/[^a-z0-9]/g, ''))?.n ?? 0) >= 2) return { name }
   const majority = [...counts.values()].sort((x, y) => y.n - x.n)[0]
-  return { name: majority && majority.n >= 2 ? majority.text : entry.display }
+  if (majority && majority.n >= 2) {
+    const single = (text: string): boolean => /^\p{Lu}\S+$/u.test(text) && text.length >= 4
+    // Nome de registro no rótulo e o nome conhecido na maioria das línguas (Marcus Vinicius Oliveira Alencar / Marquinhos): fica o completo e o conhecido vira apelido.
+    if (looksLikeFullName(name) && single(majority.text)) return { name, nickname: majority.text }
+    // O contrário (rótulo "Gabigol", a maioria diz Gabriel Barbosa): o completo é o nome e o rótulo curto o apelido, salvo erro de digitação (Facund → Facundo).
+    if (single(name) && looksLikeFullName(majority.text) && !strip(majority.text).toLowerCase().startsWith(strip(name).toLowerCase())) return { name: majority.text, nickname: name }
+    return { name: majority.text }
+  }
+  // Sem maioria: um nome completo de aparência normal (nome de registro de quem é conhecido por apelido) fica; o resto é vandalismo.
+  return { name: looksLikeFullName(name) ? name : entry.display }
+}
+
+/** Tira o desambiguador que alguns rótulos do Wikidata trazem no fim: "Paulinho (futebolista, 1995)" → "Paulinho". */
+export const withoutDisambiguation = (name: string): string => name.replace(/\s*\([^)]*\)\s*$/, '').trim() || name
+
+/** Duas palavras ou mais, todas com inicial maiúscula (ou partículas), sem números nem palavra repetida: "Marcus Vinicius Oliveira Alencar" sim, "putaso monterito" e "Hélio 67 naldo" não. */
+export function looksLikeFullName(name: string): boolean {
+  const particles = new Set(['de', 'da', 'do', 'dos', 'das', 'del', 'di', 'van', 'von', 'der', 'den', 'bin', 'el', 'al', 'la', 'le'])
+  const words = name.trim().split(/\s+/)
+  if (words.length < 2 || /\d/.test(name)) return false
+  if (new Set(words.map((w) => strip(w).toLowerCase())).size !== words.length) return false
+  return words.every((w) => particles.has(w.toLowerCase()) || /^\p{Lu}/u.test(w))
 }
 
 export const newAssembleState = (): AssembleState => ({ abbreviations: new Set(), playerIds: new Set() })
@@ -336,7 +357,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
       }
       const pid = playerId(articleQid, info.qid, entry.display)
       const named = wd?.name !== undefined ? resolveName(wd, entry) : undefined
-      const label = named?.name ?? entry.display
+      const label = withoutDisambiguation(named?.name ?? entry.display)
       if (named && named.name !== wd?.name) issue('player-name-suspect', `o rótulo do Wikidata ("${wd?.name}") não tem a ver com a Wikipedia e só uma língua o tem; usado "${named.name}"`, { club: name, player: entry.display, id: pid })
       if (state.playerIds.has(pid)) {
         issue('player-duplicate', 'já está no elenco de outro clube (emprestado?); mantido o primeiro', { club: name, player: label, id: pid })
@@ -362,7 +383,8 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         issue('player-nationality', `país não encontrado (${entry.nat ?? wd?.nationalities.join('/') ?? 'sem dado'}); usado o da liga`, { club: name, player: label, id: pid })
       }
 
-      const nickname = wd?.name && label === wd.name && entry.display.length < wd.name.length && !same(entry.display, wd.name) ? entry.display : wd?.nickname
+      // O jogo mostra o nome pelo qual o jogador é conhecido (o da tabela do clube: Gabigol, Marquinhos); o nome completo fica em `name`.
+      const nickname = named?.nickname ?? (entry.display.length < label.length && !same(entry.display, label) ? entry.display : wd?.nickname)
       const row: Record<string, string | number | undefined> = {
         id: pid,
         name: label,

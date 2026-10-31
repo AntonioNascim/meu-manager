@@ -126,19 +126,12 @@ const TASK_KINDS: Partial<Record<IssueKind, { type: string; where: string }>> = 
   'club-bad-capacity': { type: 'Clube', where: 'Wikipedia do estádio (capacidade entre 500 e 300.000)' },
   'squad-generated': { type: 'Elenco', where: 'Wikipedia do clube, site oficial (elenco atual); ver revisao.csv para os jogadores gerados' },
   'squad-missing': { type: 'Elenco', where: 'Wikipedia do clube, site oficial (elenco atual)' },
-  'player-position': { type: 'Jogador conhecido', where: 'Wikipedia do jogador, site do clube (posição exata)' },
 }
 
-/** Quantos jogadores de posição incerta entram na lista de tarefas de cada clube: os mais conhecidos (mais páginas no Wikidata). */
-export const POSITION_TASKS_PER_CLUB = 8
-
+/** Posição incerta não gera tarefa: as tarefas de posição já revisadas ficam em correcoes.json e os demais jogadores seguem com a posição automática (só na revisao.csv). */
 export function taskRows(issues: readonly Issue[]): (string | undefined)[][] {
-  const famous = new Set<Issue>()
-  const byClub = new Map<string, Issue[]>()
-  for (const i of issues) if (i.kind === 'player-position' && !i.resolved) (byClub.get(i.club ?? '') ?? byClub.set(i.club ?? '', []).get(i.club ?? '') ?? []).push(i)
-  for (const list of byClub.values()) for (const i of [...list].sort((a, b) => (b.fame ?? 0) - (a.fame ?? 0) || (a.player ?? '').localeCompare(b.player ?? '')).slice(0, POSITION_TASKS_PER_CLUB)) famous.add(i)
   return issues
-    .filter((i) => !i.resolved && TASK_KINDS[i.kind] && (i.kind !== 'player-position' || famous.has(i)) && !(i.kind === 'squad-missing' && issues.some((x) => x.kind === 'squad-generated' && x.id === i.id)))
+    .filter((i) => !i.resolved && TASK_KINDS[i.kind] && !(i.kind === 'squad-missing' && issues.some((x) => x.kind === 'squad-generated' && x.id === i.id)))
     .sort((a, b) => (TASK_KINDS[a.kind]?.type ?? '').localeCompare(TASK_KINDS[b.kind]?.type ?? '') || (a.club ?? '').localeCompare(b.club ?? '') || (a.player ?? '').localeCompare(b.player ?? ''))
     .map((i) => [TASK_KINDS[i.kind]?.type, i.club, i.player, i.id, i.field ?? '', i.detail, i.current, '', TASK_KINDS[i.kind]?.where, ''])
 }

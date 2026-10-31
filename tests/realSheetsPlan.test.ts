@@ -227,7 +227,7 @@ describe('montagem com os ajustes automáticos', () => {
     const types = new Set(rows.map((r) => r[0]))
     expect(types).toContain('Clube')
     expect(types).toContain('Elenco')
-    expect(types).toContain('Jogador conhecido')
+    expect(types).not.toContain('Jogador conhecido')
     const csv = tasksCsv(sheets.issues)
     expect(csv.split('\r\n')[0]).toBe('﻿tipo;clube;jogador;id;campo;situacao;valor_provisorio;valor_correto;onde_procurar;feito')
     expect(csv).toContain('Clube B')
@@ -237,11 +237,9 @@ describe('montagem com os ajustes automáticos', () => {
 })
 
 describe('tarefas de posição', () => {
-  it('só os 8 jogadores mais conhecidos de cada clube entram na lista de tarefas', () => {
+  it('posição incerta não vira tarefa: fica só na revisão', () => {
     const issues: Issue[] = Array.from({ length: 20 }, (_, i) => ({ league: 'br-1', kind: 'player-position', club: 'Clube', player: `J${i}`, id: `wd-Q${i}`, detail: 'x', field: 'posição', current: 'CB', fame: i }))
-    const rows = taskRows(issues)
-    expect(rows).toHaveLength(8)
-    expect(new Set(rows.map((r) => r[2]))).toEqual(new Set(['J19', 'J18', 'J17', 'J16', 'J15', 'J14', 'J13', 'J12']))
+    expect(taskRows(issues)).toEqual([])
   })
 })
 

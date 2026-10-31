@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { parseClubsCsv, parsePlayersCsv } from '../src/data/package/edit/csv'
 import type { DataPackage } from '../src/data/package/types'
-import { assembleLeague, newAssembleState, pickAbbreviation, pickColors, playerId, provisionalReputation } from '../tools/realdata/assemble'
+import { assembleLeague, newAssembleState, pickAbbreviation, pickColors, playerId, provisionalReputation, withoutDisambiguation } from '../tools/realdata/assemble'
 import type { ClubSource, LeagueInput } from '../tools/realdata/assemble'
 import { Fetcher } from '../tools/realdata/http'
 import { REAL_LEAGUES, seasonTitleCandidates, seasonYear } from '../tools/realdata/leagues'
@@ -303,6 +303,33 @@ describe('identidade dos jogadores (patrocinadores, homônimos e rótulos vandal
     const sheets = assembleLeague(extra([{ title: 'Fred', display: 'Fred', nat: 'BRA', pos: 'MF' }], [['Fred', fred]]), newAssembleState())
     expect(names(sheets)).toContain('Frederico Rodrigues Santos')
     expect(sheets.issues.some((i) => i.kind === 'player-name-suspect')).toBe(false)
+  })
+
+  it('nome conhecido: o apelido da tabela é o que o jogo mostra e o nome completo fica em name', () => {
+    // Rótulo de registro (língua local) e nome conhecido na maioria das línguas: fica o completo em name e "Marquinhos" vira apelido.
+    const marq: PlayerInfo = wd('Q906', { name: 'Marcus Vinicius Oliveira Alencar', labels: ['Marcus Vinicius Oliveira Alencar', 'Marquinhos', 'Marquinhos', 'Marquinhos'] })
+    // O contrário: rótulo curto e a maioria das línguas diz o nome completo.
+    const gabi: PlayerInfo = wd('Q907', { name: 'Gabigol', labels: ['Gabigol', 'Gabriel Barbosa', 'Gabriel Barbosa', 'Gabriel Barbosa'] })
+    const sheets = assembleLeague(extra([{ title: 'Marquinhos', display: 'Marquinhos', nat: 'BRA', pos: 'FW' }, { title: 'Gabriel Barbosa', display: 'Gabriel Barbosa', nat: 'BRA', pos: 'FW' }], [['Marquinhos', marq], ['Gabriel Barbosa', gabi]]), newAssembleState())
+    const cells = (id: string): string[] => (sheets.playersCsv.split(/\r?\n/).find((l) => l.startsWith(id + ';')) ?? '').split(';')
+    expect(cells('wd-Q906').slice(1, 3)).toEqual(['Marcus Vinicius Oliveira Alencar', 'Marquinhos'])
+    expect(cells('wd-Q907').slice(1, 3)).toEqual(['Gabriel Barbosa', 'Gabigol'])
+  })
+
+  it('desambiguador no fim do rótulo não entra no nome', () => {
+    expect(withoutDisambiguation('Paulinho (futebolista, 1995)')).toBe('Paulinho')
+    expect(withoutDisambiguation('Pedro Rangel (goleiro)')).toBe('Pedro Rangel')
+    expect(withoutDisambiguation('Nicolás Fernández(papá de river)')).toBe('Nicolás Fernández')
+    expect(withoutDisambiguation('Central Córdoba (SdE)')).toBe('Central Córdoba')
+  })
+
+  it('rótulo sem maioria que não parece nome completo (minúsculas, número, palavra repetida) é descartado', () => {
+    for (const bad of ['putaso monterito', 'Hélio 67 naldo', 'ayoub koujil koujil', 'Educación']) {
+      const v: PlayerInfo = wd('Q908', { name: bad, labels: [bad, 'Nome Certo', 'Nome Certo'] })
+      const sheets = assembleLeague(extra([{ title: 'Nome Certo', display: 'Nome Certo', nat: 'BRA', pos: 'FW' }], [['Nome Certo', v]]), newAssembleState())
+      expect(names(sheets)).toContain('Nome Certo')
+      expect(names(sheets)).not.toContain(bad)
+    }
   })
 
   it('sem os rótulos em outras línguas (coleta antiga), o rótulo vale como antes', () => {
