@@ -115,3 +115,20 @@ describe('correções guardadas', () => {
     expect(patchSheet(sheet, [item('p1', 'position', 'CB')])).toBe(0)
   })
 })
+
+describe('reputação do clube (Fase 5D)', () => {
+  it('aceita de 1 a 20 e recusa o resto', () => {
+    expect(entries('reputação', '17')).toEqual([{ field: 'reputation', value: '17' }])
+    expect(reason('reputação', '0')).toMatch(/1 a 20/)
+    expect(reason('reputação', '21')).toMatch(/1 a 20/)
+    expect(reason('reputação', 'alta')).toMatch(/1 a 20/)
+  })
+
+  it('patchSheet troca a reputação na planilha de clubes e a tarefa fica resolvida', () => {
+    const sheet = readSheet('id;name;reputation\nwd-Q1;Coritiba;19\nwd-Q2;Flamengo;17\n')
+    const items: Correction[] = [{ id: 'wd-Q1', field: 'reputation', value: '11', at: '2026-10-31' }]
+    expect(patchSheet(sheet, items)).toBe(1)
+    expect(sheet.rows.map((r) => r.reputation)).toEqual(['11', '17'])
+    expect(isTaskDone(items, 'wd-Q1', 'reputação')).toBe(true)
+  })
+})

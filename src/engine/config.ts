@@ -621,9 +621,9 @@ export const MARKET = {
 /**
  * Freio geral contra dinastias (`src/engine/offseason/dynasty.ts`): o campeão da primeira divisão com `threshold` títulos nas últimas `window` temporadas
  * (contando a que acabou) perde uma estrela para um rival, e mais uma por título além do limiar, até `maxRaids`. A estrela vai por `feeShare` do preço pedido para o
- * rival que mais ganha com ela (ganho mínimo `minGain` pontos de força, até `maxBalanceShare` do caixa dele) entre as `starPool` melhores do campeão com até `maxAge` anos.
+ * rival que mais ganha com ela, menos `titlePenalty` pontos por título recente do próprio rival (ganho mínimo `minGain` pontos de força, até `maxBalanceShare` do caixa dele) entre as `starPool` melhores do campeão com até `maxAge` anos.
  */
-export const DYNASTY = { window: 5, threshold: 3, maxRaids: 2, feeShare: 0.7, minGain: 1, maxBalanceShare: 0.5, starPool: 6, maxAge: 33 } as const
+export const DYNASTY = { window: 5, threshold: 3, maxRaids: 2, feeShare: 0.7, minGain: 1, maxBalanceShare: 0.5, starPool: 6, maxAge: 33, titlePenalty: 3 } as const
 
 /** Diretoria: a confiança vem dos pontos por jogo comparados à meta e ao limite de demissão. */
 export const BOARD = {

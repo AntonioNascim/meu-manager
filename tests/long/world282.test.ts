@@ -60,7 +60,7 @@ function countBy(values: string[]): Map<string, number> {
   return out
 }
 
-describe(`${YEARS} temporadas no mundo de 358 clubes`, () => {
+describe.skipIf(!!process.env.PACOTE_REAL && process.env.PACOTE_REAL !== '0')(`${YEARS} temporadas no mundo de 358 clubes`, () => {
   let runs: LeagueRun[] = []
   let continental: ContinentalRun
   let ids: string[] = []

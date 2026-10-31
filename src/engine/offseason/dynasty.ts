@@ -76,7 +76,7 @@ function oneRaid(state: SeasonState, leagueIds: readonly TeamId[], sellerId: Tea
     if (sellerSquad.length - 1 < MARKET.minSquadAfterSale) return undefined
     if (sellerSquad.filter((p) => p.position === star.position).length - 1 < (MARKET.minByPosition[star.position] ?? 1)) continue
     const fee = Math.round((askingPrice(star, sellerSquad, date, seller) * DYNASTY.feeShare) / 10_000) * 10_000
-    let best: { team: Team; gain: number; salary: number } | undefined
+    let best: { team: Team; score: number; salary: number } | undefined
     for (const rival of rivals) {
       const squad = squads.get(rival.id) ?? []
       if (squad.length >= SQUAD_MAX) continue
@@ -87,7 +87,9 @@ function oneRaid(state: SeasonState, leagueIds: readonly TeamId[], sellerId: Tea
       const salary = expectedSalary(star, rival)
       if (salary > rival.finances.salaryBudget - monthlyPayroll(squad)) continue
       if (fee > rival.finances.balance * DYNASTY.maxBalanceShare) continue
-      if (!best || gain > best.gain || (gain === best.gain && rival.id < best.team.id)) best = { team: rival, gain, salary }
+      // Quem também é campeão recente pesa contra: a estrela vai para o rival que ainda não domina, senão dois clubes dividiriam o título para sempre.
+      const score = gain - DYNASTY.titlePenalty * titlesInWindow(rival, false)
+      if (!best || score > best.score || (score === best.score && rival.id < best.team.id)) best = { team: rival, score, salary }
     }
     if (!best) continue
     const moved = executeTransfer(state, { playerId: star.id, toTeamId: best.team.id, fee, salary: best.salary, contractEnd: contractEndIn(state, best.team.id, years), kind: 'purchase', date })
