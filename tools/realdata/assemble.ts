@@ -33,6 +33,8 @@ export type IssueKind =
   | 'player-no-wikidata'
   | 'player-duplicate'
   | 'player-not-person'
+  | 'player-wrong-item'
+  | 'player-name-suspect'
   | 'player-to-academy'
   | 'player-freed'
   | 'player-generated'
@@ -162,11 +164,34 @@ function ageOn(birth: string, on: Date): number {
 }
 
 /** Item do Wikidata sem nascimento, país, posição nem pé: não parece uma pessoa. */
-const hasNoPersonData = (wd: PlayerInfo): boolean => !wd.birthDate && wd.birthYear === undefined && wd.nationalities.length === 0 && wd.positions.length === 0 && !wd.foot
-/** Páginas a partir das quais um item sem dados de pessoa é descartado (jogador de verdade sem nenhum dado quase não tem páginas em outras línguas). */
-const NOT_PERSON_SITELINKS = 12
+export const hasNoPersonData = (wd: PlayerInfo): boolean => !wd.birthDate && wd.birthYear === undefined && wd.nationalities.length === 0 && wd.positions.length === 0 && !wd.foot
 /** Itens sem dados de pessoa num mesmo elenco a partir dos quais a tabela toda é descartada como patrocinadores ou cidades. */
 const BOGUS_TABLE_ENTRIES = 8
+
+/** Páginas a partir das quais um item sem dados de pessoa é descartado quando não se sabe o que ele é (coleta antiga). */
+const NOT_PERSON_SITELINKS = 12
+
+/**
+ * Nome do jogador: o rótulo do Wikidata serve quando combina com a Wikipedia (alguma palavra em comum com o nome da tabela ou com o título do
+ * artigo) ou quando pelo menos duas línguas o repetem. Um rótulo que não combina e que só uma língua tem é vandalismo (\"Federico Messiano\" no
+ * item do Phil Foden): vale o rótulo que a maioria das línguas repete, ou, sem maioria, o nome da tabela. Sem os rótulos em outras línguas
+ * (coleta antiga), vale o rótulo como antes.
+ */
+export function resolveName(wd: PlayerInfo, entry: { display: string; title?: string }): { name: string } {
+  const name = wd.name as string
+  const words = (text: string): string[] => strip(text).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 2)
+  const mine = words(name)
+  const shared = (text: string): boolean => words(text).some((w) => mine.includes(w))
+  if (shared(entry.display) || (entry.title !== undefined && shared(entry.title)) || !wd.labels) return { name }
+  const counts = new Map<string, { text: string; n: number }>()
+  for (const l of wd.labels) {
+    const key = strip(l).toLowerCase().replace(/[^a-z0-9]/g, '')
+    counts.set(key, { text: l, n: (counts.get(key)?.n ?? 0) + 1 })
+  }
+  if ((counts.get(strip(name).toLowerCase().replace(/[^a-z0-9]/g, ''))?.n ?? 0) >= 2) return { name }
+  const majority = [...counts.values()].sort((x, y) => y.n - x.n)[0]
+  return { name: majority && majority.n >= 2 ? majority.text : entry.display }
+}
 
 export const newAssembleState = (): AssembleState => ({ abbreviations: new Set(), playerIds: new Set() })
 
@@ -290,16 +315,29 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
       return info !== undefined && hasNoPersonData(info)
     }).length >= BOGUS_TABLE_ENTRIES
     for (const entry of squad?.entries ?? []) {
-      const articleQid = entry.title ? input.articleToQid.get(articleKey(entry)) : undefined
-      const wd = articleQid ? input.players.get(articleQid) : undefined
-      const pid = playerId(articleQid, info.qid, entry.display)
-      const label = wd?.name ?? entry.display
-      // Link da tabela que não leva a uma pessoa (patrocinador, cidade, clube): o item não tem nascimento, país, posição nem pé e é conhecido
-      // demais para ser um jogador sem dados, ou a tabela inteira é de itens assim (uma lista de patrocinadores lida como elenco).
-      if (wd && hasNoPersonData(wd) && ((wd.sitelinks ?? 0) >= NOT_PERSON_SITELINKS || bogusTable)) {
-        issue('player-not-person', 'o link da tabela do elenco não leva a um jogador (patrocinador, cidade ou clube); descartado', { club: name, player: label, id: pid })
-        continue
+      let articleQid = entry.title ? input.articleToQid.get(articleKey(entry)) : undefined
+      let wd = articleQid ? input.players.get(articleQid) : undefined
+      // Item sem nenhum dado de pessoa. Sabendo o que ele é (consulta ao Wikidata): ser humano = jogador de item novo, fica; página de homônimos com
+      // nacionalidade na tabela = o link caiu na página errada, o jogador fica sem o item (a fama e o id seriam de outra coisa); patrocinador, clube
+      // ou cidade = descartado. Coleta antiga, sem essa informação: descartado se muito conhecido (12 páginas ou mais) ou se a tabela toda é assim.
+      if (wd && hasNoPersonData(wd)) {
+        const knownKind = wd.human !== undefined
+        const keep = knownKind ? wd.human === true && !bogusTable : (wd.sitelinks ?? 0) < NOT_PERSON_SITELINKS && !bogusTable
+        const wrongPage = knownKind && wd.disambiguation === true && !!entry.nat && !bogusTable
+        if (!keep && !wrongPage) {
+          issue('player-not-person', 'o link da tabela do elenco não leva a um jogador (patrocinador, cidade, clube ou página de homônimos); descartado', { club: name, player: wd.name ?? entry.display, id: playerId(articleQid, info.qid, entry.display) })
+          continue
+        }
+        if (wrongPage) {
+          issue('player-wrong-item', 'o link da tabela leva a uma página de homônimos; ignorada, só valem os dados da tabela', { club: name, player: entry.display, id: playerId(articleQid, info.qid, entry.display) })
+          articleQid = undefined
+          wd = undefined
+        }
       }
+      const pid = playerId(articleQid, info.qid, entry.display)
+      const named = wd?.name !== undefined ? resolveName(wd, entry) : undefined
+      const label = named?.name ?? entry.display
+      if (named && named.name !== wd?.name) issue('player-name-suspect', `o rótulo do Wikidata ("${wd?.name}") não tem a ver com a Wikipedia e só uma língua o tem; usado "${named.name}"`, { club: name, player: entry.display, id: pid })
       if (state.playerIds.has(pid)) {
         issue('player-duplicate', 'já está no elenco de outro clube (emprestado?); mantido o primeiro', { club: name, player: label, id: pid })
         continue
@@ -324,7 +362,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
         issue('player-nationality', `país não encontrado (${entry.nat ?? wd?.nationalities.join('/') ?? 'sem dado'}); usado o da liga`, { club: name, player: label, id: pid })
       }
 
-      const nickname = wd?.name && entry.display.length < wd.name.length && !same(entry.display, wd.name) ? entry.display : wd?.nickname
+      const nickname = wd?.name && label === wd.name && entry.display.length < wd.name.length && !same(entry.display, wd.name) ? entry.display : wd?.nickname
       const row: Record<string, string | number | undefined> = {
         id: pid,
         name: label,

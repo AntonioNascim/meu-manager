@@ -1,6 +1,6 @@
 /** Coleta de uma liga: clubes da temporada (Wikipedia), detalhes dos clubes e dos jogadores (Wikidata) e elencos atuais (Wikipedia em inglês e no idioma do país). */
 import type { ClubSource, Issue, LeagueInput, SquadSource } from './assemble'
-import { articleKey } from './assemble'
+import { articleKey, hasNoPersonData } from './assemble'
 import type { Fetcher } from './http'
 import { seasonTitleCandidates } from './leagues'
 import type { RealLeague } from './leagues'
@@ -9,7 +9,7 @@ import type { LocalEntry } from './localSquad'
 import { mergeSquads } from './merge'
 import { fetchViews, MIN_FAME_FOR_VIEWS } from './pageviews'
 import { articleUrl, fetchPages, fetchSquadHtml } from './wikipedia'
-import { fetchClubs, fetchFootballClubs, fetchPlayers } from './wikidata'
+import { fetchClubs, fetchFootballClubs, fetchKinds, fetchLabels, fetchPlayers } from './wikidata'
 import { parseClubInfobox, parseSeasonLinkGroups, parseSquad } from './wikitext'
 import type { WikiLink } from './wikitext'
 
@@ -164,6 +164,16 @@ export async function collectLeague(league: RealLeague, options: CollectOptions)
     for (const [title, page] of await fetchPages(fetcher, localTitles, { content: false, lang })) if (page.qid) articleToQid.set(articleKey({ title, lang }), page.qid)
   }
   const players = await fetchPlayers(fetcher, [...new Set(articleToQid.values())], league.languages)
+  // Rótulos em várias línguas: um nome que só o rótulo em inglês tem (e que a tabela da Wikipedia desmente) é vandalismo do Wikidata.
+  for (const [qid, labels] of await fetchLabels(fetcher, [...players.keys()])) {
+    const player = players.get(qid)
+    if (player) player.labels = labels
+  }
+  // Item sem dado de pessoa: é um ser humano (jogador de item novo) ou outra coisa (patrocinador, clube, cidade, página de homônimos)?
+  for (const [qid, kind] of await fetchKinds(fetcher, [...players.values()].filter(hasNoPersonData).map((p) => p.qid))) {
+    const player = players.get(qid)
+    if (player) Object.assign(player, kind)
+  }
 
   let views: Map<string, number> | undefined
   if (options.viewsFetcher) {

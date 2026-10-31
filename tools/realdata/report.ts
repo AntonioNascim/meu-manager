@@ -38,7 +38,9 @@ const KIND_TEXT: Record<IssueKind, string> = {
   'player-nationality': 'Nacionalidade incerta',
   'player-no-wikidata': 'Jogador sem artigo na Wikipedia (só nome, país e setor)',
   'player-duplicate': 'Jogador em dois elencos (mantido o primeiro)',
-  'player-not-person': 'Linha do elenco que não é um jogador (patrocinador ou cidade); descartada',
+  'player-not-person': 'Linha do elenco que não é um jogador (patrocinador, cidade, clube ou página de homônimos); descartada',
+  'player-wrong-item': 'Link do elenco levava a um item sem dados de pessoa; valem só os dados da tabela',
+  'player-name-suspect': 'Nome do Wikidata desmentido pela Wikipedia (possível vandalismo); usado o nome da tabela',
 }
 
 const ORDER = Object.keys(KIND_TEXT) as IssueKind[]

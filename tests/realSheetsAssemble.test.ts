@@ -248,3 +248,66 @@ describe('acesso à rede', () => {
     expect(await again.getJson('https://exemplo.test/d')).toEqual({ n: 2 })
   })
 })
+
+describe('identidade dos jogadores (patrocinadores, homônimos e rótulos vandalizados)', () => {
+  const base = input()
+  const extra = (entries: { title?: string; display: string; nat?: string; pos?: string }[], players: [string, PlayerInfo][]): LeagueInput => {
+    const squad = base.squads.get('Q1')!
+    const articleToQid = new Map(base.articleToQid)
+    const map = new Map(base.players)
+    for (const [title, info] of players) (articleToQid.set(title, info.qid), map.set(info.qid, info))
+    return { ...base, players: map, articleToQid, squads: new Map([['Q1', { entries: [...squad.entries, ...entries] }]]) }
+  }
+  const nothing = (qid: string, sitelinks: number): PlayerInfo => ({ qid, nationalities: [], positions: [], sitelinks })
+  const names = (sheets: ReturnType<typeof assembleLeague>): string[] => parsePlayersCsv(sheets.playersCsv, { leagues: [{ id: 'br-1' }], clubs: parseClubsCsv(sheets.clubsCsv, { leagues: [{ id: 'br-1' }], clubs: [], players: [] } as unknown as DataPackage).rows.map((r) => r.value), players: [] } as unknown as DataPackage).rows.map((r) => r.value.name)
+
+  it('descarta item sem dados de pessoa que não é ser humano, mesmo com poucas páginas e nacionalidade na tabela (Claus-7, OneFit)', () => {
+    const brand = (qid: string): PlayerInfo => ({ ...nothing(qid, 1), human: false, disambiguation: false })
+    const sheets = assembleLeague(extra([{ title: 'Claus-7', display: 'Claus-7', nat: 'CHI', pos: 'MF' }, { title: 'OneFit', display: 'OneFit', nat: 'CHI', pos: 'FW' }], [['Claus-7', brand('Q900')], ['OneFit', brand('Q901')]]), newAssembleState())
+    expect(sheets.issues.filter((i) => i.kind === 'player-not-person').map((i) => i.player).sort()).toEqual(['Claus-7', 'OneFit'])
+    expect(sheets.playersCsv).not.toContain('Claus-7')
+    expect(sheets.playersCsv).not.toContain('OneFit')
+  })
+
+  it('jogador de item novo (ser humano, sem outros dados) fica', () => {
+    const sheets = assembleLeague(extra([{ title: 'Garoto Novo', display: 'Garoto Novo', nat: 'BRA', pos: 'FW' }], [['Garoto Novo', { ...nothing('Q906', 1), human: true, disambiguation: false }]]), newAssembleState())
+    expect(sheets.playersCsv).toContain('Garoto Novo')
+    expect(sheets.playersCsv).toContain('wd-Q906')
+  })
+
+  it('coleta antiga, sem saber o que o item é: descarta o muito conhecido e mantém o de poucas páginas', () => {
+    const sheets = assembleLeague(extra([{ title: 'Adidas', display: 'Adidas', nat: 'GER', pos: 'FW' }, { title: 'Garoto Antigo', display: 'Garoto Antigo', pos: 'FW' }], [['Adidas', nothing('Q907', 107)], ['Garoto Antigo', nothing('Q908', 1)]]), newAssembleState())
+    expect(sheets.playersCsv).not.toContain('Adidas')
+    expect(sheets.playersCsv).toContain('Garoto Antigo')
+  })
+
+  it('página de homônimos com nacionalidade na tabela: o jogador fica, mas sem o id nem a fama do item errado', () => {
+    const sheets = assembleLeague(extra([{ title: 'José Torres', display: 'José Torres', nat: 'CHI', pos: 'DF' }], [['José Torres', { ...nothing('Q902', 9), human: false, disambiguation: true }]]), newAssembleState())
+    expect(sheets.issues.some((i) => i.kind === 'player-wrong-item')).toBe(true)
+    expect(sheets.playersCsv).toContain('José Torres')
+    expect(sheets.playersCsv).not.toContain('wd-Q902')
+  })
+
+  it('rótulo vandalizado que só uma língua tem perde para o nome da Wikipedia (Federico Messiano → Phil Foden)', () => {
+    const foden: PlayerInfo = wd('Q903', { name: 'Federico Messiano', labels: ['Federico Messiano', 'Phil Foden', 'Phil Foden', 'Phil Foden'] })
+    const sheets = assembleLeague(extra([{ title: 'Phil Foden', display: 'Phil Foden', nat: 'ENG', pos: 'MF' }], [['Phil Foden', foden]]), newAssembleState())
+    expect(names(sheets)).toContain('Phil Foden')
+    expect(names(sheets)).not.toContain('Federico Messiano')
+    const line = sheets.playersCsv.split('\r\n').find((l) => l.startsWith('wd-Q903;')) ?? ''
+    expect(line.split(';')[2]).toBe('')
+    expect(sheets.issues.some((i) => i.kind === 'player-name-suspect')).toBe(true)
+  })
+
+  it('nome completo legítimo (apelido na tabela) continua valendo quando outras línguas o repetem', () => {
+    const fred: PlayerInfo = wd('Q904', { name: 'Frederico Rodrigues Santos', labels: ['Frederico Rodrigues Santos', 'Frederico Rodrigues Santos', 'Fred'] })
+    const sheets = assembleLeague(extra([{ title: 'Fred', display: 'Fred', nat: 'BRA', pos: 'MF' }], [['Fred', fred]]), newAssembleState())
+    expect(names(sheets)).toContain('Frederico Rodrigues Santos')
+    expect(sheets.issues.some((i) => i.kind === 'player-name-suspect')).toBe(false)
+  })
+
+  it('sem os rótulos em outras línguas (coleta antiga), o rótulo vale como antes', () => {
+    const old: PlayerInfo = wd('Q905', { name: 'Gabigol' })
+    const sheets = assembleLeague(extra([{ title: 'Gabriel Barbosa', display: 'Gabriel Barbosa', nat: 'BRA', pos: 'FW' }], [['Gabriel Barbosa', old]]), newAssembleState())
+    expect(names(sheets)).toContain('Gabigol')
+  })
+})

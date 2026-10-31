@@ -36,6 +36,12 @@ export interface PlayerInfo {
   nickname?: string
   /** Número de páginas do item em outras línguas: mede o quanto o jogador é conhecido. */
   sitelinks?: number
+  /** Rótulos do item em várias línguas: servem para desconfiar de um nome que só uma língua tem (vandalismo no Wikidata). */
+  labels?: string[]
+  /** Só para itens sem nenhum dado de pessoa: o item é "ser humano" no Wikidata? (item novo de jogador, sim; patrocinador, clube ou cidade, não) */
+  human?: boolean
+  /** Idem: o item é uma página de homônimos (o link da tabela caiu na página errada). */
+  disambiguation?: boolean
 }
 
 export const qidOf = (uri: string): string => uri.slice(uri.lastIndexOf('/') + 1)
@@ -184,4 +190,34 @@ export async function fetchPlayers(fetcher: Fetcher, qids: readonly string[], la
   const players = new Map<string, PlayerInfo>()
   for (const batch of chunks(qids, 60)) for (const [qid, player] of aggregatePlayerRows(await sparql(fetcher, playersQuery(batch, languages)))) players.set(qid, player)
   return players
+}
+
+/** Línguas cujos rótulos servem de conferência do nome de um jogador. */
+export const LABEL_LANGUAGES = ['en', 'pt', 'es', 'fr', 'de', 'it', 'nl']
+
+/** Rótulos de cada item em várias línguas (API do Wikidata, 50 itens por consulta): um nome vandalizado costuma estar só em uma delas. */
+export async function fetchLabels(fetcher: Fetcher, qids: readonly string[]): Promise<Map<string, string[]>> {
+  const labels = new Map<string, string[]>()
+  for (const batch of chunks(qids, 50)) {
+    const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${batch.join('|')}&props=labels&languages=${LABEL_LANGUAGES.join('|')}&format=json`
+    const response = await fetcher.getJson<{ entities?: Record<string, { labels?: Record<string, { value: string }> }> }>(url)
+    for (const [qid, entity] of Object.entries(response.entities ?? {})) labels.set(qid, Object.values(entity.labels ?? {}).map((l) => l.value))
+  }
+  return labels
+}
+
+/** Para itens sem dado de pessoa: quais são `ser humano` e quais são páginas de homônimos (consulta SPARQL pequena, só desses itens). */
+export async function fetchKinds(fetcher: Fetcher, qids: readonly string[]): Promise<Map<string, { human: boolean; disambiguation: boolean }>> {
+  const kinds = new Map<string, { human: boolean; disambiguation: boolean }>()
+  for (const batch of chunks(qids, 100)) {
+    const query = `SELECT ?p ?kind WHERE { VALUES ?p { ${values(batch)} } OPTIONAL { ?p wdt:P31 ?k . ?k rdfs:label ?kind . FILTER(LANG(?kind) = "en") } }`
+    for (const row of await sparql(fetcher, query)) {
+      const qid = qidOf(row.p as string)
+      const item = kinds.get(qid) ?? { human: false, disambiguation: false }
+      if (row.kind === 'human') item.human = true
+      if (row.kind && /disambiguation/i.test(row.kind)) item.disambiguation = true
+      kinds.set(qid, item)
+    }
+  }
+  return kinds
 }
