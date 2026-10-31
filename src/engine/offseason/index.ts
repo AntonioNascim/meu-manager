@@ -179,7 +179,8 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     if (!scope.has(t.id)) return t
     const finalPosition = finalPositions[t.id]?.position ?? 10
     const expected = rankByReputation.get(t.id) ?? 10
-    let delta = clamp(Math.round((expected - finalPosition) / R.positionStep), -R.positionMax, R.positionMax)
+    const rawDelta = clamp(Math.round((expected - finalPosition) / R.positionStep), -R.positionMax, R.positionMax)
+    let delta = rawDelta
     if (champions.includes(t.id)) delta += R.champion
     if (promoted.includes(t.id)) delta += R.promoted
     if (relegated.includes(t.id)) delta += R.relegated
@@ -192,7 +193,9 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     const anchored = t.prestige !== undefined && tier === t.tier
     const pull = anchored ? R.prestigePull : tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
     const target = anchored ? (tier === 1 ? (t.prestige as number) : Math.min(t.prestige as number, mean + R.prestigeAboveTier)) : mean
-    const pulled = t.reputation + delta + pull * (target - t.reputation) + (continental.get(t.id) ?? 0)
+    // Com prestígio, o resultado pesa pouco (`anchoredResultShare`); promoção e rebaixamento valem inteiros.
+    const results = anchored ? R.anchoredResultShare : 1
+    const pulled = t.reputation + (delta - rawDelta) + rawDelta * results + pull * (target - t.reputation) + (continental.get(t.id) ?? 0) * results
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId

@@ -255,7 +255,7 @@ function northAmerica(leagues: readonly ContinentalLeague[]): PackageCup[] | und
         { name: 'Final', legs: 2, date: [5, 13], legGap: 7 },
       ],
       weekday: 3,
-      seeding: 'seeded',
+      seeding: 'random',
       homeOfSingleLeg: 'draw',
       prize: prize([1_000_000, 1_500_000, 2_000_000, 3_000_000], 7_000_000, 3_000_000),
     },

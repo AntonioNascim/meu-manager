@@ -623,7 +623,7 @@ export const MARKET = {
  * nas últimas `window` temporadas perde uma estrela para um rival, e mais uma por título além do limiar, até `maxRaids`. A estrela vai por `feeShare` do preço pedido (se o rival não paga tanto, pelo que ele pode, ao menos `minFeeShare` do pedido; folha até `salaryStretch` × a folga) para o
  * rival que mais ganha com ela, menos `titlePenalty` pontos por título recente do próprio rival (ganho mínimo `minGain` pontos de força, até `maxBalanceShare` do caixa dele) entre as `starPool` melhores do campeão com até `maxAge` anos.
  */
-export const DYNASTY = { window: 5, threshold: 3, maxRaids: 3, feeShare: 0.7, minFeeShare: 0.25, minGain: 1, maxBalanceShare: 0.5, salaryStretch: 1.3, starPool: 6, maxAge: 33, titlePenalty: 3 } as const
+export const DYNASTY = { window: 5, threshold: 3, maxRaids: 2, feeShare: 0.7, minFeeShare: 0.25, minGain: 1, maxBalanceShare: 0.5, salaryStretch: 1.3, starPool: 6, maxAge: 33, titlePenalty: 3 } as const
 
 /** Diretoria: a confiança vem dos pontos por jogo comparados à meta e ao limite de demissão. */
 export const BOARD = {
@@ -687,6 +687,8 @@ export const OFFSEASON = {
     prestigeDrift: 0.04,
     /** Fora da primeira divisão o prestígio não puxa a reputação para mais que a média da divisão + isto (um gigante rebaixado volta mais forte que os outros, mas não ao patamar antigo). */
     prestigeAboveTier: 5,
+    /** Clube com prestígio na própria divisão: fração do efeito da posição final e dos títulos continentais na reputação. Um gigante passa anos sem título e continua gigante; quem o mantém é o prestígio. */
+    anchoredResultShare: 0.3,
     champion: 0,
     /** Reputação a mais (antes de arredondar) para o campeão e o vice de uma copa continental na temporada. */
     continentalChampion: 0.8,
