@@ -16,7 +16,10 @@
     "analyze:quick": "node tools/run.mjs quickCompare",
     "dados:planilhas": "node tools/run.mjs buildRealSheets",
     "dados:aplicar": "node tools/run.mjs applyRealTasks",
+    "dados:pendencias": "node tools/run.mjs pendingTasks",
     "dados:finalizar": "node tools/run.mjs finalizeRealSheets",
+    "dados:elencos": "node tools/run.mjs squadTemplates",
+    "dados:apifootball": "node tools/run.mjs apiFootballSample",
     "typecheck": "tsc -b --noEmit"
   },
   "type": "module",

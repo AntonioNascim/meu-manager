@@ -13,6 +13,8 @@ import { ATTRIBUTE_NAMES } from '../../src/engine/types'
 import type { Attributes, Nationality, Position } from '../../src/engine/types'
 import { blendFame, generateLeagueAttributes } from './attributes'
 import type { GeneratedPlayer, Override, RosterClub, RosterPlayer } from './attributes'
+import { applyLeagueSquads, squadFiles } from './clubSquads'
+import type { SquadReport } from './clubSquads'
 import { loadCorrections, patchSheet, readSheet, writeSheet } from './corrections'
 import type { Correction, Sheet } from './corrections'
 import { REAL_LEAGUES } from './leagues'
@@ -84,6 +86,8 @@ export interface FinalizeResult {
   leagueStrength: { league: string; top: number; median: number; bottom: number }[]
   /** Correções guardadas que não acharam o registro nas planilhas (saiu do elenco?). */
   orphans: Correction[]
+  /** Planilhas de elenco por clube (`elencos-reais/`) aplicadas e os problemas delas. */
+  squads: SquadReport
   /** Ajuste das visualizações recentes à fama de carreira (regressão), quando há visualizações. */
   viewsFit?: { intercept: number; slope: number; n: number; r: number }
 }
@@ -127,6 +131,8 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
   const leagues: string[] = []
   const leagueStrength: FinalizeResult['leagueStrength'] = []
   let players = 0
+  const squads: SquadReport = { clubs: [], problems: [] }
+  const usedSquadFiles = new Set<string>()
 
   for (const league of REAL_LEAGUES) {
     const files = { clubs: join(dir, `${league.id}-clubes.csv`), players: join(dir, `${league.id}-jogadores.csv`), academy: join(dir, `${league.id}-base.csv`) }
@@ -135,6 +141,8 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
     const clubSheet = readSheet(readFileSync(files.clubs, 'utf8'))
     const playerSheet = readSheet(readFileSync(files.players, 'utf8'))
     const academySheet: Sheet = existsSync(files.academy) ? readSheet(readFileSync(files.academy, 'utf8')) : { header: playerSheet.header, rows: [] }
+    // Elencos reais por clube (planilhas feitas à mão) trocam os jogadores gerados; antes das correções, que ainda valem por cima.
+    for (const file of applyLeagueSquads(dir, league, clubSheet, playerSheet, { startYear, overrides }, squads)) usedSquadFiles.add(file)
     for (const sheet of [clubSheet, playerSheet, academySheet]) patchSheet(sheet, corrections)
     for (const sheet of [clubSheet, playerSheet, academySheet]) for (const row of sheet.rows) seen.add(row.id ?? '')
 
@@ -175,6 +183,8 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
     packageSheets.push({ leagueId: league.id, stats: { clubs: clubSheet.rows.length }, clubsCsv: writeSheet(clubSheet), playersCsv: writeSheet(playerSheet), academyCsv: writeSheet(academySheet) })
   }
 
+  for (const file of squadFiles(dir)) if (!usedSquadFiles.has(file)) squads.problems.push(`${file}: nenhum clube tem este nome de arquivo (o certo é <liga>-<clube>.csv, como em br-3-anapolis.csv)`)
+
   ranked.sort((a, b) => b.overall - a.overall || b.fame - a.fame || a.id.localeCompare(b.id))
   ranked.forEach((p, i) => (p.rank = i + 1))
   clubs.sort((a, b) => b.strength - a.strength || a.id.localeCompare(b.id))
@@ -197,6 +207,7 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
     distribution,
     leagueStrength,
     orphans: corrections.filter((c) => !seen.has(c.id)),
+    squads,
     ...(blended.fit ? { viewsFit: blended.fit } : {}),
   }
 }
@@ -230,6 +241,8 @@ export function summaryText(result: FinalizeResult, players = 20, clubs = 10): s
   lines.push('', `Top ${clubs} clubes (média dos ${CLUB_STRENGTH_PLAYERS} melhores)`)
   for (const c of result.topClubs.slice(0, clubs)) lines.push(`  ${pad(c.rank, 3)} ${pad(c.name, 28)} ${pad(c.league, 5)} força ${c.strength.toFixed(1)}  melhor: ${c.best} (${Math.round(c.bestOverall)})`)
   if (result.viewsFit) lines.push('', `Visualizações recentes × fama de carreira: ${result.viewsFit.n} jogadores, correlação ${result.viewsFit.r.toFixed(2)} (a fama de agora mistura as duas)`)
+  for (const c of result.squads.clubs) lines.push(`Elenco real de ${c.club} (${c.league}): ${c.added} novos, ${c.updated} atualizados, ${c.replacedGenerated} gerados trocados${c.removed > 0 ? `, ${c.removed} tirados` : ''}; elenco com ${c.size}${c.open > 0 ? `; ${c.open} vagas ainda em branco` : ''}`)
+  for (const problem of result.squads.problems) lines.push(`ATENÇÃO elencos-reais/${problem}`)
   const v = result.validation
   lines.push('', `Validação do pacote-real.json: ${v.errors} erros, ${v.warnings} avisos, ${v.rejected} linhas recusadas`)
   if (result.orphans.length > 0) lines.push(`Atenção: ${result.orphans.length} correções guardadas não acharam o registro nas planilhas (o jogador saiu do elenco?): ${result.orphans.slice(0, 5).map((c) => `${c.player ?? c.club ?? c.id} (${c.field})`).join(', ')}${result.orphans.length > 5 ? '…' : ''}`)
