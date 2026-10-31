@@ -144,6 +144,8 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
       colors: club.colors,
       stadium: { ...club.stadium },
       reputation: club.reputation,
+      // Clube sem dados de jogo no pacote (pacote real, planilhas): a reputação do pacote é o prestígio histórico dele.
+      ...(club.game ? {} : { prestige: club.reputation }),
       squad: squad.map((p) => p.id),
       tactic: game.tactic,
       finances: game.finances,

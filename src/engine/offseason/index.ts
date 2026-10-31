@@ -184,8 +184,11 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     const tier = landing ? landing.tier : t.tier
     // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
     const mean = landing?.reputationMean ?? R.tierMean[tier] ?? t.reputation
-    const pull = tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
-    const pulled = t.reputation + delta + pull * (mean - t.reputation) + (continental.get(t.id) ?? 0)
+    // Com prestígio (mundo real), quem fica na divisão volta ao prestígio dele (os gigantes se mantêm); quem muda de divisão segue a regra da média.
+    const anchored = t.prestige !== undefined && tier === t.tier
+    const pull = anchored ? R.prestigePull : tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
+    const target = anchored ? (t.prestige as number) : mean
+    const pulled = t.reputation + delta + pull * (target - t.reputation) + (continental.get(t.id) ?? 0)
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId
@@ -194,6 +197,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
       tier,
       ...(landing?.economy ? { economy: landing.economy } : {}),
       reputation,
+      ...(t.prestige !== undefined ? { prestige: Math.round((t.prestige + R.prestigeDrift * (reputation - t.prestige)) * 100) / 100 } : {}),
       fanBase: Math.round((t.fanBase * (1 + 0.03 * delta)) / 1_000) * 1_000,
       ticketPrice: ai ? defaultTicketPrice(reputation, { economy: landing?.economy ?? t.economy }) : t.ticketPrice,
       history: [...t.history, { year, tier: t.tier, finalPosition, champion: champions.includes(t.id) }],

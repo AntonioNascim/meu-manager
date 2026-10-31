@@ -675,6 +675,9 @@ export const OFFSEASON = {
     tierPull: 0.3,
     /** Na primeira divisão, quem fica nela e está acima da média perde reputação mais devagar (nas séries de acesso o puxão é simétrico, para a média delas não andar): os clubes grandes se mantêm grandes (sem isso o topo encolhia 0,3 da distância por ano e as ligas ficavam sem dinastias). */
     tierPullAbove: 0.1,
+    /** Clube com prestígio (`Team.prestige`, mundo real): quanto da distância até o prestígio a reputação recupera por ano (em vez do puxão para a média da divisão) e quanto o prestígio anda na direção da reputação. */
+    prestigePull: 0.25,
+    prestigeDrift: 0.08,
     champion: 0,
     /** Reputação a mais (antes de arredondar) para o campeão e o vice de uma copa continental na temporada. */
     continentalChampion: 0.8,

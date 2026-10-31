@@ -6,7 +6,7 @@
 import { createYouth } from '../src/data/generateYouth'
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { advanceSeason } from '../src/engine/offseason'
 import { advanceUntil, createSeason } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
@@ -14,7 +14,7 @@ import type { SeasonState } from '../src/engine/season'
 const args = process.argv.slice(2)
 const years = Number(args.includes('--years') ? args[args.indexOf('--years') + 1] : 6)
 // O mundo do jogo: pacote de 15 ligas importado como o jogo importa (calendários de cada país, copas padrão, contratos em 30/6 na Europa).
-const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(7))))
+const { pkg } = validatePackage(JSON.parse(JSON.stringify(measurementPackage(7))))
 if (!pkg) throw new Error('pacote inválido')
 const world = loadWorld(7, pkg)
 const cups = process.env.NO_CUPS ? undefined : world.cups

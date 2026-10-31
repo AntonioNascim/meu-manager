@@ -5,7 +5,7 @@
  */
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { stageList } from '../src/engine/cups'
 import { createSeason, simulateToSeasonEnd } from '../src/engine/season'
 import { addDays, weekday } from '../src/engine/season/dates'
@@ -15,7 +15,7 @@ const args = process.argv.slice(2)
 const seed = Number(args[args.indexOf('--seed') + 1] || 7)
 
 function season(withCups: boolean) {
-  const raw = buildScalePackage(seed)
+  const raw = measurementPackage(seed)
   const { pkg } = validatePackage(JSON.parse(JSON.stringify(withCups ? raw : { ...raw, cups: [] })))
   if (!pkg) throw new Error('pacote inválido')
   const world = loadWorld(seed, pkg)

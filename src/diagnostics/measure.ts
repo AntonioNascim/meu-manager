@@ -28,8 +28,8 @@ export const REFERENCE_TARGETS = {
   saveWorstMs: 4000,
 } as const
 
-export type WorldChoice = 'full' | 'brazil'
-export const WORLD_SPECS: Record<WorldChoice, LeagueSpec[]> = { full: FULL_WORLD, brazil: BRAZIL_ONLY }
+export type WorldChoice = 'full' | 'brazil' | 'real'
+export const WORLD_SPECS: Record<WorldChoice, LeagueSpec[]> = { full: FULL_WORLD, brazil: BRAZIL_ONLY, real: FULL_WORLD }
 
 export interface DeviceInfo {
   /** Modelo informado pelo navegador (Chrome no Android informa; Safari e Firefox não). */
@@ -191,6 +191,8 @@ export interface Measurement {
 
 export interface MeasureOptions {
   world: WorldChoice
+  /** Pacote real já lido do arquivo (obrigatório com `world: 'real'`). */
+  rawPackage?: unknown
   /** Número máximo de avanços (padrão: a temporada inteira). */
   maxAdvances?: number
   seed?: number
@@ -215,7 +217,7 @@ export async function measureWorld(options: MeasureOptions): Promise<Measurement
   const readMemory = options.readMemory ?? chromeMemory
   const yieldToUi = options.yieldToUi ?? (() => Promise.resolve())
   const wall = performance.now()
-  const built = buildDiagnosticGame(options.world, options.seed ?? 7)
+  const built = buildDiagnosticGame(options.world, options.seed ?? 7, options.rawPackage)
   let game: Game = built.game
   await yieldToUi()
   const s = game.season
@@ -341,7 +343,7 @@ export function formatReport(device: DeviceInfo, m: Measurement, userNote = '', 
     `Indice de velocidade do processador: ${device.speedIndex ?? 'indisponivel'} (maior = mais rapido)`,
     `Texto do navegador: ${device.userAgent}`,
     '',
-    `Mundo: ${m.world === 'full' ? 'completo (21 ligas, com as copas dos países, continentais e mundiais)' : 'Brasil A+B+C, com as copas do Brasil'} - ${m.clubs} clubes, ${m.players} jogadores, ${m.matches} partidas (${m.cupMatches} de ${m.cups} copas)`,
+    `Mundo: ${m.world === 'full' ? 'completo (21 ligas, com as copas dos países, continentais e mundiais)' : m.world === 'real' ? 'REAL (pacote real: 21 ligas, com as copas dos países, continentais e mundiais)' : 'Brasil A+B+C, com as copas do Brasil'} - ${m.clubs} clubes, ${m.players} jogadores, ${m.matches} partidas (${m.cupMatches} de ${m.cups} copas)`,
     `Gerar o mundo: ${f0(m.genMs)} ms | Montar a tabela: ${f0(m.seasonTableMs)} ms`,
     m.finished ? `Temporada inteira: ${f1(m.computeSeconds)} s de calculo (${f1(m.wallSeconds)} s no relogio, ${m.advances} avancos) - meta ${T.seasonSeconds} s: ${ok(m.computeSeconds <= T.seasonSeconds)}` : `Medida parcial: ${m.advances} avancos em ${f1(m.computeSeconds)} s (a temporada nao foi ate o fim)`,
     `Primeiro avanco: ${f1(m.firstMs / 1000)} s`,

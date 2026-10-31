@@ -16,6 +16,14 @@ on:
           - ligas
           - mundo-ampliado
           - personalizada
+      pacote:
+        description: "Mundo medido: o pacote fictício de teste (358 clubes) ou o pacote real de data/pacote-real.json (370 clubes). Vale para todas as medições"
+        type: choice
+        required: true
+        default: ficticio
+        options:
+          - ficticio
+          - real
       sementes:
         description: "continentais: sementes separadas por vírgula (uma execução em paralelo para cada)"
         type: string
@@ -78,6 +86,8 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       MEDICAO: ${{ inputs.medicao }}
+      # "1" = as ferramentas de tools/ e o test:long leem data/pacote-real.json (tools/worldPackage.ts); "0" = o pacote fictício de teste.
+      PACOTE_REAL: ${{ inputs.pacote == 'real' && '1' || '0' }}
       SEMENTE: ${{ matrix.semente }}
       ANOS: ${{ inputs.anos }}
       FOCO: ${{ inputs.foco }}
@@ -100,7 +110,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p resultado
-          echo "Branch: $GITHUB_REF_NAME ($GITHUB_SHA)" | tee resultado/cabecalho.txt
+          echo "Branch: $GITHUB_REF_NAME ($GITHUB_SHA) · pacote: ${{ inputs.pacote }}" | tee resultado/cabecalho.txt
           case "$MEDICAO" in
             continentais)
               echo "Copas continentais: semente $SEMENTE, $ANOS anos, foco $FOCO" | tee -a resultado/cabecalho.txt
@@ -150,7 +160,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: medicao-${{ inputs.medicao }}-semente-${{ matrix.semente }}
+          name: medicao-${{ inputs.medicao }}-${{ inputs.pacote }}-semente-${{ matrix.semente }}
           path: resultado/
           retention-days: 30
           if-no-files-found: warn
