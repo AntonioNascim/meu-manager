@@ -26,8 +26,10 @@ import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { retires, startNewSeason } from './evolution'
+import { dynastyRaids } from './dynasty'
 
 export * from './contracts'
+export * from './dynasty'
 export * from './dueContracts'
 export * from './evolution'
 export * from './renewal'
@@ -107,6 +109,8 @@ function mergeReports(reports: readonly OffseasonReport[], focus: string): Offse
 function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOptions, multi = false): { state: SeasonState; report: OffseasonReport } {
   // `season.phase` é a fase da pirâmide do foco: declarada `end-of-season`, ela vale como encerrada.
   if (!pyramidFinished(state, pyramid) && !(pyramid === focusPyramid(state) && state.season.phase === 'end-of-season')) throw new Error('A temporada ainda não acabou')
+  // Freio contra dinastias: o campeão que domina há anos perde estrelas para os rivais da liga antes de tudo.
+  state = dynastyRaids(state, pyramid, options.userTeamId).state
   const cycle = cycleOfPyramid(state, pyramid)
   const year = cycle.year
   const split = cycle.split
