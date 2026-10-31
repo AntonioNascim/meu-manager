@@ -21,12 +21,14 @@ export const REPUTATION_FIXES: Record<string, Record<string, number>> = {
   'ar-1': { 'Boca Juniors': 17, 'River Plate': 17, Independiente: 15, Racing: 15, 'San Lorenzo': 15, 'Estudiantes (LP)': 14, 'Vélez Sarsfield': 14, "Newell's Old Boys": 13, 'Rosario Central': 13, 'Gimnasia y Esgrima (LP)': 11, 'Argentinos Juniors': 11, 'Lanús': 12, 'Talleres (C)': 11, Tigre: 9 },
   'en-1': { Liverpool: 20, 'Manchester United F.C.': 19, 'Manchester City F.C.': 19, Arsenal: 18, Chelsea: 18, 'Tottenham Hotspur': 15, 'Newcastle United F.C.': 14, 'Aston Villa': 14, Everton: 13 },
   'es-1': { 'Real Madrid': 20, Barcelona: 20, 'Atlético Madrid': 18, Sevilla: 16, Valencia: 16, 'Athletic Bilbao': 15, Villarreal: 14, 'Real Betis': 13, 'Real Sociedad': 13, Espanyol: 11 },
-  'it-1': { Juventus: 19, Inter: 19, Milan: 19, Napoli: 17, Roma: 16, Lazio: 15, Atalanta: 14, Fiorentina: 14, Bologna: 11 },
+  'it-1': { Juventus: 19, Inter: 19, Milan: 19, Napoli: 16, Roma: 14, Lazio: 13, Atalanta: 13, Fiorentina: 12, Bologna: 10 },
   'de-1': { 'Bayern Munich': 20, 'Borussia Dortmund': 18, 'Bayer Leverkusen': 17, 'RB Leipzig': 15, 'Eintracht Frankfurt': 13, 'Schalke 04': 13, 'VfB Stuttgart': 13, 'Borussia Mönchengladbach': 13, 'Werder Bremen': 12, 'Union Berlin': 10, 'SC Freiburg': 10, 'TSG Hoffenheim': 10, 'Mainz 05': 9 },
-  'fr-1': { 'Paris Saint-Germain': 18, Marseille: 16, Lyon: 16, Monaco: 15, Lille: 14, Nice: 12, Rennes: 12, Lens: 11 },
-  'pt-1': { Benfica: 16, Porto: 16, 'Sporting CP': 16, Braga: 13 },
-  'nl-1': { Ajax: 15, PSV: 15, Feyenoord: 15, AZ: 12, Twente: 11 },
+  'fr-1': { 'Paris Saint-Germain': 19, Marseille: 15, Lyon: 14, Monaco: 14, Lille: 13, Nice: 11, Rennes: 11, Lens: 10 },
+  'pt-1': { Benfica: 17, Porto: 17, 'Sporting CP': 16, Braga: 13 },
+  'nl-1': { Ajax: 17, PSV: 16, Feyenoord: 15, AZ: 12, Twente: 11 },
   'mx-1': { 'América': 14, Guadalajara: 13, Monterrey: 13, 'Tigres UANL': 13, 'Cruz Azul': 12, 'Pumas UNAM': 11, Pachuca: 11, Toluca: 11, 'León': 10, 'Santos Laguna': 9, Puebla: 8 },
+  'uy-1': { 'Peñarol': 12, Nacional: 12 },
+  'cl-1': { 'Colo-Colo': 12, 'Universidad de Chile': 11 },
   'co-1': { 'Atlético Nacional': 12, Millonarios: 11, Junior: 11, 'Deportivo Cali': 10, 'Santa Fe': 10, 'América de Cali': 10, 'Once Caldas': 9 },
 }
 

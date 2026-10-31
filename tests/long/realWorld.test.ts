@@ -43,7 +43,7 @@ describe.skipIf(!process.env.PACOTE_REAL || process.env.PACOTE_REAL === '0')(`${
     for (const id of ids) {
       const first = mean(series(id).slice(0, 3).map((l) => l.strength))
       const small = (series(id)[0]?.clubs ?? 20) <= 8
-      for (const d of [1, 2]) expect.soft(Math.abs(decade(id, d, (l) => l.strength) - first), `${id} década ${d + 1}`).toBeLessThan(small ? 5 : id === 'br-3' ? 5 : 4)
+      for (const d of [1, 2]) expect.soft(Math.abs(decade(id, d, (l) => l.strength) - first), `${id} década ${d + 1} (começo ${first.toFixed(1)}, década ${decade(id, d, (l) => l.strength).toFixed(1)})`).toBeLessThan(small ? 5 : id === 'br-3' ? 5 : 4)
       for (let d = 0; d < 3; d++) {
         expect.soft(decade(id, d, (l) => l.meanAge), `${id} idade média`).toBeGreaterThan(24)
         expect.soft(decade(id, d, (l) => l.meanAge), `${id} idade média`).toBeLessThan(28.5)
