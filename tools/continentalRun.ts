@@ -8,7 +8,7 @@ import { writeFileSync } from 'node:fs'
 import { createYouth } from '../src/data/generateYouth'
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { advanceSeason } from '../src/engine/offseason'
 import { advanceUntil, createSeason } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
@@ -99,7 +99,7 @@ export function continentalObserver(): { observer: TurnObserver; run: Continenta
 }
 
 export function simulateContinental(years: number, seed = 7, focus = 'Brazil'): ContinentalRun {
-  const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(seed))))
+  const { pkg } = validatePackage(JSON.parse(JSON.stringify(measurementPackage(seed))))
   if (!pkg) throw new Error('pacote inválido')
   const world = loadWorld(seed, pkg)
   const state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus, ...(world.cups ? { cupSpecs: world.cups } : {}) })

@@ -2,14 +2,14 @@
 import { createYouth } from '../src/data/generateYouth'
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { advanceSeason } from '../src/engine/offseason'
 import { advanceUntil, createSeason, phaseOfPyramid } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
 
 const args = process.argv.slice(2)
 const until = Number(args.includes('--until') ? args[args.indexOf('--until') + 1] : 2030)
-const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(7))))
+const { pkg } = validatePackage(JSON.parse(JSON.stringify(measurementPackage(7))))
 const world = loadWorld(7, pkg!)
 let state: SeasonState = createSeason({ year: 2026, seed: 7, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus: 'Brazil', cupSpecs: world.cups! })
 const turn = (s: SeasonState, pyramid: string) => advanceSeason(s, { createYouth, pyramid })

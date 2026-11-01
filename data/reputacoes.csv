@@ -1,0 +1,371 @@
+﻿liga;clube;reputacao_antes;reputacao_nova;ajustada_a_mao;forca_14_melhores
+af-1;Al Ahly SC;13;13;;59.3
+af-1;Mamelodi Sundowns F.C.;12;12;;58.8
+af-1;Zamalek SC;11;11;;58.2
+af-1;Wydad Athletic Club;9;9;;56.3
+af-1;Espérance Sportive de Tunis;8;8;;56.8
+af-1;Raja Club Athletic;7;7;;57.8
+af-1;TP Mazembe;7;7;;57.5
+af-1;Pyramids FC;6;6;;55.9
+ar-1;Boca Juniors;17;17;sim;65.2
+ar-1;River Plate;17;17;sim;65.7
+ar-1;Independiente;15;15;sim;63.4
+ar-1;Racing;15;15;sim;63.3
+ar-1;San Lorenzo;15;15;sim;64.0
+ar-1;Vélez Sarsfield;14;14;sim;62.9
+ar-1;Estudiantes (LP);14;14;sim;61.3
+ar-1;Rosario Central;13;13;sim;62.0
+ar-1;Newell's Old Boys;13;13;;61.5
+ar-1;Lanús;12;12;sim;62.4
+ar-1;Argentinos Juniors;11;11;sim;61.9
+ar-1;Banfield;11;11;;62.0
+ar-1;Huracán;11;11;;61.7
+ar-1;Gimnasia y Esgrima (LP);11;11;sim;61.7
+ar-1;Talleres (C);11;11;sim;60.9
+ar-1;Belgrano;10;10;;61.1
+ar-1;Defensa y Justicia;10;10;;61.9
+ar-1;Atlético Tucumán;9;9;;60.5
+ar-1;Tigre;9;9;sim;60.4
+ar-1;Unión;9;9;;58.3
+ar-1;Platense;8;8;;60.7
+ar-1;Sarmiento (J);8;8;;58.5
+ar-1;Instituto;8;8;;60.1
+ar-1;Central Córdoba (SdE);7;7;;61.1
+ar-1;Aldosivi;7;7;;57.0
+ar-1;Independiente Rivadavia;7;7;;60.8
+ar-1;Deportivo Riestra;6;6;;58.8
+ar-1;Barracas Central;6;6;;59.7
+ar-1;Estudiantes (RC);5;5;;56.6
+ar-1;Gimnasia y Esgrima (M);5;5;;58.6
+as-1;Al-Nassr;14;14;;63.7
+as-1;Al Hilal SFC;13;13;;63.8
+as-1;Al Ittihad FC;11;11;;61.2
+as-1;Al Sadd Sports Club;10;10;;60.5
+as-1;Urawa Red Diamonds;9;9;;58.8
+as-1;Yokohama F. Marinos;8;8;;59.8
+as-1;Al Ain FC;7;7;;58.4
+as-1;Ulsan HD FC;6;6;;58.0
+br-1;Flamengo;19;19;sim;67.8
+br-1;Palmeiras;19;19;sim;66.7
+br-1;Corinthians;18;18;sim;66.7
+br-1;São Paulo;17;17;sim;65.8
+br-1;Atlético Mineiro;16;16;sim;65.4
+br-1;Grêmio;16;16;sim;65.3
+br-1;Santos;16;16;sim;67.4
+br-1;Internacional;16;16;sim;64.6
+br-1;Botafogo;15;15;sim;63.8
+br-1;Cruzeiro;15;15;sim;63.8
+br-1;Fluminense;15;15;sim;62.6
+br-1;Vasco da Gama;14;14;sim;63.4
+br-1;Athletico Paranaense;12;12;sim;63.4
+br-1;Coritiba;11;11;sim;62.4
+br-1;Bahia;11;11;sim;62.0
+br-1;Vitória;10;10;sim;60.4
+br-1;Red Bull Bragantino;9;9;sim;62.3
+br-1;Chapecoense;8;8;sim;59.1
+br-1;Mirassol;8;8;;60.9
+br-1;Remo;7;7;;60.0
+br-2;Avaí;8;8;;61.1
+br-2;Fortaleza;8;8;;58.1
+br-2;Ponte Preta;7;7;;55.6
+br-2;Juventude;7;7;;58.1
+br-2;Goiás;7;7;;56.0
+br-2;Sport;7;7;;55.9
+br-2;América Mineiro;6;6;;55.6
+br-2;Atlético Goianiense;6;6;;55.1
+br-2;Ceará;6;6;;53.7
+br-2;Criciúma;6;6;;54.7
+br-2;CRB;5;5;;53.7
+br-2;Náutico;5;5;;53.4
+br-2;Cuiabá;5;5;;52.2
+br-2;Londrina;5;5;;52.0
+br-2;Botafogo-SP;4;4;;50.2
+br-2;Novorizontino;4;4;;51.3
+br-2;Operário Ferroviário;4;4;;50.3
+br-2;Vila Nova;4;4;;50.6
+br-2;Athletic;3;3;;48.6
+br-2;São Bernardo;3;3;;47.7
+br-3;Figueirense;6;6;;45.2
+br-3;Guarani;6;6;;42.9
+br-3;Santa Cruz;6;6;;43.8
+br-3;Botafogo-PB;5;5;;42.1
+br-3;Ituano;5;5;;43.5
+br-3;Paysandu;5;5;;44.7
+br-3;Caxias;5;5;;44.2
+br-3;Volta Redonda;5;5;;42.8
+br-3;Inter de Limeira;4;4;;41.8
+br-3;Confiança;4;4;;39.1
+br-3;Ferroviária;4;4;;42.0
+br-3;Ypiranga;4;4;;40.8
+br-3;Amazonas;3;3;;38.5
+br-3;Anápolis;3;3;;38.6
+br-3;Brusque;3;3;;40.7
+br-3;Maranhão;3;3;;38.7
+br-3;Maringá;3;3;;40.4
+br-3;Itabaiana;2;2;;38.5
+br-3;Barra;2;2;;37.7
+br-3;Floresta;2;2;;37.9
+cl-1;Colo-Colo;11;12;sim;56.5
+cl-1;Universidad de Chile;10;11;sim;58.4
+cl-1;Palestino;9;9;;57.8
+cl-1;Universidad Católica;9;9;;58.8
+cl-1;Huachipato;8;8;;56.3
+cl-1;Audax Italiano;7;7;;58.9
+cl-1;Everton;7;7;sim;57.4
+cl-1;Cobresal;6;6;;58.2
+cl-1;O'Higgins;6;6;;56.9
+cl-1;Deportes La Serena;5;5;;56.4
+cl-1;Unión La Calera;5;5;;51.1
+cl-1;Universidad de Concepción;4;4;;53.7
+cl-1;Coquimbo Unido;4;4;;53.3
+cl-1;Deportes Limache;3;3;;53.9
+cl-1;Deportes Concepción;3;3;;53.6
+cl-1;Ñublense;3;3;;55.1
+co-1;Atlético Nacional;12;12;sim;61.8
+co-1;Junior;11;11;sim;59.6
+co-1;Millonarios;11;11;sim;59.5
+co-1;América de Cali;10;10;sim;59.3
+co-1;Deportivo Cali;10;10;sim;57.8
+co-1;Santa Fe;10;10;sim;58.9
+co-1;Once Caldas;9;9;sim;59.3
+co-1;Independiente Medellín;8;8;;57.3
+co-1;Deportes Tolima;7;7;;58.0
+co-1;Águilas Doradas;7;7;;58.2
+co-1;Atlético Bucaramanga;6;6;;57.0
+co-1;Deportivo Pasto;6;6;;56.4
+co-1;Boyacá Chicó;5;5;;58.0
+co-1;Cúcuta Deportivo;5;5;;57.2
+co-1;Deportivo Pereira;5;5;;56.2
+co-1;Fortaleza;4;4;;55.8
+co-1;Jaguares;4;4;;56.3
+co-1;Alianza;3;3;;55.9
+co-1;Internacional de Bogotá;3;3;;56.1
+co-1;Llaneros;3;3;;56.9
+de-1;Bayern Munich;20;20;sim;76.1
+de-1;Borussia Dortmund;18;18;sim;74.5
+de-1;Bayer Leverkusen;17;17;sim;72.6
+de-1;RB Leipzig;15;15;sim;71.0
+de-1;Borussia Mönchengladbach;13;13;sim;71.2
+de-1;Eintracht Frankfurt;13;13;sim;70.1
+de-1;Schalke 04;13;13;sim;71.1
+de-1;VfB Stuttgart;13;13;sim;70.4
+de-1;Werder Bremen;12;12;sim;70.5
+de-1;Hamburger SV;11;11;;69.6
+de-1;1. FC Köln;10;10;;68.5
+de-1;Union Berlin;10;10;sim;68.5
+de-1;FC Augsburg;10;10;;70.4
+de-1;SC Freiburg;10;10;sim;68.8
+de-1;TSG Hoffenheim;10;10;sim;67.9
+de-1;Mainz 05;9;9;sim;68.1
+de-1;SC Paderborn;7;7;;69.1
+de-1;SV Elversberg;7;7;;66.6
+ec-1;LDU Quito;10;10;;57.8
+ec-1;Barcelona;9;9;sim;57.2
+ec-1;Emelec;9;9;;56.1
+ec-1;Independiente del Valle;8;8;;57.6
+ec-1;Deportivo Cuenca;7;7;;56.6
+ec-1;Aucas;7;7;;56.3
+ec-1;Delfín;6;6;;55.7
+ec-1;Universidad Católica;6;6;;55.1
+ec-1;Macará;5;5;;56.6
+ec-1;Guayaquil&nbsp;City;5;5;;
+ec-1;Manta;4;4;;55.1
+ec-1;Mushuc Runa;4;4;;56.0
+ec-1;Técnico Universitario;4;4;;52.5
+ec-1;Leones;3;3;;54.5
+ec-1;Libertad;3;3;;54.4
+ec-1;Orense;3;3;;51.7
+en-1;Liverpool;20;20;sim;76.9
+en-1;Manchester City F.C.;19;19;sim;78.4
+en-1;Manchester United F.C.;19;19;sim;77.2
+en-1;Arsenal;18;18;sim;78.3
+en-1;Chelsea;18;18;sim;75.7
+en-1;Tottenham Hotspur;15;15;sim;74.3
+en-1;Aston Villa;14;14;sim;73.0
+en-1;Newcastle United F.C.;14;14;sim;73.0
+en-1;Everton;13;13;sim;71.6
+en-1;Leeds United F.C.;12;12;;72.5
+en-1;Crystal Palace F.C.;11;11;;72.6
+en-1;Fulham;11;11;;71.3
+en-1;Nottingham Forest F.C.;10;10;;69.9
+en-1;Sunderland;10;10;;70.4
+en-1;Bournemouth;9;9;;68.5
+en-1;Brighton & Hove Albion F.C.;9;9;;68.2
+en-1;Hull City;9;9;;69.3
+en-1;Brentford;8;8;;70.5
+en-1;Coventry City;8;8;;68.5
+en-1;Ipswich Town F.C.;8;8;;69.0
+es-1;Barcelona;20;20;sim;79.7
+es-1;Real Madrid;20;20;sim;80.0
+es-1;Atlético Madrid;18;18;sim;74.8
+es-1;Sevilla;16;16;sim;72.7
+es-1;Valencia;16;16;sim;72.5
+es-1;Athletic Bilbao;15;15;sim;73.1
+es-1;Villarreal;14;14;sim;71.1
+es-1;Real Betis;13;13;sim;71.1
+es-1;Real Sociedad;13;13;sim;70.6
+es-1;Celta Vigo;11;11;;68.4
+es-1;Espanyol;11;11;sim;69.0
+es-1;Deportivo A Coruña;10;10;;67.7
+es-1;Rayo Vallecano;10;10;;69.6
+es-1;Osasuna;9;9;;68.0
+es-1;Getafe;9;9;;68.7
+es-1;Levante;9;9;;67.0
+es-1;Alavés;8;8;;68.6
+es-1;Elche;8;8;;67.3
+es-1;Málaga;8;8;;67.8
+es-1;Racing Santander;8;8;;65.7
+fr-1;Paris Saint-Germain;18;19;sim;78.2
+fr-1;Marseille;16;15;sim;72.5
+fr-1;Monaco;15;14;sim;71.6
+fr-1;Lyon;16;14;sim;70.4
+fr-1;Lille;14;13;sim;69.7
+fr-1;Nice;12;11;sim;69.2
+fr-1;Rennes;12;11;sim;68.4
+fr-1;Lens;11;10;sim;68.5
+fr-1;Strasbourg;10;10;;68.0
+fr-1;Lorient;9;9;;66.6
+fr-1;Auxerre;8;8;;66.8
+fr-1;Toulouse;8;8;;65.8
+fr-1;Angers;7;7;;66.9
+fr-1;Le Havre;7;7;;66.3
+fr-1;Brest;7;7;;65.5
+fr-1;Troyes;6;6;;66.7
+fr-1;Le Mans;6;6;;65.7
+fr-1;Paris FC;6;6;;66.7
+it-1;Milan;19;19;sim;74.5
+it-1;Inter;19;19;sim;75.3
+it-1;Juventus;19;19;sim;73.4
+it-1;Napoli;17;16;sim;72.1
+it-1;Roma;16;14;sim;72.6
+it-1;Atalanta;14;13;sim;71.0
+it-1;Lazio;15;13;sim;72.1
+it-1;Fiorentina;14;12;sim;68.7
+it-1;Genoa;11;11;;69.2
+it-1;Bologna;11;10;sim;68.5
+it-1;Parma;10;10;;68.3
+it-1;Torino;10;10;;68.8
+it-1;Cagliari;9;9;;68.0
+it-1;Udinese;9;9;;67.9
+it-1;Como;8;8;;67.6
+it-1;Lecce;8;8;;68.7
+it-1;Sassuolo;8;8;;67.6
+it-1;Monza;7;7;;67.3
+it-1;Frosinone;7;7;;67.6
+it-1;Venezia;7;7;;66.4
+mx-1;América;14;14;sim;65.3
+mx-1;Guadalajara;13;13;sim;64.0
+mx-1;Monterrey;13;13;sim;64.3
+mx-1;Tigres UANL;13;13;sim;63.9
+mx-1;Cruz Azul;12;12;sim;65.2
+mx-1;Pachuca;11;11;sim;64.4
+mx-1;Pumas UNAM;11;11;sim;62.5
+mx-1;Toluca;11;11;sim;63.8
+mx-1;León;10;10;sim;63.1
+mx-1;Santos Laguna;9;9;sim;62.4
+mx-1;Puebla;8;8;sim;59.7
+mx-1;Atlas;7;7;;61.2
+mx-1;Necaxa;7;7;;61.3
+mx-1;Querétaro;6;6;;60.3
+mx-1;Tijuana;6;6;;61.0
+mx-1;Atlante;5;5;;58.1
+mx-1;Atlético San Luis;5;5;;58.7
+mx-1;Juárez;4;4;;59.1
+nl-1;Ajax;15;17;sim;69.4
+nl-1;PSV;15;16;sim;67.8
+nl-1;Feyenoord;15;15;sim;68.9
+nl-1;AZ;12;12;sim;64.6
+nl-1;Twente;11;11;sim;64.2
+nl-1;Groningen;10;10;;65.0
+nl-1;Heerenveen;9;9;;65.8
+nl-1;Utrecht;8;8;;63.2
+nl-1;Sparta Rotterdam;8;8;;60.2
+nl-1;ADO Den Haag;7;7;;63.3
+nl-1;N.E.C.;6;6;;62.4
+nl-1;Willem II;6;6;;62.0
+nl-1;Excelsior;5;5;;60.7
+nl-1;Go Ahead Eagles;5;5;;63.2
+nl-1;PEC Zwolle;5;5;;61.0
+nl-1;Fortuna Sittard;4;4;;62.2
+nl-1;Cambuur;4;4;;61.1
+nl-1;Telstar;4;4;;60.8
+oc-1;Sydney FC;10;10;;55.2
+oc-1;Auckland City FC;9;9;;56.1
+oc-1;Wellington Phoenix FC;7;7;;54.9
+oc-1;Melbourne City FC;6;6;;53.1
+pt-1;Porto;16;17;sim;68.9
+pt-1;Benfica;16;17;sim;69.0
+pt-1;Sporting CP;16;16;sim;68.1
+pt-1;Braga;13;13;sim;66.0
+pt-1;Vitória;11;11;sim;65.2
+pt-1;Nacional;10;10;sim;64.1
+pt-1;Marítimo;9;9;;64.6
+pt-1;Moreirense;8;8;;63.4
+pt-1;Rio Ave;8;8;;64.6
+pt-1;Santa Clara;7;7;;62.5
+pt-1;Arouca;6;6;;62.2
+pt-1;Gil Vicente;6;6;;63.4
+pt-1;Est. Amadora;5;5;;62.3
+pt-1;Famalicão;5;5;;61.5
+pt-1;Estoril;5;5;;61.4
+pt-1;Académico;4;4;;59.8
+pt-1;Casa Pia;4;4;;60.2
+pt-1;Alverca;4;4;;61.9
+py-1;Olimpia;10;10;;56.9
+py-1;Cerro Porteño;9;9;;56.6
+py-1;Libertad;8;8;;56.5
+py-1;Guaraní;7;7;;55.1
+py-1;Nacional;7;7;sim;54.8
+py-1;Spvo. Luqueño;6;6;;53.9
+py-1;Rubio Ñu;5;5;;54.3
+py-1;2 de Mayo;5;5;;53.9
+py-1;San Lorenzo;4;4;sim;51.9
+py-1;Spvo. Trinidense;4;4;;53.7
+py-1;Recoleta;3;3;;52.7
+py-1;Spvo. Ameliano;3;3;;53.6
+us-1;Miami;13;13;;63.5
+us-1;LA Galaxy;12;12;;61.9
+us-1;Red Bulls;12;12;;59.6
+us-1;D.C.;11;11;;61.7
+us-1;LAFC;11;11;;61.3
+us-1;Seattle;11;11;;59.4
+us-1;Montréal;10;10;;61.5
+us-1;NYCFC;10;10;;59.8
+us-1;New England;9;9;;59.5
+us-1;Portland;9;9;;59.9
+us-1;Chicago;8;8;;58.3
+us-1;Columbus;8;8;;60.3
+us-1;Colorado;7;7;;59.2
+us-1;Houston;7;7;;58.4
+us-1;Toronto;7;7;;59.0
+us-1;Atlanta;6;6;;59.8
+us-1;Orlando;6;6;;59.1
+us-1;Vancouver;6;6;;56.9
+us-1;Philadelphia;5;5;;56.4
+us-1;Salt Lake;5;5;;57.1
+us-1;San Jose;5;5;;57.8
+us-1;Cincinnati;4;4;;56.8
+us-1;Dallas;4;4;;57.7
+us-1;Minnesota;4;4;;56.7
+us-1;Nashville;4;4;;56.5
+us-1;Kansas City;4;4;;56.7
+us-1;Austin;3;3;;56.3
+us-1;Charlotte;3;3;;55.1
+us-1;San Diego;3;3;;55.3
+us-1;St. Louis;3;3;;56.1
+uy-1;Peñarol;10;12;sim;58.9
+uy-1;Nacional;11;12;sim;58.7
+uy-1;Danubio;9;9;;56.5
+uy-1;Defensor Sporting;9;9;;57.0
+uy-1;Wanderers;8;8;;55.1
+uy-1;Central Español;7;7;;55.2
+uy-1;Liverpool;7;7;sim;56.2
+uy-1;Cerro;6;6;;53.7
+uy-1;Cerro Largo;6;6;;53.7
+uy-1;Progreso;5;5;;55.1
+uy-1;Racing;5;5;sim;55.5
+uy-1;Boston River;4;4;;53.5
+uy-1;Dep. Maldonado;4;4;;55.3
+uy-1;Albion;3;3;;52.9
+uy-1;Juventud;3;3;;53.0
+uy-1;City Torque;3;3;;54.0

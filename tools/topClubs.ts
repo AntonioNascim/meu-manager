@@ -5,7 +5,7 @@
 import { createYouth } from '../src/data/generateYouth'
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { advanceSeason } from '../src/engine/offseason'
 import { playerOverall } from '../src/engine/overall'
 import { advanceUntil, createSeason, pyramidOf } from '../src/engine/season'
@@ -17,7 +17,7 @@ const years = Number(opt('years', '10'))
 const seed = Number(opt('seed', '7'))
 const COUNTRIES = ['England', 'Spain', 'Italy', 'Germany', 'France']
 
-const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(seed))))
+const { pkg } = validatePackage(JSON.parse(JSON.stringify(measurementPackage(seed))))
 if (!pkg) throw new Error('pacote inválido')
 const world = loadWorld(seed, pkg)
 const state = createSeason({ year: world.startYear, seed, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus: opt('focus', 'England'), ...(world.cups ? { cupSpecs: world.cups } : {}) })

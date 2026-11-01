@@ -94,6 +94,12 @@ export interface Team {
   stadium: Stadium
   /** Reputação, 1 a 20. */
   reputation: number
+  /**
+   * Prestígio histórico (1 a 20, decimal): a reputação para a qual o clube volta com o tempo. Os gigantes reais continuam gigantes por décadas e os
+   * pequenos continuam pequenos; ele só anda devagar na direção da reputação (`OFFSEASON.reputation.prestigeDrift`). Ausente (mundo fictício e saves
+   * antigos) = a reputação volta ao patamar da divisão (`tierMean`), como sempre foi.
+   */
+  prestige?: number
   /** Ids dos jogadores do elenco (mín. 18, máx. 30). */
   squad: PlayerId[]
   tactic: Tactic

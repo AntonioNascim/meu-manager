@@ -5,7 +5,7 @@
  */
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { stageList } from '../src/engine/cups'
 import { advanceUntil, createSeason } from '../src/engine/season'
 import { addDays } from '../src/engine/season/dates'
@@ -16,7 +16,7 @@ const opt = (name: string, fallback: string) => (args.includes(`--${name}`) ? (a
 const seed = Number(opt('seed', '7'))
 const until = opt('until', '2026-12-31')
 
-const raw = buildScalePackage(seed)
+const raw = measurementPackage(seed)
 const { pkg, report } = validatePackage(JSON.parse(JSON.stringify(raw)))
 console.log(`Pacote: ${raw.clubs.length} clubes, ${raw.leagues.length} ligas, ${raw.countries.length} países, ${raw.cups?.length ?? 0} copas; erros ${report.errors.length}, avisos ${report.warnings.length}`)
 for (const w of report.warnings) console.log(`  aviso ${w.code} ${w.path} ${w.detail ?? ''}`)

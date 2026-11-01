@@ -9,6 +9,7 @@
 import 'fake-indexeddb/auto'
 import { measureWorld } from '../src/diagnostics/measure'
 import type { WorldChoice } from '../src/diagnostics/measure'
+import { measurementPackage, useRealPackage } from './worldPackage'
 
 const args = process.argv.slice(2)
 const flag = (name: string, fallback: string) => {
@@ -16,7 +17,9 @@ const flag = (name: string, fallback: string) => {
   return i >= 0 ? (args[i + 1] ?? fallback) : fallback
 }
 const world = flag('world', 'full') as WorldChoice
-const m = await measureWorld({ world, seed: Number(flag('seed', '7')), readMemory: () => null })
+const seed = Number(flag('seed', '7'))
+const real = world === 'real' || useRealPackage()
+const m = await measureWorld({ world: real ? 'real' : world, seed, ...(real ? { rawPackage: measurementPackage(seed) } : {}), readMemory: () => null })
 const s = m.save
 console.log(`Mundo ${world}: ${m.clubs} clubes, ${m.players} jogadores, ${m.matches} partidas, ${m.advances} avancos (${m.finished ? 'temporada inteira' : 'parcial'})`)
 console.log(`JSON do save no fim: ${m.saveJsonKb} KB`)

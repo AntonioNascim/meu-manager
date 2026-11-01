@@ -11,6 +11,7 @@ import os from 'node:os'
 import { gzipSync } from 'node:zlib'
 import { playerOverall } from '../src/engine/overall'
 import { buildDiagnosticGame } from '../src/diagnostics/scaleGame'
+import { measurementPackage, useRealPackage } from './worldPackage'
 import { BRAZIL_ONLY, FULL_WORLD, buildScaleGame } from '../src/diagnostics/scaleWorld'
 import type { LeagueSpec } from '../src/diagnostics/scaleWorld'
 import { simulateMatch } from '../src/engine/match'
@@ -140,7 +141,7 @@ function quickSimBench(game: Game): void {
 function run(label: string, specs: LeagueSpec[] | null, seed: number, offseason: boolean, focus: boolean, real = false) {
   const heapBase = heap()
   // `real`: o pacote de exemplo (21 ligas) pelo caminho do jogo, com calendários de cada país e todas as copas (a tela ?diagnostico=1 mede o mesmo).
-  const built = real ? buildDiagnosticGame('full', seed) : specs ? buildScaleGame(specs, seed, { focus }) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
+  const built = real ? buildDiagnosticGame(useRealPackage() ? 'real' : 'full', seed, useRealPackage() ? measurementPackage(seed) : undefined) : specs ? buildScaleGame(specs, seed, { focus }) : { game: createGame(seed, 'team-imp'), genMs: NaN, seasonMs: NaN }
   let game = built.game
   // A diretoria não demite (no mundo sintético isso já foi feito na criação).
   game = { ...game, season: { ...game.season, teams: game.season.teams.map((t) => (t.id === game.userTeamId ? { ...t, objective: { targetPosition: 20, sackingPosition: 20 } } : t)) } }
@@ -221,4 +222,4 @@ const focus = args.includes('--focus')
 if (which === 'base') run('Mundo atual (Série A + B, 40 clubes)', null, seed, offseason, false)
 else if (which === 'brazil') run('Brasil A + B + C (60 clubes)', BRAZIL_ONLY, seed, offseason, focus)
 else if (args.includes('--classic')) run('Mundo do plano (21 ligas, sem copas nem calendários próprios)', FULL_WORLD, seed, offseason, focus)
-else run('Mundo do plano (21 ligas, 358 clubes, com copas e calendários)', FULL_WORLD, seed, offseason, true, true)
+else run(useRealPackage() ? 'Mundo REAL (21 ligas, 370 clubes, pacote real, com copas e calendários)' : 'Mundo do plano (21 ligas, 358 clubes, com copas e calendários)', FULL_WORLD, seed, offseason, true, true)

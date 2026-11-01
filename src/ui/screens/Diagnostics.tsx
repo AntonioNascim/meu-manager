@@ -7,6 +7,8 @@ import type { DeviceInfo, Measurement, WorldChoice } from '../../diagnostics/mea
 export function Diagnostics() {
   const [device, setDevice] = useState<DeviceInfo | null>(null)
   const [world, setWorld] = useState<WorldChoice>('full')
+  /** Pacote real escolhido do aparelho (data/pacote-real.json); a tela não o traz embutido, para não pesar no app. */
+  const [realPackage, setRealPackage] = useState<{ name: string; raw: unknown } | null>(null)
   const [note, setNote] = useState('')
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState('')
@@ -20,6 +22,10 @@ export function Diagnostics() {
 
   const run = async (maxAdvances?: number) => {
     if (!device || running) return
+    if (world === 'real' && !realPackage) {
+      setProgress('Escolha o arquivo do pacote real (pacote-real.json) antes de medir.')
+      return
+    }
     setRunning(true)
     setReport('')
     setCopied(false)
@@ -29,7 +35,7 @@ export function Diagnostics() {
     await yieldToUi()
     let result: Measurement
     try {
-      result = await measureWorld({ world, ...(maxAdvances ? { maxAdvances } : {}), yieldToUi, onProgress: (done, date) => setProgress(`Avanço ${done} (${date.split('-').reverse().join('/')})`) })
+      result = await measureWorld({ world, ...(world === 'real' && realPackage ? { rawPackage: realPackage.raw } : {}), ...(maxAdvances ? { maxAdvances } : {}), yieldToUi, onProgress: (done, date) => setProgress(`Avanço ${done} (${date.split('-').reverse().join('/')})`) })
     } catch (e) {
       setProgress(`Erro: ${(e as Error).message}`)
       setRunning(false)
@@ -117,12 +123,18 @@ export function Diagnostics() {
 
       <section className="flex flex-col gap-2">
         <div className="flex gap-2" role="radiogroup" aria-label="Mundo de teste">
-          {(['full', 'brazil'] as const).map((w) => (
+          {(['full', 'brazil', 'real'] as const).map((w) => (
             <button key={w} type="button" role="radio" aria-checked={world === w} disabled={running} onClick={() => setWorld(w)} className={`min-h-12 flex-1 rounded-lg border px-3 text-sm ${world === w ? 'border-accent text-accent' : 'border-line text-muted'}`}>
-              {w === 'full' ? '358 clubes (21 ligas)' : 'Brasil A+B+C (60)'}
+              {w === 'full' ? '358 clubes (21 ligas)' : w === 'real' ? 'Pacote real (370)' : 'Brasil A+B+C (60)'}
             </button>
           ))}
         </div>
+        {world === 'real' && (
+          <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-line px-4 text-center text-sm" data-testid="real-package-input">
+            {realPackage ? `Pacote real: ${realPackage.name}` : 'Escolher o arquivo do pacote real (pacote-real.json)'}
+            <input type="file" accept=".json,application/json" className="hidden" disabled={running} onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void file.text().then((text) => setRealPackage({ name: file.name, raw: JSON.parse(text) as unknown })).catch((err: Error) => setProgress(`Erro ao ler o arquivo: ${err.message}`)) }} />
+          </label>
+        )}
         <button type="button" disabled={!device || running} onClick={() => void run()} className="min-h-12 rounded-lg bg-accent px-4 font-semibold text-accent-ink disabled:opacity-50">
           Medir uma temporada inteira
         </button>

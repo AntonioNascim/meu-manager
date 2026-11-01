@@ -15,17 +15,27 @@ on:
           - test-long
           - ligas
           - mundo-ampliado
+          - calibracao-real
+          - desempenho-real
           - personalizada
+      pacote:
+        description: "Mundo medido: o pacote fictício de teste (358 clubes) ou o pacote real de data/pacote-real.json (370 clubes). Vale para todas as medições"
+        type: choice
+        required: true
+        default: ficticio
+        options:
+          - ficticio
+          - real
       sementes:
-        description: "continentais: sementes separadas por vírgula (uma execução em paralelo para cada)"
+        description: "continentais e calibracao-real: sementes separadas por vírgula (uma execução em paralelo para cada; para a calibração use 7,11,23)"
         type: string
         default: "23"
       anos:
-        description: "continentais e ligas: temporadas simuladas"
+        description: "continentais, calibracao-real e ligas: temporadas simuladas (calibracao-real: 30)"
         type: string
         default: "30"
       foco:
-        description: "continentais: país jogado lance a lance (nome em inglês)"
+        description: "continentais e calibracao-real: país jogado lance a lance (nome em inglês)"
         type: string
         default: Brazil
       ferramenta:
@@ -62,7 +72,7 @@ jobs:
             [[ "$FERRAMENTA" =~ ^[A-Za-z0-9]+$ ]] || { echo "ferramenta inválida: $FERRAMENTA"; exit 1; }
             [[ "$ARGUMENTOS" =~ ^[A-Za-z0-9\ ._,=:-]*$ ]] || { echo "argumentos inválidos: $ARGUMENTOS"; exit 1; }
           fi
-          if [ "$MEDICAO" = "continentais" ]; then
+          if [ "$MEDICAO" = "continentais" ] || [ "$MEDICAO" = "calibracao-real" ]; then
             [[ "$SEMENTES" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "sementes inválidas: $SEMENTES"; exit 1; }
             echo "matrix={\"semente\":[\"${SEMENTES//,/\",\"}\"]}" >> "$GITHUB_OUTPUT"
           else
@@ -78,6 +88,8 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       MEDICAO: ${{ inputs.medicao }}
+      # "1" = as ferramentas de tools/ e o test:long leem data/pacote-real.json (tools/worldPackage.ts); "0" = o pacote fictício de teste.
+      PACOTE_REAL: ${{ inputs.pacote == 'real' && '1' || '0' }}
       SEMENTE: ${{ matrix.semente }}
       ANOS: ${{ inputs.anos }}
       FOCO: ${{ inputs.foco }}
@@ -100,7 +112,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p resultado
-          echo "Branch: $GITHUB_REF_NAME ($GITHUB_SHA)" | tee resultado/cabecalho.txt
+          echo "Branch: $GITHUB_REF_NAME ($GITHUB_SHA) · pacote: ${{ inputs.pacote }}" | tee resultado/cabecalho.txt
           case "$MEDICAO" in
             continentais)
               echo "Copas continentais: semente $SEMENTE, $ANOS anos, foco $FOCO" | tee -a resultado/cabecalho.txt
@@ -120,6 +132,21 @@ jobs:
               node --expose-gc tools/run.mjs worldCups --until 2027-01-03 | tee resultado/4-worldCups.txt
               node --expose-gc tools/run.mjs continentalRun --years "$ANOS" --seed 7 --focus "$FOCO" | tee resultado/5-copas-mundiais.txt
               ;;
+            calibracao-real)
+              # Fase 5D: 370 clubes reais, N temporadas, campeões de ligas e copas por clube e por país contra a vida real, gigantes e dinastias (sempre com o pacote real). Termina com erro se uma meta de tools/realTargets.ts falhar.
+              export PACOTE_REAL=1
+              echo "Calibração com o pacote real: semente $SEMENTE, $ANOS anos, foco $FOCO" | tee -a resultado/cabecalho.txt
+              node --expose-gc tools/run.mjs realRun --years "$ANOS" --seed "$SEMENTE" --focus "$FOCO" | tee "resultado/calibracao-real-semente-$SEMENTE.txt"
+              ;;
+            desempenho-real)
+              # Fase 5D: tempo, memória e save do mundo real (370 clubes, mais de 10 mil jogadores), calendário das ligas e copas e o mesmo relatório do ?diagnostico=1.
+              export PACOTE_REAL=1
+              node --expose-gc tools/run.mjs realCheck | tee resultado/1-realCheck.txt
+              node --expose-gc tools/run.mjs worldScale --world full --focus --live --offseason | tee resultado/2-worldScale.txt
+              node --expose-gc tools/run.mjs saveWorld --world real | tee resultado/3-saveWorld.txt
+              node --expose-gc tools/run.mjs memRun --years 6 | tee resultado/4-memRun.txt
+              node --expose-gc tools/run.mjs worldCups --until 2027-01-03 | tee resultado/5-worldCups.txt
+              ;;
             personalizada)
               # Sem aspas de propósito: os argumentos já foram conferidos (só letras, números e . _ , = : -).
               node --expose-gc tools/run.mjs "$FERRAMENTA" $ARGUMENTOS | tee "resultado/$FERRAMENTA.txt"
@@ -132,6 +159,7 @@ jobs:
         run: |
           mkdir -p resultado
           cp node_modules/.cache/world282.txt node_modules/.cache/continental282.txt resultado/ || true
+          cp node_modules/.cache/real-world.txt resultado/ || true
 
       - name: Resumo na página da execução
         if: always()
@@ -150,7 +178,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: medicao-${{ inputs.medicao }}-semente-${{ matrix.semente }}
+          name: medicao-${{ inputs.medicao }}-${{ inputs.pacote }}-semente-${{ matrix.semente }}
           path: resultado/
           retention-days: 30
           if-no-files-found: warn

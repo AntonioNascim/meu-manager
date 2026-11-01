@@ -4,7 +4,7 @@
  */
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { foreignCount } from '../src/engine/foreign'
 import { advanceSeason } from '../src/engine/offseason'
 import { advanceUntil, createSeason } from '../src/engine/season'
@@ -18,7 +18,7 @@ const opt = (name: string, fallback: string) => {
 }
 const years = Number(opt('years', '3'))
 const seed = Number(opt('seed', '7'))
-const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(seed))))
+const { pkg } = validatePackage(JSON.parse(JSON.stringify(measurementPackage(seed))))
 if (!pkg) throw new Error('pacote inválido')
 const world = loadWorld(seed, pkg)
 const turn = (s: SeasonState, pyramid: string) => advanceSeason(s, { createYouth, pyramid })

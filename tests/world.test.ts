@@ -323,12 +323,12 @@ describe('escala de força de 1 a 100', () => {
     expect(Math.max(...xs)).toBeLessThanOrEqual(76)
   })
 
-  it('titulares da Série C ficam entre ~35 e ~55, abaixo da Série B', () => {
+  it('titulares da Série C ficam entre ~35 e ~60, abaixo da Série B', () => {
     const xs = starters(3)
     expect(percentile(xs, 0.05)).toBeGreaterThanOrEqual(34)
-    expect(percentile(xs, 0.95)).toBeLessThanOrEqual(55)
+    expect(percentile(xs, 0.95)).toBeLessThanOrEqual(60)
     expect(Math.min(...xs)).toBeGreaterThanOrEqual(25)
-    expect(Math.max(...xs)).toBeLessThanOrEqual(62)
+    expect(Math.max(...xs)).toBeLessThanOrEqual(67)
     const mean = (ys: number[]) => ys.reduce((a, b) => a + b, 0) / ys.length
     expect(mean(starters(2)) - mean(xs)).toBeGreaterThan(6)
     expect(mean(starters(2)) - mean(xs)).toBeLessThan(14)

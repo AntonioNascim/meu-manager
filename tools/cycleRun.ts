@@ -5,7 +5,7 @@
  */
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
-import { buildScalePackage } from '../src/diagnostics/scalePackage'
+import { measurementPackage } from './worldPackage'
 import { cycleOfPyramid, pyramidOf, seasonLabel } from '../src/engine/season'
 import { advanceToMatchday, createGame, nextEventOf, playPendingAuto, startNextSeason, userCompetition } from '../src/store/game'
 import type { Game } from '../src/store/game'
@@ -16,7 +16,7 @@ const seed = Number(arg('seed', '7'))
 const years = Number(arg('years', '2'))
 const leagueId = arg('team', 'br-1')
 
-const { pkg } = validatePackage(JSON.parse(JSON.stringify(buildScalePackage(seed))))
+const { pkg } = validatePackage(JSON.parse(JSON.stringify(measurementPackage(seed))))
 if (!pkg) throw new Error('pacote inválido')
 const world = loadWorld(seed, pkg)
 const user = world.competitions!.find((c) => c.id === leagueId)!.teams[0]!

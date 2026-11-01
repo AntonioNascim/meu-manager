@@ -4,7 +4,7 @@
  * Funções puras: recebem a temporada encerrada e devolvem a nova, mais um relatório do que aconteceu.
  */
 import { ACADEMY, FINANCE, MARKET, OFFSEASON } from '../config'
-import { lineupForeign } from '../foreign'
+import { lineupForeign, squadForeignBlocked } from '../foreign'
 import { defaultTicketPrice, monthlyPayroll, summarizeLedger, sustainablePayroll } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
 import { playerOverall } from '../overall'
@@ -26,8 +26,10 @@ import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { retires, startNewSeason } from './evolution'
+import { dynastyRaids } from './dynasty'
 
 export * from './contracts'
+export * from './dynasty'
 export * from './dueContracts'
 export * from './evolution'
 export * from './renewal'
@@ -107,6 +109,8 @@ function mergeReports(reports: readonly OffseasonReport[], focus: string): Offse
 function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOptions, multi = false): { state: SeasonState; report: OffseasonReport } {
   // `season.phase` é a fase da pirâmide do foco: declarada `end-of-season`, ela vale como encerrada.
   if (!pyramidFinished(state, pyramid) && !(pyramid === focusPyramid(state) && state.season.phase === 'end-of-season')) throw new Error('A temporada ainda não acabou')
+  // Freio contra dinastias: o campeão que domina há anos perde estrelas para os rivais da liga antes de tudo.
+  state = dynastyRaids(state, pyramid, options.userTeamId).state
   const cycle = cycleOfPyramid(state, pyramid)
   const year = cycle.year
   const split = cycle.split
@@ -175,7 +179,8 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     if (!scope.has(t.id)) return t
     const finalPosition = finalPositions[t.id]?.position ?? 10
     const expected = rankByReputation.get(t.id) ?? 10
-    let delta = clamp(Math.round((expected - finalPosition) / R.positionStep), -R.positionMax, R.positionMax)
+    const rawDelta = clamp(Math.round((expected - finalPosition) / R.positionStep), -R.positionMax, R.positionMax)
+    let delta = rawDelta
     if (champions.includes(t.id)) delta += R.champion
     if (promoted.includes(t.id)) delta += R.promoted
     if (relegated.includes(t.id)) delta += R.relegated
@@ -184,8 +189,13 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     const tier = landing ? landing.tier : t.tier
     // A reputação também volta devagar para o patamar da divisão (sorteio na parte fracionária).
     const mean = landing?.reputationMean ?? R.tierMean[tier] ?? t.reputation
-    const pull = tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
-    const pulled = t.reputation + delta + pull * (mean - t.reputation) + (continental.get(t.id) ?? 0)
+    // Com prestígio (mundo real), quem fica na divisão volta ao prestígio dele (os gigantes se mantêm); quem muda de divisão segue a regra da média.
+    const anchored = t.prestige !== undefined && tier === t.tier
+    const pull = anchored ? R.prestigePull : tier === 1 && t.tier === 1 && t.reputation > mean ? R.tierPullAbove : R.tierPull
+    const target = anchored ? (tier === 1 ? (t.prestige as number) : Math.min(t.prestige as number, mean + R.prestigeAboveTier)) : mean
+    // Com prestígio, o resultado pesa pouco (`anchoredResultShare`); promoção e rebaixamento valem inteiros.
+    const results = anchored ? R.anchoredResultShare : 1
+    const pulled = t.reputation + (delta - rawDelta) + rawDelta * results + pull * (target - t.reputation) + (continental.get(t.id) ?? 0) * results
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
     const ai = t.id !== options.userTeamId
@@ -194,6 +204,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
       tier,
       ...(landing?.economy ? { economy: landing.economy } : {}),
       reputation,
+      ...(t.prestige !== undefined ? { prestige: Math.round((t.prestige + R.prestigeDrift * (reputation - t.prestige)) * 100) / 100 } : {}),
       fanBase: Math.round((t.fanBase * (1 + 0.03 * delta)) / 1_000) * 1_000,
       ticketPrice: ai ? defaultTicketPrice(reputation, { economy: landing?.economy ?? t.economy }) : t.ticketPrice,
       history: [...t.history, { year, tier: t.tier, finalPosition, champion: champions.includes(t.id) }],
@@ -269,9 +280,14 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     const positions = deficits.slice(0, count)
     while (positions.length < count) positions.push(youthRng.pick(EXTRA_POSITIONS))
     const made = options.createYouth({ teamId: team.id, tier: team.tier, reputation: team.reputation, ...(team.economy ? { economy: team.economy } : {}), ...(team.country ? { country: team.country } : {}), positions, year: nextYear, ...(split ? { split } : {}) }, youthRng, taken)
+    const incoming: Player[] = []
     for (const p of made) {
       taken.add(p.name)
-      players.push({ ...p, id: `player-${++counter}`, teamId: team.id })
+      // Limite de estrangeiros do elenco: o jovem que chegaria acima dele nasce no país do clube (a base de cada país tem uma fatia de estrangeiros).
+      const blocked = squadForeignBlocked(team, squad, p, incoming)
+      const youngster = { ...p, id: `player-${++counter}`, teamId: team.id, ...(blocked ? { nationality: team.country ?? 'Brazil' } : {}) }
+      incoming.push(youngster)
+      players.push(youngster)
     }
     youth[team.id] = made.length
   }

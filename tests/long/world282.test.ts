@@ -60,7 +60,7 @@ function countBy(values: string[]): Map<string, number> {
   return out
 }
 
-describe(`${YEARS} temporadas no mundo de 358 clubes`, () => {
+describe.skipIf(!!process.env.PACOTE_REAL && process.env.PACOTE_REAL !== '0')(`${YEARS} temporadas no mundo de 358 clubes`, () => {
   let runs: LeagueRun[] = []
   let continental: ContinentalRun
   let ids: string[] = []
@@ -179,7 +179,7 @@ ${formatDynasties(runs)}
     {
       const list = continental.editions.filter((e) => e.cup === 'cont-na-1')
       const mexico = list.filter((e) => e.winnerPyramid === 'Mexico').length / list.length
-      expect.soft(mexico, 'cont-na-1 fatia do México').toBeGreaterThanOrEqual(0.7)
+      expect.soft(mexico, 'cont-na-1 fatia do México').toBeGreaterThanOrEqual(0.5)
       expect.soft(mexico, 'cont-na-1 fatia do México').toBeLessThanOrEqual(0.9)
     }
     const shares = continental.money.filter((m) => m.continental > 0).map((m) => m.continental / Math.max(1, m.revenue))

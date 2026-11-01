@@ -75,3 +75,20 @@ describe('diagnóstico: tela', () => {
     for (const text of ['Diagnóstico de desempenho', 'Medir uma temporada inteira', 'Medida rápida (10 avanços)', '358 clubes', 'Android de entrada', 'Nome do aparelho']) expect(html).toContain(text)
   })
 })
+
+describe('diagnóstico: pacote real', () => {
+  it('mede alguns avanços do mundo real (370 clubes) e diz que é o mundo real no texto', async () => {
+    const { readFileSync } = await import('node:fs')
+    const rawPackage = JSON.parse(readFileSync('data/pacote-real.json', 'utf8')) as unknown
+    const m = await measureWorld({ world: 'real', rawPackage, maxAdvances: 2, readMemory: () => null, saveStore: null })
+    expect(m.clubs).toBe(370)
+    expect(m.players).toBeGreaterThan(10_000)
+    expect(m.advances).toBe(2)
+    const device: DeviceInfo = { model: 'x', platform: 'x', browser: 'x', userAgent: 'x', cores: 8, memoryGb: 4, screen: 'x', gpu: 'x', speedIndex: 5000 }
+    expect(formatReport(device, m, 'x', new Date('2026-10-31T12:00:00Z'))).toContain('REAL (pacote real')
+  }, 120_000)
+
+  it('sem o arquivo do pacote real, avisa em vez de medir o mundo de teste', async () => {
+    await expect(measureWorld({ world: 'real', maxAdvances: 1, readMemory: () => null, saveStore: null })).rejects.toThrow(/pacote real/)
+  })
+})
