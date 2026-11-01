@@ -10,7 +10,7 @@ export const GENERATION = {
   teamLevel: {
     1: { base: 62, referenceReputation: 7, perReputation: 0.55 },
     2: { base: 50, referenceReputation: 3, perReputation: 2.2 },
-    3: { base: 40, referenceReputation: 2, perReputation: 1.7 },
+    3: { base: 45, referenceReputation: 2, perReputation: 1.7 },
   },
   /** Desvio padrão do nível entre times de mesma reputação (pontos de força dos titulares). */
   teamLevelSd: 0.4,
