@@ -4,6 +4,7 @@
  * letras minúsculas fora do comum, caracteres e números estranhos, nomes enormes e apelidos sem nenhuma relação com o nome.
  * Roda no fim do `dados:finalizar` (e sozinha em `tests/realNames.test.ts`, que barra o pacote com achado grave). Funções puras.
  */
+import type { DataPackage } from '../../src/data/package/types'
 import { MILD, ROOTS, WORDS } from './profanity'
 
 export type NameSeverity = 'alta' | 'media' | 'baixa'
@@ -220,7 +221,7 @@ export function entriesFromSheets(league: string, clubs: readonly Record<string,
 }
 
 /** Entradas a partir de um pacote de dados (para a conferência de `data/pacote-real.json`). */
-export function entriesFromPackage(pkg: { clubs: readonly { id: string; name: string; shortName?: string; city: string; stadium: { name: string }; league: string }[]; players: readonly { id: string; name: string; nickname?: string; club?: string | null }[]; academy?: readonly { id: string; name: string; nickname?: string; club?: string | null }[] }): NameEntry[] {
+export function entriesFromPackage(pkg: Pick<DataPackage, 'clubs' | 'players'> & { academy?: DataPackage['players'] }): NameEntry[] {
   const clubs = new Map(pkg.clubs.map((c) => [c.id, c]))
   const out: NameEntry[] = []
   for (const c of pkg.clubs) {
@@ -231,7 +232,7 @@ export function entriesFromPackage(pkg: { clubs: readonly { id: string; name: st
   for (const [kind, rows] of [['jogador', pkg.players], ['base', pkg.academy ?? []]] as const) {
     for (const p of rows) {
       const club = p.club ? clubs.get(p.club) : undefined
-      out.push({ kind, id: p.id, league: club?.league ?? '', club: club?.name ?? '(livre)', name: p.name, ...(p.nickname ? { nickname: p.nickname } : {}) })
+      out.push({ kind, id: p.id ?? p.name, league: club?.league ?? '', club: club?.name ?? '(livre)', name: p.name, ...(p.nickname ? { nickname: p.nickname } : {}) })
     }
   }
   return out

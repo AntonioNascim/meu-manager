@@ -48,7 +48,7 @@ describe('nome curto', () => {
     const team = loadWorld(3, real).teams.find((t) => t.name === 'Bayer Leverkusen')
     expect(team?.shortName).toBe('Leverkusen')
     // O mundo fictício não traz nome curto: a interface encurta pelo nome.
-    expect(generateWorld(1).teams.every((t) => t.shortName === undefined)).toBe(true)
+    expect(generateWorld({ seed: 1 }).teams.every((t) => t.shortName === undefined)).toBe(true)
   })
 
   it('a validação recusa nome curto vazio ou comprido demais', () => {
