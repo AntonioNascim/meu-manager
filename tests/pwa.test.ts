@@ -60,6 +60,10 @@ describe('lista de arquivos do service worker', () => {
     expect(list).toEqual(['./', 'assets/a.js', 'icons/icon-192.png', 'index.html', 'manifest.webmanifest'])
   })
 
+  it('deixa o mundo real (5 MB) fora da instalação: ele é baixado e guardado só quando alguém o usa', () => {
+    expect(precacheList(['assets/a.js', 'assets/pacote-real-AbC123.json'], [])).toEqual(['./', 'assets/a.js', 'index.html'])
+  })
+
   it('o nome do cache muda quando o conteúdo do app muda', () => {
     const template = read('tools/sw.template.js')
     const list = precacheList(['assets/a.js'], [])

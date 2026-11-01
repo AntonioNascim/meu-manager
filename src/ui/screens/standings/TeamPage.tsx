@@ -39,7 +39,7 @@ export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; t
         <div className="min-w-0">
           <h2 className="title text-4xl">{team.name}</h2>
           <p className="text-xs text-muted">
-            {competition?.name ?? ''} · {team.city}/{team.state}
+            {competition?.name ?? ''} · {team.state ? `${team.city}/${team.state}` : team.city}
           </p>
           <p className="text-xs text-muted">{team.stadium.name}</p>
           {mine && <span className="mt-1 inline-block rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-ink">Seu time</span>}

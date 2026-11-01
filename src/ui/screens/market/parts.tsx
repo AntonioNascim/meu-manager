@@ -106,7 +106,7 @@ export function MarketRow({
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <Flag nationality={player.nationality} />
-            <span className="truncate font-bold">{playerName(player)}</span>
+            <span className="line-clamp-2 min-w-0 font-bold leading-tight [overflow-wrap:anywhere]">{playerName(player)}</span>
           </span>
           <span className="block truncate text-xs text-muted">
             {POSITION_SHORT_LABELS[player.position]} · {clubName(game, player.teamId)}

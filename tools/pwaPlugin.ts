@@ -14,9 +14,12 @@ function listFiles(dir: string): string[] {
   })
 }
 
+/** Arquivos grandes que só são baixados quando usados (o service worker os guarda na primeira vez): o mundo real, de ~5 MB. */
+export const LAZY_FILE = /(^|\/)pacote-real-[^/]*\.json$/
+
 /** Lista de URLs (relativas à raiz do app) que o service worker guarda na instalação. */
 export function precacheList(bundleFiles: readonly string[], publicFiles: readonly string[]): string[] {
-  const files = [...bundleFiles, ...publicFiles].filter((f) => !f.endsWith('.map') && f !== 'sw.js')
+  const files = [...bundleFiles, ...publicFiles].filter((f) => !f.endsWith('.map') && f !== 'sw.js' && !LAZY_FILE.test(f))
   return ['./', ...new Set([...files, 'index.html'])].sort()
 }
 

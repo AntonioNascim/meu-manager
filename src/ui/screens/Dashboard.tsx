@@ -196,7 +196,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
       <header className="flex items-center gap-4">
         <Crest team={team} size="xl" />
         <div className="min-w-0 flex-1">
-          <h1 className="title line-clamp-2 text-4xl sm:text-5xl">{team.name}</h1>
+          <h1 className={`title line-clamp-2 [overflow-wrap:anywhere] ${Math.max(...team.name.split(/s+/).map((w) => w.length)) > 12 ? 'text-3xl sm:text-5xl' : 'text-4xl sm:text-5xl'}`}>{team.name}</h1>
           <p className="text-sm text-muted">{competition.name} · {team.stadium.name}</p>
         </div>
       </header>
