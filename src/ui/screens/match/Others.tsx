@@ -3,6 +3,7 @@ import { teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { playerName } from '../../format'
 import { Crest } from '../../theme'
+import { shortName } from '../standings/parts'
 import { otherGamesOf, scoreAt } from './otherGames'
 
 /** Quanto tempo o destaque de gol fica aceso (ms). */
@@ -56,7 +57,7 @@ export function OtherGames({ game, minute }: { game: Game; minute: number }) {
           <li key={m.id} data-testid="other-game" className={`rounded-xl border px-3 py-2 transition-colors duration-500 ${text ? 'border-accent bg-accent/15' : 'border-line bg-surface'}`}>
             <div className="flex items-center gap-2 text-sm font-semibold">
               <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                <span className="truncate">{home.name}</span>
+                <span className="truncate">{shortName(home)}</span>
                 <Crest team={home} size="sm" />
               </span>
               <span className={`min-w-14 rounded-md bg-bg px-2 py-0.5 text-center text-base font-bold tabular-nums ${text ? 'text-accent' : ''}`}>
@@ -64,7 +65,7 @@ export function OtherGames({ game, minute }: { game: Game; minute: number }) {
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <Crest team={away} size="sm" />
-                <span className="truncate">{away.name}</span>
+                <span className="truncate">{shortName(away)}</span>
               </span>
             </div>
             <div className="mt-0.5 h-4 text-center text-[11px] font-bold text-accent">{text ?? <span className="font-normal text-muted">{ended ? 'Fim de jogo' : minute === 0 ? 'Antes do apito' : `${minute}'`}</span>}</div>

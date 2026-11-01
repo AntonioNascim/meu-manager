@@ -18,6 +18,10 @@ import type { SquadReport } from './clubSquads'
 import { loadCorrections, patchSheet, readSheet, writeSheet } from './corrections'
 import type { Correction, Sheet } from './corrections'
 import { REAL_LEAGUES } from './leagues'
+import { FINDINGS_HEADER, cleanSpaces, entriesFromSheets, findingsCsvRows, scanNames } from './nameScan'
+import type { NameFinding } from './nameScan'
+import { nameFixCorrections } from './nameFixes'
+import { shortNameOf } from './shortNames'
 import { buildRealPackage } from './packageOut'
 import type { PackageSheet } from './packageOut'
 
@@ -88,6 +92,8 @@ export interface FinalizeResult {
   orphans: Correction[]
   /** Planilhas de elenco por clube (`elencos-reais/`) aplicadas e os problemas delas. */
   squads: SquadReport
+  /** Varredura de nomes suspeitos (`nameScan.ts`) depois das correções; a lista inteira vai para `conferencia/nomes-suspeitos.csv`. */
+  names: { findings: NameFinding[]; cleaned: number; shortNamesFilled: number }
   /** Ajuste das visualizações recentes à fama de carreira (regressão), quando há visualizações. */
   viewsFit?: { intercept: number; slope: number; n: number; r: number }
 }
@@ -118,7 +124,9 @@ function writeGenerated(row: Record<string, string>, made: GeneratedPlayer): voi
 }
 
 export function finalizeOutput(dir: string, log: (message: string) => void = () => {}): FinalizeResult {
-  const corrections = loadCorrections(dir)
+  // As correções à mão (correcoes.json) vencem as de nomes já conferidas (nameFixes.ts).
+  const manual = loadCorrections(dir)
+  const corrections = [...manual, ...nameFixCorrections(manual)]
   const overrides = overridesOf(corrections)
   const { date, fame: careerFame, views } = loadFame(dir)
   const blended = blendFame(careerFame, views)
@@ -132,6 +140,9 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
   const leagueStrength: FinalizeResult['leagueStrength'] = []
   let players = 0
   const squads: SquadReport = { clubs: [], problems: [] }
+  const nameFindings: NameFinding[] = []
+  let cleaned = 0
+  let shortNamesFilled = 0
   const usedSquadFiles = new Set<string>()
 
   for (const league of REAL_LEAGUES) {
@@ -143,7 +154,14 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
     const academySheet: Sheet = existsSync(files.academy) ? readSheet(readFileSync(files.academy, 'utf8')) : { header: playerSheet.header, rows: [] }
     // Elencos reais por clube (planilhas feitas à mão) trocam os jogadores gerados; antes das correções, que ainda valem por cima.
     for (const file of applyLeagueSquads(dir, league, clubSheet, playerSheet, { startYear, overrides }, squads)) usedSquadFiles.add(file)
+    // Coluna do nome curto (planilhas antigas não têm) e texto limpo (espaço duro, &nbsp;): antes das correções, que valem por cima.
+    if (!clubSheet.header.includes('shortName')) clubSheet.header.splice(Math.max(0, clubSheet.header.indexOf('abbreviation') + 1), 0, 'shortName')
+    for (const [sheet, columns] of [[clubSheet, ['name', 'city', 'stadiumName']], [playerSheet, ['name', 'nickname']], [academySheet, ['name', 'nickname']]] as const) {
+      for (const row of sheet.rows) for (const column of columns) if (row[column] !== undefined && cleanSpaces(row[column] as string) !== row[column]) (row[column] = cleanSpaces(row[column] as string), cleaned++)
+    }
     for (const sheet of [clubSheet, playerSheet, academySheet]) patchSheet(sheet, corrections)
+    for (const row of clubSheet.rows) if ((row.shortName ?? '') === '') (row.shortName = shortNameOf(row.name as string), shortNamesFilled++)
+    nameFindings.push(...scanNames(entriesFromSheets(league.id, clubSheet.rows, playerSheet.rows, academySheet.rows)))
     for (const sheet of [clubSheet, playerSheet, academySheet]) for (const row of sheet.rows) seen.add(row.id ?? '')
 
     const roster: RosterPlayer[] = [
@@ -194,6 +212,8 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
   const built = buildRealPackage(packageSheets, existsSync(creditsFile) ? readFileSync(creditsFile, 'utf8').trim() : '', startYear)
   writeFileSync(join(dir, 'pacote-real.json'), JSON.stringify(built.pkg))
 
+  mkdirSync(join(dir, CHECK_DIR), { recursive: true })
+  writeFileSync(join(dir, CHECK_DIR, 'nomes-suspeitos.csv'), toCsv(FINDINGS_HEADER, findingsCsvRows(nameFindings)))
   const topPlayers = ranked.slice(0, TOP_PLAYERS)
   writeCheckSheets(dir, topPlayers, clubs, overrides)
   const distribution = [90, 85, 80, 75, 70, 65, 60].map((threshold) => ({ threshold, count: ranked.filter((p) => p.overall >= threshold && p.club !== '(livre)').length }))
@@ -206,7 +226,8 @@ export function finalizeOutput(dir: string, log: (message: string) => void = () 
     topClubs: clubs.slice(0, 10),
     distribution,
     leagueStrength,
-    orphans: corrections.filter((c) => !seen.has(c.id)),
+    names: { findings: nameFindings, cleaned, shortNamesFilled },
+    orphans: manual.filter((c) => !seen.has(c.id)),
     squads,
     ...(blended.fit ? { viewsFit: blended.fit } : {}),
   }
@@ -243,6 +264,10 @@ export function summaryText(result: FinalizeResult, players = 20, clubs = 10): s
   if (result.viewsFit) lines.push('', `Visualizações recentes × fama de carreira: ${result.viewsFit.n} jogadores, correlação ${result.viewsFit.r.toFixed(2)} (a fama de agora mistura as duas)`)
   for (const c of result.squads.clubs) lines.push(`Elenco real de ${c.club} (${c.league}): ${c.added} novos, ${c.updated} atualizados, ${c.replacedGenerated} gerados trocados${c.removed > 0 ? `, ${c.removed} tirados` : ''}; elenco com ${c.size}${c.open > 0 ? `; ${c.open} vagas ainda em branco` : ''}`)
   for (const problem of result.squads.problems) lines.push(`ATENÇÃO elencos-reais/${problem}`)
+  const names = result.names.findings
+  const count = (severity: string): number => names.filter((f) => f.severity === severity).length
+  lines.push('', `Varredura de nomes: ${count('alta')} graves, ${count('media')} médios, ${count('baixa')} leves (lista inteira em conferencia/nomes-suspeitos.csv); ${result.names.cleaned} textos com espaço estranho limpos, ${result.names.shortNamesFilled} nomes curtos preenchidos`)
+  for (const f of names.filter((x) => x.severity === 'alta').slice(0, 30)) lines.push(`  ATENÇÃO nome grave [${f.code}] ${f.club}: "${f.value}" (${f.field}) — ${f.why}`)
   const v = result.validation
   lines.push('', `Validação do pacote-real.json: ${v.errors} erros, ${v.warnings} avisos, ${v.rejected} linhas recusadas`)
   if (result.orphans.length > 0) lines.push(`Atenção: ${result.orphans.length} correções guardadas não acharam o registro nas planilhas (o jogador saiu do elenco?): ${result.orphans.slice(0, 5).map((c) => `${c.player ?? c.club ?? c.id} (${c.field})`).join(', ')}${result.orphans.length > 5 ? '…' : ''}`)

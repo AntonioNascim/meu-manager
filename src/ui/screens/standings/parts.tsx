@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react'
+import { clubShortName } from '../../../data/package/shortName'
 import type { Team } from '../../../engine/types'
 import { Crest, Icon } from '../../theme'
 import type { IconName } from '../../theme'
 
-const SUFFIXES = / (Futebol Clube|Esporte Clube|Sport Club|Atlético Clube|Futebol e Regatas|Clube de Regatas|Associação Atlética|Atlético)$/
-
-/** Nome curto para listas apertadas: sem "Futebol Clube", "Esporte Clube" e parecidos no fim. */
-export const shortName = (team: Pick<Team, 'name'>): string => team.name.replace(SUFFIXES, '')
+/** Nome curto para listas apertadas: o do pacote (do jeito que a torcida chama), ou o nome sem "Futebol Clube" e parecidos. */
+export const shortName = (team: Pick<Team, 'name' | 'shortName'>): string => clubShortName(team)
 
 export type Tone = 'gold' | 'teal' | 'amber' | 'violet'
 

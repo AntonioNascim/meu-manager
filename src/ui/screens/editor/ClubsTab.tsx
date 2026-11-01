@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { addClub, addPlayer, moveClubToLeague, removeClub, replaceAt, squadCounts } from '../../../data/package/edit/ops'
+import { SHORT_NAME_MAX } from '../../../data/package/shortName'
 import type { PackageClub } from '../../../data/package/types'
 import { SQUAD_MAX, SQUAD_MIN } from '../../../engine/types/team'
 import { Crest } from '../../theme'
@@ -81,6 +82,7 @@ export function ClubsTab(props: TabProps) {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField label="Nome" value={club.name} onChange={(name) => patch({ name }, 'name')} />
+            <TextField label="Nome curto" value={club.shortName ?? ''} hint="Como a torcida chama (Leverkusen, Atlético-MG). Vazio: o jogo encurta o nome." onChange={(v) => patch({ shortName: v.trim() === '' ? undefined : v.slice(0, SHORT_NAME_MAX) }, 'shortName')} />
             <TextField label="Sigla (3 letras)" value={club.abbreviation} hint="Única no pacote." onChange={(v) => patch({ abbreviation: v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) }, 'abbr')} />
             <ColorField label="Cor principal" value={club.colors[0]} onChange={(c) => patch({ colors: [c, club.colors[1]] }, 'color1')} />
             <ColorField label="Cor secundária" value={club.colors[1]} onChange={(c) => patch({ colors: [club.colors[0], c] }, 'color2')} />

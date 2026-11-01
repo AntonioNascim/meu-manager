@@ -88,7 +88,7 @@ describe('etapa final das planilhas', () => {
 
   function setup(): string[] {
     dir = mkdtempSync(join(tmpdir(), 'final-'))
-    const clubRows = [['wd-Q1', 'Clube Um', 'UMM', '#ff0000', '#ffffff', 'Cidade', '', 'Estádio Um', 30000, 15, 'br-1', 'Brasil A'], ['wd-Q2', 'Clube Dois', 'DOI', '#0000ff', '', 'Cidade Dois', '', 'Estádio Dois', '', 9, 'br-1', 'Brasil A']]
+    const clubRows = [['wd-Q1', 'Clube Um', 'UMM', '', '#ff0000', '#ffffff', 'Cidade', '', 'Estádio Um', 30000, 15, 'br-1', 'Brasil A'], ['wd-Q2', 'Clube Dois', 'DOI', '', '#0000ff', '', 'Cidade Dois', '', 'Estádio Dois', '', 9, 'br-1', 'Brasil A']]
     writeFileSync(join(dir, 'br-1-clubes.csv'), toCsv(CLUB_COLUMNS, clubRows))
     const players = [...roster('wd-Q1', 20), ...roster('wd-Q2', 20)]
     const cells = (p: RosterPlayer): Record<string, string> => ({ id: p.id, name: p.name, birthDate: p.birthDate, nationality: p.nationality, position: p.position, club: p.clubId ?? '', clubName: p.clubId ?? '' })
@@ -134,7 +134,7 @@ describe('etapa final das planilhas', () => {
 
     // Uma rodada nova reescreve as planilhas sem as correções; a etapa final as põe de volta, com os mesmos atributos.
     const before = after(ids[5] as string)
-    writeFileSync(join(dir, 'br-1-clubes.csv'), toCsv(CLUB_COLUMNS, [['wd-Q1', 'Clube Um', 'UMM', '#ff0000', '#ffffff', 'Cidade', '', 'Estádio Um', 30000, 15, 'br-1', 'Brasil A'], ['wd-Q2', 'Clube Dois', 'DOI', '#0000ff', '', 'Cidade Dois', '', 'Estádio Dois', '', 9, 'br-1', 'Brasil A']]))
+    writeFileSync(join(dir, 'br-1-clubes.csv'), toCsv(CLUB_COLUMNS, [['wd-Q1', 'Clube Um', 'UMM', '', '#ff0000', '#ffffff', 'Cidade', '', 'Estádio Um', 30000, 15, 'br-1', 'Brasil A'], ['wd-Q2', 'Clube Dois', 'DOI', '', '#0000ff', '', 'Cidade Dois', '', 'Estádio Dois', '', 9, 'br-1', 'Brasil A']]))
     finalizeOutput(dir)
     expect(readFileSync(join(dir, 'br-1-clubes.csv'), 'utf8')).toContain('#00ff00')
     expect(after(ids[5] as string)).toBe(before)

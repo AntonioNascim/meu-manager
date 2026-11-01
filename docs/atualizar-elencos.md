@@ -52,6 +52,8 @@ npm run dados:finalizar
 
 Isso gera os atributos de todos os jogadores, monta o `pacote-real.json` novo e o valida. **O resultado esperado é zero erros.** Se aparecer erro (elenco com menos de 18, clube sem goleiro...), o texto diz qual clube e o que falta: corrija com as tarefas da etapa 2 e rode de novo.
 
+Veja no resumo a linha **"Varredura de nomes"**: ela deve dizer **0 graves, 0 médios**. Se aparecer `ATENÇÃO nome grave`, é vandalismo ou erro novo nos dados: abra `conferencia/nomes-suspeitos.csv`, preencha o `valor_correto` das linhas graves e médias, rode o passo 2 de novo (ou acrescente a correção em `tools/realdata/nameFixes.ts`) e depois o passo 3. Clubes novos precisam de **nome curto** (`tools/realdata/shortNames.ts`; sem a linha, vale o nome encurtado sozinho).
+
 Confira também `dados-reais/planilhas/conferencia/top-300-jogadores.csv`: os melhores jogadores do mundo devem ter a força que você espera. Se algum estiver errado, corrija o campo `força` na planilha de tarefas (etapa 2).
 
 Depois, copie o pacote final para o jogo:
@@ -79,7 +81,7 @@ Se a quantidade de clubes ou de ligas mudou, rode também o balanceamento (`npm 
 npm run dev
 ```
 
-Abra `http://localhost:5173`, toque em **Novo jogo**, escolha um clube e jogue um dia. Confira: o seu clube tem os jogadores atuais? Os nomes aparecem inteiros (sem pedaços de texto estranho)? Quem foi vendido na janela está no clube novo?
+Para ver no celular, siga `docs/testar-no-celular.md`. No computador, abra `http://localhost:5173`, toque em **Novo jogo**, escolha um clube e jogue um dia. Confira: o seu clube tem os jogadores atuais? Os nomes aparecem inteiros (sem pedaços de texto estranho)? Quem foi vendido na janela está no clube novo?
 
 Procure por nomes ou apelidos **estranhos ou ofensivos**: os dados vêm da Wikipedia e do Wikidata, que às vezes têm vandalismo. Se achar um, corrija o nome na planilha e rode a etapa 3 de novo.
 

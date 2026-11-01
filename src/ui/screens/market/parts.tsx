@@ -10,6 +10,7 @@ import { daysBetween, formatCompactMoney, formatDate, playerName } from '../../f
 import { INTEREST_COLORS, INTEREST_LABELS, POSITION_SHORT_LABELS, WINDOW_LABELS } from '../../labels'
 import { updateGame } from '../../../store/gameStore'
 import { Flag, Icon, Panel, ValueBadge } from '../../theme'
+import { shortName } from '../standings/parts'
 
 /** Valor curto para a lista: "R$ 51 mi", "R$ 8,3 mi", "R$ 840 mil". */
 export function shortMoney(value: number): string {
@@ -17,7 +18,7 @@ export function shortMoney(value: number): string {
   return `R$ ${Math.round(value / 1_000).toLocaleString('pt-BR')} mil`
 }
 
-export const clubName = (game: Game, id: string | null) => (id ? teamById(game, id).name : 'Livre')
+export const clubName = (game: Game, id: string | null) => (id ? shortName(teamById(game, id)) : 'Livre')
 
 const shortDate = (date: string) => date.split('-').reverse().slice(0, 2).join('/')
 

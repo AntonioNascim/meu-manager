@@ -12,6 +12,7 @@ import type { Attributes, Foot, Nationality, Position } from '../../../engine/ty
 import type { DataPackage, PackageClub, PackagePlayer } from '../types'
 import { freeAbbreviation, freeId, playersOf, syncTeamCounts, withPlayers } from './ops'
 import type { PlayerList } from './ops'
+import { SHORT_NAME_MAX } from '../shortName'
 import { suggestPlayerData } from './suggest'
 
 export type CsvIssueCode =
@@ -44,7 +45,7 @@ export const PLAYER_COLUMNS = [
   ...ATTRIBUTE_NAMES, 'potential', 'consistency', 'injuryProneness', 'professionalism', 'salary', 'contractEnd', 'releaseClause', 'generated',
 ] as const
 
-export const CLUB_COLUMNS = ['id', 'name', 'abbreviation', 'color1', 'color2', 'city', 'state', 'stadiumName', 'stadiumCapacity', 'reputation', 'league', 'leagueName'] as const
+export const CLUB_COLUMNS = ['id', 'name', 'abbreviation', 'shortName', 'color1', 'color2', 'city', 'state', 'stadiumName', 'stadiumCapacity', 'reputation', 'league', 'leagueName'] as const
 
 /** Colunas só para ler na planilha: a importação as ignora sem avisar. */
 const INFO_COLUMNS = new Set(['clubName', 'leagueName'])
@@ -137,7 +138,7 @@ export function clubsToCsv(pkg: DataPackage, options: { leagueIds?: ReadonlySet<
   const leagueName = new Map(pkg.leagues.map((l) => [l.id, l.name]))
   const rows = pkg.clubs
     .filter((c) => !options.leagueIds || options.leagueIds.has(c.league))
-    .map((c) => [c.id, c.name, c.abbreviation, c.colors[0], c.colors[1], c.city, c.state, c.stadium.name, c.stadium.capacity, c.reputation, c.league, leagueName.get(c.league)])
+    .map((c) => [c.id, c.name, c.abbreviation, c.shortName, c.colors[0], c.colors[1], c.city, c.state, c.stadium.name, c.stadium.capacity, c.reputation, c.league, leagueName.get(c.league)])
   return toCsv(CLUB_COLUMNS, rows)
 }
 
@@ -359,6 +360,8 @@ export function parseClubsCsv(text: string, pkg: DataPackage): CsvParsed<Package
       if (abbreviations.has(abbreviation)) r.fail('duplicate-abbreviation', 'abbreviation', `${abbreviation} (linha ${abbreviations.get(abbreviation)})`)
       else abbreviations.set(abbreviation, r.line)
     }
+    const shortName = r.text('shortName', false)
+    if (shortName !== undefined && shortName.length > SHORT_NAME_MAX) r.fail('out-of-range', 'shortName', `${shortName} (até ${SHORT_NAME_MAX} letras)`)
     const color = (column: string, fallback: string): string => {
       const v = r.raw(column)
       if (v === '') return fallback
@@ -383,6 +386,7 @@ export function parseClubsCsv(text: string, pkg: DataPackage): CsvParsed<Package
     }
     const state = r.text('state', false)
     if (state) club.state = state
+    if (shortName) club.shortName = shortName
     return club
   })
   return parsed

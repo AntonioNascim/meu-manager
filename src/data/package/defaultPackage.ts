@@ -46,6 +46,7 @@ export function packageFromWorld(world: World, name = 'Mundo fictício'): DataPa
       id: t.id,
       name: t.name,
       abbreviation: t.abbreviation,
+      ...(t.shortName ? { shortName: t.shortName } : {}),
       colors: [t.colors[0], t.colors[1]],
       city: t.city,
       state: t.state,

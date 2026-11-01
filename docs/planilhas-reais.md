@@ -77,9 +77,24 @@ Valores aceitos por `campo`:
 | `estádio`, `cidade` | texto. |
 | `capacidade` | número de 500 a 300.000 (`45.000` e `45 000` valem). |
 | `força`, `potencial` | 1 a 100 (planilha `conferencia/top-300-jogadores.csv`): os atributos do jogador são gerados de novo para dar essa força. |
+| `nome`, `apelido`, `nome curto` | texto. No `apelido`, `-` tira o apelido. `nome` vale para jogador e para clube (o `id` diz qual). |
 | `elenco` | não se aplica por aqui: trocar ou acrescentar jogadores é no editor ou em `<liga>-jogadores.csv`; marcar `feito` só registra. |
 
 **As correções não se perdem.** Cada correção boa fica em `correcoes.json` (pasta de saída; por id do clube ou jogador e campo; a mais nova substitui a antiga). Toda rodada do `npm run dados:planilhas` (inclusive `--atualizar`, depois de uma janela de transferências) reescreve as planilhas do zero e **reaplica as correções no fim**; as tarefas que elas resolveram não voltam para `tarefas/`. Se o jogador saiu do elenco, a correção dele fica guardada sem efeito e a etapa final avisa ("correções guardadas que não acharam o registro"). Faça cópia de `correcoes.json` junto com as planilhas.
+
+## Varredura de nomes suspeitos (automática)
+
+Os dados vêm da Wikipedia e do Wikidata, onde qualquer pessoa edita: de vez em quando entra vandalismo (ofensa no nome de um jogador, estádio trocado por brincadeira) ou erro (`Q12345` no lugar do nome de uma cidade, letra grega no lugar de um "A"). Por isso o `dados:finalizar` (que roda no fim do `dados:planilhas` e do `dados:aplicar`) **varre todos os nomes, apelidos, clubes, estádios e cidades** (`tools/realdata/nameScan.ts`) e avisa no terminal e em `conferencia/nomes-suspeitos.csv`. Acha: palavrão e ofensa em português, espanhol, inglês, italiano, francês, alemão e holandês (`profanity.ts`), frase no lugar de nome, palavra em minúscula, número ou aspas em nome de pessoa, texto de página (`&nbsp;`), link, letras com a codificação errada, letra de outro alfabeto, código do Wikidata, nomes enormes e apelido sem relação com o nome.
+
+- **Graves e médios** aparecem como `ATENÇÃO nome grave` no resumo, e `tests/realNames.test.ts` **barra o pacote** que tiver algum. Os **leves** (apelidos como "Gabigol" ou "El Guardián", que não têm a ver com o nome) só ficam na planilha, para olhar.
+- `conferencia/nomes-suspeitos.csv` tem as colunas das tarefas: ache o certo, preencha `valor_correto` e `feito`, coloque em `tarefas-feitas/` e rode `dados:aplicar`. O campo vale `nome`, `apelido`, `estádio` ou `cidade`.
+- **O que já foi corrigido não volta:** `tools/realdata/nameFixes.ts` guarda as correções conferidas (e `correcoes.json`, que vence em caso de conflito) e toda rodada as reaplica. Texto com espaço duro (`&nbsp;`) é limpo sozinho.
+- Nome que parece estranho mas é de verdade ("Jizz Hornkamp", "MAC³PARK stadion") entra em `KNOWN_OK` no `nameScan.ts` para a varredura não acusar.
+- Para rodar só a varredura num pacote: `node tools/run.mjs realNames [arquivo.json] [--baixa]`.
+
+## Nome curto dos clubes
+
+A coluna `shortName` da planilha de clubes (`Leverkusen`, `Gladbach`, `Atlético-MG`, `Man United`) é preenchida sozinha quando está em branco: primeiro pela tabela `tools/realdata/shortNames.ts` (o nome do clube na planilha → como a torcida chama), depois pelo encurtador automático (tira "F.C.", "Futebol Clube"...). Para mudar um deles, use a tarefa `nome curto` (vira correção e não se perde) ou edite no editor; clube novo na coleta sem entrada na tabela fica com o nome automático até alguém acrescentar a linha. `tests/shortName.test.ts` exige nome curto em todo clube e sem repetir dentro da liga.
 
 ## Elencos reais por clube (`elencos-reais/`)
 
