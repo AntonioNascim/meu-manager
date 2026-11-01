@@ -85,6 +85,8 @@ export interface PackageClub {
   name: string
   /** 3 letras. */
   abbreviation: string
+  /** Nome curto, do jeito que a torcida chama (até 16 letras); sem ele o jogo encurta o nome sozinho (`autoShortName`). */
+  shortName?: string
   colors: [string, string]
   city: string
   state?: string

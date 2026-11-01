@@ -87,6 +87,8 @@ export interface Team {
   name: string
   /** Abreviação de 3 letras. */
   abbreviation: string
+  /** Nome curto (do jeito que a torcida chama) para onde falta espaço; sem ele, o nome encurtado (`clubShortName` em `src/data/package/shortName.ts`). */
+  shortName?: string
   city: string
   state: string
   /** Duas cores (hex). */

@@ -326,7 +326,7 @@ export function assembleLeague(input: LeagueInput, state: AssembleState): League
       issue('club-bad-capacity', `capacidade ${capacity} fora de 500 a 300.000; deixada em branco`, { club: name, id, field: 'capacidade', current: String(capacity) })
       capacity = undefined
     }
-    clubRows.push([id, name, abbreviation, colors[0], colors[1], city, '', stadium, capacity, provisionalReputation(rankOf.get(info.qid) ?? 0, input.clubs.length, league), league.id, league.spec.name])
+    clubRows.push([id, name, abbreviation, '', colors[0], colors[1], city, '', stadium, capacity, provisionalReputation(rankOf.get(info.qid) ?? 0, input.clubs.length, league), league.id, league.spec.name])
 
     const squad = input.squads.get(info.qid)
     if (!squad || squad.entries.length === 0) issue('squad-missing', 'nenhum elenco encontrado na Wikipedia', { club: name, id })

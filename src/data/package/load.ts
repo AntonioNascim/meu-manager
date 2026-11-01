@@ -139,6 +139,7 @@ export function worldFromPackage(pkg: DataPackage, options: LoadOptions): World 
       id: club.id,
       name: club.name,
       abbreviation: club.abbreviation,
+      ...(club.shortName ? { shortName: club.shortName } : {}),
       city: club.city,
       state: club.state ?? '',
       colors: club.colors,

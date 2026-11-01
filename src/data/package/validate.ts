@@ -4,6 +4,7 @@ import type { Attributes, Region } from '../../engine/types'
 import { SQUAD_MAX, SQUAD_MIN } from '../../engine/types/team'
 import { COUNTRY_DEFAULTS } from './leagueDefaults'
 import { cupsForPackage } from './packageCups'
+import { SHORT_NAME_MAX } from './shortName'
 import { validateCups } from './validateCups'
 import { PACKAGE_FORMAT, PACKAGE_VERSION, TIEBREAKERS } from './types'
 import type { DataPackage, PackageIssue, PackageIssueCode, PackageReport } from './types'
@@ -225,6 +226,10 @@ export function validatePackage(input: unknown, options: ValidateOptions = {}): 
     if (!isObj(club)) return c.error('wrong-type', path, 'club')
     const id = text(c, club, 'id', path)
     text(c, club, 'name', path)
+    if (club.shortName !== undefined) {
+      if (typeof club.shortName !== 'string') c.error('wrong-type', `${path}.shortName`, 'shortName')
+      else if (club.shortName.trim() === '' || club.shortName.length > SHORT_NAME_MAX) c.error('out-of-range', `${path}.shortName`, club.shortName, `1 a ${SHORT_NAME_MAX} letras`)
+    }
     const abbreviation = text(c, club, 'abbreviation', path)
     if (abbreviation !== undefined) {
       if (!/^[A-Z]{3}$/.test(abbreviation)) c.error('out-of-range', `${path}.abbreviation`, abbreviation, '3 letras maiúsculas')

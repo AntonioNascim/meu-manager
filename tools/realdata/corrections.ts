@@ -10,7 +10,7 @@ import { POSITIONS } from '../../src/engine/types'
 import type { Position } from '../../src/engine/types'
 
 /** O que uma correção muda. Posição, cores, cidade, estádio e capacidade vão para as colunas da planilha; força e potencial, para a geração de atributos. */
-export type CorrectionField = 'position' | 'secondaryPositions' | 'color1' | 'color2' | 'city' | 'stadiumName' | 'capacity' | 'overall' | 'potential' | 'reputation'
+export type CorrectionField = 'position' | 'secondaryPositions' | 'color1' | 'color2' | 'city' | 'stadiumName' | 'capacity' | 'overall' | 'potential' | 'reputation' | 'name' | 'nickname' | 'shortName'
 
 export interface Correction {
   /** Id do registro (clube ou jogador) nas planilhas. */
@@ -78,6 +78,9 @@ const CAMPOS: Record<string, CorrectionField[]> = {
   cidade: ['city'],
   capacidade: ['capacity'],
   reputacao: ['reputation'],
+  nome: ['name'],
+  apelido: ['nickname'],
+  'nome curto': ['shortName'],
 }
 
 export const fieldsOfCampo = (campo: string): CorrectionField[] | undefined => CAMPOS[norm(campo)]
@@ -113,7 +116,7 @@ export function interpretTask(campo: string, rawValue: string): Interpreted {
   const key = norm(campo)
   const value = rawValue.trim()
   if (key === 'elenco') return fail('tarefa de elenco não se aplica por aqui: troque ou acrescente os jogadores no editor (aba Jogadores) ou em <liga>-jogadores.csv')
-  if (!(key in CAMPOS)) return fail(`campo "${campo}" desconhecido (aceitos: posição, força, potencial, reputação, cores, cor 1, cor 2, estádio, cidade, capacidade)`)
+  if (!(key in CAMPOS)) return fail(`campo "${campo}" desconhecido (aceitos: posição, força, potencial, reputação, cores, cor 1, cor 2, estádio, cidade, capacidade, nome, apelido, nome curto)`)
   switch (key) {
     case 'posicao': {
       const tokens = value.split(/[|,/;+\s]+/).filter(Boolean)
@@ -156,6 +159,16 @@ export function interpretTask(campo: string, rawValue: string): Interpreted {
       const n = parseInteger(value)
       if (n === undefined || n < 500 || n > 300_000) return fail(`"${value}" não é uma capacidade de 500 a 300.000`)
       return { ok: true, entries: [{ field: 'capacity', value: String(n) }] }
+    }
+    case 'nome':
+    case 'nome curto': {
+      if (value === '') return fail('valor vazio')
+      return { ok: true, entries: [{ field: key === 'nome' ? 'name' : 'shortName', value }] }
+    }
+    case 'apelido': {
+      // "-" tira o apelido.
+      if (value === '') return fail('valor vazio (escreva - para tirar o apelido)')
+      return { ok: true, entries: [{ field: 'nickname', value: value === '-' ? '' : value }] }
     }
     default: {
       if (value === '') return fail('valor vazio')
@@ -222,7 +235,7 @@ export function readSheet(text: string): Sheet {
 export const writeSheet = (sheet: Sheet): string => toCsv(sheet.header, sheet.rows.map((r) => sheet.header.map((h) => r[h] ?? '')))
 
 /** Coluna da planilha de cada campo de correção (força e potencial não são colunas editadas à mão: viram atributos). */
-const COLUMN_OF: Partial<Record<CorrectionField, string>> = { position: 'position', secondaryPositions: 'secondaryPositions', color1: 'color1', color2: 'color2', city: 'city', stadiumName: 'stadiumName', capacity: 'stadiumCapacity', reputation: 'reputation' }
+const COLUMN_OF: Partial<Record<CorrectionField, string>> = { position: 'position', secondaryPositions: 'secondaryPositions', color1: 'color1', color2: 'color2', city: 'city', stadiumName: 'stadiumName', capacity: 'stadiumCapacity', reputation: 'reputation', name: 'name', nickname: 'nickname', shortName: 'shortName' }
 
 /** Aplica as correções de posição, cores, cidade, estádio e capacidade às linhas (pelo id). Devolve quantas células mudaram. */
 export function patchSheet(sheet: Sheet, items: readonly Correction[]): number {

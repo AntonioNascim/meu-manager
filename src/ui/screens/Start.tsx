@@ -12,15 +12,21 @@ import { Button, Card } from '../components/ui'
 import { downloadText } from '../download'
 import { ImportPackage } from './ImportPackage'
 import type { ChosenPackage } from './ImportPackage'
+import { Credits } from './Credits'
 import { NewGame } from './NewGame'
 import { Editor } from './editor/Editor'
 
-type View = 'menu' | 'new' | 'load' | 'package' | 'editor'
+type View = 'menu' | 'new' | 'load' | 'package' | 'editor' | 'credits'
 
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
-  // Em desenvolvimento, /?editor=zero|padrao|15|21 abre o editor direto (&aba=leagues|clubs|players|cups|sheets|issues).
-  const [view, setView] = useState<View>(() => (import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('editor') ? 'editor' : 'menu'))
+  // Em desenvolvimento, /?editor=zero|padrao|15|21 abre o editor direto (&aba=leagues|clubs|players|cups|sheets|issues); /?menu=novo|creditos abre essas telas.
+  const [view, setView] = useState<View>(() => {
+    if (!import.meta.env.DEV || typeof window === 'undefined') return 'menu'
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('editor')) return 'editor'
+    return params.get('menu') === 'novo' ? 'new' : params.get('menu') === 'creditos' ? 'credits' : 'menu'
+  })
   const [slots, setSlots] = useState<(SaveSummary | null)[] | null>(null)
   const [latest, setLatest] = useState<SaveSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -103,6 +109,7 @@ export function Start() {
   }
 
   if (view === 'new') return <NewGame slots={slots} {...(dataPackage ? { dataPackage } : {})} onBack={() => { setDataPackage(undefined); setView('menu'); void refresh() }} />
+  if (view === 'credits') return <Credits onBack={() => setView('menu')} />
   if (view === 'editor') return <Editor onBack={() => setView('menu')} onPlay={(chosen) => { setDataPackage(chosen); setView('new') }} />
   if (view === 'package') return <ImportPackage onBack={() => setView('menu')} onUse={(chosen) => { setDataPackage(chosen); setView('new') }} />
 
@@ -142,6 +149,9 @@ export function Start() {
           </Button>
           <Button className="w-full" variant="secondary" onClick={() => fileInput.current?.click()}>
             Importar save de um arquivo
+          </Button>
+          <Button className="w-full" variant="secondary" onClick={() => setView('credits')}>
+            Créditos e avisos
           </Button>
         </div>
       )}

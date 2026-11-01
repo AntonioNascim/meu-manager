@@ -60,8 +60,16 @@ describe('avançar', () => {
 })
 
 describe('telas (renderização)', () => {
-  it('a tela de novo jogo lista os 20 times da Série A', () => {
-    const html = renderToStaticMarkup(createElement(NewGame))
+  it('a tela de novo jogo começa no mundo real e só baixa o pacote quando ele é usado', () => {
+    const html = renderToStaticMarkup(createElement(NewGame, { slots: null, onBack: () => {} }))
+    expect(html).toContain('real-loading')
+    expect(html).toContain('Mundo real')
+    expect(html).toContain('Mundo fictício')
+    expect(html).not.toContain('<li')
+  })
+
+  it('a tela de novo jogo lista os 20 times da Série A no mundo fictício', () => {
+    const html = renderToStaticMarkup(createElement(NewGame, { slots: null, onBack: () => {}, initialSource: 'fictional' }))
     expect(html).toContain('Série A')
     expect(html).toContain('Série B')
     expect(html.match(/<li/g)).toHaveLength(20)

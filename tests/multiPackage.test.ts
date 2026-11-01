@@ -148,7 +148,7 @@ describe('escolha do país, da liga e do clube', () => {
     expect(many).toContain('country-picker')
     expect(many).toContain('Inglaterra')
     expect(many).toContain('Série A')
-    const one = renderToStaticMarkup(createElement(NewGame, { slots: null, onBack: () => {} }))
+    const one = renderToStaticMarkup(createElement(NewGame, { slots: null, onBack: () => {}, initialSource: 'fictional' }))
     expect(one).not.toContain('country-picker')
     expect(one).toContain('Série B')
   })

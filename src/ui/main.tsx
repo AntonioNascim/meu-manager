@@ -8,6 +8,9 @@ import { initPwa } from '../pwa/pwa'
 import { startAutosave } from '../store/autosave'
 import { setGame } from '../store/gameStore'
 import { beginLive } from '../store/liveMatch'
+import { loadWorld } from '../data/package/defaultPackage'
+import { REAL_PACKAGE_ID, loadRealPackage } from '../data/package/realPackage'
+import type { Game } from '../store/game'
 
 // Atalhos de desenvolvimento (só com `npm run dev`):
 //   /?time=imp&semente=7       começa o jogo com o time (sigla de 3 letras)
@@ -22,12 +25,21 @@ import { beginLive } from '../store/liveMatch'
 //   &anos=2                    simula 2 temporadas inteiras antes (histórico e tabelas passadas)
 //   &equipe=team-sol           abre a página do time na Tabela; &resumo=1 abre o resumo de um jogo nas Rodadas
 //   &crise=1                  caixa pequeno e folha quatro vezes maior (mostra o alerta das finanças)
+//   &mundo=real                começa no mundo real (embutido); aí &time=fla acha o clube pela sigla ou por parte do nome
 //   &treino=intensa|leve       treino coletivo escolhido e a vaga individual ocupada (grupo físico, primeiro jogador de linha)
 if (import.meta.env.DEV) {
   const params = new URLSearchParams(window.location.search)
   const team = params.get('time')
-  if (team) {
-    let game = createGame(Number(params.get('semente') ?? 1), `team-${team.toLowerCase()}`)
+  const startDev = (team: string, real?: Awaited<ReturnType<typeof loadRealPackage>>) => {
+    const seed = Number(params.get('semente') ?? 1)
+    let game: Game
+    if (real) {
+      const world = loadWorld(seed, real)
+      const wanted = team.toLowerCase()
+      const found = world.teams.find((t) => t.abbreviation.toLowerCase() === wanted) ?? world.teams.find((t) => t.name.toLowerCase().includes(wanted))
+      if (!found) throw new Error(`Clube não encontrado no mundo real: ${team}`)
+      game = createGame(seed, found.id, { world, dataPackage: real, dataPackageId: REAL_PACKAGE_ID })
+    } else game = createGame(seed, `team-${team.toLowerCase()}`)
     for (let i = 0; i < Number(params.get('dias') ?? 0); i++) game = playPendingAuto(advanceGame(game))
     if (params.get('jogo')) {
       while (!game.pendingUserMatch && game.season.matches.some((m) => m.status === 'scheduled')) game = advanceGame(game)
@@ -58,6 +70,10 @@ if (import.meta.env.DEV) {
       if (trainee) game = startUserIndividualTraining(game, trainee.id, { type: 'group', group: 'physical' })
     }
     setGame(game)
+  }
+  if (team) {
+    if (params.get('mundo') === 'real') void loadRealPackage().then((pkg) => startDev(team, pkg))
+    else startDev(team)
   }
 }
 

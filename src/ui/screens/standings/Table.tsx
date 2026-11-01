@@ -61,7 +61,7 @@ export function Table({ game, competition, onTeam }: { game: Game; competition: 
       <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
         <div className="text-[12px]">
           <div className="flex items-center border-b border-line px-1 py-2 text-[11px] font-bold uppercase text-muted">
-            <span className="sticky left-0 z-10 flex w-[128px] shrink-0 bg-surface pl-2">
+            <span className="sticky left-0 z-10 flex w-[156px] shrink-0 bg-surface pl-2">
               <span className="w-5">#</span>Clube
             </span>
             {cols.map((h) => (
@@ -81,7 +81,7 @@ export function Table({ game, competition, onTeam }: { game: Game; competition: 
               const bg = mine ? 'bg-accent/10' : 'bg-surface'
               return (
                 <li key={row.teamId} aria-label={band ? BAND_LABEL[band] : undefined} className={`flex min-h-11 items-center border-b border-line/60 px-1 text-sm last:border-b-0 ${mine ? 'bg-accent/10 font-bold' : ''}`}>
-                  <span className={`sticky left-0 z-10 flex w-[128px] shrink-0 items-center ${bg}`}>
+                  <span className={`sticky left-0 z-10 flex w-[156px] shrink-0 items-center ${bg}`}>
                     <span className={`mr-1 h-9 w-1 shrink-0 rounded-full ${band ? BAND_BAR[band] : 'bg-transparent'}`} />
                     <span className="w-5 shrink-0 text-center text-[11px] tabular-nums text-muted">{started ? i + 1 : '–'}</span>
                     <TeamLink team={team} onOpen={onTeam} className="flex-1 gap-1.5 pr-1" />

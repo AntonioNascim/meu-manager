@@ -188,6 +188,7 @@ que dê para descrever assim.
 | `id` | sim | Único; os jogadores apontam para ele (`players[].club`) |
 | `name` | sim | Nome completo |
 | `abbreviation` | sim | **3 letras maiúsculas**, únicas no pacote |
+| `shortName` | não | Nome curto, do jeito que a torcida chama (`Leverkusen`, `Atlético-MG`, `Man United`), de 1 a 16 letras. Aparece na classificação, na lista de outros jogos da partida e onde falta espaço. Sem ele o jogo encurta o nome sozinho (tira "Futebol Clube", "F.C."...). |
 | `colors` | sim | Duas cores `#rrggbb` (escudo e camisa gerados) |
 | `city` | sim | Cidade |
 | `state` | não | Estado ou sigla do país (texto livre) |
@@ -523,7 +524,7 @@ Aba *Planilhas*: exporta e importa **jogadores** (elenco ou base) e **clubes** e
 
 - **Arquivo:** exporta com `;` e BOM UTF-8 (o Excel em português abre certo); lê `;`, `,` ou tab. Datas `AAAA-MM-DD` ou `DD/MM/AAAA`. Coluna `id` liga a linha ao registro: id que existe atualiza, id novo ou vazio cria (jogadores sem id recebem um antes de exportar). `clubName` e `leagueName` são só para ler e a importação os ignora; colunas desconhecidas são ignoradas com um aviso.
 - **Colunas dos jogadores:** `id`, `name`, `nickname`, `birthDate`, `birthEstimated` (`sim` = data estimada; vazio = data conferida), `nationality`, `position`, `secondaryPositions` (separadas por `|`; `-` = nenhuma de propósito; vazio = o jogo sorteia), `foot`, `club` (id do clube; vazio = livre), `clubName`, os 16 atributos (`passing`, `finishing`, `dribbling`, `crossing`, `tackling`, `heading`, `ballControl`, `pace`, `stamina`, `strength`, `vision`, `positioning`, `decisions`, `determination`, `reflexes`, `rushingOut`), `potential`, `consistency`, `injuryProneness`, `professionalism`, `salary`, `contractEnd`, `releaseClause`, `generated` (`sim` = jogador gerado para completar o elenco). Obrigatórias: `name`, `birthDate`, `nationality`, `position`.
-- **Colunas dos clubes:** `id`, `name`, `abbreviation`, `color1`, `color2`, `city`, `state`, `stadiumName`, `stadiumCapacity`, `reputation`, `league` (id da liga), `leagueName`. Obrigatórias: `name`, `league`.
+- **Colunas dos clubes:** `id`, `name`, `abbreviation`, `shortName`, `color1`, `color2`, `city`, `state`, `stadiumName`, `stadiumCapacity`, `reputation`, `league` (id da liga), `leagueName`. Obrigatórias: `name`, `league`.
 - **Célula vazia** em campo opcional: o jogo gera o valor. Atributos: ou os 16 preenchidos, ou todos vazios. Contrato: `salary`, `contractEnd` e `releaseClause` juntos. Ocultos: os três juntos.
 - **Exportar por liga:** o escopo escolhido leva os clubes da liga e os jogadores desses clubes. “Preencher com os valores que o jogo geraria” leva atributos, potencial, ocultos e contrato gerados para quem ainda não os tem, prontos para ajustar. Há também planilhas em branco, só com o cabeçalho.
 - **Erros por linha:** a importação mostra cada problema com a linha da planilha (o cabeçalho é a 1) e a coluna: campo obrigatório vazio, número inválido ou fora de 1 a 100, data inválida, valor desconhecido (posição, pé, nacionalidade), cor inválida, id ou sigla repetidos na planilha, clube ou liga que não existe (importe os clubes antes dos jogadores), atributos incompletos, mais de 2 posições secundárias. Com erros, *Importar tudo* fica desligado; *Importar só as N linhas corretas* aplica as boas.

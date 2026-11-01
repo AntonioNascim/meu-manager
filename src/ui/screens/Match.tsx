@@ -1,5 +1,6 @@
 import { matchLabel } from '../../engine/cups'
 import { CupPathLine } from './standings/CupPath'
+import { shortName } from './standings/parts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FORMATION_IDS } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
@@ -111,7 +112,7 @@ function Scoreboard({ game, snap, label, speed, onSpeed, onOpponent }: { game: G
     const content = (
       <>
         <TeamBadge team={team} />
-        <span className="w-full truncate text-xs font-semibold">{team.name}</span>
+        <span className="w-full truncate text-xs font-semibold">{shortName(team)}</span>
       </>
     )
     const cls = 'flex min-w-0 flex-1 flex-col items-center gap-1 text-center'
@@ -177,8 +178,8 @@ function StatsList({ game, snap }: { game: Game; snap: MatchSnapshot }) {
   return (
     <div className="space-y-3 rounded-xl bg-slate-800 p-4">
       <div className="flex justify-between text-xs font-semibold text-slate-300">
-        <span>{teamById(game, snap.home.teamId).name}</span>
-        <span>{teamById(game, snap.away.teamId).name}</span>
+        <span>{shortName(teamById(game, snap.home.teamId))}</span>
+        <span>{shortName(teamById(game, snap.away.teamId))}</span>
       </div>
       {keys.map((k) => {
         const h = snap.homeStats[k]
