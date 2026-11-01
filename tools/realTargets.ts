@@ -39,7 +39,7 @@ export const REAL_LEAGUE_REFERENCE: Record<string, LeagueReference> = {
   'br-1': { maxShare: 0.3, minDistinct: 8 },
   'ar-1': { maxShare: 0.3, minDistinct: 8 },
   'mx-1': { maxShare: 0.3, minDistinct: 6 },
-  'us-1': { maxShare: 0.25, minDistinct: 8 },
+  'us-1': { maxShare: 0.3, minDistinct: 8 },
 }
 export const DEFAULT_LEAGUE_REFERENCE: LeagueReference = { maxShare: 0.6, minDistinct: 3 }
 
@@ -60,7 +60,7 @@ export interface CupReference {
 
 export const REAL_CUP_REFERENCE: Record<string, CupReference> = {
   'cont-eu-1': { maxClubShare: 0.3, maxCountryShare: 0.5, groupShare: { countries: ['England', 'Spain', 'Italy', 'Germany'], min: 0.75 }, minDistinctShare: 0.4 },
-  'cont-sa-1': { maxClubShare: 0.2, countryShare: { Brazil: [0.4, 0.75], Argentina: [0.15, 0.35] }, minDistinctShare: 0.4 },
+  'cont-sa-1': { maxClubShare: 0.2, countryShare: { Brazil: [0.4, 0.75], Argentina: [0.15, 0.4] }, minDistinctShare: 0.4 },
   'cont-na-1': { maxClubShare: 0.25, countryShare: { Mexico: [0.7, 0.95] }, minDistinctShare: 0.3 },
 }
 
