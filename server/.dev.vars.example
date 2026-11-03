@@ -1,0 +1,3 @@
+# Copie para .dev.vars (que o Git ignora) para rodar localmente com `wrangler dev`.
+# Esta é a chave secreta de TESTE do Cloudflare: aprova qualquer desafio. Nunca use a chave real aqui.
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA

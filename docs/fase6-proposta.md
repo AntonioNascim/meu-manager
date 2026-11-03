@@ -276,7 +276,7 @@ Nenhum impede. Em ordem de risco:
 ### 4.1 Identidade e nuvem
 
 - **Identidade:** no primeiro uso o aparelho cria um par de chaves **Ed25519** (`WebCrypto`, no IndexedDB); a chave pública vira o `playerId`; cada pedido vai assinado. Sem senha e sem e-mail.
-- **Código de recuperação:** 12 palavras, mostrado uma vez, que **derivam a chave** (o servidor não guarda segredo e não consegue recuperá-lo). Trocar de aparelho = digitar o código.
+- **Código de recuperação:** 12 palavras que **derivam a chave** (o servidor não guarda segredo e não consegue recuperá-lo). Trocar de aparelho = digitar o código. **Tela (decisão de 03/11/2026):** aviso claro de que, sem o código, quem perder ou trocar de celular perde a carreira e as ligas; as 12 palavras aparecem na criação e a pessoa só segue depois de digitar 3 palavras sorteadas; depois, o código pode ser visto de novo em Menu › Código de recuperação (escondido até um toque) enquanto o aparelho tiver a identidade. O código fica guardado **neste aparelho** (junto da chave, que já dá o mesmo acesso), nunca no servidor.
 - **Apelido:** 3 a 16 caracteres, passa pelo filtro (6.2), único por liga (não global).
 - Os 3 espaços de save continuam; cada um ganha o estado de nuvem (só local, sincronizado, enviando, conflito). A nuvem é **opcional por espaço**.
 
@@ -334,7 +334,7 @@ Por identidade (chave pública) e por IP, janela deslizante; valores iniciais a 
 
 | Ação | Limite |
 |---|---|
-| Criar identidade | 5 por IP por dia |
+| Criar identidade | 30 por IP por dia (nas redes de operadora, CGNAT, muita gente divide o mesmo IP; a proteção principal é o Turnstile) |
 | Leituras gerais | 120 por minuto |
 | Escritas (tática, oferta, pronto) | 30 por minuto |
 | Gravar save na nuvem | 6 por minuto, 200 por dia |
@@ -372,7 +372,7 @@ Moderação no início: nós, com um painel pequeno de denúncias (B9). Banir id
 | Dado | Onde | Por quê | Por quanto tempo |
 |---|---|---|---|
 | Identidade: chave pública, apelido, data de criação, última visita | D1 | Reconhecer o aparelho; mostrar nas ligas | Enquanto a conta existir; apagada 12 meses depois da última visita |
-| Código de recuperação | **Só com você** | Trocar de aparelho | — |
+| Código de recuperação | **Só com você e neste aparelho** (nunca no servidor) | Trocar de aparelho; rever pelo menu | Até você apagar a conta ou os dados do navegador |
 | Saves da carreira solo (se você ligou a nuvem) | R2, pedaços comprimidos | Continuar em outro aparelho | Até você apagar ou 12 meses sem entrar |
 | Ligas online: participantes, clubes, mercado, resultados, o mundo da liga | Durable Object | Fazer a liga funcionar | Enquanto ativa; arquivada 90 dias; depois apagada. Nomes de técnicos em ligas apagadas viram "Técnico removido" |
 | Denúncias e bloqueios | D1 | Moderar | 12 meses |
@@ -390,7 +390,7 @@ Moderação no início: nós, com um painel pequeno de denúncias (B9). Banir id
 >
 > **Sem internet.** A carreira solo funciona sem internet e os jogos ficam no seu aparelho. Só as ligas online e a cópia na nuvem precisam de conexão.
 >
-> **Código de recuperação.** Ao criar a conta anônima você recebe um código de 12 palavras. Ele é a única forma de levar seus jogos para outro aparelho. **Nós não guardamos esse código e não podemos recuperá-lo.** Quem tiver o código tem acesso à sua conta; guarde-o em lugar seguro.
+> **Código de recuperação.** Ao criar a conta anônima você recebe um código de 12 palavras. Ele é a única forma de levar seus jogos para outro aparelho. **Nós não guardamos esse código e não podemos recuperá-lo**; ele fica só no seu aparelho, e você pode revê-lo no menu. Quem tiver o código tem acesso à sua conta; guarde-o em lugar seguro.
 >
 > **Quem vê o quê.** Os outros jogadores de uma liga veem o seu apelido, o seu clube e o que acontece na liga (jogos e transferências). Ninguém vê os seus jogos salvos da carreira solo.
 >
@@ -540,3 +540,13 @@ Tudo rodou no computador de desenvolvimento (Windows, 6 GB), com o **workerd** (
 5. **Endereço gratuito.** O subdomínio foi trocado para `meumanager.workers.dev` e conferido no painel (03/11/2026). Faturamento depois dos testes: US$ 0,00, nenhum uso faturável; R2 sem buckets.
 
 **B1 concluída.** Próximo: B2 (identidade), quando você mandar.
+
+---
+
+## 13. Andamento da B2 (03/11/2026)
+
+**Feito e testado, sem nuvem:** código de recuperação de 12 palavras que deriva a chave Ed25519; `playerId`; pedidos assinados com relógio e nonce; limites da seção 6.1; filtro de apelidos; registro de identidade com Turnstile e limite por IP (lógica pura); armazenamento da chave no aparelho (banco IndexedDB separado dos saves). **Mudança em relação à proposta:** a chave não usa WebCrypto, e sim `@noble/curves` (com `@noble/hashes` e `@scure/bip39`), porque o WebCrypto só tem Ed25519 em navegadores recentes (Chrome 137+, Safari 17+) e não deriva a chave das palavras; as bibliotecas funcionam em celulares mais antigos.
+
+**B2 concluída em 03/11/2026, inclusive na nuvem.** Worker `meu-manager-api`, banco D1 `meu-manager`, Durable Object `Guard` (limites e nonces em disco, 8 fatias) e Turnstile em modo Gerenciado (hosts autorizados: o GitHub Pages do projeto e `localhost`). Testes: `tools/identitySmoke.ts` passou local (9 verificações, inclusive o limite de criações por IP), na nuvem com desafio falso (403, falha fechada, CORS só para o site) e na nuvem com um desafio de verdade clicado por uma pessoa (201, `/api/me`, replay recusado, apelido proibido recusado). A identidade de teste foi apagada do banco.
+
+**Limite de criação de identidades (decisão de 03/11/2026):** subiu de 5 para **30 por IP por dia**, porque em redes de operadora (CGNAT) muita gente divide o mesmo IP e 5 bloquearia grupos de jogadores; o Turnstile é a proteção principal. O limite conta toda tentativa, inclusive as recusadas. A B9 reajusta com dados do teste fechado.

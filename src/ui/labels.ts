@@ -5,6 +5,8 @@
  */
 import type { PackageIssue } from '../data/package/types'
 import type { CsvIssue } from '../data/package/edit/csv'
+import type { NameIssue } from '../online/nameFilter'
+import type { RecoveryError } from '../online/recoveryCode'
 import type { CupEntrantSource, CupFormat, CupSpec, Region } from '../engine/types'
 import { COUNTRY_INFO } from './countries'
 import type {
@@ -455,3 +457,28 @@ export function csvIssueText(issue: CsvIssue): string {
     case 'duplicate-abbreviation': return `${where}sigla repetida na planilha: ${issue.detail}.`
   }
 }
+
+// ---- Modo online: identidade (Fase 6, B2) ----
+
+/** Por que um apelido ou nome de liga foi recusado. */
+export const NAME_ISSUE_LABELS: Record<NameIssue, string> = {
+  'too-short': 'Use pelo menos 3 letras.',
+  'too-long': 'Use no máximo 16 letras.',
+  'invalid-characters': "Use só letras, números, espaço e . _ - '",
+  'mixed-scripts': 'Não misture alfabetos diferentes.',
+  link: 'Não use links nem contatos.',
+  phone: 'Não use números de telefone.',
+  impersonal: 'Esse nome parece ser do jogo ou da equipe. Escolha outro.',
+  profanity: 'Esse nome não é permitido. Escolha outro.',
+  repeated: 'Muitas letras repetidas seguidas.',
+}
+
+/** Por que o código de recuperação digitado não vale. */
+export const RECOVERY_ERROR_LABELS: Record<RecoveryError, string> = {
+  'wrong-count': 'O código tem 12 palavras.',
+  'unknown-word': 'Uma das palavras não existe na lista do jogo.',
+  'bad-checksum': 'As palavras não formam um código válido. Confira a ordem e a escrita.',
+}
+
+/** Apelido pronto de quem ainda não escolheu. */
+export const anonymousNicknameLabel = (n: number): string => `Técnico ${n}`
