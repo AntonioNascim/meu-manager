@@ -540,3 +540,11 @@ Tudo rodou no computador de desenvolvimento (Windows, 6 GB), com o **workerd** (
 5. **Endereço gratuito.** O subdomínio foi trocado para `meumanager.workers.dev` e conferido no painel (03/11/2026). Faturamento depois dos testes: US$ 0,00, nenhum uso faturável; R2 sem buckets.
 
 **B1 concluída.** Próximo: B2 (identidade), quando você mandar.
+
+---
+
+## 13. Andamento da B2 (03/11/2026)
+
+**Feito e testado, sem nuvem:** código de recuperação de 12 palavras que deriva a chave Ed25519; `playerId`; pedidos assinados com relógio e nonce; limites da seção 6.1; filtro de apelidos; registro de identidade com Turnstile e limite por IP (lógica pura); armazenamento da chave no aparelho (banco IndexedDB separado dos saves). **Mudança em relação à proposta:** a chave não usa WebCrypto, e sim `@noble/curves` (com `@noble/hashes` e `@scure/bip39`), porque o WebCrypto só tem Ed25519 em navegadores recentes (Chrome 137+, Safari 17+) e não deriva a chave das palavras; as bibliotecas funcionam em celulares mais antigos.
+
+**Falta (precisa de conta Cloudflare):** criar o banco D1 e o Worker da API, criar o widget do Turnstile (no painel, sem custo) e um Durable Object para guardar limites e nonces em disco (os limites diários não sobrevivem à memória de um isolate). Também a tela de criar identidade e mostrar o código (entra com a B4/B8, quando houver o que fazer com a identidade).
