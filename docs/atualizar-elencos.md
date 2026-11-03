@@ -92,6 +92,15 @@ Procure por nomes ou apelidos **estranhos ou ofensivos**: os dados vêm da Wikip
 3. Junte na `main`. O GitHub publica o site sozinho (workflow *Testes e publicação no GitHub Pages*, uns 3 minutos).
 4. Abra o site com internet. A faixa **"Há uma versão nova do jogo"** aparece: toque em **Atualizar**. (No celular instalado, o mesmo.)
 
+### 7. Entregar os elencos novos sem esperar uma versão nova do jogo (Fase 6, B3)
+
+O jogo também recebe elencos novos **sem** nova versão do site: o servidor guarda cada versão do pacote e o jogo avisa "Elencos atualizados" no menu. Isso exige a conta Cloudflare e o bucket `meu-manager-pacotes` (veja `docs/fase6-proposta.md`, seção 14). Só vale para **jogos novos**; jogos em andamento nunca mudam.
+
+1. **Antes do passo 3 da coleta**, atualize `data/versao.json` com a nova versão (`AAAA.MM`, por exemplo `"version": "2027.01"`). É a mesma versão da cópia embutida no jogo. Uma versão publicada nunca é refeita: se precisar corrigir o mesmo mês, use `2027.01.1`.
+2. Com o pacote novo já em `data/pacote-real.json`, gere a versão: `node tools/run.mjs publishPackage --notas "Janela de janeiro" --indice <caminho do index.json atual>`. Para pegar o índice atual: `wrangler r2 object get meu-manager-pacotes/index.json --file dist-pacote/index-atual.json --remote` e passe esse arquivo em `--indice` (sem ele, o índice novo só teria a versão nova).
+3. A ferramenta grava `dist-pacote/` (o arquivo comprimido e o `index.json`) e mostra os dois comandos `wrangler r2 object put`. Rode **primeiro o do arquivo da versão e depois o do índice**: assim ninguém vê uma versão no índice que ainda não existe.
+4. Confira: `node tools/run.mjs packageSmoke https://meu-manager-api.meumanager.workers.dev 2026.01` (a versão final é a embutida "de mentira", mais antiga que a publicada, para o aviso aparecer).
+
 ---
 
 ## Resumo rápido (para colar na parede)
@@ -104,6 +113,7 @@ Procure por nomes ou apelidos **estranhos ou ofensivos**: os dados vêm da Wikip
 | 4 | `npm test` e `npx vitest run --project unit tests/realPackage.test.ts` | confere tudo |
 | 5 | `npm run dev` | testa no navegador |
 | 6 | commit, pull request, juntar na `main` | publica |
+| 7 | `publishPackage` e dois `wrangler r2 object put` | entrega os elencos sem nova versão do site |
 
 ## Se algo der errado
 

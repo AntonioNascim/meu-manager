@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { World } from '../../data/generateWorld'
 import { loadWorld } from '../../data/package/defaultPackage'
-import { REAL_PACKAGE_ID, loadRealPackage } from '../../data/package/realPackage'
+import { packageSource } from '../../store/realPackageSource'
+import type { AvailablePackage } from '../../store/packageSource'
 import type { DataPackage } from '../../data/package/types'
 import { playerOverall } from '../../engine/overall'
 import type { Player, Team } from '../../engine/types'
@@ -24,23 +25,25 @@ interface Option {
 
 type Source = 'real' | 'fictional'
 
-type RealState = { status: 'loading'; step: 'download' | 'build' } | { status: 'error'; message: string } | { status: 'ready'; world: World; pkg: DataPackage }
+type RealState = { status: 'loading'; step: 'download' | 'build' } | { status: 'error'; message: string } | { status: 'ready'; world: World; pkg: DataPackage; gameId: string; version: string; versions: AvailablePackage[] }
 
-/** Baixa o pacote real e monta o mundo (só quando `enabled`); a montagem espera um instante para a tela de espera aparecer. */
-function useRealWorld(seed: number, enabled: boolean): [RealState, () => void] {
+/** Abre o pacote real (a versão pedida, ou a mais nova que o aparelho tem) e monta o mundo (só quando `enabled`); a montagem espera um instante para a tela de espera aparecer. */
+function useRealWorld(seed: number, enabled: boolean, version: string | undefined): [RealState, () => void] {
   const [state, setState] = useState<RealState>({ status: 'loading', step: 'download' })
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
     setState({ status: 'loading', step: 'download' })
-    loadRealPackage()
-      .then(async (pkg) => {
+    packageSource
+      .load(version)
+      .then(async (loaded) => {
         if (cancelled) return
+        const versions = await packageSource.available()
         setState({ status: 'loading', step: 'build' })
         await new Promise((resolve) => setTimeout(resolve, 30))
         if (cancelled) return
-        setState({ status: 'ready', world: loadWorld(seed, pkg), pkg })
+        setState({ status: 'ready', world: loadWorld(seed, loaded.pkg), pkg: loaded.pkg, gameId: loaded.gameId, version: loaded.version, versions })
       })
       .catch((e: unknown) => {
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Não foi possível carregar o mundo real.' })
@@ -48,7 +51,7 @@ function useRealWorld(seed: number, enabled: boolean): [RealState, () => void] {
     return () => {
       cancelled = true
     }
-  }, [seed, enabled, attempt])
+  }, [seed, enabled, attempt, version])
   return [state, useCallback(() => setAttempt((n) => n + 1), [])]
 }
 
@@ -77,7 +80,8 @@ export function NewGame({ slots, onBack, dataPackage, initialSource = 'real' }: 
   const [seed] = useState(() => Math.floor(Math.random() * 1_000_000) + 1)
   const [source, setSource] = useState<Source>(initialSource)
   const useReal = !dataPackage && source === 'real'
-  const [real, retry] = useRealWorld(seed, useReal)
+  const [version, setVersion] = useState<string | undefined>(undefined)
+  const [real, retry] = useRealWorld(seed, useReal, version)
   const localWorld = useMemo(() => (useReal ? null : loadWorld(seed, dataPackage?.data)), [seed, dataPackage, useReal])
 
   const switcher = dataPackage ? null : (
@@ -92,12 +96,31 @@ export function NewGame({ slots, onBack, dataPackage, initialSource = 'real' }: 
       />
     </div>
   )
+  const versionPicker =
+    useReal && real.status === 'ready' && real.versions.length > 1 ? (
+      <label className="mt-3 flex items-center gap-2 text-sm text-slate-300" data-testid="version-picker">
+        <span>Elencos:</span>
+        <select className="min-h-12 rounded-lg bg-slate-800 px-3 text-slate-100" value={real.version} onChange={(e) => setVersion(e.target.value)}>
+          {real.versions.map((v) => (
+            <option key={v.version} value={v.version}>
+              {v.version} {v.origin === 'embedded' ? '(do jogo)' : '(baixada)'}
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null
+  const extra = (
+    <>
+      {switcher}
+      {versionPicker}
+    </>
+  )
   const subtitle = dataPackage ? `Pacote: ${dataPackage.data.name}. ` : source === 'real' ? 'Clubes e jogadores reais; os atributos são estimados pela fama. ' : 'Clubes e jogadores inventados. '
 
   if (useReal && real.status !== 'ready') {
     return (
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col bg-slate-900 text-slate-100">
-        <Header onBack={onBack} subtitle={subtitle} extra={switcher} />
+        <Header onBack={onBack} subtitle={subtitle} extra={extra} />
         <div className="px-4 py-10 text-center" data-testid="real-loading">
           {real.status === 'loading' ? (
             <>
@@ -122,8 +145,8 @@ export function NewGame({ slots, onBack, dataPackage, initialSource = 'real' }: 
   }
 
   const world = (useReal && real.status === 'ready' ? real.world : localWorld) as World
-  const chosenPackage: ChosenPackage | undefined = dataPackage ?? (useReal && real.status === 'ready' ? { id: REAL_PACKAGE_ID, data: real.pkg } : undefined)
-  return <Picker key={useReal ? 'real' : 'local'} slots={slots} onBack={onBack} seed={seed} world={world} dataPackage={chosenPackage} subtitle={subtitle} extra={switcher} />
+  const chosenPackage: ChosenPackage | undefined = dataPackage ?? (useReal && real.status === 'ready' ? { id: real.gameId, data: real.pkg } : undefined)
+  return <Picker key={useReal && real.status === 'ready' ? `real-${real.version}` : 'local'} slots={slots} onBack={onBack} seed={seed} world={world} dataPackage={chosenPackage} subtitle={subtitle} extra={extra} />
 }
 
 interface PickerProps {

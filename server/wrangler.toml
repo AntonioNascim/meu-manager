@@ -13,6 +13,11 @@ database_name = "meu-manager"
 database_id = "SUBSTITUIR-NA-PUBLICACAO"
 migrations_dir = "migrations"
 
+# Pacotes de dados do jogo (Fase 6, B3): precisa do bucket criado antes da publicação (wrangler r2 bucket create meu-manager-pacotes).
+[[r2_buckets]]
+binding = "PACKAGES"
+bucket_name = "meu-manager-pacotes"
+
 [[durable_objects.bindings]]
 name = "GUARD"
 class_name = "Guard"

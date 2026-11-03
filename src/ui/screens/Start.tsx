@@ -5,6 +5,7 @@ import { markSaved } from '../../store/autosave'
 import { openGame } from '../../store/gameStore'
 import { exportSlot, importSave, parseSaveFile } from '../../store/saveFile'
 import { deleteSlot, latestSlot, listSlots, loadSlot } from '../../store/saves'
+import { PackageUpdateBanner } from '../components/PackageUpdateBanner'
 import { PwaBanner } from '../components/PwaBanner'
 import { SlotInfo } from '../components/SlotInfo'
 import { SlotPicker } from '../components/SlotPicker'
@@ -116,6 +117,7 @@ export function Start() {
   return (
     <>
       <PwaBanner />
+      <PackageUpdateBanner />
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-bg px-4 py-8 text-slate-100">
       <div className="flex flex-col items-center gap-3 pb-3 text-center">
         <img src="icons/icon-192.png" alt="" width={72} height={72} className="rounded-2xl" />
