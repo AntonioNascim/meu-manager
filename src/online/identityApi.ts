@@ -3,7 +3,7 @@
  * então tudo roda em teste sem nuvem. O Worker só liga estas peças a `Request`/`Response`.
  */
 import { checkName, type NameIssue } from './nameFilter'
-import type { LimitAction, RateLimiter } from './rateLimit'
+import type { LimitAction, RateLimit } from './rateLimit'
 import { verifyRequest, type NonceStore, type RequestParts, type VerifyError } from './signedRequest'
 
 export interface IdentityRecord {
@@ -28,7 +28,7 @@ export interface TurnstileVerifier {
 export interface ApiDeps {
   store: IdentityStore
   turnstile: TurnstileVerifier
-  limiter: RateLimiter
+  limiter: RateLimit
   nonces: NonceStore
   now: () => number
 }
@@ -50,6 +50,7 @@ export type ApiError =
 export type ApiResult<T> = { status: 200 | 201; body: T } | { status: 400 | 401 | 403 | 404 | 429; body: ApiError }
 
 export const MAX_BODY_BYTES = 1024
+export const LAST_SEEN_EVERY_MS = 3_600_000
 
 const fail = <T>(status: 400 | 401 | 403 | 404 | 429, body: ApiError): ApiResult<T> => ({ status, body })
 
@@ -60,7 +61,7 @@ export async function authenticate(
   deps: ApiDeps,
 ): Promise<{ ok: true; playerId: string } | { ok: false; result: ApiResult<never> }> {
   const now = deps.now()
-  const byIp = deps.limiter.hit(action, `ip:${req.ip}`, now)
+  const byIp = await deps.limiter.hit(action, `ip:${req.ip}`, now)
   if (!byIp.allowed) return { ok: false, result: fail(429, { error: 'rate-limited', retryAfterMs: byIp.retryAfterMs }) }
   const verified = await verifyRequest(req.authorization, req, now, deps.nonces)
   if (!verified.ok) return { ok: false, result: fail(401, { error: 'unauthorized', reason: verified.error }) }
@@ -128,9 +129,10 @@ export async function requireIdentity(req: ApiRequest, action: LimitAction, deps
   const record = await deps.store.get(auth.playerId)
   if (!record) return { ok: false, result: fail(404, { error: 'unknown-identity' }) }
   // Limite também por identidade: trocar de IP não livra do teto.
-  const byId = deps.limiter.hit(action, `id:${auth.playerId}`, deps.now())
+  const byId = await deps.limiter.hit(action, `id:${auth.playerId}`, deps.now())
   if (!byId.allowed) return { ok: false, result: fail(429, { error: 'rate-limited', retryAfterMs: byId.retryAfterMs }) }
-  await deps.store.setLastSeen(auth.playerId, deps.now())
+  // A última visita só é regravada de hora em hora: cada gravação no banco custa.
+  if (deps.now() - record.lastSeen > LAST_SEEN_EVERY_MS) await deps.store.setLastSeen(auth.playerId, deps.now())
   return { ok: true, record }
 }
 

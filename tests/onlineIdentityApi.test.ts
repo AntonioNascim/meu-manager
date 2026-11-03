@@ -133,9 +133,12 @@ describe('requireIdentity', () => {
     expect((await requireIdentity(get(identity), 'read', deps)).ok).toBe(false)
     await registerIdentity(request(identity, { turnstileToken: 't' }), deps)
     advance(5000)
-    const r = await requireIdentity(get(identity, T0 + 5000), 'read', deps)
-    expect(r.ok).toBe(true)
-    expect((await deps.store.get(identity.playerId))?.lastSeen).toBe(T0 + 5000)
+    expect((await requireIdentity(get(identity, T0 + 5000), 'read', deps)).ok).toBe(true)
+    // Dentro de uma hora a última visita não é regravada; depois disso, sim.
+    expect((await deps.store.get(identity.playerId))?.lastSeen).toBe(T0)
+    advance(3_600_000)
+    expect((await requireIdentity(get(identity, T0 + 3_605_000), 'read', deps)).ok).toBe(true)
+    expect((await deps.store.get(identity.playerId))?.lastSeen).toBe(T0 + 3_605_000)
   })
 
   it('limita por identidade mesmo trocando de IP (120 leituras por minuto)', async () => {

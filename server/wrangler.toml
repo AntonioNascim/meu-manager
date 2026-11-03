@@ -1,0 +1,22 @@
+# API do Meu Manager (Fase 6). `database_id` é preenchido na publicação (veja server/LEIAME.md); não é segredo, mas é da conta.
+name = "meu-manager-api"
+main = "worker.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Páginas autorizadas a chamar a API (CORS): o site no GitHub Pages e o servidor de desenvolvimento.
+ALLOWED_ORIGINS = "https://antonionascim.github.io,http://localhost:5173,http://localhost:4173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "meu-manager"
+database_id = "SUBSTITUIR-NA-PUBLICACAO"
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "GUARD"
+class_name = "Guard"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Guard"]

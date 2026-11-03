@@ -35,3 +35,8 @@ tools/online-lab/dist-dry
 tools/online-lab/.wrangler
 tools/online-lab/determinism/bundle.js
 .wrangler-lab.log
+
+# Servidor (Fase 6)
+server/.dev.vars
+server/.wrangler
+server/wrangler.deploy.toml

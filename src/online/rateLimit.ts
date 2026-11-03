@@ -21,27 +21,36 @@ export type LimitAction = keyof typeof RATE_LIMITS
 
 export type LimitResult = { allowed: true } | { allowed: false; retryAfterMs: number }
 
-/** Guarda os instantes dos pedidos recentes de cada chave (identidade ou IP) e ação. */
-export class RateLimiter {
+/** Quem conta os pedidos: em memória (testes) ou em disco (Durable Object). Pode ser síncrono ou não. */
+export interface RateLimit {
+  /** Conta o pedido se couber em todas as regras da ação; senão não conta e diz quanto esperar. */
+  hit(action: LimitAction, key: string, now: number): LimitResult | Promise<LimitResult>
+}
+
+/** A janela mais longa da ação: pedidos mais antigos que isso podem ser esquecidos. */
+export const longestWindow = (action: LimitAction): number => Math.max(...(RATE_LIMITS[action] as readonly LimitRule[]).map((r) => r.windowMs))
+
+/** A regra de decisão, igual para qualquer armazenamento. `times` são os instantes dos pedidos já contados. */
+export function decide(action: LimitAction, times: readonly number[], now: number): LimitResult {
+  let wait = 0
+  for (const rule of RATE_LIMITS[action] as readonly LimitRule[]) {
+    const inWindow = times.filter((t) => now - t < rule.windowMs).sort((a, b) => a - b)
+    if (inWindow.length >= rule.limit) wait = Math.max(wait, inWindow[inWindow.length - rule.limit]! + rule.windowMs - now)
+  }
+  return wait > 0 ? { allowed: false, retryAfterMs: wait } : { allowed: true }
+}
+
+/** Guarda os instantes dos pedidos recentes de cada chave (identidade ou IP) e ação, na memória. */
+export class RateLimiter implements RateLimit {
   private hits = new Map<string, number[]>()
 
-  /** Conta o pedido se couber em todas as regras da ação; senão não conta e diz quanto esperar. */
   hit(action: LimitAction, key: string, now: number): LimitResult {
-    const rules: readonly LimitRule[] = RATE_LIMITS[action]
     const id = `${action}:${key}`
-    const longest = Math.max(...rules.map((r) => r.windowMs))
+    const longest = longestWindow(action)
     const times = (this.hits.get(id) ?? []).filter((t) => now - t < longest)
-    let wait = 0
-    for (const rule of rules) {
-      const inWindow = times.filter((t) => now - t < rule.windowMs)
-      if (inWindow.length >= rule.limit) wait = Math.max(wait, inWindow[inWindow.length - rule.limit]! + rule.windowMs - now)
-    }
-    if (wait > 0) {
-      this.hits.set(id, times)
-      return { allowed: false, retryAfterMs: wait }
-    }
-    times.push(now)
+    const result = decide(action, times, now)
+    if (result.allowed) times.push(now)
     this.hits.set(id, times)
-    return { allowed: true }
+    return result
   }
 }
