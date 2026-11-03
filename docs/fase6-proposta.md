@@ -276,7 +276,7 @@ Nenhum impede. Em ordem de risco:
 ### 4.1 Identidade e nuvem
 
 - **Identidade:** no primeiro uso o aparelho cria um par de chaves **Ed25519** (`WebCrypto`, no IndexedDB); a chave pública vira o `playerId`; cada pedido vai assinado. Sem senha e sem e-mail.
-- **Código de recuperação:** 12 palavras, mostrado uma vez, que **derivam a chave** (o servidor não guarda segredo e não consegue recuperá-lo). Trocar de aparelho = digitar o código.
+- **Código de recuperação:** 12 palavras que **derivam a chave** (o servidor não guarda segredo e não consegue recuperá-lo). Trocar de aparelho = digitar o código. **Tela (decisão de 03/11/2026):** aviso claro de que, sem o código, quem perder ou trocar de celular perde a carreira e as ligas; as 12 palavras aparecem na criação e a pessoa só segue depois de digitar 3 palavras sorteadas; depois, o código pode ser visto de novo em Menu › Código de recuperação (escondido até um toque) enquanto o aparelho tiver a identidade. O código fica guardado **neste aparelho** (junto da chave, que já dá o mesmo acesso), nunca no servidor.
 - **Apelido:** 3 a 16 caracteres, passa pelo filtro (6.2), único por liga (não global).
 - Os 3 espaços de save continuam; cada um ganha o estado de nuvem (só local, sincronizado, enviando, conflito). A nuvem é **opcional por espaço**.
 
@@ -372,7 +372,7 @@ Moderação no início: nós, com um painel pequeno de denúncias (B9). Banir id
 | Dado | Onde | Por quê | Por quanto tempo |
 |---|---|---|---|
 | Identidade: chave pública, apelido, data de criação, última visita | D1 | Reconhecer o aparelho; mostrar nas ligas | Enquanto a conta existir; apagada 12 meses depois da última visita |
-| Código de recuperação | **Só com você** | Trocar de aparelho | — |
+| Código de recuperação | **Só com você e neste aparelho** (nunca no servidor) | Trocar de aparelho; rever pelo menu | Até você apagar a conta ou os dados do navegador |
 | Saves da carreira solo (se você ligou a nuvem) | R2, pedaços comprimidos | Continuar em outro aparelho | Até você apagar ou 12 meses sem entrar |
 | Ligas online: participantes, clubes, mercado, resultados, o mundo da liga | Durable Object | Fazer a liga funcionar | Enquanto ativa; arquivada 90 dias; depois apagada. Nomes de técnicos em ligas apagadas viram "Técnico removido" |
 | Denúncias e bloqueios | D1 | Moderar | 12 meses |
@@ -390,7 +390,7 @@ Moderação no início: nós, com um painel pequeno de denúncias (B9). Banir id
 >
 > **Sem internet.** A carreira solo funciona sem internet e os jogos ficam no seu aparelho. Só as ligas online e a cópia na nuvem precisam de conexão.
 >
-> **Código de recuperação.** Ao criar a conta anônima você recebe um código de 12 palavras. Ele é a única forma de levar seus jogos para outro aparelho. **Nós não guardamos esse código e não podemos recuperá-lo.** Quem tiver o código tem acesso à sua conta; guarde-o em lugar seguro.
+> **Código de recuperação.** Ao criar a conta anônima você recebe um código de 12 palavras. Ele é a única forma de levar seus jogos para outro aparelho. **Nós não guardamos esse código e não podemos recuperá-lo**; ele fica só no seu aparelho, e você pode revê-lo no menu. Quem tiver o código tem acesso à sua conta; guarde-o em lugar seguro.
 >
 > **Quem vê o quê.** Os outros jogadores de uma liga veem o seu apelido, o seu clube e o que acontece na liga (jogos e transferências). Ninguém vê os seus jogos salvos da carreira solo.
 >

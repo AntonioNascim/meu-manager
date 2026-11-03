@@ -43,14 +43,22 @@ describe('IdentityStore', () => {
     expect((await store.load())?.identity.playerId).toBe(first?.identity.playerId)
   })
 
-  it('o código de recuperação nunca é gravado (nem as palavras, nem a semente em texto)', async () => {
+  it('guarda as 12 palavras para ver de novo, sem confirmação até a pessoa confirmar', async () => {
     const made = await store.create(fakeRandom(4), 1)
+    const loaded = await store.load()
+    expect(loaded?.recoveryWords).toEqual(made?.recoveryCode)
+    expect(loaded?.codeConfirmed).toBe(false)
+    await store.confirmCode()
+    expect((await store.load())?.codeConfirmed).toBe(true)
+  })
+
+  it('ao apagar a identidade (apagar conta), as palavras vão junto', async () => {
+    await store.create(fakeRandom(8), 1)
+    await store.clear()
     const raw = new Dexie(NAME)
     await raw.open()
-    const dump = JSON.stringify(await raw.table('identity').toArray(), (_k, v) => (v instanceof Uint8Array ? Array.from(v) : v))
+    expect(await raw.table('identity').count()).toBe(0)
     raw.close()
-    for (const word of made!.recoveryCode) expect(dump.includes(word)).toBe(false)
-    expect(dump.includes('recoveryCode')).toBe(false)
   })
 
   it('recuperar com o código dá a mesma identidade de antes, também após limpar o aparelho', async () => {
@@ -63,6 +71,7 @@ describe('IdentityStore', () => {
       const back = await store.recover(parsed.words, 2)
       expect(back.playerId).toBe(made!.identity.playerId)
       expect((await store.load())?.identity.playerId).toBe(made!.identity.playerId)
+      expect(await store.load()).toMatchObject({ codeConfirmed: true, recoveryWords: made!.recoveryCode })
     }
   })
 

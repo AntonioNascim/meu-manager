@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createIdentity, fromBase64Url, identityFromRecoveryCode, publicKeyOf, toBase64Url } from '../src/online/identity'
-import { parseRecoveryCode, pickCheckPositions, RECOVERY_WORDS } from '../src/online/recoveryCode'
+import { checkConfirmation, parseRecoveryCode, pickCheckPositions, RECOVERY_WORDS } from '../src/online/recoveryCode'
 import { CLOCK_SKEW_MS, MemoryNonceStore, signRequest, verifyRequest, type RequestParts } from '../src/online/signedRequest'
 import { RATE_LIMITS, RateLimiter } from '../src/online/rateLimit'
 
@@ -81,6 +81,17 @@ describe('código de recuperação e identidade', () => {
       expect([...p].sort((a, b) => a - b)).toEqual(p)
       expect(p.every((x) => x >= 0 && x < RECOVERY_WORDS)).toBe(true)
     }
+  })
+
+  it('a confirmação confere as palavras sorteadas, sem ligar para acento ou maiúscula', () => {
+    const { recoveryCode } = createIdentity(fakeRandom(15))
+    const positions = pickCheckPositions(fakeRandom(16))
+    const right = positions.map((p) => recoveryCode[p]!.normalize('NFD').replace(/\p{M}+/gu, '').toUpperCase() + ' ')
+    expect(checkConfirmation(recoveryCode, positions, right)).toEqual([true, true, true])
+    const wrong = [...right]
+    wrong[1] = 'zzz'
+    expect(checkConfirmation(recoveryCode, positions, wrong)).toEqual([true, false, true])
+    expect(checkConfirmation(recoveryCode, positions, [])).toEqual([false, false, false])
   })
 
   it('só aceita um playerId de 32 bytes', () => {

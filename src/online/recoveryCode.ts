@@ -58,3 +58,15 @@ export function pickCheckPositions(randomBytes: (n: number) => Uint8Array, count
   }
   return [...out].sort((a, b) => a - b)
 }
+
+/**
+ * Confere as palavras que a pessoa digitou nas posições sorteadas (proposta 4.5, passo 2). Devolve uma resposta por posição,
+ * na mesma ordem; ignora acento, maiúsculas e espaços nas pontas.
+ */
+export function checkConfirmation(words: readonly string[], positions: readonly number[], typed: readonly string[]): boolean[] {
+  return positions.map((p, i) => {
+    const expected = words[p]
+    const given = typed[i]
+    return expected !== undefined && given !== undefined && fold(given.trim()) === fold(expected)
+  })
+}
