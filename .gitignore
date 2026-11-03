@@ -40,3 +40,6 @@ tools/online-lab/determinism/bundle.js
 server/.dev.vars
 server/.wrangler
 server/wrangler.deploy.toml
+
+# Saída da ferramenta publishPackage (Fase 6, B3)
+dist-pacote

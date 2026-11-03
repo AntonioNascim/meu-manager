@@ -550,3 +550,13 @@ Tudo rodou no computador de desenvolvimento (Windows, 6 GB), com o **workerd** (
 **B2 concluída em 03/11/2026, inclusive na nuvem.** Worker `meu-manager-api`, banco D1 `meu-manager`, Durable Object `Guard` (limites e nonces em disco, 8 fatias) e Turnstile em modo Gerenciado (hosts autorizados: o GitHub Pages do projeto e `localhost`). Testes: `tools/identitySmoke.ts` passou local (9 verificações, inclusive o limite de criações por IP), na nuvem com desafio falso (403, falha fechada, CORS só para o site) e na nuvem com um desafio de verdade clicado por uma pessoa (201, `/api/me`, replay recusado, apelido proibido recusado). A identidade de teste foi apagada do banco.
 
 **Limite de criação de identidades (decisão de 03/11/2026):** subiu de 5 para **30 por IP por dia**, porque em redes de operadora (CGNAT) muita gente divide o mesmo IP e 5 bloquearia grupos de jogadores; o Turnstile é a proteção principal. O limite conta toda tentativa, inclusive as recusadas. A B9 reajusta com dados do teste fechado.
+
+---
+
+## 14. Andamento da B3 (03/11/2026)
+
+**Feito e testado, sem nuvem:** índice com hash, comparação de versões, download com conferência de tamanho e SHA-256 (o arquivo só é guardado depois de conferido e aberto), guarda no aparelho (2 versões, banco separado), aviso "Elencos atualizados" no menu, seletor de versão em Novo jogo, ferramenta `publishPackage` (arquivo gzip determinístico, índice com todas as versões, recusa refazer uma versão publicada) e rotas do Worker para servir tudo do R2. Teste de ponta a ponta contra o Worker local com R2 simulado (`tools/packageSmoke.ts`): 13 verificações, inclusive baixar e abrir os 370 clubes e 10.471 jogadores em ~115 ms. **Medida:** o pacote real tem 4,89 MB de JSON e **0,71 MB comprimido**.
+
+**Decisões:** o arquivo comprimido é servido como `application/gzip` e sem `Content-Encoding`, para o navegador não descomprimir sozinho e o hash do índice valer para os bytes baixados. O índice não é assinado (protege contra download quebrado, não contra o servidor trocar o arquivo; como o servidor é nosso e a versão só vale para jogos novos, o risco é baixo; assinar o índice com uma chave nossa fica como melhoria). O Cache API do Cloudflare não funciona em `workers.dev`, então cada download lê o R2 (custo de leitura desprezível: 10 milhões incluídos).
+
+**Falta (precisa de conta e do cartão já cadastrado, sem custo na faixa gratuita):** criar o bucket `meu-manager-pacotes` (R2), publicar o Worker com a rota nova e enviar a primeira versão (`mundo-real@2026.11`, 0,71 MB). Depois disso o jogo passa a avisar de versões novas quando você publicar uma.

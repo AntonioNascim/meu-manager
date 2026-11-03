@@ -2,6 +2,7 @@
  * API do Meu Manager (Fase 6). Liga as peças puras de `src/online` ao Cloudflare:
  *   POST /api/identity  cria (ou reconhece) a identidade — pedido assinado + Turnstile
  *   GET  /api/me        quem sou eu — pedido assinado
+ *   GET  /packages/index.json e /packages/<id>/<versão>/pacote.json.gz   pacotes de dados (R2), públicos e sem assinatura
  * Limites e códigos de uso único ficam num Durable Object (`Guard`, em 8 fatias), porque a memória de um Worker some a cada reinício.
  * O endereço de quem pede é usado só no instante do pedido, para limitar abuso; nunca é gravado nem registrado.
  */
@@ -15,8 +16,14 @@ import { D1IdentityStore, type D1Like } from './d1Store'
 interface DurableObjectStubLike {
   fetch(url: string, init: { method: string; body: string }): Promise<Response>
 }
+/** O pedaço do R2 que usamos. */
+interface R2Like {
+  get(key: string): Promise<{ body: ReadableStream; size: number; httpEtag: string } | null>
+}
 interface Env {
   DB: D1Like
+  /** Bucket `meu-manager-pacotes`: um arquivo por versão (que nunca muda) e o `index.json`. */
+  PACKAGES: R2Like
   GUARD: { idFromName(name: string): unknown; get(id: unknown): DurableObjectStubLike }
   /** Segredo do Turnstile: guardado no painel do Cloudflare (Worker › Configurações › Variáveis e segredos), nunca no repositório. */
   TURNSTILE_SECRET?: string
@@ -80,6 +87,29 @@ function corsHeaders(req: Request, env: Env): Record<string, string> {
   return headers
 }
 
+const PACKAGE_FILE = /^\/packages\/([a-z0-9][a-z0-9-]{0,40})\/(\d{4}\.(?:0[1-9]|1[0-2])(?:\.\d{1,3})?)\/pacote\.json\.gz$/
+
+/** Pacotes de dados: só leitura. O índice muda (cache curto); cada versão nunca muda (cache de um ano). */
+async function servePackage(req: Request, url: URL, env: Env, cors: Record<string, string>): Promise<Response | undefined> {
+  if (!url.pathname.startsWith('/packages/')) return undefined
+  if (req.method !== 'GET' && req.method !== 'HEAD') return Response.json({ error: 'method-not-allowed' }, { status: 405, headers: cors })
+  let key: string
+  let headers: Record<string, string>
+  if (url.pathname === '/packages/index.json') {
+    key = 'index.json'
+    headers = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' }
+  } else {
+    const m = PACKAGE_FILE.exec(url.pathname)
+    if (!m) return Response.json({ error: 'not-found' }, { status: 404, headers: cors })
+    key = `${m[1]}/${m[2]}/pacote.json.gz`
+    // application/gzip e sem Content-Encoding: o navegador entrega os bytes comprimidos como estão, e o hash do índice vale para eles.
+    headers = { 'Content-Type': 'application/gzip', 'Cache-Control': 'public, max-age=31536000, immutable' }
+  }
+  const object = await env.PACKAGES.get(key)
+  if (!object) return Response.json({ error: 'not-found' }, { status: 404, headers: cors })
+  return new Response(req.method === 'HEAD' ? null : object.body, { headers: { ...cors, ...headers, ETag: object.httpEtag, 'Content-Length': String(object.size) } })
+}
+
 function respond(result: ApiResult<unknown>, cors: Record<string, string>): Response {
   const headers: Record<string, string> = { ...cors }
   if (result.status === 429 && 'retryAfterMs' in result.body) headers['Retry-After'] = String(Math.ceil(result.body.retryAfterMs / 1000))
@@ -91,6 +121,8 @@ export default {
     const cors = corsHeaders(req, env)
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
     const url = new URL(req.url)
+    const pkg = await servePackage(req, url, env, cors)
+    if (pkg) return pkg
     if (!env.TURNSTILE_SECRET) return Response.json({ error: 'not-configured' }, { status: 503, headers: cors })
 
     // O corpo é lido com teto: nada de aceitar megabytes numa rota que espera uns poucos bytes.
