@@ -1,0 +1,10 @@
+{
+  "name": "online-lab",
+  "private": true,
+  "type": "module",
+  "description": "Medicoes locais da Fase 6 (B1): roda o motor no workerd, sem conta e sem custo.",
+  "devDependencies": {
+    "playwright": "^1.64.1",
+    "wrangler": "^4.156.0"
+  }
+}

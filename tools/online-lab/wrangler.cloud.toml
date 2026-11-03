@@ -1,0 +1,16 @@
+name = "lab-meumanager"
+main = "src/cloud.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "WORLD"
+class_name = "LabWorld"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LabWorld"]
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "lab-meumanager-teste"
