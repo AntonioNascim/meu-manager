@@ -334,7 +334,7 @@ Por identidade (chave pública) e por IP, janela deslizante; valores iniciais a 
 
 | Ação | Limite |
 |---|---|
-| Criar identidade | 5 por IP por dia |
+| Criar identidade | 30 por IP por dia (nas redes de operadora, CGNAT, muita gente divide o mesmo IP; a proteção principal é o Turnstile) |
 | Leituras gerais | 120 por minuto |
 | Escritas (tática, oferta, pronto) | 30 por minuto |
 | Gravar save na nuvem | 6 por minuto, 200 por dia |
@@ -547,6 +547,6 @@ Tudo rodou no computador de desenvolvimento (Windows, 6 GB), com o **workerd** (
 
 **Feito e testado, sem nuvem:** código de recuperação de 12 palavras que deriva a chave Ed25519; `playerId`; pedidos assinados com relógio e nonce; limites da seção 6.1; filtro de apelidos; registro de identidade com Turnstile e limite por IP (lógica pura); armazenamento da chave no aparelho (banco IndexedDB separado dos saves). **Mudança em relação à proposta:** a chave não usa WebCrypto, e sim `@noble/curves` (com `@noble/hashes` e `@scure/bip39`), porque o WebCrypto só tem Ed25519 em navegadores recentes (Chrome 137+, Safari 17+) e não deriva a chave das palavras; as bibliotecas funcionam em celulares mais antigos.
 
-**B2 concluída em 03/11/2026, inclusive na nuvem.** Worker `meu-manager-api`, banco D1 `meu-manager`, Durable Object `Guard` (limites e nonces em disco, 8 fatias) e Turnstile em modo Gerenciado (hosts autorizados: o GitHub Pages do projeto e `localhost`). Testes: `tools/identitySmoke.ts` passou local (9 verificações, inclusive o limite de 5 criações por IP), na nuvem com desafio falso (403, falha fechada, CORS só para o site) e na nuvem com um desafio de verdade clicado por uma pessoa (201, `/api/me`, replay recusado, apelido proibido recusado). A identidade de teste foi apagada do banco.
+**B2 concluída em 03/11/2026, inclusive na nuvem.** Worker `meu-manager-api`, banco D1 `meu-manager`, Durable Object `Guard` (limites e nonces em disco, 8 fatias) e Turnstile em modo Gerenciado (hosts autorizados: o GitHub Pages do projeto e `localhost`). Testes: `tools/identitySmoke.ts` passou local (9 verificações, inclusive o limite de criações por IP), na nuvem com desafio falso (403, falha fechada, CORS só para o site) e na nuvem com um desafio de verdade clicado por uma pessoa (201, `/api/me`, replay recusado, apelido proibido recusado). A identidade de teste foi apagada do banco.
 
-**Atenção para a B9:** o limite de 5 criações por IP por dia conta toda tentativa (inclusive as recusadas, como apelido proibido) e, em redes de operadora (CGNAT), muita gente divide o mesmo IP. Com 5 por dia, um grupo de jogadores na mesma rede ficaria bloqueado. Proposta: subir para ~30 por IP e por dia e deixar o Turnstile como proteção principal; decidir com dados do teste fechado. Os testes de hoje usaram a cota do IP de desenvolvimento por 24 h.
+**Limite de criação de identidades (decisão de 03/11/2026):** subiu de 5 para **30 por IP por dia**, porque em redes de operadora (CGNAT) muita gente divide o mesmo IP e 5 bloquearia grupos de jogadores; o Turnstile é a proteção principal. O limite conta toda tentativa, inclusive as recusadas. A B9 reajusta com dados do teste fechado.

@@ -9,7 +9,8 @@ const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
 export const RATE_LIMITS = {
-  createIdentity: [{ limit: 5, windowMs: DAY }],
+  // 30 por IP por dia: nas redes de operadora (CGNAT) muita gente divide o mesmo endereço; a proteção principal é o Turnstile.
+  createIdentity: [{ limit: 30, windowMs: DAY }],
   read: [{ limit: 120, windowMs: MINUTE }],
   write: [{ limit: 30, windowMs: MINUTE }],
   saveUpload: [{ limit: 6, windowMs: MINUTE }, { limit: 200, windowMs: DAY }],

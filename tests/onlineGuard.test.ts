@@ -34,7 +34,8 @@ describe('SqlGuard: limites em SQL', () => {
 
   it('cada chave e cada ação têm a sua conta, e o pedido recusado não conta', () => {
     const g = new SqlGuard(memorySql())
-    for (let i = 0; i < 5; i++) expect(g.hit('createIdentity', 'ip:1', 1000 + i).allowed).toBe(true)
+    const limit = RATE_LIMITS.createIdentity[0].limit
+    for (let i = 0; i < limit; i++) expect(g.hit('createIdentity', 'ip:1', 1000 + i).allowed).toBe(true)
     expect(g.hit('createIdentity', 'ip:1', 2000).allowed).toBe(false)
     expect(g.hit('createIdentity', 'ip:2', 2000).allowed).toBe(true)
     expect(g.hit('read', 'ip:1', 2000).allowed).toBe(true)

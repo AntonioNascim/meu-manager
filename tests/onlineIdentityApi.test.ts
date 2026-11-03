@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cloudflareTurnstile, MemoryIdentityStore, registerIdentity, requireIdentity, type ApiDeps, type ApiRequest } from '../src/online/identityApi'
 import { createIdentity, type Identity } from '../src/online/identity'
-import { RateLimiter } from '../src/online/rateLimit'
+import { RATE_LIMITS, RateLimiter } from '../src/online/rateLimit'
 import { MemoryNonceStore, signRequest } from '../src/online/signedRequest'
 
 function fakeRandom(start: number): (n: number) => Uint8Array {
@@ -88,7 +88,7 @@ describe('registerIdentity', () => {
     const { identity } = createIdentity(fakeRandom(6))
     let n = 0
     for (const body of ['{não é json', { turnstileToken: 'a', admin: true }, { turnstileToken: 'a'.repeat(3000) }, { turnstileToken: 5 }, { turnstileToken: '' }, { turnstileToken: 'a', nickname: 7 }, [1], 'null', ' '.repeat(2000) + '{}']) {
-      // Um IP diferente para cada tentativa: o limite de 5 por IP não é o assunto deste teste.
+      // Um IP diferente para cada tentativa: o limite de criações por IP não é o assunto deste teste.
       expect((await registerIdentity(request(identity, body, { ip: `192.0.2.${n++}` }), deps)).status).toBe(400)
     }
   })
@@ -106,9 +106,10 @@ describe('registerIdentity', () => {
     expect(replay).toEqual({ status: 401, body: { error: 'unauthorized', reason: 'replay' } })
   })
 
-  it('limita a 5 criações por IP por dia, com o tempo de espera, e libera depois', async () => {
+  it('limita a 30 criações por IP por dia, com o tempo de espera, e libera depois', async () => {
+    expect(RATE_LIMITS.createIdentity[0]).toEqual({ limit: 30, windowMs: 86_400_000 })
     const { deps, advance } = setup()
-    for (let i = 0; i < 5; i++) expect((await registerIdentity(request(createIdentity(fakeRandom(200 + i)).identity, { turnstileToken: 't' }), deps)).status).toBe(201)
+    for (let i = 0; i < RATE_LIMITS.createIdentity[0].limit; i++) expect((await registerIdentity(request(createIdentity(fakeRandom(200 + i)).identity, { turnstileToken: 't' }), deps)).status).toBe(201)
     const sixth = await registerIdentity(request(createIdentity(fakeRandom(300)).identity, { turnstileToken: 't' }), deps)
     expect(sixth.status).toBe(429)
     if (sixth.status === 429 && sixth.body.error === 'rate-limited') {

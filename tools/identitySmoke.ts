@@ -1,6 +1,6 @@
 // Teste de ponta a ponta da API de identidade (Fase 6, B2): assina pedidos com o código do jogo e confere as respostas do Worker.
 // Uso: node tools/run.mjs identitySmoke <urlBase> <local|cloud|real>
-//   local: o Worker roda com a chave de teste do Turnstile (aprova qualquer desafio); confere também o limite de 5 criações por IP.
+//   local: o Worker roda com a chave de teste do Turnstile (aprova qualquer desafio); confere também o limite de criações por IP (30 por dia).
 //   real: igual ao local, mas com um token de verdade do Turnstile (variável TURNSTILE_TOKEN, de uso único, tirado do widget num navegador); sem o teste de limite.
 //   cloud: com a chave real do Turnstile um desafio de mentira tem de ser reprovado (403); não dá para testar o caminho feliz sem um navegador.
 import { createIdentity } from '../src/online/identity'
@@ -69,9 +69,9 @@ if (mode === 'cloud') {
   check('identidade desconhecida (404)', stranger.status === 404, String(stranger.status))
 
   if (mode === 'local') {
-  // Já usamos 3 criações deste IP (a, a de novo, e as 2 recusadas contam também): continue até bater no teto de 5 por dia.
+  // Toda tentativa deste IP conta (as recusadas também): continue até bater no teto de 30 por dia.
   let blocked: { status: number; json: Record<string, unknown> } | undefined
-  for (let i = 0; i < 6 && !blocked; i++) {
+  for (let i = 0; i < 40 && !blocked; i++) {
     const r = await call(createIdentity(random).identity, 'POST', '/api/identity', { turnstileToken: token })
     if (r.status === 429) blocked = r
   }
