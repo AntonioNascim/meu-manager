@@ -607,4 +607,28 @@ Tudo rodou no computador de desenvolvimento (Windows, 6 GB), com o **workerd** (
 
 **Limites desta medição.** Foi no Node (V8) com o `node:sqlite`; os tempos no workerd devem ser parecidos (B1: ~1,1×), mas **a memória e o tempo reais só existem no Cloudflare**. Também falta o desenho do Durable Object da liga em si (rotas, alarmes, humanos no mundo), que é a B6/B7; aqui só existe o armazenamento.
 
-**Falta para fechar a B5:** repetir a temporada dentro de um Durable Object de verdade (Worker de laboratório com prefixo `lab-`, apagado no fim), para conferir tempo, memória pelo teto e o reinício real. Precisa de aprovação por mexer na conta (uso mínimo, dentro da franquia).
+**Resultado no Cloudflare real (04/11/2026; Worker de laboratório `lab-meumanager-b5` com um Durable Object, usando o `SqliteWorldStore` do projeto; apagado no fim):** uma temporada do mundo real (370 clubes, 10.471 jogadores, 162 avanços até a virada).
+
+| Medida | Resultado |
+|---|---|
+| Linhas gravadas por temporada | **10.578** (mediana 55 por avanço, p95 160, máximo 224): **idêntico ao Node**, como esperado |
+| Mundo em memória = mundo no SQLite | **idêntico em todas as conferências** (a cada 40 avanços e no fim) |
+| Reinício simulado (descarta a memória e recarrega do SQLite) | 4 de 4 idênticos; **só a carga, com a rede: 455 a 670 ms** |
+| **Reinício real** (`ctx.abort`: o contador de nascimentos do objeto subiu e a memória veio vazia) | o mundo recarregado do SQLite saiu **idêntico** ao de antes; a recarga mais a comparação com o banco levou ~3,2 s (a comparação é a maior parte) |
+| Tempo por avanço visto de fora (inclui a rede) | mediana 0,95 s, p95 3,4 s, **máximo 10,7 s** (o avanço da virada de temporada, que sozinho no Node levou 4,9 s) |
+| Carga inicial (criar o mundo e gravar) | 2,0 a 2,4 s |
+| Banco ao fim da temporada | 16,7 MB |
+
+**Memória (pelo teto, porque `process.memoryUsage()` devolve zeros no Cloudflare; lastro de 0,755 MB por bloco, medido no Node).** Sem lastro e com 80 blocos (~60 MB) a temporada passou **sem nenhum reinício**. A partir de 100 blocos (~75 MB) a plataforma começou a reiniciar o objeto no meio da temporada (uma vez em 100, 115, 130 e 180 blocos). **Nos cinco casos a liga se recuperou sozinha**: o objeto novo recarregou o mundo do SQLite e a temporada terminou (162 avanços), sem erro de dado (a perda de uma resposta foi só uma falha de rede do cliente de teste durante o reinício). Leitura: **esta vez o teto apareceu perto do limite documentado de 128 MB**, diferente da B1 (que passou com ~200 MB). Mundo vivo + gravação (os textos dos blocos alterados existem ao mesmo tempo que os objetos) + lastro de ~75 MB já estoura, então o pico do mundo gravando é de ~50 a 70 MB e a folga real contra os 128 MB é de **~1,8 a 2,5×**, bem perto do ~2× projetado na seção 3.3. **Isso mantém a decisão: sem carga por partes por enquanto (etapa 2 adiada), mas sem folga para crescer.** Se o pacote real crescer muito (mais ligas ou clubes) ou se a B6/B7 puser estruturas grandes em memória (partidas ao vivo com rastro, humanos), a etapa 2 volta a ser necessária. A B9 repete esta medição com a liga cheia.
+
+**O que foi apagado:** o Worker `lab-meumanager-b5` (e com ele o Durable Object, o SQLite e o segredo `LAB_KEY`) e a chave local. Conferido: a URL do laboratório responde 404; restam na conta só os buckets `meu-manager-pacotes` e `meu-manager-saves`, o banco D1 `meu-manager` e o Worker `meu-manager-api`. **O uso é desprezível** (cerca de 10 temporadas jogadas, ou seja, ~100 mil linhas gravadas no total (contra 50 milhões incluídos)); a confirmação é a tela de faturamento do painel, que eu não vejo.
+
+**B5 (etapa 1) concluída.**
+
+---
+
+## 17. Decisões pendentes para perto do lançamento
+
+1. **Limpeza de contas sem uso e e-mail opcional (decisão de 04/11/2026: deixar desligada por enquanto).** Ligar ou não a limpeza de cadastro e saves na nuvem após 12 meses sem acesso. Sem um canal de aviso, ela não pode ser ligada com segurança (quem some nunca vê o aviso do jogo). Opções: (a) manter desligada e só apagar quando a pessoa pedir; (b) um **e-mail opcional** para avisos (e só avisar quem informou), o que muda o aviso de privacidade (passa a haver dado pessoal), pede consentimento claro, forma de remover o e-mail e ajuste dos textos; (c) uma regra aprovada pelos sócios. Em qualquer caso, a limpeza só apagaria dados do servidor (nunca saves do aparelho) e só contas com aviso entregue. **Decidir junto com a revisão da LGPD**, antes do lançamento público; o texto do aviso de privacidade (seção 6) já diz que a limpeza está desligada.
+2. **Revisão da LGPD** do aviso de privacidade completo (já exigida na seção 6).
+3. **Medição de memória com a liga cheia** (B9) e, se a folga de ~2× diminuir, a etapa 2 da B5 (carga por partes).
