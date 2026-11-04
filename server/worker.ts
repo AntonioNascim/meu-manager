@@ -12,7 +12,7 @@ import { cloudflareTurnstile, MAX_BODY_BYTES, registerIdentity, requireIdentity,
 import type { LimitAction, LimitResult, RateLimit } from '../src/online/rateLimit'
 import type { NonceStore } from '../src/online/signedRequest'
 import { bodyLimitFor, handleCloudRequest, isCloudPath, type CloudApiDeps } from '../src/online/cloudSaveApi'
-import { RETENTION_MS, deleteAccountData, type BlobStore, type ListedObject, type StoredObject } from '../src/online/cloudSave'
+import { type BlobStore, type ListedObject, type StoredObject } from '../src/online/cloudSave'
 import { D1IdentityStore, type D1Like } from './d1Store'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
@@ -200,22 +200,7 @@ async function serveCloud(req: Request, url: URL, env: Env, cors: Record<string,
   return Response.json(result.json, { status: result.status, headers: { ...cors, ...result.headers } })
 }
 
-/** Todo dia: apaga as contas sem nenhum acesso há 12 meses (saves e cadastro). Lotes pequenos; o que sobrar fica para o dia seguinte. */
-async function purgeInactive(env: Env): Promise<number> {
-  const store = new D1IdentityStore(env.DB)
-  const blobs = r2Blobs(env.SAVES)
-  const ids = await store.listInactive(Date.now() - RETENTION_MS, 25)
-  for (const id of ids) {
-    await deleteAccountData({ blobs, now: Date.now }, id)
-    await store.delete(id)
-  }
-  return ids.length
-}
-
 export default {
-  async scheduled(_event: unknown, env: Env): Promise<void> {
-    await purgeInactive(env)
-  },
 
   async fetch(req: Request, env: Env): Promise<Response> {
     const cors = corsHeaders(req, env)

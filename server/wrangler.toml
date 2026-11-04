@@ -31,6 +31,5 @@ new_sqlite_classes = ["Guard"]
 binding = "SAVES"
 bucket_name = "meu-manager-saves"
 
-# Limpeza diária das contas sem acesso há 12 meses (proposta 4.2).
-[triggers]
-crons = ["17 4 * * *"]
+# Sem tarefa agendada de limpeza por falta de uso (decisão de 04/11/2026): o jogo não tem e-mail, então não há como avisar quem sumiu, e
+# apagar sem aviso está fora de questão. Hoje a conta só é apagada por quem a possui ("Apagar minha conta"). Ver docs/fase6-proposta.md, seção 15.
