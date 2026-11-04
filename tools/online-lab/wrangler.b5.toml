@@ -1,0 +1,12 @@
+name = "lab-meumanager-b5"
+main = "src/cloud-b5.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "WORLD"
+class_name = "LabWorld5"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LabWorld5"]

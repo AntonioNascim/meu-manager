@@ -577,3 +577,58 @@ Tudo rodou no computador de desenvolvimento (Windows, 6 GB), com o **workerd** (
 **Medido (Cloudflare real, `node tools/run.mjs cloudSaveSmoke <url> cloud`):** save de um clube no começo = 36 pedaços, 294 KB comprimidos (um save do fim de temporada deve ficar em ~1 a 2,5 MB). Primeiro envio 8 s, envio de um dia depois 4,7 s, em segundo plano (a latência de cada pedido autenticado era de 0,8 a 1,7 s antes de juntar as idas ao servidor que não dependem uma da outra; a base da rede até o Worker é ~340 ms). O teste cobre envio, outro aparelho, conflito, "usar este", cópia no servidor, recusas, exportação e apagar a conta; no fim o bucket e o banco ficaram vazios.
 
 **Falta:** a interface (ligar a nuvem num espaço, estado de cada espaço, tela de conflito, criar identidade com Turnstile e mostrar o código de recuperação, exportar e apagar a conta, aviso de conta perto de vencer). O jogo publicado não muda enquanto isso: nada do código novo é carregado pela tela atual.
+
+---
+
+## 16. Andamento da B5 (04/11/2026): mundo em blocos no SQLite, etapa 1
+
+**Decisão de escopo.** A B1 mostrou (seção 12) que o mundo real inteiro cabe na memória com folga, então a B5 sai em duas etapas, como a seção 11 já previa. **Esta é a etapa 1:** o mundo inteiro é carregado do SQLite em memória no início do passo e gravado por blocos no fim. A etapa 2 (carga por partes, "pôr em dia" na carga, mercado da IA sobre o índice) **não foi feita** e só entra se a medição de memória no Cloudflare ou a B9 pedirem.
+
+**O que foi feito (`src/store/worldStore.ts`, `saveParts.ts`):**
+- **`WorldStore`** (interface: `load()` e `save(estado)`) com `MemoryWorldStore` (o mundo como o motor usa hoje, o mesmo objeto) e `SqliteWorldStore` (em cima do `SqlLike` do Durable Object, com `transaction`, que no Cloudflare é `ctx.storage.transactionSync`).
+- **Blocos = os pedaços do save.** `planSeasonParts(temporada)` divide a temporada nos mesmos pedaços que o save do jogador já usa (campos soltos, calendário, mercado, treino e, por liga ou grupo de rodadas, partidas, times, jogadores e base). Em vez de blocos por clube, **blocos por liga**: o SQLite do Durable Object cobra por linha, não por byte, e o treino altera todo mundo todo dia, então menos linhas maiores saem mais baratas. Os blocos por clube só ajudariam a carga por partes (etapa 2). A refatoração de `saveParts.ts` não muda o que o save do jogador grava (`tests/saveParts.test.ts` continua igual).
+- **Bloco sujo sem serializar:** como o motor é imutável, o que não mudou tem a mesma referência; a gravação compara referências e escreve só os blocos alterados.
+- **Tabela `world_part (name, seq, data) WITHOUT ROWID`**: uma linha por bloco (texto maior que 500 mil caracteres é repartido em linhas, para respeitar os 2 MB por linha). A gravação é **uma transação só**; se o objeto cair no meio, o mundo anterior continua inteiro (testado). Depois de um reinício, `load()` remonta tudo e deixa pronto o que não mudou, então o primeiro `save` não regrava o mundo inteiro. Formato desconhecido ou linha faltando é recusado, não carregado errado.
+
+**Aceite (testes, `tests/worldStore.test.ts`, 10 testes):** com reinícios no meio (descarta tudo, recarrega do SQLite e segue dali), o mundo termina **idêntico, byte a byte (texto com chaves ordenadas)**, ao que ficou só em memória, também numa temporada inteira com a virada de temporada. Também: o mesmo mundo não grava linha nenhuma; falha no meio da gravação não corrompe; texto grande, pedaço que encolhe ou some; formato e linhas faltando.
+
+**Medido com o mundo real (370 clubes, 10.471 jogadores; `PACOTE_REAL=1 node --expose-gc tools/run.mjs worldStoreRun`, `node:sqlite`, uma temporada de 162 avanços até a virada):**
+
+| Medida | Resultado |
+|---|---|
+| Linhas gravadas por temporada | **10.578** (mediana 55 por avanço, p95 160, máximo 224), contra 42.496 da medição da B1 com blocos por clube. Uma liga fica em ~0,02% da franquia de 50 milhões por mês |
+| Primeira gravação | 197 pedaços, 204 linhas, 11,2 M de caracteres, 138 ms |
+| Maior pedaço | 903 KB de texto (limite de uma linha: 2 MB; o teste exige menos de 1,5 MB) |
+| Gravar um avanço | mediana 124 ms, p95 153 ms, pior 176 ms |
+| Carregar o mundo do SQLite (reinício) | 140 a 176 ms |
+| Motor por avanço | mediana 162 ms, pior 4,9 s (a virada de temporada; limite de 30 s) |
+| Banco ao fim da temporada | 218 linhas, 15,5 M de caracteres |
+| Reinícios simulados (a cada 40 avanços) | 4 de 4 idênticos |
+
+**Limites desta medição.** Foi no Node (V8) com o `node:sqlite`; os tempos no workerd devem ser parecidos (B1: ~1,1×), mas **a memória e o tempo reais só existem no Cloudflare**. Também falta o desenho do Durable Object da liga em si (rotas, alarmes, humanos no mundo), que é a B6/B7; aqui só existe o armazenamento.
+
+**Resultado no Cloudflare real (04/11/2026; Worker de laboratório `lab-meumanager-b5` com um Durable Object, usando o `SqliteWorldStore` do projeto; apagado no fim):** uma temporada do mundo real (370 clubes, 10.471 jogadores, 162 avanços até a virada).
+
+| Medida | Resultado |
+|---|---|
+| Linhas gravadas por temporada | **10.578** (mediana 55 por avanço, p95 160, máximo 224): **idêntico ao Node**, como esperado |
+| Mundo em memória = mundo no SQLite | **idêntico em todas as conferências** (a cada 40 avanços e no fim) |
+| Reinício simulado (descarta a memória e recarrega do SQLite) | 4 de 4 idênticos; **só a carga, com a rede: 455 a 670 ms** |
+| **Reinício real** (`ctx.abort`: o contador de nascimentos do objeto subiu e a memória veio vazia) | o mundo recarregado do SQLite saiu **idêntico** ao de antes; a recarga mais a comparação com o banco levou ~3,2 s (a comparação é a maior parte) |
+| Tempo por avanço visto de fora (inclui a rede) | mediana 0,95 s, p95 3,4 s, **máximo 10,7 s** (o avanço da virada de temporada, que sozinho no Node levou 4,9 s) |
+| Carga inicial (criar o mundo e gravar) | 2,0 a 2,4 s |
+| Banco ao fim da temporada | 16,7 MB |
+
+**Memória (pelo teto, porque `process.memoryUsage()` devolve zeros no Cloudflare; lastro de 0,755 MB por bloco, medido no Node).** Sem lastro e com 80 blocos (~60 MB) a temporada passou **sem nenhum reinício**. A partir de 100 blocos (~75 MB) a plataforma começou a reiniciar o objeto no meio da temporada (uma vez em 100, 115, 130 e 180 blocos). **Nos cinco casos a liga se recuperou sozinha**: o objeto novo recarregou o mundo do SQLite e a temporada terminou (162 avanços), sem erro de dado (a perda de uma resposta foi só uma falha de rede do cliente de teste durante o reinício). Leitura: **esta vez o teto apareceu perto do limite documentado de 128 MB**, diferente da B1 (que passou com ~200 MB). Mundo vivo + gravação (os textos dos blocos alterados existem ao mesmo tempo que os objetos) + lastro de ~75 MB já estoura, então o pico do mundo gravando é de ~50 a 70 MB e a folga real contra os 128 MB é de **~1,8 a 2,5×**, bem perto do ~2× projetado na seção 3.3. **Isso mantém a decisão: sem carga por partes por enquanto (etapa 2 adiada), mas sem folga para crescer.** Se o pacote real crescer muito (mais ligas ou clubes) ou se a B6/B7 puser estruturas grandes em memória (partidas ao vivo com rastro, humanos), a etapa 2 volta a ser necessária. A B9 repete esta medição com a liga cheia.
+
+**O que foi apagado:** o Worker `lab-meumanager-b5` (e com ele o Durable Object, o SQLite e o segredo `LAB_KEY`) e a chave local. Conferido: a URL do laboratório responde 404; restam na conta só os buckets `meu-manager-pacotes` e `meu-manager-saves`, o banco D1 `meu-manager` e o Worker `meu-manager-api`. **O uso é desprezível** (cerca de 10 temporadas jogadas, ou seja, ~100 mil linhas gravadas no total (contra 50 milhões incluídos)); a confirmação é a tela de faturamento do painel, que eu não vejo.
+
+**B5 (etapa 1) concluída.**
+
+---
+
+## 17. Decisões pendentes para perto do lançamento
+
+1. **Limpeza de contas sem uso e e-mail opcional (decisão de 04/11/2026: deixar desligada por enquanto).** Ligar ou não a limpeza de cadastro e saves na nuvem após 12 meses sem acesso. Sem um canal de aviso, ela não pode ser ligada com segurança (quem some nunca vê o aviso do jogo). Opções: (a) manter desligada e só apagar quando a pessoa pedir; (b) um **e-mail opcional** para avisos (e só avisar quem informou), o que muda o aviso de privacidade (passa a haver dado pessoal), pede consentimento claro, forma de remover o e-mail e ajuste dos textos; (c) uma regra aprovada pelos sócios. Em qualquer caso, a limpeza só apagaria dados do servidor (nunca saves do aparelho) e só contas com aviso entregue. **Decidir junto com a revisão da LGPD**, antes do lançamento público; o texto do aviso de privacidade (seção 6) já diz que a limpeza está desligada.
+2. **Revisão da LGPD** do aviso de privacidade completo (já exigida na seção 6).
+3. **Medição de memória com a liga cheia** (B9) e, se a folga de ~2× diminuir, a etapa 2 da B5 (carga por partes).
