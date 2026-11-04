@@ -25,3 +25,12 @@ class_name = "Guard"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Guard"]
+
+# Saves na nuvem (Fase 6, B4): bucket PRIVADO (sem domínio público, sem r2.dev). Só o Worker lê e grava, depois de conferir a assinatura.
+[[r2_buckets]]
+binding = "SAVES"
+bucket_name = "meu-manager-saves"
+
+# Limpeza diária das contas sem acesso há 12 meses (proposta 4.2).
+[triggers]
+crons = ["17 4 * * *"]

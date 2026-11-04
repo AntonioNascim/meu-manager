@@ -14,6 +14,12 @@ export const RATE_LIMITS = {
   read: [{ limit: 120, windowMs: MINUTE }],
   write: [{ limit: 30, windowMs: MINUTE }],
   saveUpload: [{ limit: 6, windowMs: MINUTE }, { limit: 200, windowMs: DAY }],
+  // Cada pedaço do save é um envio; o primeiro envio de um save tem uns 100 (o dia comum, uns poucos).
+  saveBlob: [{ limit: 300, windowMs: MINUTE }, { limit: 2000, windowMs: DAY }],
+  // Tetos por IP das rotas de save: muito mais folgados que os por identidade, porque muita gente divide o mesmo IP (CGNAT das operadoras).
+  saveUploadIp: [{ limit: 300, windowMs: MINUTE }, { limit: 20000, windowMs: DAY }],
+  saveBlobIp: [{ limit: 3000, windowMs: MINUTE }, { limit: 200000, windowMs: DAY }],
+  deleteAccount: [{ limit: 3, windowMs: DAY }],
   createLeague: [{ limit: 3, windowMs: DAY }],
   joinByCode: [{ limit: 10, windowMs: HOUR }],
 } as const satisfies Record<string, readonly LimitRule[]>

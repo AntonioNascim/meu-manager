@@ -22,6 +22,23 @@ import { SAVE_VERSION, SLOT_COUNT, SaveError, compactGame, migrateSave, summariz
 import type { SaveEnvelope, SaveSummary } from './saveFormat'
 import { joinParts, planParts, sameRefs } from './saveParts'
 
+/** Um pedaço do save como está gravado (já comprimido). `id` só existe nos pedaços do formato em partes. */
+export interface RawPart {
+  name: string
+  id?: string
+  enc: Encoding
+  data: Uint8Array | string
+  size: number
+}
+
+/** O save de um espaço como conjunto de pedaços prontos: é o que sobe para a nuvem e o que desce de lá. */
+export interface RawSave {
+  version: number
+  savedAt: string
+  summary: SaveSummary
+  parts: RawPart[]
+}
+
 interface SlotRow extends SaveSummary {}
 /** Formato antigo: o envelope inteiro numa linha só. */
 interface GameRow {
@@ -305,6 +322,67 @@ export class SaveStore {
   async firstEmptySlot(): Promise<number | null> {
     const index = (await this.listSlots()).findIndex((s) => s === null)
     return index === -1 ? null : index + 1
+  }
+
+  /**
+   * O save do espaço em pedaços prontos, **só leitura** (nada é gravado, nem de um save no formato antigo: ele é dividido em memória).
+   * `null` se o espaço está vazio.
+   */
+  async exportRaw(slot: number): Promise<RawSave | null> {
+    checkSlot(slot)
+    const db = this.db()
+    const manifest = await db.manifests.get(slot)
+    if (manifest) {
+      const summary = await db.slots.get(slot)
+      if (!summary) throw new SaveError('invalid', 'Save sem resumo.')
+      const names = Object.keys(manifest.parts)
+      const rows = await db.parts.bulkGet(names.map((n) => (manifest.parts[n] as PartRef).id))
+      const parts: RawPart[] = names.map((name, i) => {
+        const row = rows[i]
+        if (!row) throw new SaveError('invalid', `Save corrompido: falta o pedaço ${name}.`)
+        return { name, id: row.id, enc: row.enc, data: row.data, size: row.size }
+      })
+      return { version: manifest.version, savedAt: manifest.savedAt, summary, parts }
+    }
+    const legacy = await db.games.get(slot)
+    if (!legacy) return null
+    const compact = compactGame(migrateSave(legacy.envelope).game)
+    const savedAt = legacy.envelope.savedAt
+    const plan = planParts(compact)
+    const packed = await Promise.all(plan.map((p) => pack(JSON.stringify(p.build()))))
+    return { version: SAVE_VERSION, savedAt, summary: summarizeGame(compact, slot, savedAt), parts: plan.map((p, i) => ({ name: p.name, enc: packed[i]!.enc, data: packed[i]!.data, size: packed[i]!.size })) }
+  }
+
+  /**
+   * Põe no espaço um save que veio de fora (da nuvem), numa transação só e com o mesmo cuidado da gravação normal: os pedaços novos entram
+   * com ids novos e só depois o manifesto passa a apontar para eles. Quem chama guarda antes o que havia (`exportRaw`) se quiser desfazer.
+   * Recusa save de versão mais nova que a do jogo.
+   */
+  async importRaw(slot: number, raw: RawSave): Promise<SaveSummary> {
+    checkSlot(slot)
+    if (raw.version > SAVE_VERSION) throw new SaveError('newer-version', 'Este save é de uma versão mais nova do jogo. Atualize o jogo para abrir.')
+    const { slots, games, manifests, parts: partsTable } = this.db()
+    const summary: SaveSummary = { ...raw.summary, slot }
+    await this.db().transaction('rw', slots, games, manifests, partsTable, async () => {
+      const old = await manifests.get(slot)
+      const gen = (old?.gen ?? 0) + 1
+      const rows: PartRow[] = []
+      const refs: Record<string, PartRef> = {}
+      for (const p of raw.parts) {
+        const id = `${slot}:${gen}:${p.name}`
+        rows.push({ id, slot, enc: p.enc, data: p.data, size: p.size })
+        refs[p.name] = { id, size: p.size }
+      }
+      await partsTable.bulkPut(rows)
+      await manifests.put({ slot, version: raw.version, savedAt: raw.savedAt, gen, parts: refs, bytes: rows.reduce((n, r) => n + r.size, 0) })
+      await slots.put(summary)
+      const kept = new Set(rows.map((r) => r.id))
+      const stale = Object.values(old?.parts ?? {}).map((p) => p.id).filter((id) => !kept.has(id))
+      if (stale.length > 0) await partsTable.bulkDelete(stale)
+      await games.delete(slot)
+    })
+    this.cache.delete(slot)
+    return summary
   }
 
   /** O envelope como está gravado (sem migrar): é o que vai para o arquivo de backup. */
