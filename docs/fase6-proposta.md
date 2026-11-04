@@ -632,3 +632,40 @@ Tudo rodou no computador de desenvolvimento (Windows, 6 GB), com o **workerd** (
 1. **Limpeza de contas sem uso e e-mail opcional (decisão de 04/11/2026: deixar desligada por enquanto).** Ligar ou não a limpeza de cadastro e saves na nuvem após 12 meses sem acesso. Sem um canal de aviso, ela não pode ser ligada com segurança (quem some nunca vê o aviso do jogo). Opções: (a) manter desligada e só apagar quando a pessoa pedir; (b) um **e-mail opcional** para avisos (e só avisar quem informou), o que muda o aviso de privacidade (passa a haver dado pessoal), pede consentimento claro, forma de remover o e-mail e ajuste dos textos; (c) uma regra aprovada pelos sócios. Em qualquer caso, a limpeza só apagaria dados do servidor (nunca saves do aparelho) e só contas com aviso entregue. **Decidir junto com a revisão da LGPD**, antes do lançamento público; o texto do aviso de privacidade (seção 6) já diz que a limpeza está desligada.
 2. **Revisão da LGPD** do aviso de privacidade completo (já exigida na seção 6).
 3. **Medição de memória com a liga cheia** (B9) e, se a folga de ~2× diminuir, a etapa 2 da B5 (carga por partes).
+
+---
+
+## 18. Andamento da B6 (04/11/2026): relógio da liga e fidelidade por partida
+
+**Prova de que o jogo solo não mudou.** Antes de mexer no motor gravei a impressão digital (SHA-256 do estado inteiro) de carreiras solo com semente fixa, pelo caminho real do jogo (avançar, partidas do técnico no automático, fim da temporada, virada e temporada seguinte): `tools/soloDigest.ts` e `tests/fixtures/solo-digest.json` (gerado na `main`, commit anterior a qualquer mudança do motor). `tests/soloUnchanged.test.ts` roda os mesmos cenários e compara; passa. Além disso comparei a **`main` e a branch lado a lado**, cada uma na sua pasta, com o mesmo roteiro: **resultados idênticos no mundo fictício (3 cenários) e no mundo real (370 clubes, com copas)**, nos 5 pontos de cada carreira. A suíte de equilíbrio deu os mesmos números nas duas (ver abaixo).
+
+**O que existe (`src/engine/league/`, `src/engine/teamRef.ts`):**
+- **Fidelidade por partida** (`AdvanceOptions.humanTeamIds`): partida de clube humano **não é simulada pelo avanço** (fica em `pendingHumanMatches`, para a liga jogá-la lance a lance e registrá-la com `completeMatch`); **todas as outras partidas do mundo, em qualquer divisão e copa, usam `simulateQuick`**. `humanMatchInput` monta a entrada da partida (escalação salva e consertada de cada humano; a IA do motor não mexe nos times humanos; quem está ausente ou em autopiloto passa à IA completa). Sem `humanTeamIds` o avanço é o de sempre.
+- **A IA não toca nos clubes humanos** no mercado (compras, vendas, anúncios, pré-contratos), nos contratos que vencem no meio da temporada, no treino e nas finanças: `TeamRef` (um clube ou um conjunto) generaliza o "clube protegido", que antes era um só. Com uma string tudo é como antes (prova acima).
+- **Relógio** (`clock.ts`, `pace.ts`): `D` com fração de dia; ritmos Calmo 2, Normal 3, Rápido 7 e Bem rápido 14 dias por dia real; eventos (datas com partida de humano) e âncoras (último dia da temporada de cada país); horário de cada evento sorteado na faixa (futebol clássico, só à noite, só fim de semana ou personalizada) com a semente da liga: nunca o mesmo horário duas vezes seguidas se há outra opção, mínimo de 8 h (6 h no Bem rápido) e no máximo 36 h de atraso, com cascata; `D` é interpolada entre os eventos e **nunca passa da data do próximo evento antes do início dele**. A pausa congela `D` e o relógio dos prazos; a retomada **refaz os horários futuros a partir de agora**; a pausa dura no máximo 30 dias (depois a liga volta sozinha).
+- **Orquestrador** (`runner.ts`, `processLeague`): idempotente e puro (o estado da liga é só dado e vai e volta por JSON). A passagem diária (4h locais) leva o mundo à data devida de `D` (competições sem humano em modo rápido, treino, condição, finanças, mercado da IA, virada dos países); o evento começa no horário, quando todos os que têm partida deram **Pronto** com a sala aberta (5 min antes) ou pelo **Avançar** do ADM (os horários seguintes não mudam; `previewAdvance` diz quem não está pronto). Ausente e autopiloto contam como prontos. O **resultado direto** simula e fecha o evento na hora; no modo ao vivo o evento fica aberto até a B7 entregar os resultados em `submitResult`. `nextWakeup` diz quando acordar a liga (alarme do Durable Object). Os prazos (`deadlineIn`, `deadlineLeft`) congelam na pausa sozinhos.
+- **Testes com tempo simulado:** `tests/humanFidelity.test.ts` (5), `tests/leagueClock.test.ts` (16), `tests/leagueRunner.test.ts` (11), `tests/soloUnchanged.test.ts` (3).
+
+**Memória (mundo real, 370 clubes, 200 dias de jogo; `PACOTE_REAL=1 node --expose-gc tools/run.mjs leagueMemRun --mode solo|league`, no Node):**
+
+| | Solo (referência) | Liga online (4 humanos em 4 países, resultado direto) |
+|---|---|---|
+| Heap vivo no fim (depois do coletor) | 48 MB | 50 MB (**+2 MB, +4%**) |
+| Pico entre passos (com lixo ainda não coletado) | 132 MB | 153 MB |
+| Texto do mundo no fim | 16 MB | 17 MB |
+| Tempo | 20 s | 28 s (87 dias reais em passos de 2 h) |
+
+O mundo não ganhou nenhum dado novo (o estado da liga ocupa ~11 KB); o aumento vem de o mercado da IA negociar em todos os clubes a cada rodada (no solo, só 1 em cada 6 clubes de fora do foco age): o histórico de transferências fica com o dobro (360 contra 168 no mesmo período). **Não é um crescimento importante**: a folga contra o limite do Cloudflare (~2×, seção 16) fica na mesma. O pico "com lixo" é o do Node sem pressão de memória; o coletor recolhe isso quando o isolate aperta.
+
+**Equilíbrio (`npm run test:balance`, 16 arquivos, 102 testes): 100 passam e 2 falham, e as duas falhas já existem na `main`, com os mesmos números:**
+1. `tests/balance/leagues.test.ts`: a distância de força entre a Série B e a C do Brasil deu 5,98 (limite: acima de 6).
+2. `tests/balance/packageLeagues.test.ts`: `team-304` terminou com 7 estrangeiros no elenco (limite do clube: 6).
+
+Rodei as duas na `main` (commit da B5) e deram **exatamente os mesmos valores**, o que também confirma que o motor solo não mudou. Não mexi nelas (mexer seria alterar o equilíbrio do jogo); ficam registradas para decidir à parte.
+
+**Limitações conhecidas (ficam para a B7/B8):**
+1. **A virada de temporada dos países trata os clubes humanos pela regra da IA** (contratos que vencem, elenco, base, tática, meta): `advanceSeason` aceita um clube do jogador, não vários. A B8 precisa decidir o que cada técnico decide na virada.
+2. **Janelas de transferência não são âncoras de `D`**: a data fica interpolada entre eventos, então a abertura e o fechamento de uma janela podem cair até ~1 dia de jogo fora do horário real "exato". Âncoras de janela podem entrar na B7.
+3. **O fuso é um deslocamento fixo** (padrão -3, sem horário de verão); fusos com horário de verão ficam para a B8.
+4. **Mercado entre humanos, ao vivo (WebSocket), reconexão e ausência por partidas faltadas** são a B7/B8; aqui só existem o estado "ausente/autopiloto" e a regra de contá-los como prontos.
+5. O mercado da IA age em todos os clubes a cada rodada na liga online (no solo, em 1 de cada 6 fora do foco): o custo de CPU por passagem diária fica para medir na B9.
