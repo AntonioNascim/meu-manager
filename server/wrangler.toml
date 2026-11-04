@@ -25,3 +25,11 @@ class_name = "Guard"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Guard"]
+
+# Saves na nuvem (Fase 6, B4): bucket PRIVADO (sem domínio público, sem r2.dev). Só o Worker lê e grava, depois de conferir a assinatura.
+[[r2_buckets]]
+binding = "SAVES"
+bucket_name = "meu-manager-saves"
+
+# Sem tarefa agendada de limpeza por falta de uso (decisão de 04/11/2026): o jogo não tem e-mail, então não há como avisar quem sumiu, e
+# apagar sem aviso está fora de questão. Hoje a conta só é apagada por quem a possui ("Apagar minha conta"). Ver docs/fase6-proposta.md, seção 15.

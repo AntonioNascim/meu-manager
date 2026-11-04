@@ -19,6 +19,10 @@ export interface IdentityStore {
   /** `false` se já existe (não sobrescreve). */
   create(record: IdentityRecord): Promise<boolean>
   setLastSeen(playerId: string, at: number): Promise<void>
+  /** "Apagar minha conta" e a limpeza por falta de uso. */
+  delete(playerId: string): Promise<void>
+  /** Contas sem nenhum acesso desde `before` (limpeza de 12 meses). */
+  listInactive(before: number, limit: number): Promise<string[]>
 }
 
 export interface TurnstileVerifier {
@@ -59,11 +63,12 @@ export async function authenticate(
   req: ApiRequest,
   action: LimitAction,
   deps: ApiDeps,
+  ipAction: LimitAction = action,
 ): Promise<{ ok: true; playerId: string } | { ok: false; result: ApiResult<never> }> {
   const now = deps.now()
-  const byIp = await deps.limiter.hit(action, `ip:${req.ip}`, now)
+  // O limite por IP e a conferência da assinatura (que gasta o código de uso único) não dependem um do outro: andam juntos, para não somar as idas ao servidor.
+  const [byIp, verified] = await Promise.all([deps.limiter.hit(ipAction, `ip:${req.ip}`, now), verifyRequest(req.authorization, req, now, deps.nonces)])
   if (!byIp.allowed) return { ok: false, result: fail(429, { error: 'rate-limited', retryAfterMs: byIp.retryAfterMs }) }
-  const verified = await verifyRequest(req.authorization, req, now, deps.nonces)
   if (!verified.ok) return { ok: false, result: fail(401, { error: 'unauthorized', reason: verified.error }) }
   return { ok: true, playerId: verified.playerId }
 }
@@ -123,13 +128,12 @@ export async function registerIdentity(req: ApiRequest, deps: ApiDeps): Promise<
 }
 
 /** Um pedido comum de uma identidade que já existe: confere limite, assinatura e cadastro, e marca a última visita. */
-export async function requireIdentity(req: ApiRequest, action: LimitAction, deps: ApiDeps): Promise<{ ok: true; record: IdentityRecord } | { ok: false; result: ApiResult<never> }> {
-  const auth = await authenticate(req, action, deps)
+export async function requireIdentity(req: ApiRequest, action: LimitAction, deps: ApiDeps, ipAction: LimitAction = action): Promise<{ ok: true; record: IdentityRecord } | { ok: false; result: ApiResult<never> }> {
+  const auth = await authenticate(req, action, deps, ipAction)
   if (!auth.ok) return auth
-  const record = await deps.store.get(auth.playerId)
+  // Cadastro e limite por identidade andam juntos (trocar de IP não livra do teto).
+  const [record, byId] = await Promise.all([deps.store.get(auth.playerId), deps.limiter.hit(action, `id:${auth.playerId}`, deps.now())])
   if (!record) return { ok: false, result: fail(404, { error: 'unknown-identity' }) }
-  // Limite também por identidade: trocar de IP não livra do teto.
-  const byId = await deps.limiter.hit(action, `id:${auth.playerId}`, deps.now())
   if (!byId.allowed) return { ok: false, result: fail(429, { error: 'rate-limited', retryAfterMs: byId.retryAfterMs }) }
   // A última visita só é regravada de hora em hora: cada gravação no banco custa.
   if (deps.now() - record.lastSeen > LAST_SEEN_EVERY_MS) await deps.store.setLastSeen(auth.playerId, deps.now())
@@ -168,5 +172,11 @@ export class MemoryIdentityStore implements IdentityStore {
   async setLastSeen(playerId: string, at: number) {
     const r = this.rows.get(playerId)
     if (r) r.lastSeen = at
+  }
+  async delete(playerId: string) {
+    this.rows.delete(playerId)
+  }
+  async listInactive(before: number, limit: number) {
+    return [...this.rows.values()].filter((r) => r.lastSeen < before).slice(0, limit).map((r) => r.playerId)
   }
 }

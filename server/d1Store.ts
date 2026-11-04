@@ -6,6 +6,7 @@ export interface D1Like {
   prepare(query: string): {
     bind(...values: unknown[]): {
       first<T = Record<string, unknown>>(): Promise<T | null>
+      all<T = Record<string, unknown>>(): Promise<{ results: T[] }>
       run(): Promise<{ meta: { changes: number } }>
     }
   }
@@ -34,5 +35,15 @@ export class D1IdentityStore implements IdentityStore {
 
   async setLastSeen(playerId: string, at: number): Promise<void> {
     await this.db.prepare('UPDATE identities SET last_seen = ? WHERE player_id = ?').bind(at, playerId).run()
+  }
+
+
+  async delete(playerId: string): Promise<void> {
+    await this.db.prepare('DELETE FROM identities WHERE player_id = ?').bind(playerId).run()
+  }
+
+  async listInactive(before: number, limit: number): Promise<string[]> {
+    const res = await this.db.prepare('SELECT player_id FROM identities WHERE last_seen < ? ORDER BY last_seen LIMIT ?').bind(before, limit).all<{ player_id: string }>()
+    return res.results.map((r) => r.player_id)
   }
 }
