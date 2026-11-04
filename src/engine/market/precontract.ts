@@ -5,6 +5,7 @@
  * passa a valer na virada de temporada (`applyPreContracts`).
  */
 import { MARKET } from '../config'
+import { isProtected, type TeamRef } from '../teamRef'
 import { squadForeignBlocked } from '../foreign'
 import { monthlyPayroll } from '../finance'
 import { overallAt } from '../overall'
@@ -119,7 +120,7 @@ export interface PreContractTick {
 }
 
 /** Uma rodada de pré-contratos da IA: poucos clubes, um por clube, e ninguém perde mais que o limite por temporada. */
-export function runPreContractTick(state: SeasonState, date: IsoDate, userTeamId?: TeamId): PreContractTick {
+export function runPreContractTick(state: SeasonState, date: IsoDate, userTeamId?: TeamRef): PreContractTick {
   const P = MARKET.preContract.ai
   const rng = createRng(`${state.market.seed}:${date}:pre-contracts`)
   let current = state
@@ -127,14 +128,14 @@ export function runPreContractTick(state: SeasonState, date: IsoDate, userTeamId
   if (!preContractsOpen(state, date)) return { state, lost }
   const quick = quickTeamIds(state)
   for (const base of rng.shuffle(state.teams)) {
-    if (base.id === userTeamId || !actsThisRound(quick, base.id, date) || !rng.chance(P.chance)) continue
+    if (isProtected(userTeamId, base.id) || !actsThisRound(quick, base.id, date) || !rng.chance(P.chance)) continue
     if (current.market.preContracts.filter((c) => c.toTeamId === base.id).length >= P.maxPerClub) continue
     const made = pickTarget(current, base.id, date, rng)
     if (!made) continue
     const before = current.market.preContracts.length
     const result = offerPreContract(current, base.id, made.player.id, { salary: made.salary, years: made.years }, date)
     current = result.state
-    if (result.accepted && current.market.preContracts.length > before && made.player.teamId === userTeamId) lost.push(current.market.preContracts[current.market.preContracts.length - 1] as PreContract)
+    if (result.accepted && current.market.preContracts.length > before && isProtected(userTeamId, made.player.teamId)) lost.push(current.market.preContracts[current.market.preContracts.length - 1] as PreContract)
   }
   return { state: current, lost }
 }

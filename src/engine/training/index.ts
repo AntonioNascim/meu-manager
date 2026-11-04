@@ -9,6 +9,7 @@
  * Funções puras: recebem o estado e devolvem outro.
  */
 import { ACADEMY, ATTRIBUTE_MAX, ATTRIBUTE_MIN, OFFSEASON, TRAINING } from '../config'
+import { isProtected, type TeamRef } from '../teamRef'
 import { playerOverall } from '../overall'
 import { developmentFactor, stochasticRound, yearlyGain } from '../offseason/evolution'
 import { createRng } from '../rng'
@@ -266,7 +267,7 @@ function trainingInjury(rng: Rng, player: Player, intensity: TrainingPlan['inten
  * Treina de `from` a `to`: evolução do dia (coletivo e individual), lesões de treino, fim do treino individual e
  * histórico mensal da força do time do jogador (`userTeamId`).
  */
-export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, userTeamId?: TeamId): SeasonState {
+export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, userTeamId?: TeamRef): SeasonState {
   const days = daysBetween(from, to)
   if (days <= 0) return state
   // Cada país tem a sua temporada: o ganho do ano, o ritmo e os minutos possíveis seguem a pirâmide do clube.
@@ -311,7 +312,7 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
 
   const history: Record<PlayerId, StrengthSnapshot[]> = { ...training.history }
   const monthStart = from.slice(0, 7) !== to.slice(0, 7)
-  const tracked = userTeamId === undefined ? [] : state.players.filter((p) => p.teamId === userTeamId)
+  const tracked = userTeamId === undefined ? [] : state.players.filter((p) => isProtected(userTeamId, p.teamId))
   for (const p of tracked) if (!history[p.id]?.length) history[p.id] = [[from, round1(playerOverall(p))]]
 
   const players = state.players.map((p) => {
@@ -343,7 +344,7 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
   })
 
   if (userTeamId !== undefined) {
-    const squadIds = new Set(players.filter((p) => p.teamId === userTeamId).map((p) => p.id))
+    const squadIds = new Set(players.filter((p) => isProtected(userTeamId, p.teamId)).map((p) => p.id))
     if (monthStart) {
       for (const id of Object.keys(history)) if (!squadIds.has(id)) delete history[id]
       const date = `${to.slice(0, 7)}-01`

@@ -3,6 +3,7 @@
  * no fim do ano são renovados pela IA (quando o jogador ainda serve ao time) ou viram jogador livre.
  */
 import { OFFSEASON } from '../config'
+import { isProtected, type TeamRef } from '../teamRef'
 import { squadRole } from '../market/value'
 import { playerOverall } from '../overall'
 import type { Rng } from '../rng'
@@ -47,7 +48,7 @@ export interface ExpireInput {
   /** A temporada atravessa o ano (contratos terminam em 30/6). */
   split?: boolean
   rng: Rng
-  userTeamId?: TeamId
+  userTeamId?: TeamRef
   /** Quais contratos vencem agora (padrão: os que terminam até o fim da temporada `year`, a regra da virada). */
   due?: (player: Player) => boolean
   /** Temporada de cada clube, quando os contratos de várias pirâmides vencem juntos (padrão: `year` e `split` para todos). */
@@ -98,7 +99,7 @@ export function expireContracts(input: ExpireInput): ExpireResult {
     const squad = squads.get(team.id) ?? []
     const expiring = squad.filter(due)
     if (expiring.length === 0) continue
-    if (team.id === userTeamId) {
+    if (isProtected(userTeamId, team.id)) {
       for (const p of expiring) free(p)
       continue
     }

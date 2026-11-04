@@ -4,6 +4,7 @@
  * propostas por eles, pelo preço anunciado).
  */
 import { MARKET } from '../config'
+import { isProtected, type TeamRef } from '../teamRef'
 import { createRng } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import type { IsoDate, Listing, ListingKind, OfferKind, Player, PlayerId, TeamId } from '../types'
@@ -37,7 +38,7 @@ export const withoutListings = (state: SeasonState, playerId: PlayerId): SeasonS
  * Atualiza os anúncios dos clubes da IA: tira os que não valem mais (o jogador saiu, deixou de ser sobra ou o
  * elenco ficou curto) e anuncia, aos poucos, quem sobra. Os anúncios do jogador ficam como estão.
  */
-export function refreshListings(state: SeasonState, date: IsoDate, userTeamId?: TeamId): SeasonState {
+export function refreshListings(state: SeasonState, date: IsoDate, userTeamId?: TeamRef): SeasonState {
   const L = MARKET.listing
   const rng = createRng(`${state.market.seed}:${date}:listings`)
   const squads = new Map<TeamId, Player[]>()
@@ -52,13 +53,13 @@ export function refreshListings(state: SeasonState, date: IsoDate, userTeamId?: 
     const p = byId.get(l.playerId)
     if (!p || p.teamId !== l.teamId || p.contract.loanedFrom) return false
     if (l.by === 'user') return true
-    if (l.teamId === userTeamId) return false
+    if (isProtected(userTeamId, l.teamId)) return false
     const squad = squads.get(l.teamId) ?? []
     return squad.length > L.minSquad && squadRole(p, squad) === 'surplus'
   })
   const next = [...keep]
   for (const team of rng.shuffle(state.teams)) {
-    if (team.id === userTeamId) continue
+    if (isProtected(userTeamId, team.id)) continue
     const squad = squads.get(team.id) ?? []
     if (squad.length <= L.minSquad) continue
     const mine = next.filter((l) => l.teamId === team.id)

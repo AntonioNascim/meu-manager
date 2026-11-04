@@ -4,6 +4,7 @@
  * do time do jogador (que ele aceita ou recusa).
  */
 import { MARKET } from '../config'
+import { isProtected, type TeamRef } from '../teamRef'
 import { salaryScale } from '../economy'
 import { formationOf } from '../formations'
 import { squadForeignBlocked } from '../foreign'
@@ -102,7 +103,7 @@ const isBuyable = (p: Player): boolean => !p.contract.loanedFrom && p.condition.
  * Os mesmos jogadores que `bestTarget` consideraria no mercado inteiro, na mesma ordem, sem passar por quem não tem como
  * dar o ganho mínimo de força: o resultado é igual ao de olhar a lista toda, só que a rodada deixa de custar clubes × jogadores.
  */
-function marketPool(index: PoolIndex, team: Team, squad: readonly Player[], userTeamId: TeamId | undefined): Player[] {
+function marketPool(index: PoolIndex, team: Team, squad: readonly Player[], userTeamId: TeamRef | undefined): Player[] {
   const picked: { player: Player; order: number }[] = []
   const roomForSalary = team.finances.salaryBudget - monthlyPayroll(squad)
   const scale = salaryScale(team)
@@ -120,7 +121,7 @@ function marketPool(index: PoolIndex, team: Team, squad: readonly Player[], user
       const entry = list[i] as PoolEntry
       if (entry.overall - need.weakest < MARKET.ai.minUpgrade) break
       const p = entry.player
-      if (p.teamId === team.id || p.teamId === userTeamId) continue
+      if (p.teamId === team.id || isProtected(userTeamId, p.teamId)) continue
       picked.push(entry)
     }
   }
@@ -134,7 +135,7 @@ interface Candidate {
 }
 
 /** Para os testes: o que o mercado olha por um clube, sem ter de rodar uma rodada inteira. */
-export function marketPoolOf(players: readonly Player[], team: Team, squad: readonly Player[], userTeamId?: TeamId): Player[] {
+export function marketPoolOf(players: readonly Player[], team: Team, squad: readonly Player[], userTeamId?: TeamRef): Player[] {
   return marketPool(new PoolIndex(players), team, squad, userTeamId)
 }
 
@@ -212,7 +213,7 @@ function trimSquad(state: SeasonState, teamId: TeamId, date: IsoDate): SeasonSta
 }
 
 /** Uma rodada de negociações da IA. Só age dentro de uma janela aberta. */
-export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: TeamId): MarketTickResult {
+export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: TeamRef): MarketTickResult {
   // Cada clube negocia na janela da região da liga dele: a europeia pode estar aberta com a brasileira fechada.
   const windows = new Map<Region, TransferWindow | null>()
   const windowOfRegion = (region: Region) => {
@@ -226,7 +227,7 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
   const quick = quickTeamIds(state)
   // Série e liga de cada clube não mudam dentro da rodada: o preço de quem vende vem daqui.
   const clubs = new Map(state.teams.map((t) => [t.id, t]))
-  const aiTeams = rng.shuffle(state.teams.filter((t) => t.id !== userTeamId)).filter((t) => actsThisRound(quick, t.id, date))
+  const aiTeams = rng.shuffle(state.teams.filter((t) => !isProtected(userTeamId, t.id))).filter((t) => actsThisRound(quick, t.id, date))
 
   // Elenco de cada clube, refeito só quando uma transferência muda a lista de jogadores (antes era refeito a cada clube: custo quadrático).
   let squadsOf: Map<TeamId, Player[]> | undefined
@@ -263,7 +264,7 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
     if (signingsInWindow(current, team.id, window) >= MARKET.ai.maxSigningsPerWindow) continue
     const spendable = Math.min(spendableOf(team, squad), Math.max(0, MARKET.ai.windowSpendShare * expectedAnnualRevenue(team) - spentInWindow(current, team.id, window)))
     // 1) Propostas pelos jogadores do time do jogador.
-    if (userTeamId && incomingCount(current) < MARKET.ai.maxPendingIncoming && rng.chance(MARKET.ai.userOfferChance)) {
+    if (typeof userTeamId === 'string' && incomingCount(current) < MARKET.ai.maxPendingIncoming && rng.chance(MARKET.ai.userOfferChance)) {
       const offer = proposeToUser(current, team, squad, userTeamId, date, window, spendable, rng, sellers, clubs)
       if (offer) {
         current = { ...current, market: { ...current.market, offers: [...current.market.offers, offer], counter: current.market.counter + 1 } }
