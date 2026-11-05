@@ -119,7 +119,7 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
             <Button variant="secondary" className="flex-1" onClick={() => void copy('code', inviteCode)}>
               {copied === 'code' ? 'Copiado!' : 'Copiar código'}
             </Button>
-            <Button variant="secondary" className="flex-1" onClick={() => void copy('link', `${window.location.origin}${window.location.pathname}?convite=${inviteCode}`)}>
+            <Button variant="secondary" className="flex-1" onClick={() => void copy('link', `${window.location.origin}${window.location.pathname}?online=1&convite=${inviteCode}`)}>
               {copied === 'link' ? 'Copiado!' : 'Copiar link'}
             </Button>
           </div>
