@@ -766,3 +766,20 @@ As 12 palavras com confirmação de 3 eram trabalhosas demais. Agora:
 **Aviso de privacidade** (seção 14, texto do código de recuperação) e o texto do cartão Online no menu foram atualizados. A semente da chave agora é `HKDF(código, "ed25519-identity-v2")`: contas feitas com as 12 palavras só existiram em testes locais (o online não está em uso: 0 identidades no servidor) e não migram.
 
 **Testes:** `tests/onlineIdentity.test.ts` (alfabeto sem confusão, sorteio sem viés, leitura com hífen/espaço/minúscula, erros), `tests/recoveryCodeScreen.test.ts`, `tests/accountScreens.test.ts`, `tests/onlineIdentityStore.test.ts`; ponta a ponta `tools/online-lab/b8-e2e.mjs` (cria a conta sem ver o código, aviso no menu, mostrar/baixar/"Já guardei", entrar em outro aparelho com o código em minúsculas e espaços). Observação do teste local: o servidor local usa a chave de teste do Turnstile, que aprova qualquer desafio, então um código inexistente **cria** uma conta em vez de dar "não encontrada"; na nuvem real o desafio falso é recusado.
+
+## 24. B8.4: Pronto, Avançar, Pausa e horários (05/11/2026)
+
+A sala de uma liga em andamento deixou de ser só a lista de técnicos (some a nota transitória "Liga em andamento"). `LeagueRunning` mostra:
+
+- **Próxima rodada** com dia da semana, data e hora **no fuso do aparelho** (o servidor só guarda milissegundos; `Intl.DateTimeFormat` formata), "em 9 dias", a data do mundo e a hora em que a sala abre (5 min antes).
+- **Pronto:** só quem tem partida no próximo evento precisa dar. Botão "Estou pronto" / "Pronto! Toque para desfazer". Com a sala aberta e todos prontos a rodada começa antes do horário (regra de B6, `shouldStart`). Dar Pronto conta como presença (`setPlayerReady`: volta de ausente para ativo e zera as faltas). Durante um evento ou em pausa o botão some, com o motivo.
+- **Quem está pronto:** cada técnico com o clube e "Pronto", "Falta", "Sem jogo", "Ausente (IA joga)" ou "Piloto automático".
+- **Calendário:** as próximas 12 rodadas (só eventos com partidas), no fuso local.
+- **ADM:** *Avançar* (janela de confirmação com a data, o horário que será pulado e **quem ainda não deu Pronto**; quem faltar joga com a IA), *Pausar*/*Retomar* (pausa congela o tempo e os prazos; os horários são refeitos ao retomar; volta sozinha em 30 dias), *Ritmo* (só liga de amigos; aberta é sempre Normal; refaz os horários futuros agora; não vale no meio de um evento) e **sugestões de ausência** ("Técnicos sumidos", só para o ADM: quem já passaria do limite de uma liga aberta, com botão Remover; a decisão é sempre do ADM). Remover técnico e passar o cargo já existiam (8.3).
+- **Últimos acontecimentos:** registro da liga (criada, rodada começou/terminou, ADM avançou, pausa, retomada).
+
+**Servidor.** Engine puro novo: `engine/league/view.ts` (`leagueView`, `setPlayerReady`) e `replanForPace` em `runner.ts`. API (`leagueApi.ts`): `GET /api/leagues/:id/state` (membro ou ADM; as sugestões só vão ao ADM), `POST .../ready`, `.../advance`, `.../pause`, `.../resume` (só ADM) e `.../pace` (só ADM, só amigos); a sala ganhou as rotas internas `state`, `ready`, `advance`, `pause`, `resume` e `pace`. O estado é consultado por polling a cada 5 s (limite de leitura de 120/min por identidade); o WebSocket é da partida ao vivo (8.5).
+
+**Testes:** `tests/leagueView.test.ts` (8), `tests/onlineLeagueApi.test.ts` (5 novos: permissões, corpo, estado da liga), ponta a ponta `tools/online-lab/b8-4-e2e.mjs` (3 técnicos: calendário, Pronto e desfazer, ADM vê o Pronto, pausa para todos, retomar, ritmo refaz os horários, Avançar com confirmação e registro). **Não coberto no navegador:** a sugestão de ausência aparecer (precisa de várias rodadas perdidas; coberta no motor) e "todos prontos começa antes do horário" (precisa estar a 5 min do evento; coberto em `leagueView.test.ts`).
+
+**Publicação:** nada publicado nesta parte. As rotas novas só valem na nuvem depois de `wrangler deploy` (precisa de autorização).

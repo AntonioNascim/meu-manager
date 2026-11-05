@@ -6,6 +6,7 @@ import { Button, Card, TeamBadge } from '../../../components/ui'
 import { BAND_LABELS, LEAGUE_ERROR_LABELS, LEAGUE_KIND_LABELS, LEAGUE_STATUS_LABELS, PACE_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
 import { ClubPicker } from './ClubPicker'
+import { LeagueRunning } from './LeagueRunning'
 import { Frame, Pill } from './parts'
 
 const pretty = (code: string): string => `${code.slice(0, 4)}-${code.slice(4)}`
@@ -108,7 +109,8 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
         {PACE_LABELS[league.pace]} · {BAND_LABELS[league.band]} · {league.directResult ? 'Resultado direto' : 'Partidas ao vivo'}
       </p>
       {league.status === 'lobby' && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">A liga ainda não começou. Cada técnico escolhe um clube e o ADM inicia quando todos estiverem prontos.</p>}
-      {league.status === 'running' && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">Liga em andamento. Quem entra agora assume um clube livre.</p>}
+      {league.status === 'running' && <LeagueRunning league={league} teams={teams ?? undefined} onRefresh={() => void load()} />}
+      {league.status === 'running' && !member && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">Quem entra agora assume um clube livre.</p>}
 
       {league.isAdmin && inviteCode && (
         <Card title="Convite">
@@ -175,7 +177,7 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
       )}
 
       {league.isAdmin && (
-        <Card title="Controles do ADM">
+        <Card title={league.status === 'running' ? 'Entrada e convite' : 'Controles do ADM'}>
           <div className="flex flex-col gap-2">
             {league.status === 'lobby' && (
               <Button disabled={busy || league.humans < 1} onClick={() => void act('start')} data-testid="start-league">

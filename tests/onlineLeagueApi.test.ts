@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, createLeague, getLeague, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, leagueState, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -39,6 +39,25 @@ class FakeRoom implements RoomPort {
   }
   async start(id: string) {
     this.started.add(id)
+    return { ok: true as const }
+  }
+  calls: string[] = []
+  running = new Set<string>()
+  async state(id: string) {
+    if (!this.seats.has(id)) return { ok: false as const, error: 'not-found' as const }
+    if (!this.started.has(id)) return { ok: true as const, phase: 'lobby' as const }
+    return { ok: true as const, phase: 'running' as const, view: { now: 0, worldDate: '2026-01-01', pace: 'normal', band: 'classic', tzOffsetMin: -180, directResult: false, paused: false, events: [], seats: [], log: [], suggestions: [{ playerId: 'x', teamId: 'team-1', missed: 9, idleDays: 20 }] } as never }
+  }
+  async ready(id: string, playerId: string, ready: boolean) {
+    this.calls.push(`ready:${id}:${playerId}:${ready}`)
+    return { ok: true as const }
+  }
+  async control(id: string, action: string, by: string) {
+    this.calls.push(`${action}:${id}:${by}`)
+    return { ok: true as const }
+  }
+  async setPace(id: string, pace: string) {
+    this.calls.push(`pace:${id}:${pace}`)
     return { ok: true as const }
   }
   async destroy(id: string) {
@@ -207,6 +226,67 @@ describe('diretório, convite e entrada', () => {
     const last = await createLeague(s.req(await s.person('Admx'), 'POST', '/api/leagues', { ...create, kind: 'open', name: 'Sexta Liga' }), s.deps)
     if (last.status !== 201) throw new Error('x')
     expect((await joinLeague(s.req(dan, 'POST', `/api/leagues/${last.body.id}/join`, { teamId: 'team-30' }), s.deps, last.body.id)).body).toMatchObject({ error: 'too-many-joined' })
+  })
+})
+
+describe('andamento da liga (B8.4)', () => {
+  async function running() {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const dudu = await s.person('Dudu')
+    const made = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, teamId: 'team-1' }), s.deps)
+    if (made.status !== 201) throw new Error('x')
+    const id = made.body.id
+    await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-2', code: made.body.code }), s.deps, id)
+    return { s, ana, bia, dudu, id }
+  }
+
+  it('antes de iniciar a liga está no saguão; depois mostra a visão, e só o ADM recebe as sugestões de ausência', async () => {
+    const { s, ana, bia, id } = await running()
+    const lobby = await leagueState(s.req(ana, 'GET', `/api/leagues/${id}/state`), s.deps, id)
+    expect(lobby.body).toMatchObject({ phase: 'lobby', isAdmin: true })
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    const adm = await leagueState(s.req(ana, 'GET', `/api/leagues/${id}/state`), s.deps, id)
+    const tec = await leagueState(s.req(bia, 'GET', `/api/leagues/${id}/state`), s.deps, id)
+    expect(adm.status === 200 && adm.body.view?.suggestions).toHaveLength(1)
+    expect(tec.status === 200 && tec.body.view?.suggestions).toHaveLength(0)
+    expect(tec.status === 200 && tec.body.isAdmin).toBe(false)
+  })
+
+  it('quem não está na liga não vê o andamento', async () => {
+    const { s, dudu, id } = await running()
+    expect((await leagueState(s.req(dudu, 'GET', `/api/leagues/${id}/state`), s.deps, id)).status).toBe(404)
+  })
+
+  it('Pronto: só membro, só com a liga em andamento, corpo conferido', async () => {
+    const { s, ana, bia, dudu, id } = await running()
+    expect((await setReady(s.req(bia, 'POST', `/api/leagues/${id}/ready`, { ready: true }), s.deps, id)).status).toBe(409)
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    expect((await setReady(s.req(bia, 'POST', `/api/leagues/${id}/ready`, { ready: true }), s.deps, id)).body).toEqual({ ready: true })
+    expect(s.room.calls).toContain(`ready:${id}:${bia.playerId}:true`)
+    expect((await setReady(s.req(dudu, 'POST', `/api/leagues/${id}/ready`, { ready: true }), s.deps, id)).status).toBe(404)
+    expect((await setReady(s.req(bia, 'POST', `/api/leagues/${id}/ready`, { ready: 'sim' }), s.deps, id)).status).toBe(400)
+  })
+
+  it('Avançar, Pausar e Retomar são só do ADM e só com a liga em andamento', async () => {
+    const { s, ana, bia, id } = await running()
+    expect((await controlLeague(s.req(ana, 'POST', `/api/leagues/${id}/advance`, {}), s.deps, id, 'advance')).status).toBe(409)
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    expect((await controlLeague(s.req(bia, 'POST', `/api/leagues/${id}/pause`, {}), s.deps, id, 'pause')).status).toBe(403)
+    for (const a of ['advance', 'pause', 'resume'] as const) expect((await controlLeague(s.req(ana, 'POST', `/api/leagues/${id}/${a}`, {}), s.deps, id, a)).status).toBe(200)
+    expect(s.room.calls.filter((c) => c.endsWith(ana.playerId))).toHaveLength(3)
+  })
+
+  it('o ritmo muda só pelo ADM, só em liga de amigos, com ritmo que existe', async () => {
+    const { s, ana, bia, id } = await running()
+    expect((await changePace(s.req(bia, 'POST', `/api/leagues/${id}/pace`, { pace: 'calm' }), s.deps, id)).status).toBe(403)
+    expect((await changePace(s.req(ana, 'POST', `/api/leagues/${id}/pace`, { pace: 'turbo' }), s.deps, id)).status).toBe(400)
+    expect((await changePace(s.req(ana, 'POST', `/api/leagues/${id}/pace`, { pace: 'calm' }), s.deps, id)).body).toEqual({ pace: 'calm' })
+    expect((await getLeague(s.req(ana, 'GET', `/api/leagues/${id}`), s.deps, id)).body).toMatchObject({ pace: 'calm' })
+    const open = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, kind: 'open' }), s.deps)
+    if (open.status !== 201) throw new Error('x')
+    expect((await changePace(s.req(ana, 'POST', `/api/leagues/${open.body.id}/pace`, { pace: 'fast' }), s.deps, open.body.id)).status).toBe(409)
   })
 })
 

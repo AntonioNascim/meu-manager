@@ -32,7 +32,7 @@ import {
   type ClockState,
   type ScheduledEvent,
 } from './clock'
-import { DEFAULT_TICK_HOUR, MAX_PAUSE_MS, ROOM_OPENS_BEFORE_MS, SCHEDULE_HORIZON_MS } from './pace'
+import { DEFAULT_TICK_HOUR, MAX_PAUSE_MS, ROOM_OPENS_BEFORE_MS, SCHEDULE_HORIZON_MS, type PaceId } from './pace'
 
 export type SeatStatus = 'active' | 'absent' | 'autopilot'
 
@@ -339,4 +339,16 @@ export function processLeague(league: LeagueState, world: SeasonState, now: numb
     break
   }
   return state
+}
+
+/**
+ * O ADM mudou o ritmo (B8.4): os horários dos eventos futuros são refeitos a partir de agora com o ritmo novo; o que já aconteceu não muda.
+ * Só vale com nenhum evento em andamento; em pausa, os horários se refazem na retomada.
+ */
+export function replanForPace(league: LeagueState, world: SeasonState, pace: PaceId): LeagueState {
+  if (league.config.clock.pace === pace || league.current) return league
+  const config: LeagueConfig = { ...league.config, clock: { ...league.config.clock, pace } }
+  const days = eventDaysOf(world, league.seats)
+  const base: LeagueState = { ...league, config }
+  return league.clock.pausedAt !== undefined ? base : { ...base, clock: replanClock(league.clock, config.clock, days) }
 }

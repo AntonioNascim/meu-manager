@@ -17,7 +17,9 @@ import { type BlobStore, type ListedObject, type StoredObject } from '../src/onl
 import { D1IdentityStore, type D1Like } from './d1Store'
 import { D1LeagueStore } from './leagueStore'
 import { LeagueRoom } from './leagueRoom'
-import { adminAction, createLeague, getLeague, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, resolveCode, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
+import type { PaceId } from '../src/engine/league/pace'
+import type { LeagueView } from '../src/engine/league/view'
+import { adminAction, changePace, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
@@ -148,6 +150,25 @@ class DoRooms implements RoomPort {
   start(leagueId: string) {
     return this.call(leagueId, '/internal/start', {})
   }
+  async state(leagueId: string) {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch('https://room/internal/state', { method: 'POST', body: '{}' })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; phase?: 'lobby' | 'running'; view?: LeagueView }
+      return json.ok ? { ok: true as const, phase: json.phase ?? 'lobby', ...(json.view ? { view: json.view } : {}) } : { ok: false as const, error: json.error ?? 'unavailable' }
+    } catch {
+      return { ok: false as const, error: 'unavailable' as const }
+    }
+  }
+  ready(leagueId: string, playerId: string, ready: boolean) {
+    return this.call(leagueId, '/internal/ready', { playerId, ready })
+  }
+  control(leagueId: string, action: ControlAction, by: string) {
+    return this.call(leagueId, `/internal/${action}`, { by })
+  }
+  setPace(leagueId: string, pace: PaceId) {
+    return this.call(leagueId, '/internal/pace', { pace })
+  }
   async destroy(leagueId: string) {
     await this.call(leagueId, '/internal/destroy', {})
   }
@@ -189,6 +210,10 @@ async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDe
     return respondLeague(await resolveCode(request, deps, code.slice(0, 32)), cors)
   }
   if (!second && method === 'GET') return respondLeague(await getLeague(request, deps, first), cors)
+  if (second === 'state' && method === 'GET') return respondLeague(await leagueState(request, deps, first), cors)
+  if (second === 'ready' && method === 'POST') return respondLeague(await setReady(request, deps, first), cors)
+  if ((second === 'advance' || second === 'pause' || second === 'resume') && method === 'POST') return respondLeague(await controlLeague(request, deps, first, second), cors)
+  if (second === 'pace' && method === 'POST') return respondLeague(await changePace(request, deps, first), cors)
   if (second === 'join' && method === 'POST') return respondLeague(await joinLeague(request, deps, first), cors)
   if (second === 'leave' && method === 'POST') return respondLeague(await leaveLeague(request, deps, first), cors)
   if (second && ADMIN_ACTIONS.includes(second) && method === 'POST') return respondLeague(await adminAction(request, deps, first, second as AdminAction), cors)

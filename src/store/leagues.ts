@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react'
 import { ONLINE_CONFIG } from '../online/config'
 import * as client from '../online/leagueClient'
 import type { Answer, CreateLeagueInput } from '../online/leagueClient'
-import type { AdminAction, LeagueDetail, LeagueSummary } from '../online/leagueApi'
+import type { AdminAction, ControlAction, LeagueDetail, LeagueSummary } from '../online/leagueApi'
+import type { PaceId } from '../engine/league/pace'
 import { loadWorld } from '../data/package/defaultPackage'
 import type { CompetitionSetup } from '../engine/season/calendar'
 import type { Team } from '../engine/types'
@@ -32,6 +33,10 @@ export const leagueApi = {
   join: (leagueId: string, teamId: string, code?: string) => withIdentity((id) => client.joinLeague(deps(), id, leagueId, teamId, code)),
   leave: (leagueId: string) => withIdentity((id) => client.leaveLeague(deps(), id, leagueId)),
   admin: (leagueId: string, action: AdminAction, playerId?: string) => withIdentity((id) => client.adminLeague(deps(), id, leagueId, action, playerId)),
+  state: (leagueId: string) => withIdentity((id) => client.leagueState(deps(), id, leagueId)),
+  ready: (leagueId: string, ready: boolean) => withIdentity((id) => client.sendReady(deps(), id, leagueId, ready)),
+  control: (leagueId: string, action: ControlAction) => withIdentity((id) => client.controlLeague(deps(), id, leagueId, action)),
+  pace: (leagueId: string, pace: PaceId) => withIdentity((id) => client.changePace(deps(), id, leagueId, pace)),
 }
 
 /** Um clube do mundo da liga, com o nome da liga em que joga. */
