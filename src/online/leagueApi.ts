@@ -11,7 +11,7 @@ import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type Iden
 import { checkName, type NameIssue } from './nameFilter'
 
 export const LEAGUE_LIMITS = {
-  /** Ligas ativas que uma identidade administra. */
+  /** Ligas ativas que uma identidade administra (mesmo sem clube). */
   activeCreated: 3,
   /** Ligas em que uma identidade participa (criou ou entrou). */
   participating: 5,
@@ -280,7 +280,7 @@ const roomFailure = <T>(error: RoomFailure): LeagueResult<T> =>
 
 /** Cria a liga. Ligas abertas só usam o ritmo Normal; quem cria é o ADM e já pode escolher o clube. */
 export async function createLeague(req: ApiRequest, deps: LeagueDeps): Promise<LeagueResult<LeagueDetail>> {
-  const auth = await requireIdentity(req, 'createLeague', deps)
+  const auth = await requireIdentity(req, 'createLeague', deps, 'createLeagueIp')
   if (!auth.ok) return auth.result as LeagueResult<never>
   const body = parseCreate(req.body)
   if (!body) return fail(400, { error: 'bad-body' })
@@ -350,7 +350,8 @@ export async function getLeague(req: ApiRequest, deps: LeagueDeps, id: string): 
   const league = await deps.leagues.get(id)
   if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
   const members = await deps.leagues.members(id)
-  const mine = members.some((m) => m.playerId === auth.record.playerId)
+  // O ADM sempre vê a própria liga, mesmo antes de escolher um clube.
+  const mine = members.some((m) => m.playerId === auth.record.playerId) || league.adminId === auth.record.playerId
   if (league.kind === 'friends' && !mine) return fail(404, { error: 'not-found' })
   if (league.hidden && !mine) return fail(404, { error: 'not-found' })
   return { status: 200, body: await detailOf(deps, league, auth.record.playerId) }
@@ -358,7 +359,7 @@ export async function getLeague(req: ApiRequest, deps: LeagueDeps, id: string): 
 
 /** Convite por código: devolve a liga para a pessoa escolher o clube. Limitado a 10 tentativas por hora. */
 export async function resolveCode(req: ApiRequest, deps: LeagueDeps, code: string): Promise<LeagueResult<LeagueDetail>> {
-  const auth = await requireIdentity(req, 'joinByCode', deps)
+  const auth = await requireIdentity(req, 'joinByCode', deps, 'joinByCodeIp')
   if (!auth.ok) return auth.result as LeagueResult<never>
   const normalized = normalizeCode(code)
   if (normalized.length !== CODE_LENGTH || [...normalized].some((c) => !CODE_ALPHABET.includes(c))) return fail(404, { error: 'wrong-code' })
@@ -392,7 +393,8 @@ export async function joinLeague(req: ApiRequest, deps: LeagueDeps, id: string):
   if (!o || !onlyKeys(o, ['teamId', 'code']) || typeof o.teamId !== 'string' || !TEAM_ID.test(o.teamId) || (o.code !== undefined && typeof o.code !== 'string')) return fail(400, { error: 'bad-body' })
   const league = await deps.leagues.get(id)
   if (!league || league.status === 'closed' || league.hidden) return fail(404, { error: 'not-found' })
-  if (league.kind === 'friends' && !(typeof o.code === 'string' && league.code && sameText(normalizeCode(o.code), league.code))) {
+  // Liga de amigos: o código vale; o ADM entra sem ele (a liga é dele).
+  if (league.kind === 'friends' && league.adminId !== auth.record.playerId && !(typeof o.code === 'string' && league.code && sameText(normalizeCode(o.code), league.code))) {
     const hit = await deps.limiter.hit('joinByCode', `id:${auth.record.playerId}`, deps.now())
     if (!hit.allowed) return fail(429, { error: 'rate-limited', retryAfterMs: hit.retryAfterMs })
     return fail(403, { error: 'wrong-code' })
@@ -421,7 +423,7 @@ export async function leaveLeague(req: ApiRequest, deps: LeagueDeps, id: string)
   const league = await deps.leagues.get(id)
   const me = auth.record.playerId
   if (!league) return fail(404, { error: 'not-found' })
-  if (!(await deps.leagues.members(id)).some((m) => m.playerId === me)) return fail(404, { error: 'not-found' })
+  if (!(await deps.leagues.members(id)).some((m) => m.playerId === me) && league.adminId !== me) return fail(404, { error: 'not-found' })
   await deps.rooms.removeSeat(id, me)
   await deps.leagues.removeMember(id, me)
   await afterMemberLeft(deps, league, me)

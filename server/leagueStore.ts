@@ -95,8 +95,8 @@ export class D1LeagueStore implements LeagueStore {
 
   async mine(playerId: string): Promise<LeagueRow[]> {
     const res = await this.db
-      .prepare(`SELECT l.*, ${HUMANS} FROM leagues l WHERE l.status != 'closed' AND l.id IN (SELECT league_id FROM league_members WHERE player_id = ?) ORDER BY l.created_at DESC`)
-      .bind(playerId)
+      .prepare(`SELECT l.*, ${HUMANS} FROM leagues l WHERE l.status != 'closed' AND (l.admin_id = ? OR l.id IN (SELECT league_id FROM league_members WHERE player_id = ?)) ORDER BY l.created_at DESC`)
+      .bind(playerId, playerId)
       .all<Row>()
     return res.results.map((r) => ({ ...toRecord(r), humans: r.humans ?? 0 }))
   }
@@ -121,7 +121,7 @@ export class D1LeagueStore implements LeagueStore {
   }
 
   async countMemberships(playerId: string): Promise<number> {
-    const r = await this.db.prepare("SELECT COUNT(*) AS n FROM league_members m JOIN leagues l ON l.id = m.league_id WHERE m.player_id = ? AND l.status != 'closed'").bind(playerId).first<{ n: number }>()
+    const r = await this.db.prepare("SELECT COUNT(*) AS n FROM leagues l WHERE l.status != 'closed' AND (l.admin_id = ? OR l.id IN (SELECT league_id FROM league_members WHERE player_id = ?))").bind(playerId, playerId).first<{ n: number }>()
     return r?.n ?? 0
   }
 }

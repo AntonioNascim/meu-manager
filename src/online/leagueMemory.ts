@@ -39,7 +39,7 @@ export class MemoryLeagueStore implements LeagueStore {
   }
   async mine(playerId: string) {
     const ids = new Set(this.rows.filter((m) => m.playerId === playerId).map((m) => m.leagueId))
-    return [...this.leagues.values()].filter((l) => ids.has(l.id) && l.status !== 'closed').map((l) => this.row(l))
+    return [...this.leagues.values()].filter((l) => (ids.has(l.id) || l.adminId === playerId) && l.status !== 'closed').map((l) => this.row(l))
   }
   async members(leagueId: string) {
     return this.rows.filter((m) => m.leagueId === leagueId).map((m) => ({ ...m }))
@@ -56,7 +56,6 @@ export class MemoryLeagueStore implements LeagueStore {
     return [...this.leagues.values()].filter((l) => l.adminId === playerId && l.status !== 'closed').length
   }
   async countMemberships(playerId: string) {
-    const ids = new Set(this.rows.filter((m) => m.playerId === playerId).map((m) => m.leagueId))
-    return [...this.leagues.values()].filter((l) => ids.has(l.id) && l.status !== 'closed').length
+    return (await this.mine(playerId)).length
   }
 }

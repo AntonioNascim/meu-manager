@@ -22,6 +22,9 @@ export const RATE_LIMITS = {
   deleteAccount: [{ limit: 3, windowMs: DAY }],
   createLeague: [{ limit: 3, windowMs: DAY }],
   joinByCode: [{ limit: 10, windowMs: HOUR }],
+  // Tetos por IP (B8.3): bem mais folgados que os por identidade, porque muita gente divide o mesmo IP (CGNAT das operadoras).
+  createLeagueIp: [{ limit: 60, windowMs: DAY }],
+  joinByCodeIp: [{ limit: 300, windowMs: HOUR }],
 } as const satisfies Record<string, readonly LimitRule[]>
 
 export type LimitAction = keyof typeof RATE_LIMITS

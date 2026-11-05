@@ -194,7 +194,7 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
         </Card>
       )}
 
-      {member && (
+      {(member || league.isAdmin) && (
         <button type="button" className="min-h-12 rounded-xl border border-loss font-bold text-loss" onClick={() => setLeaving(true)}>
           Sair da liga
         </button>
