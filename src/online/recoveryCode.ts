@@ -1,72 +1,54 @@
 /**
- * Código de recuperação (Fase 6, B2; proposta 4.1): 12 palavras (128 bits + 4 de conferência) que **derivam** a chave da identidade.
- * O servidor nunca vê o código nem guarda segredo. Lista de palavras: BIP39 em português (2048 palavras).
+ * Código de recuperação (Fase 6, B2; trocado na B8.1 a pedido dos sócios): um código só, como `K7QP-9X2M-HT4R-8WZC`, que **deriva** a chave da identidade.
+ * O servidor nunca vê o código nem guarda segredo.
+ *
+ * Tamanho: 20 símbolos de um alfabeto de 31 (log2 31 ≈ 4,95 bits cada) = ~99 bits. Como o `playerId` (chave pública) aparece para os outros
+ * técnicos, quem quiser descobrir o código pode testar palpites sem falar com o servidor; 2^99 palpites é inviável mesmo com milhões de placas de
+ * vídeo, então 20 basta (o código antigo, de 12 palavras, tinha 128 bits, mais do que se precisa). Sem letras que se confundem: não há O, I, L, 0 nem 1.
  */
-import { entropyToMnemonic, mnemonicToEntropy } from '@scure/bip39'
-import { wordlist } from '@scure/bip39/wordlists/portuguese.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 
-export const RECOVERY_WORDS = 12
-const ENTROPY_BYTES = 16
+export const RECOVERY_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+export const RECOVERY_LENGTH = 20
+const GROUP = 4
 
-/** Sem acento e em minúsculas: quem digita "coração" ou "CORACAO" chega à mesma palavra. */
-const fold = (w: string): string => w.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase()
+export type RecoveryError = 'wrong-length' | 'bad-char'
 
-const byFolded: ReadonlyMap<string, string> = new Map(wordlist.map((w) => [fold(w), w]))
+export type RecoveryParse = { ok: true; code: string } | { ok: false; error: RecoveryError; index?: number }
 
-export type RecoveryError = 'wrong-count' | 'unknown-word' | 'bad-checksum'
-
-export type RecoveryParse = { ok: true; words: string[] } | { ok: false; error: RecoveryError; index?: number }
-
-/** Código novo a partir de bytes aleatórios (o chamador passa `crypto.getRandomValues`; aqui não há sorteio escondido). */
-export function newRecoveryCode(randomBytes: (n: number) => Uint8Array): string[] {
-  return entropyToMnemonic(randomBytes(ENTROPY_BYTES), wordlist).split(' ')
+/** Código novo a partir de bytes aleatórios (o chamador passa `crypto.getRandomValues`; aqui não há sorteio escondido). Devolve os 20 símbolos, sem hífens. */
+export function newRecoveryCode(randomBytes: (n: number) => Uint8Array): string {
+  const n = RECOVERY_ALPHABET.length
+  const limit = 256 - (256 % n) // evita viés: descarta bytes acima do maior múltiplo de 31
+  let out = ''
+  while (out.length < RECOVERY_LENGTH) {
+    for (const b of randomBytes(RECOVERY_LENGTH)) {
+      if (b < limit && out.length < RECOVERY_LENGTH) out += RECOVERY_ALPHABET[b % n]
+    }
+  }
+  return out
 }
 
-/** Lê o que a pessoa digitou: separa por espaço, vírgula ou quebra de linha, ignora acento e maiúsculas, confere palavras e soma de conferência. */
+/** `K7QP9X2MHT4R8WZC3NFB` → `K7QP-9X2M-HT4R-8WZC-3NFB`. */
+export function formatRecoveryCode(code: string): string {
+  return (code.match(new RegExp(`.{1,${GROUP}}`, 'g')) ?? []).join('-')
+}
+
+/** Lê o que a pessoa digitou: ignora espaço, hífen, ponto e maiúsculas. Devolve o código limpo (20 símbolos) ou o erro, com a posição do símbolo que não existe. */
 export function parseRecoveryCode(text: string): RecoveryParse {
-  const typed = text.split(/[\s,;]+/).filter(Boolean)
-  if (typed.length !== RECOVERY_WORDS) return { ok: false, error: 'wrong-count' }
-  const words: string[] = []
-  for (let i = 0; i < typed.length; i++) {
-    const word = byFolded.get(fold(typed[i]!))
-    if (!word) return { ok: false, error: 'unknown-word', index: i }
-    words.push(word)
+  const clean = text.replace(/[\s\-–—._,;]+/g, '').toUpperCase()
+  for (let i = 0; i < clean.length; i++) {
+    if (!RECOVERY_ALPHABET.includes(clean[i]!)) return { ok: false, error: 'bad-char', index: i }
   }
-  try {
-    mnemonicToEntropy(words.join(' '), wordlist)
-  } catch {
-    return { ok: false, error: 'bad-checksum' }
-  }
-  return { ok: true, words }
+  if (clean.length !== RECOVERY_LENGTH) return { ok: false, error: 'wrong-length' }
+  return { ok: true, code: clean }
 }
+
+/** Quantos símbolos válidos a pessoa já digitou (para o contador da tela). */
+export const typedSymbols = (text: string): number => text.replace(/[\s\-–—._,;]+/g, '').length
 
 /** A semente de 32 bytes da chave Ed25519, derivada do código (HKDF-SHA256 com contexto próprio: o mesmo código nunca vira outra coisa por engano). */
-export function seedFromRecoveryCode(words: readonly string[]): Uint8Array {
-  const entropy = mnemonicToEntropy(words.join(' '), wordlist)
-  return hkdf(sha256, entropy, new TextEncoder().encode('meu-manager'), new TextEncoder().encode('ed25519-identity-v1'), 32)
-}
-
-/** Posições sorteadas (0 a 11, em ordem) para conferir que a pessoa anotou o código (proposta 4.5, passo 2: três palavras). */
-export function pickCheckPositions(randomBytes: (n: number) => Uint8Array, count = 3): number[] {
-  const out = new Set<number>()
-  while (out.size < count) {
-    const [b] = randomBytes(1)
-    // 252 = maior múltiplo de 12 até 255: evita viés.
-    if (b! < 252) out.add(b! % RECOVERY_WORDS)
-  }
-  return [...out].sort((a, b) => a - b)
-}
-
-/**
- * Confere as palavras que a pessoa digitou nas posições sorteadas (proposta 4.5, passo 2). Devolve uma resposta por posição,
- * na mesma ordem; ignora acento, maiúsculas e espaços nas pontas.
- */
-export function checkConfirmation(words: readonly string[], positions: readonly number[], typed: readonly string[]): boolean[] {
-  return positions.map((p, i) => {
-    const expected = words[p]
-    const given = typed[i]
-    return expected !== undefined && given !== undefined && fold(given.trim()) === fold(expected)
-  })
+export function seedFromRecoveryCode(code: string): Uint8Array {
+  return hkdf(sha256, new TextEncoder().encode(code), new TextEncoder().encode('meu-manager'), new TextEncoder().encode('ed25519-identity-v2'), 32)
 }

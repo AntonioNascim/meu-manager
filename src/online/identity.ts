@@ -48,14 +48,14 @@ export function identityFromSeed(seed: Uint8Array): Identity {
 }
 
 /** Identidade e código novos: o código é mostrado uma vez e a chave deriva dele. */
-export function createIdentity(randomBytes: (n: number) => Uint8Array): { identity: Identity; recoveryCode: string[] } {
+export function createIdentity(randomBytes: (n: number) => Uint8Array): { identity: Identity; recoveryCode: string } {
   const recoveryCode = newRecoveryCode(randomBytes)
   return { identity: identityFromSeed(seedFromRecoveryCode(recoveryCode)), recoveryCode }
 }
 
 /** Trocar de aparelho: o mesmo código dá a mesma identidade. */
-export function identityFromRecoveryCode(words: readonly string[]): Identity {
-  return identityFromSeed(seedFromRecoveryCode(words))
+export function identityFromRecoveryCode(code: string): Identity {
+  return identityFromSeed(seedFromRecoveryCode(code))
 }
 
 export const signBytes = (secretKey: Uint8Array, message: Uint8Array): Uint8Array => ed25519.sign(message, secretKey)

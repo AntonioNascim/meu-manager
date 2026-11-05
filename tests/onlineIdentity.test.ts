@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createIdentity, fromBase64Url, identityFromRecoveryCode, publicKeyOf, toBase64Url } from '../src/online/identity'
-import { checkConfirmation, parseRecoveryCode, pickCheckPositions, RECOVERY_WORDS } from '../src/online/recoveryCode'
+import { formatRecoveryCode, newRecoveryCode, parseRecoveryCode, RECOVERY_ALPHABET, RECOVERY_LENGTH, typedSymbols } from '../src/online/recoveryCode'
 import { CLOCK_SKEW_MS, MemoryNonceStore, signRequest, verifyRequest, type RequestParts } from '../src/online/signedRequest'
 import { RATE_LIMITS, RateLimiter } from '../src/online/rateLimit'
 
@@ -32,13 +32,29 @@ describe('base64url', () => {
 })
 
 describe('código de recuperação e identidade', () => {
-  it('gera 12 palavras e a mesma identidade a partir delas', () => {
+  it('gera um código de 20 símbolos legíveis e a mesma identidade a partir dele', () => {
     const { identity, recoveryCode } = createIdentity(fakeRandom(7))
-    expect(recoveryCode).toHaveLength(RECOVERY_WORDS)
+    expect(recoveryCode).toHaveLength(RECOVERY_LENGTH)
+    expect([...recoveryCode].every((c) => RECOVERY_ALPHABET.includes(c))).toBe(true)
     expect(identity.playerId).toHaveLength(43)
     const again = identityFromRecoveryCode(recoveryCode)
     expect(again.playerId).toBe(identity.playerId)
     expect(Array.from(again.secretKey)).toEqual(Array.from(identity.secretKey))
+  })
+
+  it('o alfabeto não tem símbolos que se confundem (O, I, L, 0, 1) nem repetidos', () => {
+    for (const c of 'OIL01') expect(RECOVERY_ALPHABET).not.toContain(c)
+    expect(new Set(RECOVERY_ALPHABET).size).toBe(RECOVERY_ALPHABET.length)
+    expect(RECOVERY_ALPHABET).toHaveLength(31)
+  })
+
+  it('o sorteio usa o alfabeto todo, sem viés grosseiro', () => {
+    const counts = new Map<string, number>()
+    const rnd = fakeRandom(99)
+    for (let i = 0; i < 3000; i++) for (const c of newRecoveryCode(rnd)) counts.set(c, (counts.get(c) ?? 0) + 1)
+    expect(counts.size).toBe(31)
+    const expected = (3000 * 20) / 31
+    for (const n of counts.values()) expect(Math.abs(n - expected)).toBeLessThan(expected * 0.15)
   })
 
   it('códigos diferentes dão identidades diferentes', () => {
@@ -46,52 +62,25 @@ describe('código de recuperação e identidade', () => {
     expect(ids.size).toBe(8)
   })
 
-  it('o que a pessoa digita vale com maiúsculas, acentos a menos, vírgulas e quebras de linha', () => {
+  it('mostra em grupos de 4 e lê de volta com hífen, espaço, minúsculas ou colado', () => {
     const { recoveryCode, identity } = createIdentity(fakeRandom(11))
-    const typed = recoveryCode.map((w, i) => (i % 3 === 0 ? w.toUpperCase() : w.normalize('NFD').replace(/\p{M}+/gu, ''))).join(i2(recoveryCode))
-    const parsed = parseRecoveryCode(typed)
-    expect(parsed.ok).toBe(true)
-    if (parsed.ok) expect(identityFromRecoveryCode(parsed.words).playerId).toBe(identity.playerId)
+    const shown = formatRecoveryCode(recoveryCode)
+    expect(shown).toMatch(/^([A-Z2-9]{4}-){4}[A-Z2-9]{4}$/)
+    for (const typed of [shown, shown.toLowerCase(), shown.replace(/-/g, ' '), recoveryCode, `  ${shown}
+`]) {
+      const parsed = parseRecoveryCode(typed)
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) expect(identityFromRecoveryCode(parsed.code).playerId).toBe(identity.playerId)
+    }
   })
 
-  it('aponta o erro: quantidade, palavra desconhecida (com a posição) e soma de conferência', () => {
+  it('aponta o erro: tamanho errado e símbolo que não existe (com a posição)', () => {
     const { recoveryCode } = createIdentity(fakeRandom(13))
-    expect(parseRecoveryCode(recoveryCode.slice(0, 11).join(' '))).toEqual({ ok: false, error: 'wrong-count' })
-    expect(parseRecoveryCode([...recoveryCode.slice(0, 4), 'zzzzzz', ...recoveryCode.slice(5)].join(' '))).toEqual({ ok: false, error: 'unknown-word', index: 4 })
-    // Trocar duas palavras de lugar quebra a soma de conferência na maioria dos códigos; procura um em que isso acontece.
-    let found = false
-    for (let s = 20; s < 60 && !found; s++) {
-      const w = createIdentity(fakeRandom(s)).recoveryCode
-      if (w[0] === w[1]) continue
-      const swapped = [w[1]!, w[0]!, ...w.slice(2)]
-      const r = parseRecoveryCode(swapped.join(' '))
-      if (!r.ok) {
-        expect(r.error).toBe('bad-checksum')
-        found = true
-      }
-    }
-    expect(found).toBe(true)
-  })
-
-  it('sorteia posições distintas, em ordem, entre 0 e 11', () => {
-    for (let s = 1; s < 30; s++) {
-      const p = pickCheckPositions(fakeRandom(s))
-      expect(p).toHaveLength(3)
-      expect(new Set(p).size).toBe(3)
-      expect([...p].sort((a, b) => a - b)).toEqual(p)
-      expect(p.every((x) => x >= 0 && x < RECOVERY_WORDS)).toBe(true)
-    }
-  })
-
-  it('a confirmação confere as palavras sorteadas, sem ligar para acento ou maiúscula', () => {
-    const { recoveryCode } = createIdentity(fakeRandom(15))
-    const positions = pickCheckPositions(fakeRandom(16))
-    const right = positions.map((p) => recoveryCode[p]!.normalize('NFD').replace(/\p{M}+/gu, '').toUpperCase() + ' ')
-    expect(checkConfirmation(recoveryCode, positions, right)).toEqual([true, true, true])
-    const wrong = [...right]
-    wrong[1] = 'zzz'
-    expect(checkConfirmation(recoveryCode, positions, wrong)).toEqual([true, false, true])
-    expect(checkConfirmation(recoveryCode, positions, [])).toEqual([false, false, false])
+    expect(parseRecoveryCode(recoveryCode.slice(0, 19))).toEqual({ ok: false, error: 'wrong-length' })
+    expect(parseRecoveryCode(recoveryCode + 'A')).toEqual({ ok: false, error: 'wrong-length' })
+    expect(parseRecoveryCode(recoveryCode.slice(0, 4) + 'O' + recoveryCode.slice(5))).toEqual({ ok: false, error: 'bad-char', index: 4 })
+    expect(parseRecoveryCode('1'.repeat(20))).toMatchObject({ ok: false, error: 'bad-char' })
+    expect(typedSymbols('K7QP-9X2M')).toBe(8)
   })
 
   it('só aceita um playerId de 32 bytes', () => {
@@ -102,10 +91,6 @@ describe('código de recuperação e identidade', () => {
   })
 })
 
-/** Separadores mistos para o teste de digitação. */
-function i2(words: readonly string[]): string {
-  return words.length > 0 ? ' , ' : ''
-}
 
 describe('pedidos assinados', () => {
   const NOW = 1_800_000_000_000

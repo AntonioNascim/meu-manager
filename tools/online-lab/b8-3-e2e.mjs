@@ -26,14 +26,7 @@ const person = async (nick) => {
   await page.goto(base)
   await page.getByRole('button', { name: 'Criar minha conta online' }).click()
   await page.getByTestId('nickname-input').fill(nick)
-  await page.getByRole('button', { name: 'Continuar' }).click()
-  await page.getByTestId('recovery-words').waitFor()
-  const words = (await page.locator('[data-testid=recovery-words] li').allInnerTexts()).map((t) => t.replace(/^\d+\s*/, '').trim())
-  await page.getByRole('button', { name: 'Anotei, continuar' }).click()
-  const idx = (await page.locator('[data-testid=recovery-setup-confirm] label span.font-semibold').allInnerTexts()).map((t) => Number(t.replace(/\D/g, '')) - 1)
-  const inputs = page.locator('[data-testid=recovery-setup-confirm] input')
-  for (let i = 0; i < 3; i++) await inputs.nth(i).fill(words[idx[i]])
-  await page.getByRole('button', { name: 'Confirmar' }).click()
+  await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByTestId('online-account').waitFor()
   return { context, page, nick }
 }

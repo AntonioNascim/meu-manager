@@ -475,9 +475,8 @@ export const NAME_ISSUE_LABELS: Record<NameIssue, string> = {
 
 /** Por que o código de recuperação digitado não vale. */
 export const RECOVERY_ERROR_LABELS: Record<RecoveryError, string> = {
-  'wrong-count': 'O código tem 12 palavras.',
-  'unknown-word': 'Uma das palavras não existe na lista do jogo.',
-  'bad-checksum': 'As palavras não formam um código válido. Confira a ordem e a escrita.',
+  'wrong-length': 'O código tem 20 letras e números (por exemplo K7QP-9X2M-HT4R-8WZC-3NFB).',
+  'bad-char': 'Esse símbolo não existe no código. O código não usa O, I, L, 0 nem 1.',
 }
 
 /** Apelido pronto de quem ainda não escolheu. */

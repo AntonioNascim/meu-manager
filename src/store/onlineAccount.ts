@@ -58,11 +58,11 @@ export const getAccount = (): AccountState => state
 
 // ------------------------------------------------------------------ conta
 
-export type CreateResult = { ok: true; words: string[] } | Exclude<RegisterResult, { ok: true }>
+export type CreateResult = { ok: true; code: string } | Exclude<RegisterResult, { ok: true }>
 
 /**
  * Cria a conta: confere o apelido aqui (o servidor confere de novo), sorteia o código no aparelho e registra no servidor. O código só é gravado
- * no aparelho depois de o servidor aceitar. Devolve as 12 palavras para a tela mostrar.
+ * no aparelho depois de o servidor aceitar. Não mostra o código: a pessoa já sai jogando e o menu avisa para guardá-lo.
  */
 export async function createAccount(nickname: string, turnstileToken: string): Promise<CreateResult> {
   const checked = checkName(nickname)
@@ -72,7 +72,7 @@ export async function createAccount(nickname: string, turnstileToken: string): P
   if (!result.ok) return result
   await mainIdentityStore.adopt(made, Date.now(), result.nickname ?? checked.name)
   await loadAccount()
-  return { ok: true, words: made.recoveryCode }
+  return { ok: true, code: made.recoveryCode }
 }
 
 export type RecoverResult = { ok: true; nickname?: string } | { ok: false; reason: 'format'; error: RecoveryError; index?: number } | { ok: false; reason: 'not-found' | 'offline' | 'rate-limited' | 'server' }
@@ -83,14 +83,14 @@ export async function recoverAccount(text: string): Promise<RecoverResult> {
   if (!parsed.ok) return { ok: false, reason: 'format', error: parsed.error, index: parsed.index }
   let identity: Identity
   try {
-    identity = identityFromRecoveryCode(parsed.words)
+    identity = identityFromRecoveryCode(parsed.code)
   } catch {
-    return { ok: false, reason: 'format', error: 'bad-checksum' }
+    return { ok: false, reason: 'format', error: 'wrong-length' }
   }
   // O servidor só pede o desafio para contas novas: com um código que não existe, ele recusa, e isso aqui quer dizer "não encontrei".
   const result = await registerIdentity(clientDeps(), identity, 'recuperar')
   if (!result.ok) return { ok: false, reason: result.reason === 'turnstile-failed' || result.reason === 'bad-nickname' || result.reason === 'unauthorized' ? 'not-found' : result.reason }
-  await mainIdentityStore.recover(parsed.words, Date.now())
+  await mainIdentityStore.recover(parsed.code, Date.now())
   await mainIdentityStore.markRegistered(result.nickname)
   await loadAccount()
   return { ok: true, nickname: result.nickname }

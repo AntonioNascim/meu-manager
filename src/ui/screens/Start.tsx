@@ -183,6 +183,12 @@ export function Start() {
           <Button className="w-full" variant="secondary" onClick={() => fileInput.current?.click()}>
             Importar save de um arquivo
           </Button>
+          {onlineUnlockedHere() && account && !account.codeConfirmed && (
+            <button type="button" onClick={() => openOnline('code')} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-yellow-500/50 bg-yellow-500/10 px-4 py-2 text-left text-sm" data-testid="code-reminder">
+              <span>Guarde o seu código de recuperação: sem ele, trocar de aparelho faz perder a conta.</span>
+              <span className="flex-none font-bold text-yellow-300">Ver</span>
+            </button>
+          )}
           {onlineUnlockedHere() && (
           <Card title="Online">
             {account ? (
@@ -196,7 +202,7 @@ export function Start() {
                   Saves na nuvem{cloudStates.length > 0 ? ` (${cloudStates.filter((c) => c.enabled).length} de ${SLOT_COUNT})` : ''}
                 </Button>
                 <Button variant="secondary" onClick={() => openOnline('code')}>
-                  Código de recuperação{account.codeConfirmed ? '' : ' — anote!'}
+                  Código de recuperação
                 </Button>
                 <Button variant="secondary" onClick={() => openOnline('data')}>
                   Dados e conta
@@ -204,7 +210,7 @@ export function Start() {
               </div>
             ) : (
               <div className="flex flex-col gap-2" data-testid="online-no-account">
-                <p className="text-sm text-muted">Ligas entre jogadores e saves na nuvem. Sem e-mail e sem senha: a sua conta é um apelido e um código de 12 palavras que fica com você.</p>
+                <p className="text-sm text-muted">Ligas entre jogadores e saves na nuvem. Sem e-mail e sem senha: a sua conta é um apelido e um código de recuperação que fica com você.</p>
                 <Button onClick={() => openOnline('create')}>Criar minha conta online</Button>
                 <button type="button" className="min-h-12 text-sm text-muted underline" onClick={() => openOnline('recover')}>
                   Já tem uma conta? Entrar com o código de recuperação

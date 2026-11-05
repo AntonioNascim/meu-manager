@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { IdentityStore } from '../src/store/identityStore'
-import { parseRecoveryCode } from '../src/online/recoveryCode'
+import { formatRecoveryCode, parseRecoveryCode } from '../src/online/recoveryCode'
 import { Dexie } from 'dexie'
 
 function fakeRandom(start: number): (n: number) => Uint8Array {
@@ -31,7 +31,7 @@ describe('IdentityStore', () => {
     await store.adopt(made, 2000, 'Craque Ana')
     const loaded = await store.load()
     expect(loaded).toMatchObject({ nickname: 'Craque Ana', registered: true, codeConfirmed: false, createdAt: 2000 })
-    expect(loaded?.recoveryWords).toEqual(made.recoveryCode)
+    expect(loaded?.recoveryCode).toEqual(made.recoveryCode)
     await store.confirmCode()
     expect((await store.load())?.codeConfirmed).toBe(true)
   })
@@ -42,7 +42,7 @@ describe('IdentityStore', () => {
 
   it('cria, guarda e relê a mesma identidade, ainda não registrada', async () => {
     const made = await store.create(fakeRandom(1), 1000)
-    expect(made?.recoveryCode).toHaveLength(12)
+    expect(made?.recoveryCode).toHaveLength(20)
     const loaded = await store.load()
     expect(loaded?.identity.playerId).toBe(made?.identity.playerId)
     expect(loaded).toMatchObject({ createdAt: 1000, registered: false })
@@ -54,16 +54,16 @@ describe('IdentityStore', () => {
     expect((await store.load())?.identity.playerId).toBe(first?.identity.playerId)
   })
 
-  it('guarda as 12 palavras para ver de novo, sem confirmação até a pessoa confirmar', async () => {
+  it('guarda o código para ver de novo, sem confirmação até a pessoa confirmar', async () => {
     const made = await store.create(fakeRandom(4), 1)
     const loaded = await store.load()
-    expect(loaded?.recoveryWords).toEqual(made?.recoveryCode)
+    expect(loaded?.recoveryCode).toEqual(made?.recoveryCode)
     expect(loaded?.codeConfirmed).toBe(false)
     await store.confirmCode()
     expect((await store.load())?.codeConfirmed).toBe(true)
   })
 
-  it('ao apagar a identidade (apagar conta), as palavras vão junto', async () => {
+  it('ao apagar a identidade (apagar conta), o código vai junto', async () => {
     await store.create(fakeRandom(8), 1)
     await store.clear()
     const raw = new Dexie(NAME)
@@ -76,13 +76,13 @@ describe('IdentityStore', () => {
     const made = await store.create(fakeRandom(5), 1)
     await store.clear()
     expect(await store.load()).toBeUndefined()
-    const parsed = parseRecoveryCode(made!.recoveryCode.join(' '))
+    const parsed = parseRecoveryCode(formatRecoveryCode(made!.recoveryCode))
     expect(parsed.ok).toBe(true)
     if (parsed.ok) {
-      const back = await store.recover(parsed.words, 2)
+      const back = await store.recover(parsed.code, 2)
       expect(back.playerId).toBe(made!.identity.playerId)
       expect((await store.load())?.identity.playerId).toBe(made!.identity.playerId)
-      expect(await store.load()).toMatchObject({ codeConfirmed: true, recoveryWords: made!.recoveryCode })
+      expect(await store.load()).toMatchObject({ codeConfirmed: true, recoveryCode: made!.recoveryCode })
     }
   })
 
