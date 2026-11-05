@@ -6,6 +6,7 @@ import { simulateToSeasonEnd } from '../engine/season'
 import { advanceGame, createGame, playPendingAuto, startNextSeason, setUserTrainingPlan, squadOf, startUserIndividualTraining } from '../store/game'
 import { initPwa } from '../pwa/pwa'
 import { startAutosave } from '../store/autosave'
+import { flushCloud, loadAccount } from '../store/onlineAccount'
 import { setGame } from '../store/gameStore'
 import { beginLive } from '../store/liveMatch'
 import { loadWorld } from '../data/package/defaultPackage'
@@ -27,6 +28,15 @@ import type { Game } from '../store/game'
 //   &crise=1                  caixa pequeno e folha quatro vezes maior (mostra o alerta das finanças)
 //   &mundo=real                começa no mundo real (embutido); aí &time=fla acha o clube pela sigla ou por parte do nome
 //   &treino=intensa|leve       treino coletivo escolhido e a vaga individual ocupada (grupo físico, primeiro jogador de linha)
+/** Conta online e nuvem (Fase 6, B8): lê a conta do aparelho e envia o que está pendente quando a internet volta ou a aba vai para segundo plano. */
+function startOnline() {
+  void loadAccount()
+  window.addEventListener('online', flushCloud)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushCloud()
+  })
+}
+
 if (import.meta.env.DEV) {
   const params = new URLSearchParams(window.location.search)
   const team = params.get('time')
@@ -91,6 +101,7 @@ if (diagnostic) {
 } else {
   startAutosave()
   initPwa()
+  startOnline()
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

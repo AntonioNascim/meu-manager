@@ -25,6 +25,17 @@ beforeEach(async () => {
 afterAll(() => store.close())
 
 describe('IdentityStore', () => {
+  it('adota uma identidade que o servidor já aceitou (B8.1): registrada, com apelido e o código ainda por confirmar', async () => {
+    const { createIdentity } = await import('../src/online/identity')
+    const made = createIdentity(fakeRandom(9))
+    await store.adopt(made, 2000, 'Craque Ana')
+    const loaded = await store.load()
+    expect(loaded).toMatchObject({ nickname: 'Craque Ana', registered: true, codeConfirmed: false, createdAt: 2000 })
+    expect(loaded?.recoveryWords).toEqual(made.recoveryCode)
+    await store.confirmCode()
+    expect((await store.load())?.codeConfirmed).toBe(true)
+  })
+
   it('começa vazio', async () => {
     expect(await store.load()).toBeUndefined()
   })

@@ -701,3 +701,22 @@ Motivos: (1) no Bem rápido o intervalo mínimo entre eventos é de 6 h e cada d
 
 ### Fica para a B8 e a B9
 Rotas públicas e autenticação do WebSocket (a assinatura do pedido não vai no cabeçalho do navegador: usar um código de uso único pedido por uma rota assinada), tela da sala ao vivo, "Pronto" pela interface, aviso de privacidade; B9: limite final de pedidos e a medição da memória do objeto com a liga cheia (a seção 16 avisa que a folga é de ~2×; as partidas ao vivo mantêm o motor em memória, ~1 MB por partida, e podem ser reconstruídas do registro se for preciso).
+
+---
+
+## 20. Andamento da B8.1 e da B8.2 (05/11/2026): conta online, código de recuperação e saves na nuvem
+
+Telas aprovadas em `docs/mockups/b8-1-2` (capturas em `.shots/b8-1-2-*.png`); as telas prontas estão em `.shots/b8-1-2-pronta-*.png`.
+
+**O que existe.**
+- **Servidor:** `PUT /api/me` troca o apelido (`changeNickname` em `identityApi.ts`, `setNickname` nos dois armazenamentos), com o mesmo filtro do cadastro e sem gastar o Turnstile. **Precisa de `wrangler deploy` para valer na nuvem** (o Worker publicado ainda não tem a rota; nenhuma migração de banco).
+- **Cliente:** `src/online/identityClient.ts` (cadastro, volta com o código, troca de apelido, puro), `src/store/onlineAccount.ts` (a conta do aparelho + `CloudSync`/`CloudScheduler` num lugar só, `useAccount`, `createAccount`, `recoverAccount`, `changeNickname`, `deleteAccount`, `onSlotSaved`), `IdentityStore.adopt` (a conta só é gravada no aparelho depois de o servidor aceitar: falha de rede não deixa conta "meio criada").
+- **Ligação com o jogo:** o salvamento automático chama `onSlotSaved(slot)` (agenda o envio, 2 min entre envios); a internet voltando ou a aba indo para segundo plano chama `flushCloud`. Sem conta, nada disso faz nada.
+- **Telas** (`src/ui/screens/online/`): `CreateAccount` (apelido com o filtro na hora + Turnstile, depois o código com a conferência de 3 palavras), `RecoverAccount`, `RecoveryCodeView` (agora esconde sozinho em 30 s), `CloudSaves` (um cartão por espaço, interruptor, estado, "Enviar agora", "Baixar para este aparelho" para o que só existe na nuvem, janela de ligar, janela de conflito com as três saídas), `AccountData` (trocar apelido, ver código, exportar meus dados, apagar a conta digitando o apelido). Entrada pelo cartão "Online" do menu inicial; atalhos de desenvolvimento `/?menu=criar|entrar|nuvem|dados|codigo`.
+- **Os três itens que faltavam:** trocar apelido (rota nova + tela), esconder o código em 30 s (tela) e "Guardar as duas" (já existia em `CloudSync.resolve('both')` e tinha teste; a tela trata o caso "sem espaço livre").
+
+**Diferenças em relação aos mockups.** O cartão do menu não tem "Minhas ligas" (a função só existe na 8.3; não se cria botão para o que não existe). Na janela de conflito as linhas são Time, Temporada, No jogo (data do jogo) e Salvo (rodada e posição não fazem parte do resumo do save). A tela da nuvem ganhou o cartão "Só na nuvem" com "Baixar para este aparelho", necessário para quem entra num aparelho novo.
+
+**Teste de ponta a ponta, sem custo:** `tools/online-lab/b8-e2e.mjs` (Playwright, 380 px) contra o servidor local (`wrangler dev --local` em `server/`, chave de teste do Turnstile em `server/.dev.vars`) e o Vite com `VITE_API_BASE=http://127.0.0.1:8787 VITE_TURNSTILE_BYPASS=1` (os dois só valem em `npm run dev`). Dois aparelhos = dois contextos do navegador. 27 verificações passam: criar conta, apelido ofensivo, código e conferência, rever o código e o esconder em 30 s, ligar a nuvem, entrar em outro aparelho com o código (maiúsculas e vírgulas), baixar o save, conflito real entre dois aparelhos e "Guardar as duas", trocar apelido (inclusive recusado), exportar, apagar a conta (os saves do aparelho ficam) e a conta sumindo do servidor. **O limite de apagar conta (3 por dia por IP) aparece nos testes locais depois de 3 execuções seguidas:** apague `server/.wrangler/state/v3/do` com o servidor parado.
+
+**Observação do filtro de apelidos:** "bundão" passa (só "bunda" está na lista, e a regra é por palavra inteira). Ampliar a lista é decisão de moderação (B9).

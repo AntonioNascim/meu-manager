@@ -16,8 +16,15 @@ import type { ChosenPackage } from './ImportPackage'
 import { Credits } from './Credits'
 import { NewGame } from './NewGame'
 import { Editor } from './editor/Editor'
+import { OnlineArea } from './online/OnlineArea'
+import type { OnlineView } from './online/OnlineArea'
+import { cloudState, useAccount } from '../../store/onlineAccount'
+import type { CloudSlotState } from '../../store/cloudState'
 
-type View = 'menu' | 'new' | 'load' | 'package' | 'editor' | 'credits'
+type View = 'menu' | 'new' | 'load' | 'package' | 'editor' | 'credits' | 'online'
+
+/** Atalhos de desenvolvimento: `/?menu=criar|entrar|nuvem|dados|codigo` abre a tela da conta online. */
+const DEV_ONLINE: Record<string, OnlineView> = { criar: 'create', entrar: 'recover', nuvem: 'cloud', dados: 'data', codigo: 'code' }
 
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
@@ -26,8 +33,22 @@ export function Start() {
     if (!import.meta.env.DEV || typeof window === 'undefined') return 'menu'
     const params = new URLSearchParams(window.location.search)
     if (params.get('editor')) return 'editor'
+    if (DEV_ONLINE[params.get('menu') ?? '']) return 'online'
     return params.get('menu') === 'novo' ? 'new' : params.get('menu') === 'creditos' ? 'credits' : 'menu'
   })
+  const [onlineStart, setOnlineStart] = useState<OnlineView>(() => {
+    if (!import.meta.env.DEV || typeof window === 'undefined') return 'create'
+    return DEV_ONLINE[new URLSearchParams(window.location.search).get('menu') ?? ''] ?? 'create'
+  })
+  const { account } = useAccount()
+  const [cloudStates, setCloudStates] = useState<CloudSlotState[]>([])
+  useEffect(() => {
+    if (account && view === 'menu') void cloudState.all().then(setCloudStates)
+  }, [account, view])
+  const openOnline = (to: OnlineView) => {
+    setOnlineStart(to)
+    setView('online')
+  }
   const [slots, setSlots] = useState<(SaveSummary | null)[] | null>(null)
   const [latest, setLatest] = useState<SaveSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -111,6 +132,7 @@ export function Start() {
 
   if (view === 'new') return <NewGame slots={slots} {...(dataPackage ? { dataPackage } : {})} onBack={() => { setDataPackage(undefined); setView('menu'); void refresh() }} />
   if (view === 'credits') return <Credits onBack={() => setView('menu')} />
+  if (view === 'online') return <OnlineArea start={onlineStart} onClose={() => { setView('menu'); void refresh() }} />
   if (view === 'editor') return <Editor onBack={() => setView('menu')} onPlay={(chosen) => { setDataPackage(chosen); setView('new') }} />
   if (view === 'package') return <ImportPackage onBack={() => setView('menu')} onUse={(chosen) => { setDataPackage(chosen); setView('new') }} />
 
@@ -131,6 +153,7 @@ export function Start() {
             <Card title="Continuar">
               <div className="flex items-center gap-3">
                 <SlotInfo summary={latest} />
+                {cloudStates[latest.slot - 1]?.enabled && <span className="rounded-full border border-win/50 px-2.5 py-1 text-[11px] font-bold text-win">Na nuvem</span>}
               </div>
               <Button className="mt-3 w-full" disabled={busy} onClick={() => void open(latest.slot)}>
                 Continuar
@@ -152,6 +175,31 @@ export function Start() {
           <Button className="w-full" variant="secondary" onClick={() => fileInput.current?.click()}>
             Importar save de um arquivo
           </Button>
+          <Card title="Online">
+            {account ? (
+              <div className="flex flex-col gap-2" data-testid="online-account">
+                <p className="font-semibold">{account.nickname ?? 'Conta online'}</p>
+                <p className="text-xs text-muted">Conta online · criada em {new Date(account.createdAt).toLocaleDateString('pt-BR')}</p>
+                <Button variant="secondary" onClick={() => openOnline('cloud')}>
+                  Saves na nuvem{cloudStates.length > 0 ? ` (${cloudStates.filter((c) => c.enabled).length} de ${SLOT_COUNT})` : ''}
+                </Button>
+                <Button variant="secondary" onClick={() => openOnline('code')}>
+                  Código de recuperação{account.codeConfirmed ? '' : ' — anote!'}
+                </Button>
+                <Button variant="secondary" onClick={() => openOnline('data')}>
+                  Dados e conta
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2" data-testid="online-no-account">
+                <p className="text-sm text-muted">Saves na nuvem e, em breve, ligas entre jogadores. Sem e-mail e sem senha: a sua conta é um apelido e um código de 12 palavras que fica com você.</p>
+                <Button onClick={() => openOnline('create')}>Criar minha conta online</Button>
+                <button type="button" className="min-h-12 text-sm text-muted underline" onClick={() => openOnline('recover')}>
+                  Já tem uma conta? Entrar com o código de recuperação
+                </button>
+              </div>
+            )}
+          </Card>
           <Button className="w-full" variant="secondary" onClick={() => setView('credits')}>
             Créditos e avisos
           </Button>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { checkConfirmation, RECOVERY_WORDS } from '../../../online/recoveryCode'
 import { Button, Card } from '../../components/ui'
 
@@ -103,8 +103,17 @@ export function RecoveryCodeSetup({ words, positions, onConfirmed }: { words: re
  * Pelo menu, depois: o código só aparece depois de um toque (para não ficar à vista de quem olha a tela), com o mesmo aviso.
  * Só existe enquanto o aparelho tem a identidade; sem ela, o menu não oferece este item.
  */
+/** Quanto tempo o código fica visível antes de se esconder sozinho. */
+export const CODE_VISIBLE_MS = 30_000
+
 export function RecoveryCodeView({ words, onBack }: { words: readonly string[]; onBack: () => void }) {
   const [shown, setShown] = useState(false)
+  // Some sozinho depois de 30 s (ou ao sair da tela), para não ficar à vista de quem olha.
+  useEffect(() => {
+    if (!shown) return
+    const t = setTimeout(() => setShown(false), CODE_VISIBLE_MS)
+    return () => clearTimeout(t)
+  }, [shown])
   return (
     <div className="flex flex-col gap-4" data-testid="recovery-view">
       <div className="flex items-center justify-between">
@@ -119,8 +128,9 @@ export function RecoveryCodeView({ words, onBack }: { words: readonly string[]; 
           <Card title="Suas 12 palavras, em ordem">
             <Words words={words} />
           </Card>
+          <p className="text-center text-xs text-muted">Esconde sozinho em 30 segundos.</p>
           <Button variant="secondary" onClick={() => setShown(false)}>
-            Esconder
+            Esconder agora
           </Button>
         </>
       ) : (

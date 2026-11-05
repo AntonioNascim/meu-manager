@@ -482,3 +482,23 @@ export const RECOVERY_ERROR_LABELS: Record<RecoveryError, string> = {
 
 /** Apelido pronto de quem ainda não escolheu. */
 export const anonymousNicknameLabel = (n: number): string => `Técnico ${n}`
+
+/** Por que o cadastro ou a troca de apelido não deu certo (fora o filtro do apelido, que tem `NAME_ISSUE_LABELS`). */
+export const ACCOUNT_REASON_LABELS: Record<'turnstile-failed' | 'rate-limited' | 'offline' | 'unauthorized' | 'server' | 'unknown-identity', string> = {
+  'turnstile-failed': 'A verificação de que você é uma pessoa não passou. Tente de novo.',
+  'rate-limited': 'Muitas tentativas seguidas. Espere um pouco e tente de novo.',
+  offline: 'Sem conexão com o servidor. Confira a internet e tente de novo.',
+  unauthorized: 'O servidor recusou o pedido. Confira a data e a hora do aparelho.',
+  server: 'O servidor está com problema agora. Tente de novo daqui a pouco.',
+  'unknown-identity': 'Esta conta ainda não existe no servidor.',
+}
+
+/** Estado da nuvem de um espaço de save. */
+export const CLOUD_STATUS_LABELS: Record<import('../store/cloudState').CloudStatus, string> = {
+  synced: 'Sincronizado',
+  pending: 'Envio pendente',
+  syncing: 'Enviando…',
+  offline: 'Sem conexão',
+  conflict: 'Conflito',
+  error: 'Erro no envio',
+}
