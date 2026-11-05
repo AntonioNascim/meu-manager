@@ -8,6 +8,7 @@
  * suspensões, forma e moral).
  */
 import { collectGate, matchAttendance, monthStartsBetween, settleMonth } from '../finance'
+import { isProtected, type TeamRef } from '../teamRef'
 import { lineupForeign } from '../foreign'
 import { buildTactic, repairTactic } from '../lineup'
 import { expireOffers, nextMarketEvent, refreshListings, resolveDueOffers, runMarketTick, runPreContractTick } from '../market'
@@ -82,10 +83,10 @@ export function playMatch(match: Match, home: { team: Team; players: readonly Pl
 }
 
 /** Fechamento financeiro dos meses que começam no intervalo (de, até]; os clubes da IA reinvestem o excesso. */
-function settleMonths(teams: readonly Team[], squads: Map<TeamId, Player[]>, from: IsoDate, to: IsoDate, userTeamId?: TeamId): Team[] {
+function settleMonths(teams: readonly Team[], squads: Map<TeamId, Player[]>, from: IsoDate, to: IsoDate, userTeamId?: TeamRef): Team[] {
   let current = [...teams]
   for (const month of monthStartsBetween(from, to)) {
-    current = current.map((t) => settleMonth(t, squads.get(t.id) ?? [], month, t.id !== userTeamId))
+    current = current.map((t) => settleMonth(t, squads.get(t.id) ?? [], month, !isProtected(userTeamId, t.id)))
   }
   return current
 }
@@ -105,6 +106,12 @@ export interface AdvanceOptions {
    * virariam para sempre.
    */
   turn?: TurnRunner
+  /**
+   * Técnicos humanos de uma liga online (Fase 6, B6). Com ela o mundo muda de fidelidade **por partida**: as partidas de clubes humanos não são simuladas
+   * aqui (ficam em `pendingHumanMatches`, para a liga jogá-las lance a lance) e **todas as outras** usam o resultado simplificado, em qualquer competição.
+   * A IA não mexe nesses clubes (mercado, contratos que vencem, treino). Sem ela, o avanço é o de sempre (carreira solo).
+   */
+  humanTeamIds?: readonly TeamId[]
 }
 
 export type TurnRunner = (state: SeasonState, pyramid: string) => { state: SeasonState; report: OffseasonReport }
@@ -120,18 +127,27 @@ export interface AdvanceResult {
   notices: MarketNotice[]
   /** Países da IA que viraram a temporada neste avanço. */
   turned?: TurnRecord[]
+  /** Partidas de clubes humanos neste dia (só com `humanTeamIds`), ainda por jogar: o avanço seguinte só vale depois de registrá-las (`completeMatch`). */
+  pendingHumanMatches?: Match[]
+}
+
+/** Quem a IA não pode tocar neste avanço: o clube do jogador (solo), ou o conjunto de clubes humanos (liga online) mais o do jogador, se houver. */
+function protectedOf(options: AdvanceOptions): TeamRef | undefined {
+  if (!options.humanTeamIds) return options.userTeamId
+  return new Set([...options.humanTeamIds, ...(options.userTeamId ? [options.userTeamId] : [])])
 }
 
 /** Passa os dias até `date`: recuperação, fechamento dos meses e, se for dia de negociação, o mercado. */
 function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, marketEvent: MarketEvent | undefined): { state: SeasonState; notices: MarketNotice[] } {
   const days = daysBetween(state.season.currentDate, date)
+  const guarded = protectedOf(options)
   // Quem faz anos nesses dias envelhece um ano (idade, declínio e ruído dos atributos).
   const players = applyBirthdays(progressDays(state.players, days, (teamId) => fitnessProfile(state.training, teamId, days)), state.season.currentDate, date, state.market.seed) as Player[]
   const squads = groupByTeam(players)
-  const teams = settleMonths(state.teams, squads, state.season.currentDate, date, options.userTeamId)
-  let current: SeasonState = applyTraining({ ...state, players, teams, season: { ...state.season, currentDate: date } }, state.season.currentDate, date, options.userTeamId)
+  const teams = settleMonths(state.teams, squads, state.season.currentDate, date, guarded)
+  let current: SeasonState = applyTraining({ ...state, players, teams, season: { ...state.season, currentDate: date } }, state.season.currentDate, date, guarded)
   // Contratos que terminam nestes dias (no meio da temporada) acabam na data deles.
-  const due = settleDueContracts(current, state.season.currentDate, date, options.userTeamId)
+  const due = settleDueContracts(current, state.season.currentDate, date, guarded)
   current = due.state
   const notices: MarketNotice[] = [...due.notices]
   if (!options.market) return { state: current, notices }
@@ -144,16 +160,16 @@ function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, ma
     current = answered.state
     for (const o of answered.decided) notices.push({ type: 'offer-answered', offerId: o.id })
     if (marketEvent.tick) {
-      const tick = runMarketTick(current, date, options.userTeamId)
+      const tick = runMarketTick(current, date, guarded)
       current = tick.state
       for (const o of tick.incoming) notices.push({ type: 'offer-received', offerId: o.id })
     }
     if (marketEvent.preContract) {
-      const pre = runPreContractTick(current, date, options.userTeamId)
+      const pre = runPreContractTick(current, date, guarded)
       current = pre.state
       for (const c of pre.lost) notices.push({ type: 'pre-contract-lost', playerId: c.playerId, teamId: c.toTeamId })
     }
-    if (marketEvent.opens.length > 0 || marketEvent.tick) current = refreshListings(current, date, options.userTeamId)
+    if (marketEvent.opens.length > 0 || marketEvent.tick) current = refreshListings(current, date, guarded)
     current = { ...current, market: { ...current.market, handled: date } }
   }
   return { state: current, notices }
@@ -230,7 +246,7 @@ export function advanceUntil(state: SeasonState, date: IsoDate, options: Advance
     current = step.state
     for (const t of step.turned ?? []) turned.push(t)
     for (const n of step.notices) notices.push(n)
-    if (step.pendingUserMatch) return { ...step, played: [], notices, turned }
+    if (step.pendingUserMatch || (step.pendingHumanMatches?.length ?? 0) > 0) return { ...step, played: [], notices, turned }
   }
   // Os países da IA que chegaram ao último dia exatamente em `date` viram agora.
   const due = runDueTurns(current, options)
@@ -271,7 +287,7 @@ function stepWorld(state: SeasonState, options: AdvanceOptions, limit?: IsoDate)
       const day = playMatchday(current, date, options, notices)
       current = day.state
       
-      if (limit === undefined || day.pendingUserMatch) return { ...day, ...(turned.length > 0 ? { turned } : {}) }
+      if (limit === undefined || day.pendingUserMatch || (day.pendingHumanMatches?.length ?? 0) > 0) return { ...day, ...(turned.length > 0 ? { turned } : {}) }
       if (current.season.currentDate >= limit) return { state: current, event: day.event, played: [], notices, ...(turned.length > 0 ? { turned } : {}) }
       continue
     }
@@ -294,7 +310,9 @@ export function playMatchday(state: SeasonState, date: IsoDate, options: Advance
   const quickIds = quickCompetitionIds(state)
 
   const { userTeamId } = options
+  const humans = options.humanTeamIds ? new Set(options.humanTeamIds) : undefined
   let pendingUserMatch: Match | undefined
+  const pendingHuman: Match[] = []
   const played: Match[] = []
   const changed = new Map<PlayerId, Player>()
   const matches = state.matches.map((m) => {
@@ -308,13 +326,18 @@ export function playMatchday(state: SeasonState, date: IsoDate, options: Advance
       pendingUserMatch = m
       return m
     }
+    // Liga online: partida de clube humano não se simula aqui; a liga a joga lance a lance e a registra com `completeMatch`.
+    if (humans && (humans.has(m.homeTeamId) || humans.has(m.awayTeamId))) {
+      pendingHuman.push(m)
+      return m
+    }
     // Copa: suspensão e amarelos são os da copa, o mata-mata tem prorrogação e pênaltis e a final pode ser em campo neutro.
     const cup = m.cup ? state.cups?.find((c) => c.id === m.competitionId) : undefined
     const scope = cup ? cupScopeOf(cup) : undefined
     const homeView = cup ? cupView(homeSquad, cup.id) : homeSquad
     const awayView = cup ? cupView(awaySquad, cup.id) : awaySquad
     const rules = knockoutRulesFor(cup, m, state.matches)
-    const quick = allQuick || (m.cup ? cupMatchIsQuick(state, m) : quickIds.has(m.competitionId))
+    const quick = allQuick || humans !== undefined || (m.cup ? cupMatchIsQuick(state, m) : quickIds.has(m.competitionId))
     const finished = quick
       ? playQuickMatch(m, { team: home, players: homeView }, { team: away, players: awayView }, rules, m.cup?.neutral)
       : playMatch(m, { team: { ...home, tactic: aiTactic(home, homeView) }, players: homeView }, { team: { ...away, tactic: aiTactic(away, awayView) }, players: awayView }, rules, m.cup?.neutral)
@@ -334,6 +357,7 @@ export function playMatchday(state: SeasonState, date: IsoDate, options: Advance
     played,
     notices,
     ...(pendingUserMatch ? { pendingUserMatch } : {}),
+    ...(pendingHuman.length > 0 ? { pendingHumanMatches: pendingHuman } : {}),
   }
 }
 
@@ -365,6 +389,35 @@ export function userMatchInput(state: SeasonState, match: Match, userTeamId: Tea
     seed: match.seed,
     attendance: matchAttendance(teamOf(match.homeTeamId), teamOf(match.awayTeamId)),
     userControlled: { home: match.homeTeamId === userTeamId, away: match.awayTeamId === userTeamId },
+    ...(rules ? { knockout: rules } : {}),
+    ...(match.cup?.neutral ? { neutral: true } : {}),
+  }
+}
+
+/**
+ * Entrada de motor da partida de clubes humanos de uma liga online: a escalação de cada humano é a última que ele salvou (consertada para quem ficou
+ * indisponível), o clube sem técnico humano usa a escalação da IA, e a IA do motor não mexe nos times humanos (`userControlled`). Quem não está
+ * conectado pode entrar em `aiControlled`: a IA completa assume o time (Fase 6, B7).
+ */
+export function humanMatchInput(state: SeasonState, match: Match, humanTeamIds: ReadonlySet<TeamId>, aiControlled: ReadonlySet<TeamId> = new Set()): MatchInput {
+  const squads = groupByTeam(state.players)
+  const teamOf = (id: TeamId) => state.teams.find((t) => t.id === id) as Team
+  const cup = match.cup ? state.cups?.find((c) => c.id === match.competitionId) : undefined
+  const rules = knockoutRulesFor(cup, match, state.matches)
+  const human = (id: TeamId) => humanTeamIds.has(id)
+  const side = (id: TeamId) => {
+    const team = teamOf(id)
+    const squad = cup ? cupView(squads.get(id) ?? [], cup.id) : (squads.get(id) ?? [])
+    const tactic = human(id) ? repairTactic(team.tactic, squad, lineupForeign(team)) : aiTactic(team, squad)
+    return { team: { ...team, tactic }, players: squad }
+  }
+  const controlled = (id: TeamId) => human(id) && !aiControlled.has(id)
+  return {
+    home: side(match.homeTeamId),
+    away: side(match.awayTeamId),
+    seed: match.seed,
+    attendance: matchAttendance(teamOf(match.homeTeamId), teamOf(match.awayTeamId)),
+    userControlled: { home: controlled(match.homeTeamId), away: controlled(match.awayTeamId) },
     ...(rules ? { knockout: rules } : {}),
     ...(match.cup?.neutral ? { neutral: true } : {}),
   }

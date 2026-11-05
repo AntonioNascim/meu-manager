@@ -1,0 +1,23 @@
+{
+  "ficticio-ligas": {
+    "start": "7add535ecbb6450ecc656b56",
+    "afterDays": "b72d23023921bca147572e4b",
+    "endOfSeason": "7f6d0efaafffed83e2f4d550",
+    "afterTurn": "d8b5e065b26553a6077b8b85",
+    "nextSeason": "f78c81b8f2e192a39ac8ff50"
+  },
+  "ficticio-ligas-b": {
+    "start": "e90efcd80fa19245ae31abc5",
+    "afterDays": "d4584ee83a967870b1e98a8e",
+    "endOfSeason": "be4fb37d15a448dc1e98a91a",
+    "afterTurn": "b9b1e53471722bad530b1e90",
+    "nextSeason": "3e94b3e9bba331ed9cb0e979"
+  },
+  "ficticio-copas": {
+    "start": "7bdddc44beb1349f9d7246c6",
+    "afterDays": "0286e5a170f7fae55f80b4d0",
+    "endOfSeason": "03101f9fad2ecd0dcdd730e6",
+    "afterTurn": "b904c0813179a520cd37c108",
+    "nextSeason": "de86176b4c989ae87d58f151"
+  }
+}

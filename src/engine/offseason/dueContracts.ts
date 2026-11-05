@@ -5,6 +5,7 @@
  * resolvidos na virada, junto com o resto do fim de temporada.
  */
 import { applyPreContracts } from '../market/precontract'
+import { isProtected, type TeamRef } from '../teamRef'
 import { createRng } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { cycleOfTeam } from '../season/cycles'
@@ -28,7 +29,7 @@ export interface DueContractsResult {
 const endsBetween = (state: SeasonState, from: IsoDate, to: IsoDate) => (p: Player) =>
   p.teamId !== null && !p.contract.loanedFrom && p.contract.endDate > from && p.contract.endDate <= to && p.contract.endDate < cycleOfTeam(state, p.teamId).end
 
-export function settleDueContracts(state: SeasonState, from: IsoDate, to: IsoDate, userTeamId?: TeamId): DueContractsResult {
+export function settleDueContracts(state: SeasonState, from: IsoDate, to: IsoDate, userTeamId?: TeamRef): DueContractsResult {
   const due = endsBetween(state, from, to)
   const nothing: DueContractsResult = { state, notices: [], moved: [], freed: [], renewed: 0 }
   if (to <= from || !state.players.some(due)) return nothing
@@ -56,6 +57,6 @@ export function settleDueContracts(state: SeasonState, from: IsoDate, to: IsoDat
     listings: state.market.listings.filter((l) => !gone.has(l.playerId)),
     history: [...state.market.history, ...pre.applied.map((a) => ({ date: to, playerId: a.playerId, fromTeamId: a.fromTeamId, toTeamId: a.toTeamId, kind: 'purchase' as const, fee: 0 }))],
   }
-  const notices: MarketNotice[] = expired.released.filter((r) => r.teamId === userTeamId).map((r) => ({ type: 'contract-ended', playerId: r.playerId }))
+  const notices: MarketNotice[] = expired.released.filter((r) => isProtected(userTeamId, r.teamId)).map((r) => ({ type: 'contract-ended', playerId: r.playerId }))
   return { state: { ...state, players: expired.players, teams, market }, notices, moved: [...movedIds], freed: [...freedIds], renewed: expired.renewed }
 }
