@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Mockups B8.1 e B8.2 — identidade, código de recuperação e saves na nuvem</title>
+<style>
+@font-face { font-family: Inter; font-weight: 400; src: url(../../../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2); }
+@font-face { font-family: Inter; font-weight: 700; src: url(../../../node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2); }
+@font-face { font-family: Barlow; font-weight: 800; src: url(../../../node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-800-normal.woff2); }
+:root { --bg:#080b14; --surface:#121828; --surface2:#1a2136; --line:#262e47; --muted:#8b94b0; --accent:#d4ff2e; --ink:#11160a; --win:#9cf27a; --loss:#f5766b; --warn:#f5c04b; }
+* { box-sizing: border-box; }
+body { margin:0; background:#000; color:#e8ebf5; font:14px/1.45 Inter, system-ui, sans-serif; padding:20px; display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start; }
+.phone { width:380px; background:var(--bg); padding:16px; display:flex; flex-direction:column; gap:14px; min-height:560px; position:relative; }
+h1 { font:800 30px/1 Barlow, 'Arial Narrow', sans-serif; text-transform:uppercase; margin:0; letter-spacing:.3px; }
+h2 { font:800 20px/1 Barlow, 'Arial Narrow', sans-serif; text-transform:uppercase; margin:0; }
+.eyebrow { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+.card { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+.row { display:flex; align-items:center; gap:10px; }
+.grow { flex:1; min-width:0; }
+.muted { color:var(--muted); }
+.small { font-size:12px; }
+.btn { min-height:48px; border-radius:14px; border:1px solid var(--line); background:var(--surface2); color:#e8ebf5; font:700 15px Inter; display:flex; align-items:center; justify-content:center; text-align:center; padding:0 14px; }
+.btn.primary { background:var(--accent); color:var(--ink); border-color:var(--accent); }
+.btn.danger { background:transparent; color:var(--loss); border-color:var(--loss); }
+.btn.ghost { background:transparent; }
+.badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; border:1px solid var(--line); white-space:nowrap; }
+.badge.ok { color:var(--win); border-color:#3d6b2c; } .badge.wait { color:var(--warn); border-color:#6b5420; } .badge.off { color:var(--muted); } .badge.bad { color:var(--loss); border-color:#7a3a34; }
+.dot { width:8px; height:8px; border-radius:50%; background:currentColor; display:inline-block; }
+.input { min-height:52px; border-radius:14px; background:var(--surface2); border:1px solid var(--line); padding:0 14px; display:flex; align-items:center; font-size:17px; font-weight:600; }
+.input.err { border-color:var(--loss); } .input.good { border-color:var(--win); }
+.alert { border:1px solid var(--loss); background:rgba(245,118,107,.1); border-radius:16px; padding:14px; }
+.alert.warn { border-color:var(--warn); background:rgba(245,192,75,.08); }
+.alert b.t { color:var(--loss); } .alert.warn b.t { color:var(--warn); }
+.words { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0; padding:0; list-style:none; }
+.words li { min-height:48px; display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--line); border-radius:12px; padding:0 12px; font-weight:700; }
+.words li span { color:var(--muted); font-size:12px; font-weight:400; width:18px; text-align:right; }
+.nav { margin-top:auto; display:flex; justify-content:space-around; border-top:1px solid var(--line); padding-top:10px; color:var(--muted); font-size:11px; }
+.sheet { position:absolute; left:0; right:0; bottom:0; background:var(--surface); border-top:1px solid var(--line); border-radius:22px 22px 0 0; padding:16px; display:flex; flex-direction:column; gap:12px; box-shadow:0 -20px 40px rgba(0,0,0,.6); }
+.scrim { position:absolute; inset:0; background:rgba(0,0,0,.55); }
+.grip { width:44px; height:4px; background:var(--line); border-radius:4px; align-self:center; }
+.bar { height:8px; background:var(--surface2); border-radius:8px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--accent); }
+.toggle { width:46px; height:28px; border-radius:20px; background:var(--accent); position:relative; flex:none; } .toggle::after { content:''; position:absolute; right:3px; top:3px; width:22px; height:22px; border-radius:50%; background:var(--ink); }
+.toggle.off { background:var(--surface2); border:1px solid var(--line); } .toggle.off::after { right:auto; left:3px; background:var(--muted); }
+.crest { width:38px; height:38px; border-radius:10px; flex:none; display:grid; place-items:center; font:800 14px Barlow; color:#fff; }
+.tag { position:absolute; top:-1px; right:0; font-size:10px; color:#000; background:#fff8; padding:1px 6px; }
+.compare { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.compare .card { gap:6px; } .compare .card.pick { border-color:var(--accent); }
+.kv { display:flex; justify-content:space-between; font-size:13px; } .kv span:first-child { color:var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- 01 -->
+<section class="phone" id="s01">
+  <div><div class="eyebrow">Jogo de técnico de futebol</div><h1>Meu Manager</h1></div>
+  <div class="card"><div class="eyebrow">Continuar</div>
+    <div class="row"><div class="crest" style="background:#b3202a">FLA</div><div class="grow"><b>Flamengo</b><div class="small muted">Temporada 2026 · rodada 14 · 3º lugar</div></div></div>
+    <div class="btn primary">Continuar carreira</div></div>
+  <div class="row"><div class="btn grow">Novo jogo</div><div class="btn grow">Carregar</div></div>
+  <div class="card" style="border-style:dashed">
+    <div class="eyebrow">Online</div>
+    <h2>Jogue com outras pessoas</h2>
+    <div class="muted small">Ligas entre jogadores e saves na nuvem. Sem e-mail e sem senha: a sua conta é um apelido e um código de 12 palavras que fica com você.</div>
+    <div class="btn primary">Criar minha conta online</div>
+    <div class="small muted" style="text-align:center">Já tem uma conta? <u>Entrar com o código de recuperação</u></div>
+  </div>
+  <div class="row small muted" style="justify-content:center;gap:18px"><span>Editor</span><span>Pacote de dados</span><span>Créditos</span></div>
+</section>
+
+<!-- 02 -->
+<section class="phone" id="s02">
+  <div><div class="eyebrow">Jogo de técnico de futebol</div><h1>Meu Manager</h1></div>
+  <div class="card"><div class="eyebrow">Continuar</div>
+    <div class="row"><div class="crest" style="background:#b3202a">FLA</div><div class="grow"><b>Flamengo</b><div class="small muted">Temporada 2026 · rodada 14 · 3º lugar</div></div><span class="badge ok"><i class="dot"></i>Na nuvem</span></div>
+    <div class="btn primary">Continuar carreira</div></div>
+  <div class="row"><div class="btn grow">Novo jogo</div><div class="btn grow">Carregar</div></div>
+  <div class="card">
+    <div class="row"><div class="crest" style="background:#2f3857">CA</div><div class="grow"><b>Craque_Ana</b><div class="small muted">Conta online · criada em 02/11/2026</div></div></div>
+    <div class="btn ghost" style="justify-content:space-between">Minhas ligas <span class="muted">0</span></div>
+    <div class="btn ghost" style="justify-content:space-between">Saves na nuvem <span class="badge ok"><i class="dot"></i>2 de 3</span></div>
+    <div class="btn ghost" style="justify-content:space-between">Código de recuperação <span class="badge wait">anote!</span></div>
+    <div class="btn ghost">Dados e conta</div>
+  </div>
+  <div class="row small muted" style="justify-content:center;gap:18px"><span>Editor</span><span>Pacote de dados</span><span>Créditos</span></div>
+</section>
+
+<!-- 03 -->
+<section class="phone" id="s03">
+  <div class="eyebrow">Passo 1 de 2 · Conta online</div>
+  <h1>Escolha seu apelido</h1>
+  <div class="muted">É o nome que os outros técnicos veem nas ligas. Você pode trocar depois.</div>
+  <div><div class="eyebrow" style="margin-bottom:6px">Apelido</div><div class="input err">Fulano_Bundao</div>
+    <div class="small" style="color:var(--loss);margin-top:6px">Esse apelido não é permitido: contém uma palavra ofensiva. Escolha outro.</div></div>
+  <div><div class="eyebrow" style="margin-bottom:6px">Exemplo de apelido aceito</div><div class="input good">Craque_Ana<span style="margin-left:auto;color:var(--win)">✓</span></div></div>
+  <div class="card small"><b>Regras</b>
+    <div class="muted">• 3 a 16 caracteres: letras, números, espaço, ponto, hífen e sublinhado<br>• Sem links, telefone, palavrões ou nomes que imitam o jogo<br>• Pode repetir o apelido de outra pessoa: o que identifica você é o seu código</div></div>
+  <div class="small muted">Vamos conferir que você é uma pessoa (uma checagem rápida, sem quebra-cabeça).</div>
+  <div class="btn primary" style="margin-top:auto">Continuar</div>
+  <div class="btn ghost">Cancelar</div>
+</section>
+
+<!-- 04 -->
+<section class="phone" id="s04">
+  <div class="eyebrow">Passo 2 de 2 · Conta online</div>
+  <h1>Seu código de recuperação</h1>
+  <div class="alert"><b class="t">Anote estas 12 palavras agora.</b>
+    <p style="margin:8px 0 0"><b>Sem elas, quem perder o celular, limpar os dados do navegador ou trocar de aparelho perde a carreira salva na nuvem e o acesso às ligas online.</b> Nós não guardamos este código e não conseguimos recuperá-lo.</p>
+    <p class="muted" style="margin:8px 0 0">Quem tiver o código entra na sua conta. Guarde em papel, em lugar seguro, e não mostre nem envie para ninguém.</p></div>
+  <ol class="words">
+    <li><span>1</span>abrigo</li><li><span>2</span>cavalo</li><li><span>3</span>fronteira</li><li><span>4</span>lanterna</li>
+    <li><span>5</span>mosaico</li><li><span>6</span>navio</li><li><span>7</span>orquídea</li><li><span>8</span>pêssego</li>
+    <li><span>9</span>quintal</li><li><span>10</span>rochedo</li><li><span>11</span>saveiro</li><li><span>12</span>tapete</li></ol>
+  <div class="small muted">Palavras de exemplo — o código real é sorteado no seu aparelho.</div>
+  <div class="btn primary">Anotei — continuar</div>
+</section>
+
+<!-- 05 -->
+<section class="phone" id="s05">
+  <div class="eyebrow">Conferência</div>
+  <h1>Confirme o código</h1>
+  <div class="muted">Digite as palavras pedidas para provar que você anotou. Acentos e maiúsculas não importam.</div>
+  <div><div class="eyebrow" style="margin-bottom:6px">Palavra nº 3</div><div class="input good">fronteira<span style="margin-left:auto;color:var(--win)">✓</span></div></div>
+  <div><div class="eyebrow" style="margin-bottom:6px">Palavra nº 7</div><div class="input err">orquidea<span style="margin-left:auto;color:var(--loss)">✗</span></div>
+    <div class="small" style="color:var(--loss);margin-top:6px">Não confere. Veja de novo o papel.</div></div>
+  <div><div class="eyebrow" style="margin-bottom:6px">Palavra nº 11</div><div class="input" style="color:var(--muted)">digite aqui</div></div>
+  <div class="btn primary" style="margin-top:auto">Confirmar</div>
+  <div class="btn ghost">Voltar e ver as palavras</div>
+</section>
+
+<!-- 06 -->
+<section class="phone" id="s06">
+  <div class="row"><div class="grow"><div class="eyebrow">Conta online</div><h1>Código de recuperação</h1></div></div>
+  <div class="alert warn"><b class="t">Cuidado: quem vê estas palavras entra na sua conta.</b>
+    <p style="margin:6px 0 0" class="muted">Confira se ninguém está olhando a tela antes de mostrar.</p></div>
+  <ol class="words" style="filter:blur(7px);user-select:none">
+    <li><span>1</span>abrigo</li><li><span>2</span>cavalo</li><li><span>3</span>fronteira</li><li><span>4</span>lanterna</li>
+    <li><span>5</span>mosaico</li><li><span>6</span>navio</li><li><span>7</span>orquídea</li><li><span>8</span>pêssego</li>
+    <li><span>9</span>quintal</li><li><span>10</span>rochedo</li><li><span>11</span>saveiro</li><li><span>12</span>tapete</li></ol>
+  <div class="btn primary">Tocar para mostrar</div>
+  <div class="small muted" style="text-align:center">Fica visível por 30 segundos e esconde sozinho.</div>
+  <div class="btn ghost" style="margin-top:auto">Voltar</div>
+</section>
+
+<!-- 07 -->
+<section class="phone" id="s07">
+  <div class="eyebrow">Outro aparelho</div>
+  <h1>Entrar com o código</h1>
+  <div class="muted">Digite as 12 palavras da conta. Separe por espaço ou vírgula; acento e maiúscula não importam.</div>
+  <div class="input" style="min-height:130px;align-items:flex-start;padding-top:12px;font-weight:400;font-size:16px;line-height:1.5">abrigo cavalo fronteira lanterna mosaico navio orquidea pessego quintal rochedo saveiro <span style="border-left:2px solid var(--accent);margin-left:2px"></span></div>
+  <div class="row small"><span class="badge wait">11 de 12 palavras</span><span class="muted">falta 1</span></div>
+  <div class="card small"><b>O que acontece</b>
+    <div class="muted">• Sua conta e seus saves da nuvem voltam a este aparelho<br>• Os saves que já estão neste aparelho não são apagados<br>• Nada é enviado antes de você escolher quais espaços ligar à nuvem</div></div>
+  <div class="btn primary" style="opacity:.45;margin-top:auto">Entrar</div>
+  <div class="btn ghost">Cancelar</div>
+</section>
+
+<!-- 08 -->
+<section class="phone" id="s08">
+  <div class="row"><div class="grow"><div class="eyebrow">Conta online · Craque_Ana</div><h1>Saves na nuvem</h1></div></div>
+  <div class="small muted">A nuvem é uma cópia por espaço. O jogo continua rodando e salvando neste aparelho, mesmo sem internet.</div>
+  <div class="card">
+    <div class="row"><div class="crest" style="background:#b3202a">FLA</div><div class="grow"><b>Espaço 1 · Flamengo</b><div class="small muted">2026 · rodada 14 · enviado há 3 min</div></div><div class="toggle"></div></div>
+    <div class="row"><span class="badge ok"><i class="dot"></i>Sincronizado</span><span class="small muted">1,6 de 5 MB</span></div></div>
+  <div class="card">
+    <div class="row"><div class="crest" style="background:#1d5fa8">BOT</div><div class="grow"><b>Espaço 2 · Botafogo</b><div class="small muted">2027 · rodada 3 · alterado há 1 min</div></div><div class="toggle"></div></div>
+    <div class="row"><span class="badge wait"><i class="dot"></i>Envio pendente</span><span class="small muted">sem conexão, envia quando voltar</span></div></div>
+  <div class="card">
+    <div class="row"><div class="crest" style="background:#2f3857">—</div><div class="grow"><b>Espaço 3 · vazio</b><div class="small muted">Comece um jogo para usar este espaço</div></div><div class="toggle off"></div></div></div>
+  <div class="card small"><div class="row"><b class="grow">Uso da nuvem</b><span class="muted">3,3 MB</span></div>
+    <div class="bar"><i style="width:33%"></i></div><div class="muted">Cada espaço pode ter até 5 MB. Cópias antigas ficam 7 dias.</div></div>
+  <div class="btn ghost" style="margin-top:auto">Dados e conta</div>
+</section>
+
+<!-- 09 -->
+<section class="phone" id="s09" style="overflow:hidden">
+  <div class="row"><div class="grow"><div class="eyebrow">Conta online · Craque_Ana</div><h1>Saves na nuvem</h1></div></div>
+  <div class="card"><div class="row"><div class="crest" style="background:#b3202a">FLA</div><div class="grow"><b>Espaço 1 · Flamengo</b></div><div class="toggle off"></div></div></div>
+  <div class="card"><div class="row"><div class="crest" style="background:#1d5fa8">BOT</div><div class="grow"><b>Espaço 2 · Botafogo</b></div><div class="toggle off"></div></div></div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grip"></div>
+    <h2>Ligar o espaço 1 à nuvem?</h2>
+    <div class="small muted">Flamengo · temporada 2026 · rodada 14</div>
+    <div class="card small" style="background:var(--surface2)">
+      <div><b>O que sobe:</b> o seu save (elenco, finanças, tabela, histórico), comprimido, com cerca de <b>1,6 MB</b>.</div>
+      <div><b>Quando:</b> depois de cada jogo, com pelo menos 2 minutos entre envios, e só com internet.</div>
+      <div><b>Onde fica:</b> num armazenamento privado, só acessível com a sua conta. Não é público e não tem link.</div>
+      <div><b>Para sair:</b> desligue aqui ou apague a conta; o save do aparelho nunca é tocado.</div></div>
+    <div class="btn primary">Ligar e enviar agora</div>
+    <div class="btn ghost">Agora não</div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="phone" id="s10">
+  <div class="eyebrow">Espaço 1 · conflito</div>
+  <h1>Duas versões deste save</h1>
+  <div class="alert warn"><b class="t">Este espaço foi jogado em dois aparelhos.</b>
+    <p style="margin:6px 0 0" class="muted">O envio ficou parado para não perder nada. Escolha qual versão vale — o jogo não mistura as duas.</p></div>
+  <div class="compare">
+    <div class="card pick"><div class="eyebrow">Nesta tela</div><b>Flamengo</b>
+      <div class="kv"><span>Temporada</span><span>2026</span></div><div class="kv"><span>Rodada</span><span>16</span></div>
+      <div class="kv"><span>Posição</span><span>2º</span></div><div class="kv"><span>Jogado</span><span>hoje 21:10</span></div></div>
+    <div class="card"><div class="eyebrow">Na nuvem</div><b>Flamengo</b>
+      <div class="kv"><span>Temporada</span><span>2026</span></div><div class="kv"><span>Rodada</span><span>15</span></div>
+      <div class="kv"><span>Posição</span><span>3º</span></div><div class="kv"><span>Jogado</span><span>hoje 19:42</span></div><div class="small muted">em outro aparelho</div></div>
+  </div>
+  <div class="btn primary">Manter esta e enviar para a nuvem</div>
+  <div class="btn">Usar a da nuvem neste aparelho</div>
+  <div class="btn ghost">Guardar as duas (a da nuvem vai para o espaço 3)</div>
+  <div class="small muted">Antes de trocar, uma cópia do que sai fica guardada por 7 dias neste aparelho.</div>
+</section>
+
+<!-- 11 -->
+<section class="phone" id="s11">
+  <div class="eyebrow">Conta online · Craque_Ana</div>
+  <h1>Dados e conta</h1>
+  <div class="card"><b>Seu apelido</b><div class="input">Craque_Ana<span style="margin-left:auto;color:var(--muted);font-size:13px">Trocar</span></div>
+    <div class="small muted">ID da conta: 7Hq2…xK9a · criada em 02/11/2026</div></div>
+  <div class="card"><b>Exportar meus dados</b>
+    <div class="small muted">Baixa um arquivo com tudo o que o servidor guarda sobre você: apelido, saves da nuvem e ligas.</div>
+    <div class="btn">Baixar meus dados</div></div>
+  <div class="card"><b>Código de recuperação</b>
+    <div class="small muted">Só aparece quando você pedir. Não fica no servidor.</div>
+    <div class="btn">Ver o código</div></div>
+  <div class="card" style="border-color:#7a3a34"><b style="color:var(--loss)">Apagar minha conta</b>
+    <div class="small muted">Remove a conta, os saves da nuvem e a sua presença nas ligas. Os saves deste aparelho continuam.</div>
+    <div class="btn danger">Apagar minha conta…</div></div>
+</section>
+
+<!-- 12 -->
+<section class="phone" id="s12" style="overflow:hidden">
+  <div class="eyebrow">Conta online · Craque_Ana</div>
+  <h1>Dados e conta</h1>
+  <div class="card"><b>Apagar minha conta</b></div>
+  <div class="scrim"></div>
+  <div class="sheet" style="border-top-color:var(--loss)">
+    <div class="grip"></div>
+    <h2 style="color:var(--loss)">Apagar a conta de vez?</h2>
+    <div class="small">Isto <b>não tem volta</b>:</div>
+    <div class="small muted">• Os saves da nuvem (3,3 MB) são apagados do servidor<br>• Você sai das ligas; os clubes que comandava viram IA<br>• O apelido e o código deixam de valer<br>• <b>Os saves deste aparelho não são apagados</b></div>
+    <div><div class="eyebrow" style="margin-bottom:6px">Digite o apelido para confirmar</div><div class="input err" style="min-height:48px">Craque_An<span style="border-left:2px solid var(--accent);margin-left:2px;height:22px"></span></div></div>
+    <div class="btn danger" style="opacity:.5">Apagar minha conta</div>
+    <div class="btn ghost">Cancelar</div>
+  </div>
+</section>
+
+</body>
+</html>
