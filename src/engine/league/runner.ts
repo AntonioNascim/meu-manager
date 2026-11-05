@@ -43,6 +43,10 @@ export interface Seat {
   status: SeatStatus
   /** Deu "Pronto" para o próximo evento. */
   ready: boolean
+  /** Partidas humanas seguidas sem técnico presente (B7, `absence.ts`). */
+  missed?: number
+  /** Última vez (ms) que o técnico esteve presente numa partida ou deu Pronto; sem valor, vale a entrada na liga. */
+  lastActiveAt?: number
 }
 
 export interface LeagueConfig {
