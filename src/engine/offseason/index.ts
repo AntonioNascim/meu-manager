@@ -237,7 +237,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
 
   // Pré-contratos assinados por quem vence com a temporada do país: mudam de clube de graça.
   const endsNow = (p: Player) => p.teamId !== null && scope.has(p.teamId) && p.contract.endDate <= cycle.end
-  const preContracts = applyPreContracts(players, state.market.preContracts, year, endsNow, (id) => cycleOfTeam(state, id))
+  const preContracts = applyPreContracts(players, state.market.preContracts, year, endsNow, (id) => cycleOfTeam(state, id), (id) => state.teams.find((x) => x.id === id))
   players = preContracts.players
 
   // 5) Fim dos contratos (empréstimos voltam para casa; a IA renova o que faz sentido).

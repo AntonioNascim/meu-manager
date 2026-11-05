@@ -27,7 +27,7 @@ on:
           - ficticio
           - real
       sementes:
-        description: "continentais e calibracao-real: sementes separadas por vírgula (uma execução em paralelo para cada; para a calibração use 7,11,23)"
+        description: "continentais e calibracao-real: sementes separadas por vírgula (uma execução em paralelo para cada; para a calibração use 5 sementes, por exemplo 7,11,23,5,13)"
         type: string
         default: "23"
       anos:
