@@ -669,3 +669,35 @@ Rodei as duas na `main` (commit da B5) e deram **exatamente os mesmos valores**,
 3. **O fuso é um deslocamento fixo** (padrão -3, sem horário de verão); fusos com horário de verão ficam para a B8.
 4. **Mercado entre humanos, ao vivo (WebSocket), reconexão e ausência por partidas faltadas** são a B7/B8; aqui só existem o estado "ausente/autopiloto" e a regra de contá-los como prontos.
 5. O mercado da IA age em todos os clubes a cada rodada na liga online (no solo, em 1 de cada 6 fora do foco): o custo de CPU por passagem diária fica para medir na B9.
+
+---
+
+## 19. Andamento da B7 (05/11/2026): partida ao vivo e ausência (parte local, sem custo)
+
+**O que existe.**
+- `src/engine/league/live.ts` (puro): `startLiveEvent` abre as partidas dos técnicos (`humanMatchInput`: tática salva e consertada por `repairTactic`; quem não está conectado joga com a IA completa), `stepLiveEvent` leva o evento ao minuto devido, **um minuto por vez**, aplicando antes de cada minuto a fila de comandos (comando vencido, com mais de 2 minutos de espera, cai). Pausa/retomada (`pauseLiveEvent`, `resumeLiveEvent`, aviso de 10 s), presença (`setConnected`), reconexão (`viewOf`, `eventsSince`) e o fim do evento (`finishLiveEvent`: entrega os resultados pelo `submitResult` da B6, atualiza a ausência de cada técnico e devolve os registros de reprodução).
+- `LiveMatch.setControlled(lado, bool)` (motor): passa o time à IA completa ou ao técnico a partir do próximo lance. Não muda nenhum resultado do jogo solo (`matchGolden` e `soloUnchanged` continuam iguais).
+- **Registro de reprodução** (`ReplayRecord`): a entrada do motor mais a lista de comandos, cada um com o minuto em que valeu (inclusive as trocas de controle feitas pelo servidor). Refazer a partida com ele dá o mesmo resultado, e é **também como o objeto se reconstrói** depois de hibernar ou reiniciar (`rebuildLiveEvent`: nenhum objeto do motor precisa ser guardado). `verifyReplay` compara com a impressão digital SHA-256 do resultado entregue (`makeStoredReplay`, `replayKey`).
+- `src/engine/league/absence.ts` (seção 2.9): ausente (1 ou 2 partidas), autopiloto longo (3, aviso ao ADM), vaga aberta (6 partidas ou 21 dias, **só em liga aberta**); em liga de amigos só sugestões ao ADM.
+- `src/online/liveProtocol.ts`: mensagens do WebSocket com validação estrita (até 4 KB; o comando `control` nunca vem do cliente), quadros que mandam só o que mudou (`frameSince`).
+- `server/leagueRoom.ts`: Durable Object da liga. Mundo em blocos no SQLite (B5), estado da liga e do evento em linhas próprias, **alarme por minuto de jogo só durante o evento**, WebSocket com a API de hibernação (`ctx.acceptWebSocket`), limite de 12 comandos por 10 s por técnico (o limite final é da B9), registros de reprodução numa tabela e, se existir o bucket `REPLAYS`, também no R2. A autenticação fica no Worker da frente (`x-player-id`); as rotas públicas são da B8. **Nada disto foi publicado**: `wrangler.toml` e `worker.ts` de produção não mudaram.
+
+**Teste com `wrangler dev --local` (sem conta, sem custo):** `tools/online-lab/live-b7-test.mjs` contra `wrangler.b7.toml`. Passou inteiro: sala criada, evento ao vivo, estado completo no `hello`, quadros por minuto, comando aceito no minuto seguinte, comando inválido recusado pelo motor, `control` barrado, queda e volta de um técnico, **reinício real do objeto no meio da partida** (a partida seguiu do mesmo ponto), fim do evento sozinho, replays guardados e **todas as partidas refeitas pelo registro com o mesmo resultado**. Como rodar: `cd tools/online-lab && npx wrangler dev --local -c wrangler.b7.toml --port 8788 --var LAB_KEY:teste` e, em outro terminal, `node live-b7-test.mjs http://127.0.0.1:8788 teste`.
+
+**Lesão ao vivo:** o jogo não para (o motor troca na hora, como já fazia sem a opção `holdInjurySubs`); o técnico conectado corrige depois pelas trocas dentro do limite. Por isso não existe o comando `resolveInjury` no protocolo.
+
+### Duração da partida ao vivo em cada ritmo (proposta)
+
+A pergunta: no Normal a partida dura 15 min reais (10 s por minuto de jogo). Nos ritmos mais rápidos ela também deve ficar mais curta, porque há mais eventos por dia real e cada um não pode ocupar o técnico por tanto tempo. Valores em `LIVE_MATCH_MS` (`pace.ts`), a duração ÷ 90 é o tempo de cada minuto:
+
+| Ritmo | Jogo por dia real | Partida ao vivo | Cada minuto de jogo |
+|---|---|---|---|
+| Calmo | 2 dias | **20 min** | 13,3 s |
+| Normal | 3 dias | **15 min** | 10 s |
+| Rápido | 7 dias | **10 min** | 6,7 s |
+| Bem rápido | 14 dias | **6 min** | 4 s |
+
+Motivos: (1) no Bem rápido o intervalo mínimo entre eventos é de 6 h e cada dia real traz até 14 dias de jogo, então 15 minutos por partida comeria uma parte grande do tempo livre de quem joga; (2) o Durable Object fica acordado (alarme a cada minuto de jogo) enquanto o evento dura, então partida mais curta também custa menos; (3) 4 s por minuto ainda deixa tempo para ler o lance e mandar uma troca, que entra no minuto seguinte. O **resultado direto** continua disponível em qualquer ritmo para quem não quer assistir. Duas coisas para decidir depois (não incluídas): um **intervalo** parado no minuto 45 (por exemplo 1 min real no Normal) para dar tempo de mexer no time, e a prorrogação de mata-mata, que soma até 30 minutos de jogo à mesma velocidade.
+
+### Fica para a B8 e a B9
+Rotas públicas e autenticação do WebSocket (a assinatura do pedido não vai no cabeçalho do navegador: usar um código de uso único pedido por uma rota assinada), tela da sala ao vivo, "Pronto" pela interface, aviso de privacidade; B9: limite final de pedidos e a medição da memória do objeto com a liga cheia (a seção 16 avisa que a folga é de ~2×; as partidas ao vivo mantêm o motor em memória, ~1 MB por partida, e podem ser reconstruídas do registro se for preciso).

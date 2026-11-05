@@ -1,0 +1,12 @@
+name = "lab-meumanager-b7"
+main = "src/live-b7.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "LabRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LabRoom"]
