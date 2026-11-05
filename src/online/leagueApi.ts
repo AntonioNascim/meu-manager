@@ -7,6 +7,7 @@
 import type { PaceId, BandId } from '../engine/league/pace'
 import { OPEN_LEAGUE_PACE, PACES } from '../engine/league/pace'
 import type { SeatError } from '../engine/league/seats'
+import type { LeagueView } from '../engine/league/view'
 import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
 import { checkName, type NameIssue } from './nameFilter'
 
@@ -83,7 +84,14 @@ export interface RoomPort {
   removeSeat(leagueId: string, playerId: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   start(leagueId: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   destroy(leagueId: string): Promise<void>
+  /** A visão da liga para a tela (B8.4). */
+  state(leagueId: string): Promise<{ ok: true; phase: 'lobby' | 'running'; view?: LeagueView } | { ok: false; error: RoomFailure }>
+  ready(leagueId: string, playerId: string, ready: boolean): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
+  control(leagueId: string, action: ControlAction, by: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
+  setPace(leagueId: string, pace: PaceId): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
 }
+
+export type ControlAction = 'advance' | 'pause' | 'resume'
 
 export interface LeagueDeps extends ApiDeps {
   leagues: LeagueStore
@@ -276,7 +284,7 @@ function parseCreate(body: ApiRequest['body']): CreateBody | undefined {
 // ---------------------------------------------------------------- operações
 
 const roomFailure = <T>(error: RoomFailure): LeagueResult<T> =>
-  error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
+  error === 'bad-state' ? fail(409, { error: 'bad-state' }) : error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
 
 /** Cria a liga. Ligas abertas só usam o ritmo Normal; quem cria é o ADM e já pode escolher o clube. */
 export async function createLeague(req: ApiRequest, deps: LeagueDeps): Promise<LeagueResult<LeagueDetail>> {
@@ -475,6 +483,79 @@ export async function leaveAllLeagues(deps: LeagueDeps, playerId: string): Promi
     await deps.leagues.removeMember(row.id, playerId)
     await afterMemberLeft(deps, league, playerId)
   }
+}
+
+// ---------------------------------------------------------------- andamento da liga (B8.4)
+
+export interface LeagueStateBody {
+  phase: 'lobby' | 'running'
+  view?: LeagueView
+  isAdmin: boolean
+}
+
+async function memberOrAdmin(deps: LeagueDeps, id: string, playerId: string): Promise<{ league: LeagueRecord; isAdmin: boolean } | undefined> {
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return undefined
+  const isAdmin = league.adminId === playerId
+  const member = (await deps.leagues.members(id)).some((m) => m.playerId === playerId)
+  return member || isAdmin ? { league, isAdmin } : undefined
+}
+
+/** O calendário, o Pronto de cada um e a pausa. Só quem está na liga (ou o ADM) vê; as sugestões de ausência só o ADM. */
+export async function leagueState(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<LeagueStateBody>> {
+  const auth = await requireIdentity(req, 'read', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const who = await memberOrAdmin(deps, id, auth.record.playerId)
+  if (!who) return fail(404, { error: 'not-found' })
+  const room = await deps.rooms.state(id)
+  if (!room.ok) return roomFailure(room.error)
+  const view = room.view ? { ...room.view, suggestions: who.isAdmin ? room.view.suggestions : [] } : undefined
+  return { status: 200, body: { phase: room.phase, ...(view ? { view } : {}), isAdmin: who.isAdmin } }
+}
+
+/** "Pronto" (ou desfazer) de um técnico com clube na liga em andamento. */
+export async function setReady(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ ready: boolean }>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const o = parseJson(req.body)
+  if (!o || !onlyKeys(o, ['ready']) || typeof o.ready !== 'boolean') return fail(400, { error: 'bad-body' })
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (!(await deps.leagues.members(id)).some((m) => m.playerId === auth.record.playerId)) return fail(404, { error: 'not-found' })
+  if (league.status !== 'running') return fail(409, { error: 'bad-state' })
+  const r = await deps.rooms.ready(id, auth.record.playerId, o.ready)
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { ready: o.ready } }
+}
+
+/** Avançar, Pausar e Retomar: só o ADM. */
+export async function controlLeague(req: ApiRequest, deps: LeagueDeps, id: string, action: ControlAction): Promise<LeagueResult<{ done: true }>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (league.adminId !== auth.record.playerId) return fail(403, { error: 'forbidden' })
+  if (league.status !== 'running') return fail(409, { error: 'bad-state' })
+  const r = await deps.rooms.control(id, action, auth.record.playerId)
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { done: true } }
+}
+
+/** Muda o ritmo (só o ADM, só em liga de amigos: a aberta é sempre Normal). */
+export async function changePace(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ pace: PaceId }>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const o = parseJson(req.body)
+  if (!o || !onlyKeys(o, ['pace']) || typeof o.pace !== 'string' || !(o.pace in PACES)) return fail(400, { error: 'bad-body' })
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (league.adminId !== auth.record.playerId) return fail(403, { error: 'forbidden' })
+  if (league.kind !== 'friends') return fail(409, { error: 'bad-state' })
+  const pace = o.pace as PaceId
+  const r = await deps.rooms.setPace(id, pace)
+  if (!r.ok) return roomFailure(r.error)
+  await deps.leagues.update(id, { pace })
+  return { status: 200, body: { pace } }
 }
 
 export { authenticate }

@@ -4,7 +4,7 @@
  */
 import type { Identity } from './identity'
 import { signedCall, type IdentityClientDeps } from './identityClient'
-import type { LeagueDetail, LeagueSummary, LeagueError, AdminAction, WorldRef } from './leagueApi'
+import type { LeagueDetail, LeagueSummary, LeagueError, AdminAction, WorldRef, LeagueStateBody, ControlAction } from './leagueApi'
 import type { PaceId } from '../engine/league/pace'
 
 export type LeagueClientDeps = IdentityClientDeps
@@ -48,3 +48,7 @@ export const resolveInviteCode = (deps: LeagueClientDeps, identity: Identity, co
 export const joinLeague = (deps: LeagueClientDeps, identity: Identity, id: string, teamId: string, code?: string) => detail(deps, identity, 'POST', `/api/leagues/${id}/join`, { teamId, ...(code ? { code } : {}) })
 export const leaveLeague = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ left: true }>(deps, identity, 'POST', `/api/leagues/${id}/leave`, {})
 export const adminLeague = (deps: LeagueClientDeps, identity: Identity, id: string, action: AdminAction, playerId?: string) => detail(deps, identity, 'POST', `/api/leagues/${id}/${action}`, playerId ? { playerId } : {})
+export const leagueState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<LeagueStateBody>(deps, identity, 'GET', `/api/leagues/${id}/state`)
+export const sendReady = (deps: LeagueClientDeps, identity: Identity, id: string, ready: boolean) => ask<{ ready: boolean }>(deps, identity, 'POST', `/api/leagues/${id}/ready`, { ready })
+export const controlLeague = (deps: LeagueClientDeps, identity: Identity, id: string, action: ControlAction) => ask<{ done: true }>(deps, identity, 'POST', `/api/leagues/${id}/${action}`, {})
+export const changePace = (deps: LeagueClientDeps, identity: Identity, id: string, pace: PaceId) => ask<{ pace: PaceId }>(deps, identity, 'POST', `/api/leagues/${id}/pace`, { pace })

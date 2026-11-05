@@ -36,11 +36,16 @@ import {
   resumeLiveEvent,
   setConnected,
   setReady,
+  setPlayerReady,
+  leagueView,
+  replanForPace,
+  PACES,
   startLiveEvent,
   stepLiveEvent,
   toStored,
   viewOf,
   type LeagueState,
+  type PaceId,
   type LiveEvent,
   type ReplayRecord,
   type StoredLiveEvent,
@@ -516,6 +521,43 @@ export class LeagueRoom {
         return ok()
       }
       this.set('lobby', JSON.stringify(this.lobby().filter((m) => m.playerId !== playerId)))
+      return ok()
+    }
+    // ---- andamento da liga (B8.4)
+    if (path === '/internal/state') {
+      if (!this.league) return Response.json({ ok: true, phase: 'lobby' })
+      return Response.json({ ok: true, phase: 'running', view: leagueView(this.league, world, now, () => meta.createdAt) })
+    }
+    if (path === '/internal/ready') {
+      if (!this.league) return no('bad-state')
+      if (!this.league.seats.some((x) => x.playerId === playerId)) return no('not-seated')
+      if (this.league.current) return no('bad-state')
+      this.league = setPlayerReady(this.league, playerId, body.ready === true, now)
+      this.persist()
+      await this.run()
+      return ok()
+    }
+    if (path === '/internal/advance' || path === '/internal/pause' || path === '/internal/resume') {
+      const l = this.league
+      if (!l) return no('bad-state')
+      const paused = l.clock.pausedAt !== undefined
+      if (path === '/internal/advance' && (paused || l.current || l.clock.events.length === 0)) return no('bad-state')
+      if (path === '/internal/pause' && paused) return no('bad-state')
+      if (path === '/internal/resume' && !paused) return no('bad-state')
+      await this.admin(path.replace('/internal', '/admin'), { by: String(body.by ?? 'adm') })
+      return ok()
+    }
+    if (path === '/internal/pace') {
+      const l = this.league
+      const pace = String(body.pace ?? '') as PaceId
+      if (!l || !(pace in PACES) || l.current) return no('bad-state')
+      this.league = replanForPace(l, world, pace)
+      if (meta.record) {
+        this.meta = { ...meta, record: { ...meta.record, pace } }
+        this.set('meta', JSON.stringify(this.meta))
+      }
+      this.persist()
+      await this.schedule(now)
       return ok()
     }
     if (path === '/internal/start') {

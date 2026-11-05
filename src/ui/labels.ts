@@ -518,6 +518,19 @@ export const BAND_LABELS: Record<'classic' | 'night' | 'weekend', string> = {
 }
 
 export const LEAGUE_KIND_LABELS: Record<'open' | 'friends', string> = { open: 'Aberta', friends: 'Só amigos' }
+/** O que o registro da liga conta (B8.4). */
+export const LEAGUE_LOG_LABELS: Record<import('../engine/league/runner').LogType, string> = {
+  created: 'Liga criada',
+  'event-started': 'Rodada começou',
+  'event-ended': 'Rodada terminou',
+  advance: 'ADM avançou a rodada',
+  pause: 'Liga pausada',
+  resume: 'Liga retomada',
+  'auto-resume': 'Liga retomada sozinha (30 dias)',
+  tick: 'Dia passou',
+}
+/** Estado de um técnico na liga (B8.4). */
+export const SEAT_STATUS_LABELS: Record<import('../engine/league/runner').SeatStatus, string> = { active: 'Presente', absent: 'Ausente (IA joga)', autopilot: 'Piloto automático' }
 export const LEAGUE_STATUS_LABELS: Record<'lobby' | 'running' | 'closed', string> = { lobby: 'Aguardando início', running: 'Em andamento', closed: 'Encerrada' }
 
 /** Por que um pedido de liga não deu certo. */
