@@ -3,6 +3,7 @@
  *   POST /api/identity  cria (ou reconhece) a identidade — pedido assinado + Turnstile
  *   GET  /api/me        quem sou eu — pedido assinado
  *   GET/PUT/POST/DELETE /api/saves..., GET/DELETE /api/account...  saves na nuvem e conta (B4; ver src/online/cloudSaveApi.ts)
+ *   /api/leagues...    ligas online (B8.3): criar, diretório, convite por código, entrar, sair, ADM (ver src/online/leagueApi.ts)
  *   GET  /packages/index.json e /packages/<id>/<versão>/pacote.json.gz   pacotes de dados (R2), públicos e sem assinatura
  * Limites e códigos de uso único ficam num Durable Object (`Guard`, em 8 fatias), porque a memória de um Worker some a cada reinício.
  * O endereço de quem pede é usado só no instante do pedido, para limitar abuso; nunca é gravado nem registrado.
@@ -14,6 +15,9 @@ import type { NonceStore } from '../src/online/signedRequest'
 import { bodyLimitFor, handleCloudRequest, isCloudPath, type CloudApiDeps } from '../src/online/cloudSaveApi'
 import { type BlobStore, type ListedObject, type StoredObject } from '../src/online/cloudSave'
 import { D1IdentityStore, type D1Like } from './d1Store'
+import { D1LeagueStore } from './leagueStore'
+import { LeagueRoom } from './leagueRoom'
+import { adminAction, createLeague, getLeague, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, resolveCode, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
@@ -37,6 +41,8 @@ interface Env {
   /** Bucket `meu-manager-saves`: pedaços e manifestos dos saves (privado). */
   SAVES: R2Full
   GUARD: { idFromName(name: string): unknown; get(id: unknown): DurableObjectStubLike }
+  /** Uma sala por liga (Durable Object `LeagueRoom`): dona do mundo e das vagas. */
+  LEAGUES: { idFromName(name: string): unknown; get(id: unknown): DurableObjectStubLike }
   /** Segredo do Turnstile: guardado no painel do Cloudflare (Worker › Configurações › Variáveis e segredos), nunca no repositório. */
   TURNSTILE_SECRET?: string
   ALLOWED_ORIGINS: string
@@ -116,6 +122,79 @@ export class Guard {
   }
 }
 
+/** Fala com a sala de uma liga (só o Worker alcança o Durable Object). */
+class DoRooms implements RoomPort {
+  constructor(private env: Env) {}
+
+  private async call(leagueId: string, path: string, body: unknown): Promise<{ ok: true } | { ok: false; error: RoomFailure }> {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch(`https://room${path}`, { method: 'POST', body: JSON.stringify(body) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure }
+      return json.ok ? { ok: true } : { ok: false, error: json.error ?? 'unavailable' }
+    } catch {
+      return { ok: false, error: 'unavailable' }
+    }
+  }
+  init(league: LeagueRecord) {
+    return this.call(league.id, '/internal/init', league)
+  }
+  addSeat(leagueId: string, playerId: string, teamId: string) {
+    return this.call(leagueId, '/internal/seat/add', { playerId, teamId })
+  }
+  removeSeat(leagueId: string, playerId: string) {
+    return this.call(leagueId, '/internal/seat/remove', { playerId })
+  }
+  start(leagueId: string) {
+    return this.call(leagueId, '/internal/start', {})
+  }
+  async destroy(leagueId: string) {
+    await this.call(leagueId, '/internal/destroy', {})
+  }
+}
+
+/** Dependências das rotas de liga, em cima das da identidade. */
+function leagueDeps(env: Env, base: ApiDeps): LeagueDeps {
+  return { ...base, leagues: new D1LeagueStore(env.DB), rooms: new DoRooms(env), identities: base.store, randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)) }
+}
+
+function respondLeague(result: LeagueResult<unknown>, cors: Record<string, string>): Response {
+  const headers: Record<string, string> = { ...cors }
+  if (result.status === 429 && 'retryAfterMs' in result.body) headers['Retry-After'] = String(Math.ceil(result.body.retryAfterMs / 1000))
+  return Response.json(result.body, { status: result.status, headers })
+}
+
+const ADMIN_ACTIONS: readonly string[] = ['kick', 'close-entry', 'open-entry', 'rotate-code', 'start', 'make-admin']
+
+/** Rotas de ligas. Devolve `undefined` se o caminho não é de liga. */
+async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDeps, cors: Record<string, string>): Promise<Response | undefined> {
+  const m = /^\/api\/leagues(?:\/([A-Za-z0-9]+))?(?:\/([a-z-]+))?$/.exec(url.pathname)
+  if (!m) return undefined
+  const [, first, second] = m
+  const deps = leagueDeps(env, base)
+  const method = request.method
+  if (!first) return method === 'POST' ? respondLeague(await createLeague(request, deps), cors) : undefined
+  if (first === 'open' && !second && method === 'GET') {
+    const before = Number(url.searchParams.get('before'))
+    return respondLeague(await listOpenLeagues(request, deps, Number.isFinite(before) && before > 0 ? before : undefined), cors)
+  }
+  if (first === 'mine' && !second && method === 'GET') return respondLeague(await myLeagues(request, deps), cors)
+  if (first === 'code' && !second && method === 'POST') {
+    let code = ''
+    try {
+      code = String((JSON.parse(String(request.body)) as { code?: unknown }).code ?? '')
+    } catch {
+      /* corpo ruim: o código vazio é recusado abaixo */
+    }
+    return respondLeague(await resolveCode(request, deps, code.slice(0, 32)), cors)
+  }
+  if (!second && method === 'GET') return respondLeague(await getLeague(request, deps, first), cors)
+  if (second === 'join' && method === 'POST') return respondLeague(await joinLeague(request, deps, first), cors)
+  if (second === 'leave' && method === 'POST') return respondLeague(await leaveLeague(request, deps, first), cors)
+  if (second && ADMIN_ACTIONS.includes(second) && method === 'POST') return respondLeague(await adminAction(request, deps, first, second as AdminAction), cors)
+  return undefined
+}
+
 function corsHeaders(req: Request, env: Env): Record<string, string> {
   const origin = req.headers.get('Origin')
   const headers: Record<string, string> = { Vary: 'Origin', 'Cache-Control': 'no-store' }
@@ -189,7 +268,11 @@ async function readCapped(req: Request, limit: number): Promise<Uint8Array | und
 async function serveCloud(req: Request, url: URL, env: Env, cors: Record<string, string>): Promise<Response> {
   const body = await readCapped(req, bodyLimitFor(req.method, url.pathname))
   if (!body) return Response.json({ error: 'too-large' }, { status: 413, headers: cors })
-  const deps: CloudApiDeps = { ...identityDeps(env, new RemoteGuard(env)), blobs: r2Blobs(env.SAVES), deleteIdentity: (id) => new D1IdentityStore(env.DB).delete(id) }
+  const deps: CloudApiDeps = { ...identityDeps(env, new RemoteGuard(env)), blobs: r2Blobs(env.SAVES), deleteIdentity: async (id) => {
+      // Sai de todas as ligas antes (cada clube volta à IA; se era o ADM, o humano mais antigo assume).
+      await leaveAllLeagues(leagueDeps(env, identityDeps(env, new RemoteGuard(env))), id)
+      await new D1IdentityStore(env.DB).delete(id)
+    } }
   const result = await handleCloudRequest(
     { method: req.method, path: url.pathname + url.search, body, ip: req.headers.get('CF-Connecting-IP') ?? 'unknown', authorization: req.headers.get('Authorization') },
     url,
@@ -240,6 +323,11 @@ export default {
       return Response.json({ playerId: auth.record.playerId, nickname: auth.record.nickname ?? null, createdAt: auth.record.createdAt }, { headers: cors })
     }
     if (url.pathname === '/api/me' && req.method === 'PUT') return respond(await changeNickname(request, deps), cors)
+    const leagues = await serveLeagues(request, url, env, deps, cors)
+    if (leagues) return leagues
     return Response.json({ error: 'not-found' }, { status: 404, headers: cors })
   },
 }
+
+/** O Cloudflare exige que as classes de Durable Object saiam do módulo principal. */
+export { LeagueRoom }

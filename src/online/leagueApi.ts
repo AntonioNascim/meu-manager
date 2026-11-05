@@ -74,7 +74,7 @@ export interface LeagueStore {
   countMemberships(playerId: string): Promise<number>
 }
 
-export type RoomFailure = SeatError | 'not-found' | 'bad-world' | 'unavailable'
+export type RoomFailure = SeatError | 'not-found' | 'bad-world' | 'bad-state' | 'unavailable'
 
 /** A sala da liga (Durable Object): dona das vagas e do mundo. */
 export interface RoomPort {

@@ -502,3 +502,45 @@ export const CLOUD_STATUS_LABELS: Record<import('../store/cloudState').CloudStat
   conflict: 'Conflito',
   error: 'Erro no envio',
 }
+
+/** Ritmo da liga online: quantos dias de jogo passam por dia real (proposta, seção 2.2). */
+export const PACE_LABELS: Record<import('../engine/league/pace').PaceId, string> = {
+  calm: 'Calmo (2 dias por dia)',
+  normal: 'Normal (3 dias por dia)',
+  fast: 'Rápido (7 dias por dia)',
+  'very-fast': 'Bem rápido (14 dias por dia)',
+}
+
+/** Faixa de horários dos jogos da liga online. */
+export const BAND_LABELS: Record<'classic' | 'night' | 'weekend', string> = {
+  classic: 'Futebol clássico (sábado, domingo e meio de semana)',
+  night: 'Só à noite (19h às 22h30)',
+  weekend: 'Só fim de semana (10h às 22h)',
+}
+
+export const LEAGUE_KIND_LABELS: Record<'open' | 'friends', string> = { open: 'Aberta', friends: 'Só amigos' }
+export const LEAGUE_STATUS_LABELS: Record<'lobby' | 'running' | 'closed', string> = { lobby: 'Aguardando início', running: 'Em andamento', closed: 'Encerrada' }
+
+/** Por que um pedido de liga não deu certo. */
+export const LEAGUE_ERROR_LABELS: Record<import('../online/leagueApi').LeagueError['error'] | 'offline' | 'server', string> = {
+  'rate-limited': 'Muitas tentativas seguidas. Espere um pouco e tente de novo.',
+  unauthorized: 'O servidor recusou o pedido. Confira a data e a hora do aparelho.',
+  'unknown-identity': 'Esta conta ainda não existe no servidor.',
+  'bad-body': 'O pedido não está certo. Confira os campos e tente de novo.',
+  'turnstile-failed': 'A verificação de que você é uma pessoa não passou. Tente de novo.',
+  'bad-name': 'Esse nome não serve.',
+  'not-found': 'Não encontramos essa liga.',
+  forbidden: 'Só o ADM da liga pode fazer isso.',
+  'too-many-created': 'Você já administra o máximo de 3 ligas.',
+  'too-many-joined': 'Você já está no máximo de 5 ligas.',
+  'league-full': 'A liga está cheia.',
+  'entry-closed': 'A entrada nesta liga está fechada.',
+  'wrong-code': 'Código não encontrado. Confira as letras e os números.',
+  'already-member': 'Você já está nesta liga.',
+  'team-taken': 'Esse clube já tem técnico. Escolha outro.',
+  'unknown-team': 'Esse clube não existe neste mundo.',
+  'room-failed': 'A sala da liga não respondeu. Tente de novo daqui a pouco.',
+  'bad-state': 'Isso não é possível agora.',
+  offline: 'Sem conexão com o servidor. Confira a internet e tente de novo.',
+  server: 'O servidor está com problema agora. Tente de novo daqui a pouco.',
+}
