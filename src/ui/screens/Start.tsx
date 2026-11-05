@@ -18,6 +18,7 @@ import { NewGame } from './NewGame'
 import { Editor } from './editor/Editor'
 import { OnlineArea } from './online/OnlineArea'
 import type { OnlineView } from './online/OnlineArea'
+import { onlineUnlockedHere } from '../../online/gate'
 import { cloudState, useAccount } from '../../store/onlineAccount'
 import type { CloudSlotState } from '../../store/cloudState'
 
@@ -27,7 +28,7 @@ type View = 'menu' | 'new' | 'load' | 'package' | 'editor' | 'credits' | 'online
 const DEV_ONLINE: Record<string, OnlineView> = { criar: 'create', entrar: 'recover', nuvem: 'cloud', dados: 'data', codigo: 'code', ligas: 'leagues' }
 
 /** Código de convite que veio no endereço (`?convite=ABCD2345`): abre direto a tela de entrar na liga. */
-const inviteFromUrl = (): string | undefined => (typeof window === 'undefined' ? undefined : (new URLSearchParams(window.location.search).get('convite') ?? undefined))
+const inviteFromUrl = (): string | undefined => (typeof window === 'undefined' || !onlineUnlockedHere() ? undefined : (new URLSearchParams(window.location.search).get('convite') ?? undefined))
 
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
@@ -182,6 +183,7 @@ export function Start() {
           <Button className="w-full" variant="secondary" onClick={() => fileInput.current?.click()}>
             Importar save de um arquivo
           </Button>
+          {onlineUnlockedHere() && (
           <Card title="Online">
             {account ? (
               <div className="flex flex-col gap-2" data-testid="online-account">
@@ -210,6 +212,7 @@ export function Start() {
               </div>
             )}
           </Card>
+          )}
           <Button className="w-full" variant="secondary" onClick={() => setView('credits')}>
             Créditos e avisos
           </Button>
