@@ -74,3 +74,18 @@ export interface Band {
 export function bandOf(id: Exclude<BandId, 'custom'>): Band {
   return { id, slots: BANDS[id] }
 }
+
+/**
+ * Duração real de uma partida ao vivo em cada ritmo (Fase 6, B7). Quanto mais rápida a liga, mais eventos por dia real e menos tempo cada um pode
+ * ocupar do técnico; no Calmo, com poucos eventos, dá para assistir com calma. A partida tem 90 minutos de jogo (mais 30 na prorrogação), então cada
+ * minuto dura a duração ÷ 90. O "resultado direto" continua disponível em qualquer ritmo.
+ */
+export const LIVE_MATCH_MS: Record<PaceId, number> = {
+  calm: 20 * MS_MINUTE,
+  normal: 15 * MS_MINUTE,
+  fast: 10 * MS_MINUTE,
+  'very-fast': 6 * MS_MINUTE,
+}
+
+/** Tempo real de cada minuto de jogo no ritmo dado (Normal: 10 s). */
+export const liveMinuteMs = (pace: PaceId): number => LIVE_MATCH_MS[pace] / 90

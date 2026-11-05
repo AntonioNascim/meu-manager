@@ -123,6 +123,8 @@ export interface LiveMatch {
   reorganize(side: MatchSide): void
   /** Resolve a lesão que parou o jogo: com `incomingId` o reserva entra na vaga; sem ele o time segue com um a menos. */
   resolveInjury(side: MatchSide, incomingId?: string): void
+  /** Passa o time ao técnico (`true`) ou à IA completa do motor (`false`), valendo do próximo lance (liga online: técnico desconectado, Fase 6, B7). */
+  setControlled(side: MatchSide, controlled: boolean): void
   /** Resultado completo (só depois do apito final). */
   result(): MatchResult
 }
@@ -356,6 +358,16 @@ export function startMatch(input: MatchInput): LiveMatch {
     reorganize(side) {
       const s = sideOf(side)
       syncShortHanded(s, true)
+    },
+    setControlled(side, controlled) {
+      const s = sideOf(side)
+      if (s.userControlled === controlled) return
+      s.userControlled = controlled
+      s.underdogShift = 0
+      if (!controlled) {
+        s.holdInjury = false
+        applyUnderdogPosture(s, side === 'home' ? ctx.away : ctx.home)
+      }
     },
     resolveInjury(side, incomingId) {
       const pending = ctx.pendingInjury
