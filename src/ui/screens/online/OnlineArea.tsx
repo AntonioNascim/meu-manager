@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAccount } from '../../../store/onlineAccount'
+import { confirmRecoveryCode, useAccount } from '../../../store/onlineAccount'
 import { AccountData } from './AccountData'
 import { CloudSaves } from './CloudSaves'
 import { CreateAccount } from './CreateAccount'
@@ -41,11 +41,11 @@ export function OnlineArea({ start, onClose, invite }: { start: OnlineView; onCl
   if (view === 'code') {
     return (
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100">
-        {account.recoveryWords ? (
-          <RecoveryCodeView words={account.recoveryWords} onBack={() => setView('data')} />
+        {account.recoveryCode ? (
+          <RecoveryCodeView code={account.recoveryCode} confirmed={account.codeConfirmed} {...(account.nickname ? { nickname: account.nickname } : {})} onConfirm={() => void confirmRecoveryCode().then(onClose)} onBack={() => setView('data')} />
         ) : (
           <>
-            <p className="text-sm text-muted">Este aparelho não guardou o código (a conta foi criada numa versão antiga). Use o código que você anotou quando criou a conta.</p>
+            <p className="text-sm text-muted">Este aparelho não guardou o código (a conta foi criada numa versão antiga). Use o código que você guardou quando criou a conta.</p>
             <button type="button" className="min-h-12 rounded-xl bg-surface-2 font-bold ring-1 ring-line" onClick={() => setView('data')}>
               Voltar
             </button>

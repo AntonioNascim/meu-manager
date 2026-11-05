@@ -276,7 +276,7 @@ Nenhum impede. Em ordem de risco:
 ### 4.1 Identidade e nuvem
 
 - **Identidade:** no primeiro uso o aparelho cria um par de chaves **Ed25519** (`WebCrypto`, no IndexedDB); a chave pública vira o `playerId`; cada pedido vai assinado. Sem senha e sem e-mail.
-- **Código de recuperação:** 12 palavras que **derivam a chave** (o servidor não guarda segredo e não consegue recuperá-lo). Trocar de aparelho = digitar o código. **Tela (decisão de 03/11/2026):** aviso claro de que, sem o código, quem perder ou trocar de celular perde a carreira e as ligas; as 12 palavras aparecem na criação e a pessoa só segue depois de digitar 3 palavras sorteadas; depois, o código pode ser visto de novo em Menu › Código de recuperação (escondido até um toque) enquanto o aparelho tiver a identidade. O código fica guardado **neste aparelho** (junto da chave, que já dá o mesmo acesso), nunca no servidor.
+- **Código de recuperação** (trocado na seção 23: era de 12 palavras; hoje 20 símbolos de um alfabeto de 31): **deriva a chave** (o servidor não guarda segredo e não consegue recuperá-lo). Trocar de aparelho = digitar o código. **Tela (decisão de 03/11/2026):** aviso claro de que, sem o código, quem perder ou trocar de celular perde a carreira e as ligas; as 12 palavras aparecem na criação e a pessoa só segue depois de digitar 3 palavras sorteadas; depois, o código pode ser visto de novo em Menu › Código de recuperação (escondido até um toque) enquanto o aparelho tiver a identidade. O código fica guardado **neste aparelho** (junto da chave, que já dá o mesmo acesso), nunca no servidor.
 - **Apelido:** 3 a 16 caracteres, passa pelo filtro (6.2), único por liga (não global).
 - Os 3 espaços de save continuam; cada um ganha o estado de nuvem (só local, sincronizado, enviando, conflito). A nuvem é **opcional por espaço**.
 
@@ -390,7 +390,7 @@ Moderação no início: nós, com um painel pequeno de denúncias (B9). Banir id
 >
 > **Sem internet.** A carreira solo funciona sem internet e os jogos ficam no seu aparelho. Só as ligas online e a cópia na nuvem precisam de conexão.
 >
-> **Código de recuperação.** Ao criar a conta anônima você recebe um código de 12 palavras. Ele é a única forma de levar seus jogos para outro aparelho. **Nós não guardamos esse código e não podemos recuperá-lo**; ele fica só no seu aparelho, e você pode revê-lo no menu. Quem tiver o código tem acesso à sua conta; guarde-o em lugar seguro.
+> **Código de recuperação.** Ao criar a conta anônima ela passa a ter um código de recuperação (20 letras e números, como K7QP-9X2M-HT4R-8WZC-3NFB), que você encontra no menu (Online › Código de recuperação) e deve guardar. Ele é a única forma de levar seus jogos para outro aparelho. **Nós não guardamos esse código e não podemos recuperá-lo**; ele fica só no seu aparelho, e você pode revê-lo no menu. Quem tiver o código tem acesso à sua conta; guarde-o em lugar seguro.
 >
 > **Quem vê o quê.** Os outros jogadores de uma liga veem o seu apelido, o seu clube e o que acontece na liga (jogos e transferências). Ninguém vê os seus jogos salvos da carreira solo.
 >
@@ -753,3 +753,16 @@ Telas aprovadas em `docs/mockups/b8-1-2` (capturas em `.shots/b8-1-2-*.png`); as
 Memória: o Cloudflare não deixa ler a memória (`process.memoryUsage()` dá zeros). Medi pelo teto, segurando lastro no heap antes de criar a sala: **passou com lastro de até 260 blocos (~196 MB no Node), sem reinício**, com o mundo vivo (~50 MB) por cima. Não achei o teto, ou seja, o limite de 128 MB não aparece neste caminho (criar e iniciar); ele só apareceu na B5 em temporadas completas gravando. A leitura honesta continua: **criar e iniciar a sala do mundo real cabe com folga; o pico de uma virada de temporada com gravação ainda é medido na B9**.
 
 **Estado do servidor depois do teste:** nenhuma liga nem identidade no D1; Worker de laboratório apagado (as salas de teste foram junto); nada de teste no R2.
+
+
+## 23. Código de recuperação único (pedido dos sócios, 05/11/2026)
+
+As 12 palavras com confirmação de 3 eram trabalhosas demais. Agora:
+
+1. **Um código só**, em grupos de 4 (`K7QP-9X2M-HT4R-8WZC-3NFB`), alfabeto de 31 símbolos `23456789ABCDEFGHJKMNPQRSTUVWXYZ`: sem O, I, L, 0 e 1. **São 20 símbolos (~99 bits).** Por quê: o `playerId` (chave pública) aparece para os outros técnicos, então quem quiser descobrir o código pode testar palpites sem falar com o servidor; 2^99 palpites é inviável mesmo com milhões de placas de vídeo (o código antigo tinha 128 bits, mais do que se precisa). Menos que isso (por exemplo 12 símbolos, ~59 bits) já seria arriscado; mais que isso só deixa o código mais comprido. Não há dígito de conferência: um erro de digitação vira "símbolo inexistente" (quando cai em O, I, L, 0 ou 1) ou "conta não encontrada".
+2. **Sem confirmação digitando partes.** A tela mostra o código (escondido até o toque, 30 s), com **Copiar**, **Baixar arquivo** (`meu-manager-codigo-de-recuperacao.txt`) e **Já guardei**.
+3. **O código não aparece na criação da conta:** a pessoa cria e já joga. O menu mostra um aviso discreto até ela tocar em "Já guardei".
+
+**Aviso de privacidade** (seção 14, texto do código de recuperação) e o texto do cartão Online no menu foram atualizados. A semente da chave agora é `HKDF(código, "ed25519-identity-v2")`: contas feitas com as 12 palavras só existiram em testes locais (o online não está em uso: 0 identidades no servidor) e não migram.
+
+**Testes:** `tests/onlineIdentity.test.ts` (alfabeto sem confusão, sorteio sem viés, leitura com hífen/espaço/minúscula, erros), `tests/recoveryCodeScreen.test.ts`, `tests/accountScreens.test.ts`, `tests/onlineIdentityStore.test.ts`; ponta a ponta `tools/online-lab/b8-e2e.mjs` (cria a conta sem ver o código, aviso no menu, mostrar/baixar/"Já guardei", entrar em outro aparelho com o código em minúsculas e espaços). Observação do teste local: o servidor local usa a chave de teste do Turnstile, que aprova qualquer desafio, então um código inexistente **cria** uma conta em vez de dar "não encontrada"; na nuvem real o desafio falso é recusado.

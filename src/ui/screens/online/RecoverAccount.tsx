@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RECOVERY_WORDS } from '../../../online/recoveryCode'
+import { RECOVERY_LENGTH, typedSymbols } from '../../../online/recoveryCode'
 import { recoverAccount } from '../../../store/onlineAccount'
 import { Button, Card } from '../../components/ui'
 import { ACCOUNT_REASON_LABELS, RECOVERY_ERROR_LABELS } from '../../labels'
@@ -9,7 +9,7 @@ export function RecoverAccount({ onDone, onBack }: { onDone: () => void; onBack:
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const count = text.split(/[\s,;]+/).filter(Boolean).length
+  const count = typedSymbols(text)
 
   const submit = async () => {
     setBusy(true)
@@ -18,21 +18,21 @@ export function RecoverAccount({ onDone, onBack }: { onDone: () => void; onBack:
     setBusy(false)
     if (result.ok) return onDone()
     if (result.reason === 'format') {
-      const which = result.index !== undefined ? ` (palavra nº ${result.index + 1})` : ''
+      const which = result.index !== undefined ? ` (símbolo nº ${result.index + 1})` : ''
       return setError(`${RECOVERY_ERROR_LABELS[result.error]}${which}`)
     }
-    setError(result.reason === 'not-found' ? 'Não encontramos uma conta com esse código. Confira as palavras e a ordem.' : ACCOUNT_REASON_LABELS[result.reason])
+    setError(result.reason === 'not-found' ? 'Não encontramos uma conta com esse código. Confira o código.' : ACCOUNT_REASON_LABELS[result.reason])
   }
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100" data-testid="recover-account">
       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Outro aparelho</p>
       <h1 className="title text-3xl">Entrar com o código</h1>
-      <p className="text-sm text-muted">Digite as {RECOVERY_WORDS} palavras da conta. Separe por espaço ou vírgula; acento e maiúscula não importam.</p>
-      <textarea
-        className={`min-h-32 rounded-xl bg-surface-2 p-3 text-base leading-relaxed ring-1 ${error ? 'ring-loss' : 'ring-line'}`}
+      <p className="text-sm text-muted">Digite o código de recuperação da conta (por exemplo K7QP-9X2M-HT4R-8WZC-3NFB). Os hífens e as maiúsculas não importam.</p>
+      <input
+        className={`min-h-14 rounded-xl bg-surface-2 px-3 text-center font-mono text-xl font-bold uppercase tracking-wider ring-1 ${error ? 'ring-loss' : 'ring-line'}`}
         value={text}
-        autoCapitalize="none"
+        autoCapitalize="characters"
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
@@ -43,8 +43,8 @@ export function RecoverAccount({ onDone, onBack }: { onDone: () => void; onBack:
         data-testid="recover-input"
       />
       <p className="text-xs">
-        <span className={`rounded-full border px-2.5 py-1 font-bold ${count === RECOVERY_WORDS ? 'border-win text-win' : 'border-line text-muted'}`}>
-          {count} de {RECOVERY_WORDS} palavras
+        <span className={`rounded-full border px-2.5 py-1 font-bold ${count === RECOVERY_LENGTH ? 'border-win text-win' : 'border-line text-muted'}`}>
+          {count} de {RECOVERY_LENGTH} símbolos
         </span>
       </p>
       {error && (
@@ -60,7 +60,7 @@ export function RecoverAccount({ onDone, onBack }: { onDone: () => void; onBack:
         </p>
       </Card>
       <div className="mt-auto flex flex-col gap-3">
-        <Button disabled={count !== RECOVERY_WORDS || busy} onClick={() => void submit()}>
+        <Button disabled={count !== RECOVERY_LENGTH || busy} onClick={() => void submit()}>
           {busy ? 'Entrando…' : 'Entrar'}
         </Button>
         <Button variant="secondary" onClick={onBack}>

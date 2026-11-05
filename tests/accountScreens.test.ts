@@ -6,26 +6,29 @@ import { CreateAccount } from '../src/ui/screens/online/CreateAccount'
 import { RecoverAccount } from '../src/ui/screens/online/RecoverAccount'
 import { ACCOUNT_REASON_LABELS, CLOUD_STATUS_LABELS } from '../src/ui/labels'
 
-const words = ['abrigo', 'cavalo', 'fronteira', 'lanterna', 'mosaico', 'navio', 'orquidea', 'pessego', 'quintal', 'rochedo', 'saveiro', 'tapete']
+const CODE = 'K7QP9X2MHT4R8WZC3NFB'
 
 describe('telas da conta online (B8.1)', () => {
   it('criar conta começa pelo apelido, com as regras e o botão desligado', () => {
     const html = renderToStaticMarkup(createElement(CreateAccount, { onDone: () => undefined, onBack: () => undefined }))
     expect(html).toContain('Escolha seu apelido')
-    expect(html).toContain('Passo 1 de 2')
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>Continuar<\/button>/)
+    expect(html).not.toContain('Passo 1 de 2')
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Criar conta<\/button>/)
   })
 
-  it('entrar com o código pede as 12 palavras e começa com o botão desligado', () => {
+  it('entrar com o código pede o código único e começa com o botão desligado', () => {
     const html = renderToStaticMarkup(createElement(RecoverAccount, { onDone: () => undefined, onBack: () => undefined }))
-    expect(html).toContain('0 de 12 palavras')
+    expect(html).toContain('0 de 20 símbolos')
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Entrar<\/button>/)
   })
 
   it('o código só aparece depois do toque e esconde sozinho em 30 s', () => {
-    const html = renderToStaticMarkup(createElement(RecoveryCodeView, { words, onBack: () => undefined }))
-    expect(html).not.toContain('fronteira')
+    const html = renderToStaticMarkup(createElement(RecoveryCodeView, { code: CODE, confirmed: false, onConfirm: () => undefined, onBack: () => undefined }))
+    expect(html).not.toContain('K7QP')
     expect(html).toContain('Mostrar o código')
+    expect(html).toContain('Copiar')
+    expect(html).toContain('Baixar arquivo')
+    expect(html).toContain('Já guardei')
     expect(CODE_VISIBLE_MS).toBe(30_000)
   })
 

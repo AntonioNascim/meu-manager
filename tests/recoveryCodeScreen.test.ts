@@ -1,24 +1,38 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { RecoveryCodeSetup, RecoveryCodeView } from '../src/ui/screens/online/RecoveryCode'
+import { recoveryFile, RecoveryCodeView } from '../src/ui/screens/online/RecoveryCode'
 
-const WORDS = ['abacate', 'abaixo', 'abalar', 'abater', 'abduzir', 'abelha', 'aberto', 'abismo', 'abotoar', 'abranger', 'abreviar', 'abrigar']
+const CODE = 'K7QP9X2MHT4R8WZC3NFB'
+const view = (confirmed: boolean) => renderToStaticMarkup(createElement(RecoveryCodeView, { code: CODE, confirmed, onConfirm: () => {}, onBack: () => {} }))
 
-describe('telas do código de recuperação (primeira renderização)', () => {
-  it('o primeiro uso começa pelo aviso e pelas 12 palavras numeradas, antes de qualquer confirmação', () => {
-    const html = renderToStaticMarkup(createElement(RecoveryCodeSetup, { words: WORDS, positions: [1, 5, 9], onConfirmed: () => {} }))
+describe('tela do código de recuperação', () => {
+  it('traz o aviso, esconde o código até o toque e oferece copiar, baixar e "Já guardei"', () => {
+    const html = view(false)
     expect(html).toContain('recovery-warning')
     expect(html).toContain('perde a carreira salva na nuvem e o acesso às ligas online')
-    for (const w of WORDS) expect(html).toContain(w)
-    expect(html).toContain('Anotei, continuar')
-    expect(html).not.toContain('Confira o que anotou')
+    expect(html).toContain('Mostrar o código')
+    expect(html).not.toContain('K7QP')
+    expect(html).toContain('Copiar')
+    expect(html).toContain('Baixar arquivo')
+    expect(html).toContain('Já guardei')
   })
 
-  it('pelo menu, o código fica escondido até o toque, mas o aviso aparece', () => {
-    const html = renderToStaticMarkup(createElement(RecoveryCodeView, { words: WORDS, onBack: () => {} }))
-    expect(html).toContain('recovery-warning')
-    expect(html).toContain('Mostrar o código')
-    for (const w of WORDS) expect(html).not.toContain(w)
+  it('depois do "Já guardei" o botão some', () => {
+    const html = view(true)
+    expect(html).not.toContain('code-saved-button')
+    expect(html).toContain('Você marcou que já guardou o código.')
+  })
+
+  it('não há mais confirmação digitando partes do código', () => {
+    expect(view(false)).not.toContain('Confira o que anotou')
+  })
+
+  it('o arquivo baixado traz o código em grupos, o apelido e o aviso', () => {
+    const f = recoveryFile(CODE, 'Craque Ana')
+    expect(f.filename).toBe('meu-manager-codigo-de-recuperacao.txt')
+    expect(f.text).toContain('K7QP-9X2M-HT4R-8WZC-3NFB')
+    expect(f.text).toContain('Craque Ana')
+    expect(f.text).toContain('Quem tiver este código entra na sua conta')
   })
 })
