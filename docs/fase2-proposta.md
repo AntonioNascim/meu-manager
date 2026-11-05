@@ -915,6 +915,36 @@ Formato das copas no pacote: `docs/formato-pacote.md` (seções "Copas mundiais"
 
 ### 23.5 Recalibração com 5 sementes e pendências da revisão manual
 
-**Limite ajustado:** o piso da fatia do México na `cont-na-1` do mundo real passou de 70% para **65%** (`tools/realTargets.ts`: 65–95%); só o limite mudou. Junto com a fase, entraram a correção do 7º estrangeiro (o limite também vale ao aplicar o pré-contrato na virada de outro país) e o limite de distância Série B–C do Brasil em 5,5. O resumo de várias sementes da calibração real é `tools/realSummary.ts` (o workflow `Medições pesadas` roda 5 sementes). Os números por semente ficam no artefato do workflow; **os valores desta rodada ainda precisam ser colados aqui** (não estavam disponíveis ao registrar).
+**Limite ajustado:** o piso da fatia do México na `cont-na-1` do mundo real passou de 70% para **65%** (`tools/realTargets.ts`: 65–95%); só o limite mudou. Junto com a fase, entraram a correção do 7º estrangeiro (o limite também vale ao aplicar o pré-contrato na virada de outro país) e o limite de distância Série B–C do Brasil em 5,5. O resumo de várias sementes da calibração real é `tools/realSummary.ts` (o workflow `Medições pesadas` roda 5 sementes). Resultado da rodada de 5 sementes (5, 7, 11, 13, 23; 30 temporadas cada), gerado por `realSummary` (arquivos em `dados-reais/medicoes/recalibracao`, um por semente):
+
+**Títulos nacionais por gigante** (média das sementes; "vida real" = últimos 30 anos)
+
+| Clube | Média | Por semente (5, 7, 11, 13, 23) | Vida real |
+|---|---|---|---|
+| Paris Saint-Germain | 8,4 | 9, 9, 12, 8, 4 | 11 |
+| Bayern Munich | 7,4 | 6, 9, 11, 7, 4 | 22 |
+| Real Madrid | 7,2 | 7, 7, 7, 11, 4 | 10 |
+| Barcelona | 9,0 | 8, 9, 9, 9, 10 | 14 |
+| Manchester United | 5,4 | 7, 6, 5, 4, 5 | 11 |
+| Manchester City | 6,2 | 8, 7, 8, 4, 4 | 8 |
+| Chelsea | 3,2 | 3, 5, 2, 5, 1 | 5 |
+| Arsenal | 2,6 | 0, 1, 2, 4, 6 | 3 |
+| Liverpool | 6,8 | 4, 5, 8, 10, 7 | 2 |
+| Tottenham | 1,6 | 2, 3, 1, 0, 2 | 0 |
+| Juventus | 6,6 | 8, 8, 6, 6, 5 | 14 |
+| Inter | 4,8 | 5, 5, 1, 10, 3 | 6 |
+| Milan | 6,4 | 3, 8, 7, 7, 7 | 4 |
+| Napoli | 3,0 | 6, 1, 4, 1, 3 | 2 |
+| Roma | 2,6 | 4, 3, 0, 0, 6 | 1 |
+| Flamengo | 3,6 | 3, 5, 4, 2, 4 | 4 |
+| Palmeiras | 3,0 | 4, 3, 4, 1, 3 | 5 a 6 |
+| River Plate | 2,8 | 5, 1, 4, 1, 3 | ~12 |
+| Boca Juniors | 3,2 | 4, 3, 3, 5, 1 | ~12 |
+
+**Títulos continentais** (Champions = `cont-eu-1`, Libertadores = `cont-sa-1`): Real Madrid 3,4 (vida real 9), Barcelona 3,0 (4), Manchester City 2,4 (1), Chelsea 1,8 (2), Arsenal 1,8 (0), Juventus 1,6 (1), Manchester United 1,4 (2), Milan 1,4 (2), Liverpool 0,8 (2), Inter 0,6 (2), PSG 0,4 (1), Bayern 0,2 (3), Tottenham 0,4 (0), Napoli 0,4 (0), Roma 0,2 (0); Libertadores: River Plate 3,4 (3), Flamengo 3,2 (3), Palmeiras 1,8 (2), Boca Juniors 0,8 (4).
+
+**Desgaste da reputação dos 6 maiores de cada liga** (começo → fim, queda média; nenhuma liga com queda acima de 1 em mais de uma semente): en-1 0,3; es-1 0,2; it-1 0,6; de-1 0,4; fr-1 0,5; pt-1 0,3; nl-1 0,3; br-1 0,6 (uma semente acima de 1); ar-1 0,7; mx-1 0,6.
+
+**Leitura:** o Bayern fica em 7,4 títulos contra 22 da vida real (a pendência abaixo) e a Juventus em 6,6 contra 14; Liverpool (6,8 contra 2) e Milan (6,4 contra 4) ganham mais do que na vida real. Barcelona perde fôlego em todas as sementes (4,8 títulos na 1ª década, 1,6 na 3ª).
 
 **Pendência da revisão manual do top 300 e das reputações (item 2):** o Bayern precisa de uma vantagem bem maior sobre o Dortmund e o resto da Alemanha, e a Juventus sobre a Itália, para ficarem mais perto da vida real. Ajustar a reputação (`REPUTATION_FIXES`) e a força dos craques (`conferencia/top-300-jogadores.csv`, campo `força`) desses clubes; depois `dados:finalizar`, `realReputation --copiar` e nova calibração com várias sementes. Soma-se às pendências de 23.3 e 23.4 (Inter, Milan, Portugal).
