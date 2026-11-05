@@ -734,3 +734,22 @@ Telas aprovadas em `docs/mockups/b8-1-2` (capturas em `.shots/b8-1-2-*.png`); as
 **Testes.** `tests/onlineLeagueApi.test.ts` (12: criar, limites, convite, diretório, entrada, ADM, sair, conta apagada), `tests/leagueSeats.test.ts` (5) e o teste de ponta a ponta `tools/online-lab/b8-3-e2e.mjs` (Playwright, 380 px, servidor local): 4 pessoas em 4 aparelhos criam e entram em ligas de amigos e aberta, código errado e certo (minúsculas e hífen), link de convite, clube ocupado bloqueado, liga cheia, remover, fechar entrada, iniciar (outro aparelho vê "Em andamento" sozinho), diretório e sair.
 
 **Não coberto ainda.** O mundo **real** numa liga (criar o mundo de 370 clubes dentro do Durable Object a partir do bucket) não foi exercitado no servidor local; o risco é memória e CPU do objeto (a seção 16 fala de uma folga de ~2×) e só se mede no Cloudflare. Denúncia e ocultar liga ficam para a B9. O calendário, o "Pronto" e a partida ao vivo na tela são a 8.4 e a 8.5.
+
+## 22. Publicação da B8.1–B8.3 e medição do mundo real na nuvem (05/11/2026)
+
+**Portão do online.** O cartão "Online" do menu só aparece com `?online=1` no endereço (a escolha fica no aparelho; `?online=0` esconde de novo; em `npm run dev` sempre aparece). O link de convite gerado pela sala já leva `online=1`. Código em `src/online/gate.ts`, teste em `tests/onlineGate.test.ts`. Até então o menu mostrava o online a todos.
+
+**Publicação.** Migração `0002_leagues.sql` aplicada no D1 remoto e `wrangler deploy` do `meu-manager-api` (bindings `LEAGUES`, `GUARD`, `DB`, `PACKAGES`, `SAVES`). `server/wrangler.deploy.toml` (ignorado pelo Git) é gerado do `wrangler.toml` trocando o `database_id`.
+
+**Mundo real inteiro (370 clubes, 10.471 jogadores, 21 competições) numa sala, no Cloudflare.** Feito com um Worker de laboratório temporário (`tools/online-lab/src/liga-real.ts`, já apagado) que estende a `LeagueRoom` de verdade e lê o pacote `mundo-real/2026.11` do bucket de produção, sem passar pelo Turnstile.
+
+| Passo | Tempo (de quem chama) | CPU (do `wrangler tail`) |
+|---|---|---|
+| Criar a sala (ler o pacote do R2, descomprimir, montar o mundo, gravar 12 MB no SQLite) | 1,9 a 2,8 s | ~1,1 a 1,7 s |
+| Sentar 2 técnicos | ~0,2 s | 1 ms |
+| Iniciar a liga (calendário de 21 competições, 74 eventos) | ~0,25 s | 9 a 32 ms |
+| Reinício real do objeto e recarga do SQLite | ~0,5 s | ~90 ms |
+
+Memória: o Cloudflare não deixa ler a memória (`process.memoryUsage()` dá zeros). Medi pelo teto, segurando lastro no heap antes de criar a sala: **passou com lastro de até 260 blocos (~196 MB no Node), sem reinício**, com o mundo vivo (~50 MB) por cima. Não achei o teto, ou seja, o limite de 128 MB não aparece neste caminho (criar e iniciar); ele só apareceu na B5 em temporadas completas gravando. A leitura honesta continua: **criar e iniciar a sala do mundo real cabe com folga; o pico de uma virada de temporada com gravação ainda é medido na B9**.
+
+**Estado do servidor depois do teste:** nenhuma liga nem identidade no D1; Worker de laboratório apagado (as salas de teste foram junto); nada de teste no R2.
