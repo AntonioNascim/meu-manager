@@ -19,6 +19,8 @@ export interface IdentityStore {
   /** `false` se já existe (não sobrescreve). */
   create(record: IdentityRecord): Promise<boolean>
   setLastSeen(playerId: string, at: number): Promise<void>
+  /** Troca o apelido (Fase 6, B8.1). */
+  setNickname(playerId: string, nickname: string): Promise<void>
   /** "Apagar minha conta" e a limpeza por falta de uso. */
   delete(playerId: string): Promise<void>
   /** Contas sem nenhum acesso desde `before` (limpeza de 12 meses). */
@@ -140,6 +142,27 @@ export async function requireIdentity(req: ApiRequest, action: LimitAction, deps
   return { ok: true, record }
 }
 
+/**
+ * Troca o apelido (B8.1): `PUT /api/me` com `{ nickname }`, assinado. Passa pelo mesmo filtro do cadastro; não gasta Turnstile.
+ */
+export async function changeNickname(req: ApiRequest, deps: ApiDeps): Promise<ApiResult<{ playerId: string; nickname: string }>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result
+  const text = typeof req.body === 'string' ? req.body : new TextDecoder().decode(req.body)
+  let raw: unknown
+  try {
+    raw = text.length > MAX_BODY_BYTES ? undefined : JSON.parse(text)
+  } catch {
+    raw = undefined
+  }
+  const o = raw as Record<string, unknown> | undefined
+  if (!o || typeof o !== 'object' || Array.isArray(o) || Object.keys(o).some((k) => k !== 'nickname') || typeof o.nickname !== 'string') return fail(400, { error: 'bad-body' })
+  const checked = checkName(o.nickname)
+  if (!checked.ok) return fail(400, { error: 'bad-nickname', issue: checked.issue })
+  await deps.store.setNickname(auth.record.playerId, checked.name)
+  return { status: 200, body: { playerId: auth.record.playerId, nickname: checked.name } }
+}
+
 /** Verificador do Turnstile do Cloudflare (`siteverify`). O segredo vem do ambiente do Worker, nunca do repositório. */
 export function cloudflareTurnstile(secret: string, fetchFn: typeof fetch = fetch): TurnstileVerifier {
   return {
@@ -172,6 +195,10 @@ export class MemoryIdentityStore implements IdentityStore {
   async setLastSeen(playerId: string, at: number) {
     const r = this.rows.get(playerId)
     if (r) r.lastSeen = at
+  }
+  async setNickname(playerId: string, nickname: string) {
+    const r = this.rows.get(playerId)
+    if (r) r.nickname = nickname
   }
   async delete(playerId: string) {
     this.rows.delete(playerId)

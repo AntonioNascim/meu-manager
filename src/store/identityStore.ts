@@ -63,6 +63,14 @@ export class IdentityStore {
     return made
   }
 
+  /**
+   * Guarda uma identidade que o servidor já aceitou (criada na tela de cadastro: o código é sorteado antes e só é gravado depois de o servidor
+   * aceitar, para uma falha de rede não deixar uma conta "meio criada" no aparelho). O código ainda precisa ser confirmado (`confirmCode`).
+   */
+  async adopt(made: { identity: Identity; recoveryCode: string[] }, now: number, nickname?: string): Promise<void> {
+    await this.db.identity.put({ id: 'me', playerId: made.identity.playerId, secretKey: made.identity.secretKey, nickname, recoveryWords: made.recoveryCode, codeConfirmed: false, createdAt: now, registered: true })
+  }
+
   /** Outro aparelho: a identidade volta a partir do código (já registrada no servidor, se foi criada lá antes). */
   async recover(words: readonly string[], now: number): Promise<Identity> {
     const identity = identityFromRecoveryCode(words)

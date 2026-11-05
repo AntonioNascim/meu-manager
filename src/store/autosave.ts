@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from 'react'
 import { getActiveSlot, getGame, subscribeGame } from './gameStore'
 import type { Game } from './game'
+import { onSlotSaved } from './onlineAccount'
 import { saveDetailed } from './saves'
 import type { SaveStats } from './saves'
 
@@ -41,6 +42,8 @@ function writeNow(): Promise<void> {
     .then(({ summary, stats }) => {
       lastSaveMs = stats.ms
       setStatus({ state: 'saved', at: summary.savedAt, stats })
+      // Espaço ligado à nuvem (B8.2): agenda o envio. Sem conta ou sem a nuvem ligada, não faz nada.
+      onSlotSaved(slot)
     })
     .catch((error: unknown) => {
       lastSaved = null

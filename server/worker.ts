@@ -8,7 +8,7 @@
  * O endereço de quem pede é usado só no instante do pedido, para limitar abuso; nunca é gravado nem registrado.
  */
 import { SqlGuard, type SqlLike } from '../src/online/guard'
-import { cloudflareTurnstile, MAX_BODY_BYTES, registerIdentity, requireIdentity, type ApiDeps, type ApiRequest, type ApiResult } from '../src/online/identityApi'
+import { changeNickname, cloudflareTurnstile, MAX_BODY_BYTES, registerIdentity, requireIdentity, type ApiDeps, type ApiRequest, type ApiResult } from '../src/online/identityApi'
 import type { LimitAction, LimitResult, RateLimit } from '../src/online/rateLimit'
 import type { NonceStore } from '../src/online/signedRequest'
 import { bodyLimitFor, handleCloudRequest, isCloudPath, type CloudApiDeps } from '../src/online/cloudSaveApi'
@@ -239,6 +239,7 @@ export default {
       if (!auth.ok) return respond(auth.result, cors)
       return Response.json({ playerId: auth.record.playerId, nickname: auth.record.nickname ?? null, createdAt: auth.record.createdAt }, { headers: cors })
     }
+    if (url.pathname === '/api/me' && req.method === 'PUT') return respond(await changeNickname(request, deps), cors)
     return Response.json({ error: 'not-found' }, { status: 404, headers: cors })
   },
 }

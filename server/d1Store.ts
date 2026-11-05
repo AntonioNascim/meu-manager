@@ -37,6 +37,10 @@ export class D1IdentityStore implements IdentityStore {
     await this.db.prepare('UPDATE identities SET last_seen = ? WHERE player_id = ?').bind(at, playerId).run()
   }
 
+  async setNickname(playerId: string, nickname: string): Promise<void> {
+    await this.db.prepare('UPDATE identities SET nickname = ? WHERE player_id = ?').bind(nickname, playerId).run()
+  }
+
 
   async delete(playerId: string): Promise<void> {
     await this.db.prepare('DELETE FROM identities WHERE player_id = ?').bind(playerId).run()
