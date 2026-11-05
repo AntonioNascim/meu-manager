@@ -51,6 +51,7 @@ export const useAccount = (): AccountState =>
   useSyncExternalStore(
     (l) => (listeners.add(l), () => listeners.delete(l)),
     () => state,
+    () => state,
   )
 
 export const getAccount = (): AccountState => state
