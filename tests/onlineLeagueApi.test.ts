@@ -1,0 +1,261 @@
+import { describe, expect, it } from 'vitest'
+import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, createLeague, getLeague, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { MemoryLeagueStore } from '../src/online/leagueMemory'
+import { createIdentity, type Identity } from '../src/online/identity'
+import { RateLimiter } from '../src/online/rateLimit'
+import { MemoryNonceStore, signRequest } from '../src/online/signedRequest'
+
+let x = 11
+const random = (n: number) =>
+  Uint8Array.from({ length: n }, () => {
+    x = (Math.imul(x, 1664525) + 1013904223) >>> 0
+    return x >>> 24
+  })
+const T0 = 1_800_000_000_000
+
+/** Sala falsa: guarda as vagas e diz "unknown-team" para clubes que não começam com "team-". */
+class FakeRoom implements RoomPort {
+  seats = new Map<string, Map<string, string>>()
+  started = new Set<string>()
+  destroyed: string[] = []
+  failInit = false
+  async init(league: { id: string }) {
+    if (this.failInit) return { ok: false as const, error: 'unavailable' as const }
+    this.seats.set(league.id, new Map())
+    return { ok: true as const }
+  }
+  async addSeat(id: string, playerId: string, teamId: string) {
+    const room = this.seats.get(id)
+    if (!room) return { ok: false as const, error: 'not-found' as const }
+    if (!teamId.startsWith('team-')) return { ok: false as const, error: 'unknown-team' as const }
+    if ([...room.values()].includes(teamId)) return { ok: false as const, error: 'team-taken' as const }
+    room.set(playerId, teamId)
+    return { ok: true as const }
+  }
+  async removeSeat(id: string, playerId: string) {
+    this.seats.get(id)?.delete(playerId)
+    return { ok: true as const }
+  }
+  async start(id: string) {
+    this.started.add(id)
+    return { ok: true as const }
+  }
+  async destroy(id: string) {
+    this.destroyed.push(id)
+    this.seats.delete(id)
+  }
+}
+
+function setup() {
+  let now = T0
+  const room = new FakeRoom()
+  const identities = new MemoryIdentityStore()
+  const deps: LeagueDeps = {
+    store: identities,
+    identities,
+    turnstile: { verify: async (t) => t !== 'ruim' },
+    limiter: new RateLimiter(),
+    nonces: new MemoryNonceStore(() => now),
+    now: () => now,
+    leagues: new MemoryLeagueStore(),
+    rooms: room,
+    randomBytes: random,
+  }
+  const people = new Map<string, Identity>()
+  const person = async (name: string): Promise<Identity> => {
+    const { identity } = createIdentity(random)
+    await identities.create({ playerId: identity.playerId, createdAt: now, lastSeen: now, nickname: name })
+    people.set(name, identity)
+    return identity
+  }
+  let ip = 0
+  const req = (who: Identity, method: string, path: string, body: unknown = {}, over: Partial<ApiRequest> = {}): ApiRequest => {
+    const text = JSON.stringify(body)
+    const parts = { method, path, body: text }
+    return { ...parts, ip: `203.0.113.${(ip++ % 250) + 1}`, authorization: signRequest(who, parts, now, random), ...over }
+  }
+  return { deps, room, person, req, advance: (ms: number) => (now += ms) }
+}
+
+const create = { turnstileToken: 'ok', name: 'Liga dos Amigos', kind: 'friends', world: { source: 'ficticio' }, pace: 'fast', band: 'night', maxHumans: 4 }
+
+describe('criar liga', () => {
+  it('cria liga de amigos com código de 8 caracteres e o ADM escolhe o clube', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const res = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, teamId: 'team-1' }), s.deps)
+    expect(res.status).toBe(201)
+    if (res.status !== 201) return
+    expect(res.body).toMatchObject({ name: 'Liga dos Amigos', kind: 'friends', pace: 'fast', status: 'lobby', humans: 1, isAdmin: true, myTeamId: 'team-1' })
+    expect(res.body.code).toHaveLength(8)
+    expect([...res.body.code!].every((c) => CODE_ALPHABET.includes(c))).toBe(true)
+    expect(s.room.seats.get(res.body.id)?.get(ana.playerId)).toBe('team-1')
+  })
+
+  it('liga aberta só usa o ritmo Normal e não tem código', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const res = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, kind: 'open' }), s.deps)
+    expect(res.status).toBe(201)
+    if (res.status === 201) expect(res.body).toMatchObject({ pace: 'normal' }), expect(res.body.code).toBeUndefined()
+  })
+
+  it('recusa nome ofensivo, Turnstile reprovado, corpo ruim e campo extra', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    expect((await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, name: 'Moderador' }), s.deps)).body).toMatchObject({ error: 'bad-name', issue: 'impersonal' })
+    expect((await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, turnstileToken: 'ruim' }), s.deps)).status).toBe(403)
+    for (const bad of [{ ...create, maxHumans: 1 }, { ...create, maxHumans: 21 }, { ...create, pace: 'turbo' }, { ...create, band: 'custom' }, { ...create, world: { source: 'real', version: 'x' } }, { ...create, extra: 1 }, { ...create, tzOffsetMin: 7 }]) {
+      // Uma identidade nova por tentativa: o limite de criar por dia não é o assunto aqui.
+      expect((await createLeague(s.req(await s.person('Fulano'), 'POST', '/api/leagues', bad), s.deps)).status).toBe(400)
+    }
+  })
+
+  it('limites: 3 ligas ativas por ADM e falha da sala não deixa liga pela metade', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    for (let i = 0; i < LEAGUE_LIMITS.activeCreated; i++) {
+      expect((await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, name: `Liga ${i} Teste` }), s.deps)).status).toBe(201)
+      s.advance(25 * 3_600_000) // o limite de criar por dia não é o assunto aqui
+    }
+    expect((await createLeague(s.req(ana, 'POST', '/api/leagues', create), s.deps)).body).toMatchObject({ error: 'too-many-created' })
+    const bia = await s.person('Bia')
+    s.room.failInit = true
+    expect((await createLeague(s.req(bia, 'POST', '/api/leagues', create), s.deps)).status).toBe(502)
+    expect(await s.deps.leagues.mine(bia.playerId)).toEqual([])
+    expect(await s.deps.leagues.countCreated(bia.playerId)).toBe(0)
+  })
+
+  it('clube que não existe ao criar: a liga não fica', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    expect((await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, teamId: 'xx' }), s.deps)).status).toBe(400)
+    expect(await s.deps.leagues.countCreated(ana.playerId)).toBe(0)
+  })
+})
+
+describe('diretório, convite e entrada', () => {
+  it('liga aberta aparece no diretório; de amigos não; entra com clube livre', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const open = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, kind: 'open', name: 'Liga Aberta' }), s.deps)
+    await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, name: 'Liga Fechada' }), s.deps)
+    const dir = await listOpenLeagues(s.req(bia, 'GET', '/api/leagues/open', ''), s.deps)
+    expect(dir.status === 200 && dir.body.leagues.map((l) => l.name)).toEqual(['Liga Aberta'])
+    expect(dir.status === 200 && dir.body.leagues[0]!.adminNickname).toBe('Ana')
+    if (open.status !== 201) throw new Error('x')
+    const joined = await joinLeague(s.req(bia, 'POST', `/api/leagues/${open.body.id}/join`, { teamId: 'team-7' }), s.deps, open.body.id)
+    expect(joined.status).toBe(200)
+    expect(joined.status === 200 && joined.body.members.map((m) => [m.nickname, m.teamId])).toEqual([['Bia', 'team-7']])
+    expect((await myLeagues(s.req(bia, 'GET', '/api/leagues/mine', ''), s.deps)).body).toMatchObject({ leagues: [{ id: open.body.id, humans: 1 }] })
+  })
+
+  it('liga de amigos: código certo entra, errado é recusado (e conta tentativas), sem código não se vê a liga', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const made = await createLeague(s.req(ana, 'POST', '/api/leagues', create), s.deps)
+    if (made.status !== 201) throw new Error('x')
+    const id = made.body.id
+    const code = made.body.code!
+    expect((await getLeague(s.req(bia, 'GET', `/api/leagues/${id}`, ''), s.deps, id)).status).toBe(404)
+    expect((await resolveCode(s.req(bia, 'POST', '/api/leagues/code', {}), s.deps, 'ABCD2345')).body).toMatchObject({ error: 'wrong-code' })
+    const seen = await resolveCode(s.req(bia, 'POST', '/api/leagues/code', {}), s.deps, code.toLowerCase().replace(/(.{4})/, '$1-'))
+    expect(seen.status === 200 && seen.body.id).toBe(id)
+    expect(seen.status === 200 && seen.body.code).toBeUndefined()
+    expect((await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-2' }), s.deps, id)).body).toMatchObject({ error: 'wrong-code' })
+    expect((await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-2', code }), s.deps, id)).status).toBe(200)
+    expect(normalizeCode(' ab-cd 23 ')).toBe('ABCD23')
+  })
+
+  it('tentativas de código: 10 por hora, depois 429', async () => {
+    const s = setup()
+    const bia = await s.person('Bia')
+    for (let i = 0; i < 10; i++) expect((await resolveCode(s.req(bia, 'POST', '/api/leagues/code', {}), s.deps, 'ABCD2345')).status).toBe(404)
+    const eleventh = await resolveCode(s.req(bia, 'POST', '/api/leagues/code', {}), s.deps, 'ABCD2345')
+    expect(eleventh.status).toBe(429)
+  })
+
+  it('recusa clube ocupado, liga cheia, entrada fechada, quem já é membro e o limite de 5 ligas', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const cai = await s.person('Cai')
+    const made = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, kind: 'open', maxHumans: 2, teamId: 'team-1' }), s.deps)
+    if (made.status !== 201) throw new Error('x')
+    const id = made.body.id
+    expect((await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-1' }), s.deps, id)).body).toMatchObject({ error: 'team-taken' })
+    expect((await joinLeague(s.req(ana, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-3' }), s.deps, id)).body).toMatchObject({ error: 'already-member' })
+    expect((await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-2' }), s.deps, id)).status).toBe(200)
+    expect((await joinLeague(s.req(cai, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-3' }), s.deps, id)).body).toMatchObject({ error: 'league-full' })
+    // Liga cheia sai do diretório.
+    expect((await listOpenLeagues(s.req(cai, 'GET', '/api/leagues/open', ''), s.deps)).body).toMatchObject({ leagues: [] })
+    // Entrada fechada.
+    const other = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, kind: 'open', name: 'Outra Liga' }), s.deps)
+    if (other.status !== 201) throw new Error('x')
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${other.body.id}/close-entry`, {}), s.deps, other.body.id, 'close-entry')
+    expect((await joinLeague(s.req(cai, 'POST', `/api/leagues/${other.body.id}/join`, { teamId: 'team-5' }), s.deps, other.body.id)).body).toMatchObject({ error: 'entry-closed' })
+    // 5 ligas no máximo.
+    const dan = await s.person('Dan')
+    for (let i = 0; i < LEAGUE_LIMITS.participating; i++) {
+      const l = await createLeague(s.req(await s.person(`Adm${i}`), 'POST', '/api/leagues', { ...create, kind: 'open', name: `Aberta ${i} Teste`, maxHumans: 5 }), s.deps)
+      if (l.status !== 201) throw new Error('x')
+      expect((await joinLeague(s.req(dan, 'POST', `/api/leagues/${l.body.id}/join`, { teamId: `team-${10 + i}` }), s.deps, l.body.id)).status).toBe(200)
+    }
+    const last = await createLeague(s.req(await s.person('Admx'), 'POST', '/api/leagues', { ...create, kind: 'open', name: 'Sexta Liga' }), s.deps)
+    if (last.status !== 201) throw new Error('x')
+    expect((await joinLeague(s.req(dan, 'POST', `/api/leagues/${last.body.id}/join`, { teamId: 'team-30' }), s.deps, last.body.id)).body).toMatchObject({ error: 'too-many-joined' })
+  })
+})
+
+describe('ADM, sair e conta apagada', () => {
+  it('só o ADM inicia, remove, fecha a entrada, troca o código e passa o cargo', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const made = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, teamId: 'team-1' }), s.deps)
+    if (made.status !== 201) throw new Error('x')
+    const id = made.body.id
+    await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-2', code: made.body.code }), s.deps, id)
+    expect((await adminAction(s.req(bia, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')).status).toBe(403)
+    expect((await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')).body).toMatchObject({ status: 'running' })
+    expect(s.room.started.has(id)).toBe(true)
+    expect((await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')).status).toBe(409)
+    const rotated = await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/rotate-code`, {}), s.deps, id, 'rotate-code')
+    expect(rotated.status === 200 && rotated.body.code).not.toBe(made.body.code)
+    expect((await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/kick`, { playerId: bia.playerId }), s.deps, id, 'kick')).body).toMatchObject({ humans: 1 })
+    expect(s.room.seats.get(id)?.has(bia.playerId)).toBe(false)
+    expect((await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/kick`, { playerId: ana.playerId }), s.deps, id, 'kick')).status).toBe(400)
+  })
+
+  it('o ADM sai: o humano mais antigo assume; sem ninguém, a liga fecha e a sala é apagada', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const made = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, teamId: 'team-1' }), s.deps)
+    if (made.status !== 201) throw new Error('x')
+    const id = made.body.id
+    s.advance(1000)
+    await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-2', code: made.body.code }), s.deps, id)
+    expect((await leaveLeague(s.req(ana, 'POST', `/api/leagues/${id}/leave`, {}), s.deps, id)).status).toBe(200)
+    expect((await s.deps.leagues.get(id))?.adminId).toBe(bia.playerId)
+    await leaveLeague(s.req(bia, 'POST', `/api/leagues/${id}/leave`, {}), s.deps, id)
+    expect((await s.deps.leagues.get(id))?.status).toBe('closed')
+    expect(s.room.destroyed).toContain(id)
+  })
+
+  it('conta apagada: sai de todas as ligas', async () => {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const a = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, kind: 'open', teamId: 'team-1' }), s.deps)
+    if (a.status !== 201) throw new Error('x')
+    await joinLeague(s.req(bia, 'POST', `/api/leagues/${a.body.id}/join`, { teamId: 'team-2' }), s.deps, a.body.id)
+    await leaveAllLeagues(s.deps, ana.playerId)
+    expect(await s.deps.leagues.mine(ana.playerId)).toEqual([])
+    expect((await s.deps.leagues.get(a.body.id))?.adminId).toBe(bia.playerId)
+    expect(s.room.seats.get(a.body.id)?.has(ana.playerId)).toBe(false)
+  })
+})

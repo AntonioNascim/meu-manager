@@ -25,13 +25,13 @@ export type NicknameResult =
   | { ok: false; reason: 'bad-nickname'; issue: NameIssue }
   | { ok: false; reason: 'rate-limited' | 'offline' | 'unauthorized' | 'unknown-identity' | 'server' }
 
-async function send(deps: IdentityClientDeps, identity: Identity, method: string, path: string, body: string): Promise<{ status: number; json: Record<string, unknown> } | 'offline'> {
+export async function signedCall(deps: IdentityClientDeps, identity: Identity, method: string, path: string, body: string): Promise<{ status: number; json: Record<string, unknown> } | 'offline'> {
   const authorization = signRequest(identity, { method, path, body }, deps.now(), deps.randomBytes)
   try {
     const res = await deps.fetchFn(`${deps.base}${path}`, {
       method,
       headers: { Authorization: authorization, 'Content-Type': 'application/json' },
-      body,
+      body: method === 'GET' || method === 'HEAD' ? undefined : body,
       signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(deps.timeoutMs ?? 20_000) : undefined,
     })
     let json: Record<string, unknown> = {}
@@ -48,7 +48,7 @@ async function send(deps: IdentityClientDeps, identity: Identity, method: string
 
 /** Cria a conta (ou reconhece a que já existe). `turnstileToken` só é conferido para contas novas. */
 export async function registerIdentity(deps: IdentityClientDeps, identity: Identity, turnstileToken: string, nickname?: string): Promise<RegisterResult> {
-  const res = await send(deps, identity, 'POST', '/api/identity', JSON.stringify({ turnstileToken, ...(nickname !== undefined ? { nickname } : {}) }))
+  const res = await signedCall(deps, identity, 'POST', '/api/identity', JSON.stringify({ turnstileToken, ...(nickname !== undefined ? { nickname } : {}) }))
   if (res === 'offline') return { ok: false, reason: 'offline' }
   if (res.status === 200 || res.status === 201) return { ok: true, created: res.json.created === true, nickname: typeof res.json.nickname === 'string' ? res.json.nickname : undefined }
   if (res.status === 400 && res.json.error === 'bad-nickname') return { ok: false, reason: 'bad-nickname', issue: res.json.issue as NameIssue }
@@ -60,7 +60,7 @@ export async function registerIdentity(deps: IdentityClientDeps, identity: Ident
 
 /** Troca o apelido no servidor. */
 export async function changeNickname(deps: IdentityClientDeps, identity: Identity, nickname: string): Promise<NicknameResult> {
-  const res = await send(deps, identity, 'PUT', '/api/me', JSON.stringify({ nickname }))
+  const res = await signedCall(deps, identity, 'PUT', '/api/me', JSON.stringify({ nickname }))
   if (res === 'offline') return { ok: false, reason: 'offline' }
   if (res.status === 200) return { ok: true, nickname: String(res.json.nickname) }
   if (res.status === 400 && res.json.error === 'bad-nickname') return { ok: false, reason: 'bad-nickname', issue: res.json.issue as NameIssue }

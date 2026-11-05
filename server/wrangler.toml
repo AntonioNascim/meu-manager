@@ -2,6 +2,8 @@
 name = "meu-manager-api"
 main = "worker.ts"
 compatibility_date = "2026-10-01"
+# O motor do jogo roda dentro da sala da liga (B7/B8.3); a mesma bandeira do laboratório de medições.
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 # Páginas autorizadas a chamar a API (CORS): o site no GitHub Pages e o servidor de desenvolvimento.
@@ -22,9 +24,18 @@ bucket_name = "meu-manager-pacotes"
 name = "GUARD"
 class_name = "Guard"
 
+[[durable_objects.bindings]]
+name = "LEAGUES"
+class_name = "LeagueRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Guard"]
+
+# Uma sala por liga online (Fase 6, B8.3). Só vale depois de `wrangler deploy` (gera custo: ver docs/fase6-proposta.md, seção 12).
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["LeagueRoom"]
 
 # Saves na nuvem (Fase 6, B4): bucket PRIVADO (sem domínio público, sem r2.dev). Só o Worker lê e grava, depois de conferir a assinatura.
 [[r2_buckets]]

@@ -22,12 +22,14 @@ export function Button({
   disabled,
   variant = 'primary',
   className = '',
+  'data-testid': testId,
 }: {
   children: ReactNode
   onClick?: () => void
   disabled?: boolean
   variant?: 'primary' | 'secondary'
   className?: string
+  'data-testid'?: string
 }) {
   const color = variant === 'primary' ? 'bg-accent text-accent-ink hover:brightness-110' : 'bg-surface-2 text-slate-100 ring-1 ring-line hover:bg-slate-700'
   return (
@@ -35,6 +37,7 @@ export function Button({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       className={`min-h-12 rounded-xl px-5 font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${color} ${className}`}
     >
       {children}

@@ -13,7 +13,14 @@
  * os testes locais usam um Worker de laboratório). Estruturas do Cloudflare entram como tipos mínimos para não depender de pacote de tipos.
  */
 import {
+  addSeat,
   advanceLeague,
+  defaultLeagueConfig,
+  DEFAULT_CONFIG,
+  bandOf,
+  dropLeavingSeats,
+  removeSeat,
+  startLeague,
   enqueueCommand,
   finishLiveEvent,
   isFinished,
@@ -40,6 +47,9 @@ import {
 } from '../src/engine/league'
 import type { SeasonState } from '../src/engine/season'
 import { turnRunner } from '../src/store/game'
+import { createLeagueWorld } from '../src/store/leagueWorld'
+import type { LeagueRecord } from '../src/online/leagueApi'
+import type { DataPackage } from '../src/data/package/types'
 import { SqliteWorldStore, type WorldSql } from '../src/store/worldStore'
 import { frameSince, makeStoredReplay, parseClientMessage, replayKey, type Cursor, type ServerMessage } from '../src/online/liveProtocol'
 import { fingerprintResult } from '../src/online/liveProtocol'
@@ -71,11 +81,15 @@ interface RoomCtx {
   getWebSockets(tag?: string): SocketLike[]
 }
 interface RoomEnv {
+  /** Bucket dos pacotes de dados (`meu-manager-pacotes`): o mundo real de uma liga é lido dele. */
+  PACKAGES?: { get(key: string): Promise<{ body: ReadableStream } | null> }
   /** Bucket opcional dos registros de reprodução (`meu-manager-replays`). */
   REPLAYS?: { put(key: string, value: string): Promise<unknown> }
 }
 
 export interface RoomMeta {
+  /** A liga como o índice a conhece (nome, ritmo, faixa, mundo...). Ausente em salas de laboratório. */
+  record?: LeagueRecord
   leagueId: string
   /** Aberta ou só para amigos (muda a regra de vaga aberta). */
   kind: 'open' | 'friends'
@@ -125,14 +139,19 @@ export class LeagueRoom {
 
   /** Recarrega da memória persistente o que faltar (objeto novo, reinício ou despertar). */
   protected ensureLoaded(): boolean {
-    if (this.league && this.world && this.meta) return true
+    return this.ensureWorld() && this.league !== undefined
+  }
+
+  /** Carrega a sala (mundo e, se a liga já começou, o estado dela). Numa liga ainda no saguão não há `league`. */
+  protected ensureWorld(): boolean {
+    if (this.world && this.meta && (this.league || this.get('league') === undefined)) return true
     const meta = this.get('meta')
-    const league = this.get('league')
-    if (!meta || !league) return false
-    const world = this.store.load()
+    if (!meta) return false
+    const world = this.world ?? this.store.load()
     if (!world) return false
     this.meta = JSON.parse(meta) as RoomMeta
-    this.league = JSON.parse(league) as LeagueState
+    const league = this.get('league')
+    if (league) this.league = JSON.parse(league) as LeagueState
     this.world = world
     this.cursor = JSON.parse(this.get('cursor') ?? '{}') as Cursor
     const liveMeta = this.get('live')
@@ -181,7 +200,7 @@ export class LeagueRoom {
   }
 
   /** Cria a sala com o mundo e a liga prontos (B8 faz isto pelo fluxo de "Criar liga"). */
-  protected create(meta: RoomMeta, league: LeagueState, world: SeasonState): void {
+  protected create(meta: RoomMeta, league: LeagueState | undefined, world: SeasonState): void {
     this.meta = meta
     this.league = league
     this.world = world
@@ -291,8 +310,9 @@ export class LeagueRoom {
     for (const s of done.newLongAutopilot) notices.push({ at: now, type: 'long-autopilot', playerId: s.playerId, teamId: s.teamId })
     for (const s of done.vacated) notices.push({ at: now, type: meta.kind === 'open' ? 'vacancy-opened' : 'suggest-remove', playerId: s.playerId, teamId: s.teamId })
     this.set('notices', JSON.stringify(notices.slice(-50)))
-    this.league = done.stepped.league
     this.world = done.stepped.world
+    // Quem pediu para sair no meio do evento fecha a vaga agora.
+    this.league = dropLeavingSeats(done.stepped.league, this.world)
     this.live = undefined
     this.cursor = {}
   }
@@ -425,9 +445,94 @@ export class LeagueRoom {
     return Response.json(this.sql.exec('SELECT k FROM replays ORDER BY k').toArray().map((r) => String(r.k)))
   }
 
+  // ------------------------------------------------------- vagas e saguão (B8.3)
+  private lobby(): { playerId: string; teamId: string }[] {
+    return JSON.parse(this.get('lobby') ?? '[]') as { playerId: string; teamId: string }[]
+  }
+
+  /** Monta o mundo da liga: o fictício nasce da semente; o real é lido do bucket dos pacotes (versão fixada na criação da liga). */
+  protected async buildWorld(record: LeagueRecord): Promise<SeasonState | 'bad-world'> {
+    if (record.world.source === 'ficticio') return createLeagueWorld(record.seed)
+    const object = await this.env.PACKAGES?.get(`mundo-real/${record.world.version}/pacote.json.gz`)
+    if (!object) return 'bad-world'
+    const text = await new Response(object.body.pipeThrough(new DecompressionStream('gzip'))).text()
+    return createLeagueWorld(record.seed, JSON.parse(text) as DataPackage)
+  }
+
+  /** Pedidos do Worker da frente (só ele alcança o objeto): criar a sala, entrar, sair, iniciar e apagar. */
+  protected async internal(path: string, body: Record<string, unknown>): Promise<Response> {
+    const now = this.now()
+    const ok = () => Response.json({ ok: true })
+    const no = (error: string, status = 200) => Response.json({ ok: false, error }, { status })
+    if (path === '/internal/init') {
+      const record = body as unknown as LeagueRecord
+      const world = await this.buildWorld(record)
+      if (world === 'bad-world') return no('bad-world')
+      this.league = undefined
+      this.live = undefined
+      this.world = world
+      this.create({ record, leagueId: record.id, kind: record.kind, createdAt: now }, undefined, world)
+      this.set('lobby', '[]')
+      return ok()
+    }
+    if (path === '/internal/destroy') {
+      await this.ctx.storage.deleteAlarm()
+      await this.ctx.storage.deleteAll()
+      this.league = undefined
+      this.world = undefined
+      this.meta = undefined
+      this.live = undefined
+      for (const ws of this.ctx.getWebSockets()) ws.close(1000, 'liga encerrada')
+      return ok()
+    }
+    if (!this.ensureWorld()) return no('not-found', 404)
+    const world = this.world as SeasonState
+    const meta = this.meta as RoomMeta
+    const playerId = String(body.playerId ?? '')
+    if (path === '/internal/seat/add') {
+      const teamId = String(body.teamId ?? '')
+      if (this.league) {
+        const res = addSeat(this.league, world, playerId, teamId, now)
+        if (!res.ok) return no(res.error)
+        this.league = res.league
+        this.persist()
+        await this.schedule(now)
+        return ok()
+      }
+      const members = this.lobby()
+      if (!world.teams.some((t) => t.id === teamId)) return no('unknown-team')
+      if (members.some((m) => m.playerId === playerId)) return no('already-seated')
+      if (members.some((m) => m.teamId === teamId)) return no('team-taken')
+      this.set('lobby', JSON.stringify([...members, { playerId, teamId }]))
+      return ok()
+    }
+    if (path === '/internal/seat/remove') {
+      if (this.league) {
+        const res = removeSeat(this.league, world, playerId)
+        if (!res.ok) return no(res.error)
+        this.league = res.league
+        this.persist()
+        await this.schedule(now)
+        return ok()
+      }
+      this.set('lobby', JSON.stringify(this.lobby().filter((m) => m.playerId !== playerId)))
+      return ok()
+    }
+    if (path === '/internal/start') {
+      if (this.league || !meta.record) return no('bad-state')
+      const r = meta.record
+      this.league = startLeague(defaultLeagueConfig({ ...DEFAULT_CONFIG(r.id), pace: r.pace, band: bandOf(r.band), tzOffsetMin: r.tzOffsetMin }, r.directResult), world, this.lobby(), now)
+      this.persist({ world: true })
+      await this.run()
+      return ok()
+    }
+    return no('not-found', 404)
+  }
+
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url)
     try {
+      if (url.pathname.startsWith('/internal/') && req.method === 'POST') return await this.internal(url.pathname, (await req.json().catch(() => ({}))) as Record<string, unknown>)
       if (url.pathname === '/ws' && req.headers.get('Upgrade') === 'websocket') return await this.upgrade(req)
       if (url.pathname === '/replays') return this.replays(url.searchParams.get('key') ?? undefined)
       if (url.pathname.startsWith('/admin/')) return await this.admin(url.pathname, req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {})

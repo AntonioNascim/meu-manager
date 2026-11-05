@@ -47,6 +47,8 @@ export interface Seat {
   missed?: number
   /** Última vez (ms) que o técnico esteve presente numa partida ou deu Pronto; sem valor, vale a entrada na liga. */
   lastActiveAt?: number
+  /** Pediu para sair no meio de um evento: joga o resto com a IA e sai quando o evento acabar (B8.3). */
+  leaving?: boolean
 }
 
 export interface LeagueConfig {
@@ -205,7 +207,7 @@ export function previewAdvance(league: LeagueState, world: SeasonState): { date:
   return ev ? { date: dateOfDay(ev.day), notReady: notReady(league, world).map((s) => s.playerId) } : undefined
 }
 
-function refreshEvents(league: LeagueState, world: SeasonState): LeagueState {
+export function refreshEvents(league: LeagueState, world: SeasonState): LeagueState {
   const days = eventDaysOf(world, league.seats)
   const same = days.length === league.clock.events.length && days.every((d, i) => d.day === league.clock.events[i]!.day && d.kind === league.clock.events[i]!.kind)
   return same ? league : { ...league, clock: replanClock(league.clock, league.config.clock, days) }

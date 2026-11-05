@@ -24,12 +24,16 @@ import type { CloudSlotState } from '../../store/cloudState'
 type View = 'menu' | 'new' | 'load' | 'package' | 'editor' | 'credits' | 'online'
 
 /** Atalhos de desenvolvimento: `/?menu=criar|entrar|nuvem|dados|codigo` abre a tela da conta online. */
-const DEV_ONLINE: Record<string, OnlineView> = { criar: 'create', entrar: 'recover', nuvem: 'cloud', dados: 'data', codigo: 'code' }
+const DEV_ONLINE: Record<string, OnlineView> = { criar: 'create', entrar: 'recover', nuvem: 'cloud', dados: 'data', codigo: 'code', ligas: 'leagues' }
+
+/** Código de convite que veio no endereço (`?convite=ABCD2345`): abre direto a tela de entrar na liga. */
+const inviteFromUrl = (): string | undefined => (typeof window === 'undefined' ? undefined : (new URLSearchParams(window.location.search).get('convite') ?? undefined))
 
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
   // Em desenvolvimento, /?editor=zero|padrao|15|21 abre o editor direto (&aba=leagues|clubs|players|cups|sheets|issues); /?menu=novo|creditos abre essas telas.
   const [view, setView] = useState<View>(() => {
+    if (inviteFromUrl()) return 'online'
     if (!import.meta.env.DEV || typeof window === 'undefined') return 'menu'
     const params = new URLSearchParams(window.location.search)
     if (params.get('editor')) return 'editor'
@@ -37,10 +41,11 @@ export function Start() {
     return params.get('menu') === 'novo' ? 'new' : params.get('menu') === 'creditos' ? 'credits' : 'menu'
   })
   const [onlineStart, setOnlineStart] = useState<OnlineView>(() => {
+    if (inviteFromUrl()) return 'join-code'
     if (!import.meta.env.DEV || typeof window === 'undefined') return 'create'
     return DEV_ONLINE[new URLSearchParams(window.location.search).get('menu') ?? ''] ?? 'create'
   })
-  const { account } = useAccount()
+  const { account, loaded } = useAccount()
   const [cloudStates, setCloudStates] = useState<CloudSlotState[]>([])
   useEffect(() => {
     if (account && view === 'menu') void cloudState.all().then(setCloudStates)
@@ -132,7 +137,9 @@ export function Start() {
 
   if (view === 'new') return <NewGame slots={slots} {...(dataPackage ? { dataPackage } : {})} onBack={() => { setDataPackage(undefined); setView('menu'); void refresh() }} />
   if (view === 'credits') return <Credits onBack={() => setView('menu')} />
-  if (view === 'online') return <OnlineArea start={onlineStart} onClose={() => { setView('menu'); void refresh() }} />
+  // Convite no endereço: espera ler a conta do aparelho para saber se pede o cadastro antes.
+  if (view === 'online' && inviteFromUrl() && !loaded) return null
+  if (view === 'online') return <OnlineArea start={account || !inviteFromUrl() ? onlineStart : 'create'} invite={inviteFromUrl()} onClose={() => { if (inviteFromUrl()) window.history.replaceState(null, '', window.location.pathname); setView('menu'); void refresh() }} />
   if (view === 'editor') return <Editor onBack={() => setView('menu')} onPlay={(chosen) => { setDataPackage(chosen); setView('new') }} />
   if (view === 'package') return <ImportPackage onBack={() => setView('menu')} onUse={(chosen) => { setDataPackage(chosen); setView('new') }} />
 
@@ -180,6 +187,9 @@ export function Start() {
               <div className="flex flex-col gap-2" data-testid="online-account">
                 <p className="font-semibold">{account.nickname ?? 'Conta online'}</p>
                 <p className="text-xs text-muted">Conta online · criada em {new Date(account.createdAt).toLocaleDateString('pt-BR')}</p>
+                <Button variant="secondary" onClick={() => openOnline('leagues')}>
+                  Ligas online
+                </Button>
                 <Button variant="secondary" onClick={() => openOnline('cloud')}>
                   Saves na nuvem{cloudStates.length > 0 ? ` (${cloudStates.filter((c) => c.enabled).length} de ${SLOT_COUNT})` : ''}
                 </Button>
@@ -192,7 +202,7 @@ export function Start() {
               </div>
             ) : (
               <div className="flex flex-col gap-2" data-testid="online-no-account">
-                <p className="text-sm text-muted">Saves na nuvem e, em breve, ligas entre jogadores. Sem e-mail e sem senha: a sua conta é um apelido e um código de 12 palavras que fica com você.</p>
+                <p className="text-sm text-muted">Ligas entre jogadores e saves na nuvem. Sem e-mail e sem senha: a sua conta é um apelido e um código de 12 palavras que fica com você.</p>
                 <Button onClick={() => openOnline('create')}>Criar minha conta online</Button>
                 <button type="button" className="min-h-12 text-sm text-muted underline" onClick={() => openOnline('recover')}>
                   Já tem uma conta? Entrar com o código de recuperação
