@@ -172,6 +172,23 @@ describe('na virada de temporada', () => {
     expect(applyPreContracts(renewed, [pre], 2026).applied).toEqual([])
   })
 
+
+  it('o limite de estrangeiros vale na hora de assinar: o comprador que completou o limite depois da oferta perde o pré-contrato', () => {
+    const buyer = state.teams.find((t) => t.id !== USER) as (typeof state.teams)[number]
+    const squad = state.players.filter((p) => p.teamId === buyer.id)
+    const home = buyer.country ?? 'Brazil'
+    const foreigner = (state.players.find((p) => p.teamId && p.teamId !== buyer.id && p.nationality !== home && lastYear(p) && !p.contract.loanedFrom)) as Player
+    const pre = { playerId: foreigner.id, fromTeamId: foreigner.teamId as string, toTeamId: buyer.id, salary: 50_000, years: 2, signedOn: '2026-08-01' }
+    // O clube tem espaço no elenco (contratos longos no resto do mundo não importam: só a regra do limite muda).
+    const roomyPlayers = state.players.filter((p) => p.teamId !== buyer.id || p.age < 30).map((p) => (p.teamId === buyer.id ? { ...p, contract: { ...p.contract, endDate: '2031-12-31' } } : p))
+    const abroad = roomyPlayers.filter((p) => p.teamId === buyer.id && p.nationality !== home).length
+    const team = (max: number) => ({ country: buyer.country, foreignLimit: { squad: max } })
+    // Com folga no limite, assina; com o limite já cheio (o número de estrangeiros que ele tem hoje), cai.
+    expect(applyPreContracts(roomyPlayers, [pre], 2026, undefined, undefined, () => team(abroad + 1)).applied).toHaveLength(1)
+    expect(applyPreContracts(roomyPlayers, [pre], 2026, undefined, undefined, () => team(abroad)).applied).toEqual([])
+    expect(squad.length).toBeGreaterThan(0)
+  })
+
   it('o comprador sem vaga no elenco perde o pré-contrato', () => {
     const player = state.players.find((p) => p.teamId && p.teamId !== USER && lastYear(p) && !p.contract.loanedFrom) as Player
     const pre = { playerId: player.id, fromTeamId: player.teamId as string, toTeamId: USER, salary: 50_000, years: 2, signedOn: '2026-08-01' }

@@ -177,7 +177,7 @@ export interface AppliedPreContract {
  * Na virada: quem assinou pré-contrato muda de clube com o contrato combinado (de graça). O pré-contrato cai se o
  * jogador já saiu do clube, se o contrato dele não vence mais ou se o comprador ficou sem vaga no elenco.
  */
-export function applyPreContracts(players: readonly Player[], preContracts: readonly PreContract[], year: number, due: (player: Player) => boolean = (p) => isLastContractYear(p, year), cycleOf?: (teamId: TeamId) => { year: number; split: boolean }): { players: Player[]; applied: AppliedPreContract[] } {
+export function applyPreContracts(players: readonly Player[], preContracts: readonly PreContract[], year: number, due: (player: Player) => boolean = (p) => isLastContractYear(p, year), cycleOf?: (teamId: TeamId) => { year: number; split: boolean }, buyerOf?: (teamId: TeamId) => Pick<Team, 'country' | 'foreignLimit'> | undefined): { players: Player[]; applied: AppliedPreContract[] } {
   const applied: AppliedPreContract[] = []
   const byId = new Map(players.map((p) => [p.id, p]))
   const stays = new Map<TeamId, number>()
@@ -187,6 +187,9 @@ export function applyPreContracts(players: readonly Player[], preContracts: read
     const p = byId.get(c.playerId)
     if (!p || p.teamId !== c.fromTeamId || !due(p)) continue
     if ((stays.get(c.toTeamId) ?? 0) >= SQUAD_MAX - 1) continue
+    // O limite de estrangeiros vale na hora de assinar, não só na oferta: entre os dois dias o clube pode ter completado o limite (base, mercado, outro pré-contrato).
+    const buyer = buyerOf?.(c.toTeamId)
+    if (buyer && squadForeignBlocked(buyer, [...byId.values()].filter((q) => (moved.get(q.id) ?? q).teamId === c.toTeamId).map((q) => moved.get(q.id) ?? q), p)) continue
     stays.set(c.toTeamId, (stays.get(c.toTeamId) ?? 0) + 1)
     moved.set(p.id, { ...p, teamId: c.toTeamId, contract: { salary: c.salary, endDate: contractEndFor((cycleOf?.(c.toTeamId).year ?? year) + c.years, cycleOf?.(c.toTeamId).split ?? false), releaseClause: Math.round((c.salary * 36) / 1000) * 1000 } })
     applied.push({ playerId: p.id, fromTeamId: c.fromTeamId, toTeamId: c.toTeamId })
