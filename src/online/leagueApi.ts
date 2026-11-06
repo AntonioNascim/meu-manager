@@ -89,6 +89,8 @@ export interface RoomPort {
   ready(leagueId: string, playerId: string, ready: boolean): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   control(leagueId: string, action: ControlAction, by: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   setPace(leagueId: string, pace: PaceId): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
+  /** Ticket de uso único (30 s) para abrir o WebSocket da partida ao vivo (B8.5). */
+  ticket(leagueId: string, playerId: string): Promise<{ ok: true; ticket: string; expiresInMs: number } | { ok: false; error: RoomFailure }>
 }
 
 export type ControlAction = 'advance' | 'pause' | 'resume'
@@ -526,6 +528,19 @@ export async function setReady(req: ApiRequest, deps: LeagueDeps, id: string): P
   const r = await deps.rooms.ready(id, auth.record.playerId, o.ready)
   if (!r.ok) return roomFailure(r.error)
   return { status: 200, body: { ready: o.ready } }
+}
+
+/** Ticket para o técnico (com clube na liga em andamento) abrir o WebSocket da partida: vale 30 s e uma vez só. */
+export async function liveTicket(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ ticket: string; expiresInMs: number }>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (!(await deps.leagues.members(id)).some((m) => m.playerId === auth.record.playerId)) return fail(404, { error: 'not-found' })
+  if (league.status !== 'running') return fail(409, { error: 'bad-state' })
+  const r = await deps.rooms.ticket(id, auth.record.playerId)
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { ticket: r.ticket, expiresInMs: r.expiresInMs } }
 }
 
 /** Avançar, Pausar e Retomar: só o ADM. */

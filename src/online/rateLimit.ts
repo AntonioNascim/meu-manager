@@ -25,6 +25,8 @@ export const RATE_LIMITS = {
   // Tetos por IP (B8.3): bem mais folgados que os por identidade, porque muita gente divide o mesmo IP (CGNAT das operadoras).
   createLeagueIp: [{ limit: 60, windowMs: DAY }],
   joinByCodeIp: [{ limit: 300, windowMs: HOUR }],
+  // Abrir o WebSocket da partida (B8.5): por IP, folgado para o CGNAT; tickets errados também contam.
+  liveConnectIp: [{ limit: 300, windowMs: MINUTE }],
 } as const satisfies Record<string, readonly LimitRule[]>
 
 export type LimitAction = keyof typeof RATE_LIMITS

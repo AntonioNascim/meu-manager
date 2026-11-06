@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { slotAt } from '../../../engine/grid'
 import type { MatchSnapshot } from '../../../engine/match'
-import { teamById } from '../../../store/game'
-import type { Game } from '../../../store/game'
+import type { Player } from '../../../engine/types'
 import { playerName } from '../../format'
 import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor, HOLD_MS, devFlag, devParam } from './pitchModel'
 import type { Beat, Layout, MarkKind, Placed, Pt, Side } from './pitchModel'
@@ -64,6 +63,17 @@ function Shirt({ shirt, trim, number, ink }: { shirt: string; trim: string; numb
   )
 }
 
+/** O que o campo precisa saber do mundo: cores e sigla dos dois times e o nome dos jogadores (o jogo solo passa o `season`; a liga online, o `roster`). */
+export interface PitchTeam {
+  id: string
+  colors: readonly [string, string]
+  abbreviation: string
+}
+export interface PitchData {
+  teams: readonly PitchTeam[]
+  players: readonly Pick<Player, 'id' | 'name' | 'nickname'>[]
+}
+
 interface View {
   beat: Beat | null
   /** Duração das transições (ms). */
@@ -75,9 +85,10 @@ interface View {
  * relógio da partida. A cada minuto simulado o lance mais recente vira uma sequência curta de batidas (meio,
  * progressão, chance, finalização); em 4x e 8x só a batida final aparece, sem setas.
  */
-export function Pitch({ game, snap, speed, running, numbers: shared }: { game: Game; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number> }) {
-  const home = teamById(game, snap.home.teamId)
-  const away = teamById(game, snap.away.teamId)
+export function Pitch({ data, snap, speed, running, numbers: shared }: { data: PitchData; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number> }) {
+  const teamOf = (id: string) => data.teams.find((t) => t.id === id) as PitchTeam
+  const home = teamOf(snap.home.teamId)
+  const away = teamOf(snap.away.teamId)
   const kits = useMemo(() => kitsFor(home.colors, away.colors), [home.colors, away.colors])
   const wingers = {
     home: snap.home.grid.map(slotAt).some((s) => (s.position === 'RW' || s.position === 'LW') && s.sector === 'attack'),
@@ -88,7 +99,7 @@ export function Pitch({ game, snap, speed, running, numbers: shared }: { game: G
   const ownNumbers = useRef(new Map<string, number>())
   // Os números podem vir de fora (as Trocas usam os mesmos); sem eles o campo guarda os seus.
   const numbers = { current: shared ?? ownNumbers.current }
-  const names = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
+  const names = useMemo(() => new Map(data.players.map((p) => [p.id, p])), [data.players])
   for (const [id, p] of layout) known.current.set(id, p)
   for (const p of layout.values()) assignNumber(numbers.current, p.side, p.playerId, p.slot)
 
@@ -152,7 +163,7 @@ export function Pitch({ game, snap, speed, running, numbers: shared }: { game: G
     const shown = [...fresh].reverse().find((e) => e.type === 'yellow-card' || e.type === 'red-card')
     if (!shown) return
     const who = names.get(shown.playerId)
-    setCard({ kind: shown.type === 'red-card' ? 'red' : 'yellow', name: who ? playerName(who) : '', team: teamById(game, shown.teamId).abbreviation, key: snap.events.length })
+    setCard({ kind: shown.type === 'red-card' ? 'red' : 'yellow', name: who ? playerName(who) : '', team: teamOf(shown.teamId).abbreviation, key: snap.events.length })
     window.clearTimeout(cardTimer.current)
     cardTimer.current = window.setTimeout(() => setCard(null), HOLD_MS.card)
   }, [snap.events.length]) // eslint-disable-line react-hooks/exhaustive-deps
