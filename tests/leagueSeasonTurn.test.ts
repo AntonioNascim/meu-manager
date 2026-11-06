@@ -19,8 +19,9 @@ const deps = { turn: turnRunner }
 const pyramid = pyramidOf(serieA)
 
 /** Avança a liga (como o ADM) até a virada de temporada do país das séries A e B. */
-function playSeason(): { before: Stepped; after: Stepped } {
-  let s: Stepped = { league: createLeague(defaultLeagueConfig(DEFAULT_CONFIG('liga-virada'), true), base, SEATS, T0), world: base, actions: [] }
+function playSeason(status?: Record<string, 'absent' | 'autopilot'>): { before: Stepped; after: Stepped } {
+  const league = createLeague(defaultLeagueConfig(DEFAULT_CONFIG('liga-virada'), true), base, SEATS, T0)
+  let s: Stepped = { league: { ...league, seats: league.seats.map((x) => (status?.[x.playerId] ? { ...x, status: status[x.playerId] as 'absent' | 'autopilot' } : x)) }, world: base, actions: [] }
   const startYear = cycleOfPyramid(s.world, pyramid).year
   let before = s
   let now = T0
@@ -80,5 +81,39 @@ describe('virada de temporada numa liga online (B8.7)', () => {
       const gone = squadBefore.filter((p) => !after.world.players.some((q) => q.id === p.id && q.teamId === id))
       for (const p of gone) expect(p.contract.endDate <= cycleEnd || p.contract.loanedFrom !== undefined || p.age >= 33).toBe(true)
     }
+  })
+}, 600_000)
+
+describe('virada de temporada: técnico ausente ou em piloto automático (B8.7)', () => {
+  const [ana, bia] = SEATS
+  const { before, after } = playSeason({ 'jogador-2': 'absent' })
+  const cycleEnd = cycleOfPyramid(before.world, pyramid).end
+  const afterById = new Map(after.world.players.map((p) => [p.id, p]))
+  const renewedIn = (teamId: string) =>
+    before.world.players.filter((p) => p.teamId === teamId && !p.contract.loanedFrom && p.contract.endDate <= cycleEnd).filter((p) => {
+      const now = afterById.get(p.id)
+      return now && now.teamId === teamId && now.contract.endDate > cycleEnd
+    })
+
+  it('a IA renova os contratos do clube do técnico ausente (como faz com os da IA); o clube do técnico ativo segue sem renovação automática', () => {
+    expect(renewedIn(bia!.teamId).length).toBeGreaterThan(0)
+    expect(renewedIn(ana!.teamId)).toEqual([])
+  })
+
+  it('a base do técnico ausente é decidida pela IA (ninguém fica esperando); a do ativo espera a decisão dele', () => {
+    const pending = (teamId: string) => after.world.academy.filter((p) => p.teamId === teamId && p.age >= ACADEMY.graduationAge)
+    expect(pending(bia!.teamId)).toEqual([])
+    expect(pending(ana!.teamId).length).toBeGreaterThan(0)
+  })
+
+  it('piloto automático conta como ausente na virada', () => {
+    const auto = playSeason({ 'jogador-2': 'autopilot' })
+    const end = cycleOfPyramid(auto.before.world, pyramid).end
+    const byId = new Map(auto.after.world.players.map((p) => [p.id, p]))
+    const renewed = auto.before.world.players.filter((p) => p.teamId === bia!.teamId && !p.contract.loanedFrom && p.contract.endDate <= end).filter((p) => {
+      const now = byId.get(p.id)
+      return now && now.teamId === bia!.teamId && now.contract.endDate > end
+    })
+    expect(renewed.length).toBeGreaterThan(0)
   })
 }, 600_000)
