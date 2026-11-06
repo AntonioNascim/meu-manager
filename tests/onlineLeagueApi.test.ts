@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -43,6 +43,12 @@ class FakeRoom implements RoomPort {
   }
   calls: string[] = []
   running = new Set<string>()
+  tradeOps: string[] = []
+  async trade(id: string, playerId: string, op: { op: string; offerId?: string; playerId?: string }) {
+    this.tradeOps.push(`${op.op}:${id}:${playerId}`)
+    if (op.op === 'offer' && op.playerId === 'recusa') return { ok: false as const, refused: 'fee-too-low', minimumSalary: 7000 }
+    return { ok: true as const, body: { windowOpen: true, offers: [], openAsBuyer: 0, reserved: 0, history: [], reports: [{ id: 'rp-1', at: 0, by: 'x', recordId: 'tr-1', reason: 'laranja' as const }] } }
+  }
   clubCalls: string[] = []
   async club(id: string, playerId: string) {
     this.clubCalls.push(`club:${id}:${playerId}`)
@@ -305,6 +311,38 @@ describe('andamento da liga (B8.4)', () => {
     expect(refused.status).toBe(409)
     expect(refused.body).toEqual({ error: 'club-refused', reason: 'salary', minimumSalary: 5000 })
     expect((await post(dudu, { type: 'promote', playerId: 'player-9' })).status).toBe(404)
+  })
+
+  it('Mercado: só membro e liga em andamento; as denúncias só o ADM vê; corpos conferidos; recusa devolve o motivo', async () => {
+    const { s, ana, bia, dudu, id } = await running()
+    const get = (who: Identity, op: Parameters<typeof tradeRead>[3]) => tradeRead(s.req(who, 'GET', `/api/leagues/${id}/trade`), s.deps, id, op)
+    expect((await get(bia, { op: 'body' })).status).toBe(409)
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    expect((await get(dudu, { op: 'body' })).status).toBe(404)
+    const adm = await get(ana, { op: 'body' })
+    const other = await get(bia, { op: 'body' })
+    expect(adm.status).toBe(200)
+    expect('body' in adm.body && adm.body.body?.reports).toHaveLength(1)
+    expect('body' in other.body && other.body.body?.reports).toEqual([])
+    const act = (who: Identity, kind: Parameters<typeof tradeAct>[3], body: unknown) => tradeAct(s.req(who, 'POST', `/api/leagues/${id}/trade-${kind}`, body), s.deps, id, kind)
+    const good = { kind: 'purchase', playerId: 'player-9', fee: 500000, salary: 20000, contractEnd: '2029-01-01' }
+    expect((await act(bia, 'offer', good)).status).toBe(200)
+    expect(s.room.tradeOps).toContain(`offer:${id}:${bia.playerId}`)
+    expect((await act(bia, 'respond', { offerId: 'of-1', type: 'accept' })).status).toBe(200)
+    expect((await act(bia, 'respond', { offerId: 'of-1', type: 'counter', fee: 400000 })).status).toBe(200)
+    expect((await act(bia, 'withdraw', { offerId: 'of-1' })).status).toBe(200)
+    expect((await act(bia, 'sign', { playerId: 'player-9', salary: 30000, contractEnd: '2029-01-01' })).status).toBe(200)
+    expect((await act(bia, 'report', { recordId: 'tr-1', reason: 'laranja' })).status).toBe(200)
+    const bad: [Parameters<typeof tradeAct>[3], unknown][] = [
+      ['offer', { ...good, kind: 'free' }], ['offer', { ...good, fee: -1 }], ['offer', { ...good, fee: 'caro' }], ['offer', { ...good, contractEnd: '1/1/2029' }], ['offer', { ...good, extra: 1 }], ['offer', { ...good, playerId: 'a b' }],
+      ['respond', { offerId: 'of-1', type: 'counter' }], ['respond', { offerId: 'of-1', type: 'accept', fee: 5 }], ['respond', { offerId: 'of-1', type: 'talvez' }],
+      ['withdraw', {}], ['sign', { playerId: 'p', salary: 0, contractEnd: '2029-01-01' }], ['report', { recordId: 'tr-1', reason: 'xingamento' }],
+    ]
+    for (const [kind, body] of bad) expect((await act(bia, kind, body)).status).toBe(400)
+    const refused = await act(bia, 'offer', { ...good, playerId: 'recusa' })
+    expect(refused.status).toBe(409)
+    expect(refused.body).toEqual({ error: 'trade-refused', reason: 'fee-too-low', minimumSalary: 7000 })
+    expect((await act(dudu, 'offer', good)).status).toBe(404)
   })
 
   it('ticket do WebSocket: só membro, só com a liga em andamento, e o ticket é de uso único na sala', async () => {

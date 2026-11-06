@@ -9,6 +9,7 @@ import { OPEN_LEAGUE_PACE, PACES } from '../engine/league/pace'
 import type { SeatError } from '../engine/league/seats'
 import type { LeagueView } from '../engine/league/view'
 import type { ClubAction, ClubError, ClubView } from '../engine/league/club'
+import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer, TradeReport, TradeResponse } from '../engine/league/trade'
 import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
 import { checkName, type NameIssue } from './nameFilter'
 
@@ -86,7 +87,7 @@ export interface RoomPort {
   start(leagueId: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   destroy(leagueId: string): Promise<void>
   /** A visão da liga para a tela (B8.4). */
-  state(leagueId: string): Promise<{ ok: true; phase: 'lobby' | 'running'; view?: LeagueView } | { ok: false; error: RoomFailure }>
+  state(leagueId: string, playerId?: string): Promise<{ ok: true; phase: 'lobby' | 'running'; view?: LeagueView; awaiting?: number } | { ok: false; error: RoomFailure }>
   ready(leagueId: string, playerId: string, ready: boolean): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   control(leagueId: string, action: ControlAction, by: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   setPace(leagueId: string, pace: PaceId): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
@@ -95,8 +96,22 @@ export interface RoomPort {
   club(leagueId: string, playerId: string): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure }>
   /** Renovar, promover ou dispensar um jovem; a sala aplica as regras do jogo solo. */
   clubAction(leagueId: string, playerId: string, action: ClubAction): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure } | { ok: false; refused: ClubError; minimumSalary?: number }>
+  /** Mercado entre técnicos (B8.6): a sala aplica as regras e devolve o que a tela precisa. */
+  trade(leagueId: string, playerId: string, op: TradeOp): Promise<TradeReply | { ok: false; error: RoomFailure }>
   ticket(leagueId: string, playerId: string): Promise<{ ok: true; ticket: string; expiresInMs: number } | { ok: false; error: RoomFailure }>
 }
+
+export type TradeOp =
+  | { op: 'body' }
+  | { op: 'squad'; teamId: string }
+  | { op: 'free'; position?: string }
+  | { op: 'offer'; kind: 'purchase' | 'loan'; playerId: string; fee: number; salary: number; contractEnd: string }
+  | { op: 'respond'; offerId: string; response: TradeResponse }
+  | { op: 'withdraw'; offerId: string }
+  | { op: 'sign'; playerId: string; salary: number; contractEnd: string }
+  | { op: 'report'; recordId: string; reason: TradeReport['reason'] }
+
+export type TradeReply = { ok: true; body?: TradeBody; squad?: SquadRow[]; free?: FreeAgentRow[]; offer?: TradeOffer } | { ok: false; refused: string; minimumSalary?: number }
 
 export type ControlAction = 'advance' | 'pause' | 'resume'
 
@@ -128,6 +143,8 @@ export type LeagueError =
   | { error: 'bad-state' }
   /** O clube não pôde fazer o que o técnico pediu (renovação recusada, elenco cheio...): `reason` é o código das regras do jogo. */
   | { error: 'club-refused'; reason: ClubError; minimumSalary?: number }
+  /** O mercado recusou (janela fechada, preço fora da faixa, limite do par, orçamento...): `reason` é o código das regras. */
+  | { error: 'trade-refused'; reason: string; minimumSalary?: number }
 
 export type LeagueResult<T> = { status: 200 | 201; body: T } | { status: 400 | 401 | 403 | 404 | 409 | 429 | 502; body: LeagueError }
 
@@ -500,6 +517,8 @@ export interface LeagueStateBody {
   phase: 'lobby' | 'running'
   view?: LeagueView
   isAdmin: boolean
+  /** Propostas do mercado esperando a minha resposta. */
+  awaiting?: number
 }
 
 async function memberOrAdmin(deps: LeagueDeps, id: string, playerId: string): Promise<{ league: LeagueRecord; isAdmin: boolean } | undefined> {
@@ -516,10 +535,76 @@ export async function leagueState(req: ApiRequest, deps: LeagueDeps, id: string)
   if (!auth.ok) return auth.result as LeagueResult<never>
   const who = await memberOrAdmin(deps, id, auth.record.playerId)
   if (!who) return fail(404, { error: 'not-found' })
-  const room = await deps.rooms.state(id)
+  const room = await deps.rooms.state(id, auth.record.playerId)
   if (!room.ok) return roomFailure(room.error)
-  const view = room.view ? { ...room.view, suggestions: who.isAdmin ? room.view.suggestions : [] } : undefined
-  return { status: 200, body: { phase: room.phase, ...(view ? { view } : {}), isAdmin: who.isAdmin } }
+  const view = room.view ? { ...room.view, suggestions: who.isAdmin ? room.view.suggestions : [], reports: who.isAdmin ? room.view.reports : [] } : undefined
+  return { status: 200, body: { phase: room.phase, ...(view ? { view } : {}), isAdmin: who.isAdmin, ...(room.awaiting ? { awaiting: room.awaiting } : {}) } }
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const MONEY_MAX = 10_000_000_000
+const money = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MONEY_MAX
+
+/** Corpo de cada pedido do mercado, conferido campo a campo (`undefined` = corpo inválido). */
+export function parseTradeOp(kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report', body: ApiRequest['body']): TradeOp | undefined {
+  const o = parseJson(body)
+  if (!o) return undefined
+  const id = (v: unknown): v is string => typeof v === 'string' && TEAM_ID.test(v)
+  if (kind === 'offer') {
+    if (!onlyKeys(o, ['kind', 'playerId', 'fee', 'salary', 'contractEnd']) || (o.kind !== 'purchase' && o.kind !== 'loan') || !id(o.playerId) || !money(o.fee) || !money(o.salary) || typeof o.contractEnd !== 'string' || !ISO_DATE.test(o.contractEnd)) return undefined
+    return { op: 'offer', kind: o.kind, playerId: o.playerId, fee: o.fee, salary: o.salary, contractEnd: o.contractEnd }
+  }
+  if (kind === 'respond') {
+    if (!onlyKeys(o, ['offerId', 'type', 'fee']) || !id(o.offerId)) return undefined
+    if (o.type === 'accept' || o.type === 'decline') return o.fee === undefined ? { op: 'respond', offerId: o.offerId, response: { type: o.type } } : undefined
+    if (o.type === 'counter' && money(o.fee)) return { op: 'respond', offerId: o.offerId, response: { type: 'counter', fee: o.fee } }
+    return undefined
+  }
+  if (kind === 'withdraw') return onlyKeys(o, ['offerId']) && id(o.offerId) ? { op: 'withdraw', offerId: o.offerId } : undefined
+  if (kind === 'sign') return onlyKeys(o, ['playerId', 'salary', 'contractEnd']) && id(o.playerId) && money(o.salary) && typeof o.contractEnd === 'string' && ISO_DATE.test(o.contractEnd) ? { op: 'sign', playerId: o.playerId, salary: o.salary, contractEnd: o.contractEnd } : undefined
+  if (!onlyKeys(o, ['recordId', 'reason']) || !id(o.recordId) || (o.reason !== 'laranja' && o.reason !== 'abusivo' && o.reason !== 'outro')) return undefined
+  return { op: 'report', recordId: o.recordId, reason: o.reason }
+}
+
+async function memberOf(deps: LeagueDeps, id: string, playerId: string): Promise<'ok' | LeagueResult<never>> {
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (!(await deps.leagues.members(id)).some((m) => m.playerId === playerId)) return fail(404, { error: 'not-found' })
+  if (league.status !== 'running') return fail(409, { error: 'bad-state' })
+  return 'ok'
+}
+
+type TradeBodyOut = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
+
+/** Consultas do mercado: o painel (propostas, histórico), o elenco de outro técnico e os jogadores livres. */
+export async function tradeRead(req: ApiRequest, deps: LeagueDeps, id: string, op: Extract<TradeOp, { op: 'body' | 'squad' | 'free' }>): Promise<LeagueResult<TradeBodyOut>> {
+  const auth = await requireIdentity(req, 'read', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const m = await memberOf(deps, id, auth.record.playerId)
+  if (m !== 'ok') return m
+  const r = await deps.rooms.trade(id, auth.record.playerId, op)
+  if (!r.ok && 'refused' in r) return fail(409, { error: 'trade-refused', reason: r.refused })
+  if (!r.ok) return roomFailure(r.error)
+  const { ok: _ok, ...rest } = r
+  // As denúncias só o ADM vê.
+  const isAdmin = (await deps.leagues.get(id))?.adminId === auth.record.playerId
+  if (rest.body && !isAdmin) rest.body = { ...rest.body, reports: [] }
+  return { status: 200, body: rest }
+}
+
+/** Decisões do mercado (propor, responder, retirar, contratar livre, denunciar). A recusa devolve o motivo das regras. */
+export async function tradeAct(req: ApiRequest, deps: LeagueDeps, id: string, kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report'): Promise<LeagueResult<TradeBodyOut>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const op = parseTradeOp(kind, req.body)
+  if (!op) return fail(400, { error: 'bad-body' })
+  const m = await memberOf(deps, id, auth.record.playerId)
+  if (m !== 'ok') return m
+  const r = await deps.rooms.trade(id, auth.record.playerId, op)
+  if (!r.ok && 'refused' in r) return fail(409, { error: 'trade-refused', reason: r.refused, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) })
+  if (!r.ok) return roomFailure(r.error)
+  const { ok: _ok, ...rest } = r
+  return { status: 200, body: rest }
 }
 
 /** Corpo do pedido de decisão do clube: só os campos conhecidos, números inteiros e ids no formato dos ids do jogo. */

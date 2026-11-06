@@ -901,3 +901,34 @@ export const QUICK = {
   rating: { sd: [0.38, 0.2, 0.18, 0.28] as readonly number[], skill: 0.003, shift: [1.21, 0.3, 0.13, 0.13] as readonly number[] },
   stats: { shotsPerGoal: 10.5, possessionSlope: 0.6 },
 }
+
+/**
+ * Mercado entre técnicos humanos de uma liga online (B8.6; proposta, seção 27). `V` é o valor de mercado do jogador. Os números protegem contra "laranja"
+ * (combinar transferências entre amigos para mover dinheiro): preço mínimo e teto, poucos negócios por par de técnicos por janela e bloqueio de devolução.
+ */
+export const LEAGUE_TRADE = {
+  /** Compra: preço entre 60% e 250% de V (a IA pede de 85% a 150%; o anúncio dela vale 70%). */
+  floorShare: 0.6,
+  ceilingShare: 2.5,
+  /** Empréstimo: taxa entre 50% e 250% da taxa de empréstimo padrão (`MARKET.loanFeeShare` × V). */
+  loanFloorShare: 0.5,
+  loanCeilingShare: 2.5,
+  /** Negócios (compra ou empréstimo) do mesmo par de técnicos por janela de transferências. */
+  maxDealsPerPair: 2,
+  /** Dinheiro total entre o mesmo par por janela: no máximo este múltiplo do maior V negociado entre eles. */
+  maxPairValueMultiple: 3,
+  /** Quem vendeu um jogador (compra) não o recompra do mesmo técnico por tantos dias do jogo. */
+  returnBlockDays: 90,
+  /** Propostas abertas (aguardando resposta) como comprador. */
+  maxOpenOffers: 5,
+  /** Prazo da proposta e de cada contraproposta (tempo real, congela na pausa). */
+  offerTtlMs: 48 * 3_600_000,
+  counterTtlMs: 24 * 3_600_000,
+  /** Rodadas de contraproposta por negociação. */
+  maxRounds: 3,
+  /** Transferências guardadas no histórico da liga e quantas a tela mostra. */
+  historyKept: 100,
+  historyShown: 30,
+  /** Denúncias guardadas. */
+  reportsKept: 50,
+} as const

@@ -8,7 +8,9 @@ import { Button, Card } from '../../../components/ui'
 import { LEAGUE_ERROR_LABELS, LEAGUE_LOG_LABELS, PACE_LABELS, SEAT_STATUS_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
 import { ClubCard } from './ClubCard'
+import { LeagueMarket } from './LeagueMarket'
 import { LiveMatchOnline } from './LiveMatchOnline'
+import { formatMoney } from '../../../format'
 import { Pill } from './parts'
 
 const POLL_MS = 5000
@@ -41,6 +43,7 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
   const [confirmAdvance, setConfirmAdvance] = useState(false)
   const [pacing, setPacing] = useState(false)
   const [watching, setWatching] = useState(false)
+  const [market, setMarket] = useState(false)
 
   const load = useCallback(async () => {
     const r = await leagueApi.state(id)
@@ -73,6 +76,7 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
 
   return (
     <>
+      {market && <LeagueMarket league={league} teams={teams} worldDate={view.worldDate} onClose={() => setMarket(false)} />}
       {watching && <LiveMatchOnline leagueId={id} onClose={() => setWatching(false)} />}
       <Status view={view} />
 
@@ -102,6 +106,14 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
         </Card>
       )}
 
+      {me && (
+        <Card title="Mercado">
+          <p className="text-sm text-muted">Proponha compras e empréstimos aos outros técnicos, contrate jogadores livres e acompanhe as transferências da liga.</p>
+          <Button className="mt-3 w-full" onClick={() => setMarket(true)} data-testid="open-market">
+            {body.awaiting ? `Abrir o mercado (${body.awaiting} proposta${body.awaiting > 1 ? 's' : ''} esperando você)` : 'Abrir o mercado'}
+          </Button>
+        </Card>
+      )}
       {me && <ClubCard leagueId={id} />}
 
       <Card title="Quem está pronto">
@@ -179,8 +191,23 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
         </Card>
       )}
 
+      {view.transfers.length > 0 && (
+        <Card title="Últimas transferências">
+          <ul className="flex flex-col gap-2 text-sm" data-testid="room-transfers">
+            {view.transfers.slice(0, 5).map((r) => (
+              <li key={r.id}>
+                <span className="font-semibold">{r.playerName}</span>
+                <span className="block text-xs text-muted">
+                  {r.kind === 'free' ? 'Contratado livre' : r.kind === 'loan' ? 'Emprestado' : 'Vendido'} · {r.fromTeamId ? clubOf(r.fromTeamId) : 'Livre'} → {clubOf(r.toTeamId)} · {r.fee > 0 ? formatMoney(r.fee) : 'sem taxa'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       {view.log.length > 0 && (
-        <Card title="Últimos acontecimentos">
+      <Card title="Últimos acontecimentos">
           <ul className="flex flex-col gap-1 text-xs text-muted" data-testid="league-log">
             {[...view.log].reverse().slice(0, 8).map((l, i) => (
               <li key={i}>

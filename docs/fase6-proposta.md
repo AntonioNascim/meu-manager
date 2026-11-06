@@ -821,3 +821,26 @@ Antes desta parte a virada de temporada tratava os clubes humanos pela regra da 
 **Testes:** `tests/leagueSeasonTurn.test.ts` (uma temporada inteira de liga com 2 humanos até a virada: contrato que vence num clube humano não é renovado e na IA há renovações; base humana com jovens de 20 anos esperando e a da IA decidida; meta nova, histórico e nenhum corte além de contratos vencidos), `tests/leagueClub.test.ts` (4), `tests/onlineLeagueApi.test.ts` (Meu clube), ponta a ponta `tools/online-lab/b8-7-e2e.mjs` (meta, lista de contratos, renovar pela janela e o jogador sai da lista; a outra técnica não é afetada). **Não coberto no navegador:** promover e dispensar jovem e os avisos depois da virada (precisam de uma temporada inteira pela tela; o motor está coberto nos testes).
 
 **Fora desta parte (vão para a 8.6):** comprar e vender jogador (mercado entre humanos) e avisos de contrato acabando por mensagem. **Publicação:** nada publicado; as rotas novas só valem na nuvem depois de `wrangler deploy` (parte nova: precisa de autorização).
+
+## 27. B8.6: mercado entre técnicos (06/11/2026)
+
+Escopo decidido com os sócios: **negociação entre técnicos humanos da liga e contratação de jogador livre**. Comprar de clubes da IA, busca com filtros, lista de anúncios e propostas da IA pelos jogadores dos técnicos ficam para a **8.6b** (obrigatória antes do lançamento, antes da 8.8: numa liga online quase todos os clubes são da IA).
+
+**Proteção contra "laranja"** (`LEAGUE_TRADE` em `config.ts`; números aprovados em 06/11/2026; `V` = valor de mercado do jogador):
+| Regra | Valor |
+|---|---|
+| Compra entre técnicos | de 60% a 250% de V |
+| Empréstimo | taxa de 50% a 250% da taxa padrão (12% de V) |
+| Negócios do mesmo par de técnicos por janela | 2 (compra ou empréstimo; vale nos dois sentidos) |
+| Dinheiro total do par por janela | no máximo 3 × o maior V negociado entre eles |
+| Recompra do mesmo jogador do mesmo técnico | bloqueada por 90 dias de jogo (só compra) |
+| Propostas abertas por técnico (como comprador) | 5, e só uma proposta aberta por jogador |
+Também valem as regras do jogo solo: **as janelas dos dois clubes precisam estar abertas** (`isWindowOpen`), o **limite de estrangeiros** e o orçamento de compras e de salários (`buyerCheck`), elenco do vendedor com o mínimo e cobertura por posição, e o **consentimento do jogador** (`playerDecision`: salário, espaço no time, reputação; se recusa, o jogo mostra o salário mínimo que ele aceitaria).
+
+**Como funciona** (`engine/league/trade.ts`, puro; estado em `LeagueState.trades`, opcional: ligas anteriores não o têm). O comprador propõe preço, salário e duração; a taxa fica **reservada** (sai do orçamento de compras e do caixa visíveis para outras propostas) enquanto a proposta estiver aberta; o vendedor aceita, recusa ou **contrapropõe o preço** (no máximo 3 rodadas; quem responde alterna); o comprador pode retirar. A proposta vale **48 h** e cada contraproposta **24 h**, no relógio dos prazos da liga (`deadlineIn`), que **congela na pausa**; a sala acorda no prazo mais próximo (`tradeWakeup`) e varre as vencidas (`sweepTrades`: também caem quando o jogador sai do clube ou a janela fecha). Aceitar **confere tudo de novo** e executa `executeTransfer`. Contratar **jogador livre** é na hora (janela, orçamento e o jogador). Propostas e contratações **não valem durante uma rodada em andamento** (o mundo não muda no meio das partidas). O **histórico público** (`TradeRecord`: jogador, clubes, preço, valor, janela) aparece para todos na sala (`view.transfers`) e no Mercado; qualquer técnico pode **denunciar** uma transferência (`TradeReport`, uma por técnico) e **só o ADM vê as denúncias**; ficam na própria sala (sem banco novo, sem migração; o painel de moderação é da B9).
+
+**API** (`leagueApi.ts`): `GET /api/leagues/:id/trade` (painel), `trade-squad?team=` (elenco de outro técnico, com as faixas de preço), `trade-free?pos=` (livres), `POST trade-offer|trade-respond|trade-withdraw|trade-sign|trade-report` (corpo conferido campo a campo; recusa = 409 `trade-refused` com `reason` e, se for salário, `minimumSalary`). `/state` traz `awaiting` (propostas esperando a minha resposta). Sala: rota interna `/internal/trade` com `op`. **Tela:** `LeagueMarket.tsx` (abas Propostas, Técnicos, Livres, Histórico; botão "Abrir o mercado" na sala, com o aviso de propostas esperando) e o cartão "Últimas transferências" na sala.
+
+**Testes:** `tests/leagueTrade.test.ts` (16: reserva, faixa de preço, aceitar executa e vai ao histórico, contraproposta e rodadas, recusa, orçamento reservado, janela fechada, prazo e pausa, limite do par, teto de dinheiro do par, bloqueio de 90 dias, 5 propostas, jogador livre, denúncia, elenco), `tests/onlineLeagueApi.test.ts` (corpos e recusas), ponta a ponta `tools/online-lab/b8-6-e2e.mjs` (Ana propõe, Bia contrapropõe, Ana aceita, histórico nos dois, denúncia vista pelo ADM, segunda compra do par). **Não coberto no navegador:** jogador livre (o mundo de teste não tem livres; coberto nos testes de unidade), prazo de 48 h e pausa (nos de unidade) e o limite de estrangeiros (nas regras do solo).
+
+**Publicação:** nada publicado; as rotas só valem na nuvem depois de `wrangler deploy` (parte nova: precisa de autorização; sem migração de banco).
