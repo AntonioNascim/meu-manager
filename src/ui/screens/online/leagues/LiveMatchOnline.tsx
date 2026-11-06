@@ -247,6 +247,9 @@ function Controls({ state, side, session, now, numbers }: { state: LiveClientSta
     }))
     send({ type: 'position', playerId, point })
   }
+  const rivalInjury = game.injury && game.injury.side !== side ? game.injury : undefined
+  const rivalName = rivalInjury ? ((byId.get(rivalInjury.playerId) && playerLabel(byId.get(rivalInjury.playerId) as RosterPlayer)) ?? rivalInjury.playerId) : ''
+  const rivalSeconds = rivalInjury ? Math.max(0, Math.ceil((rivalInjury.deadline - now) / 1000)) : 0
   const leftSeconds = injury ? Math.max(0, Math.ceil((injury.deadline - now) / 1000)) : 0
   const hurt = injury ? byId.get(injury.playerId) : undefined
   const hurtName = hurt ? playerLabel(hurt) : (injury?.playerId ?? '')
@@ -262,6 +265,12 @@ function Controls({ state, side, session, now, numbers }: { state: LiveClientSta
   return (
     <Card title="Seu time" className="!p-3">
       <div className="space-y-3" data-testid="live-controls">
+        {rivalInjury && (
+          <div className="rounded-xl border border-line bg-surface-2 p-3" data-testid="live-rival-injury">
+            <p className="text-sm font-bold">✚ {rivalName} (adversário) se machucou. O jogo está parado.</p>
+            <p className="mt-1 text-xs text-muted">O técnico adversário escolhe o reserva; volta em até {rivalSeconds} s. Você ainda pode mudar a tática: vale quando o jogo voltar.</p>
+          </div>
+        )}
         {injury && (
           <div className="rounded-xl border border-amber-400/60 bg-amber-950/50 p-3" data-testid="live-injury">
             <p className="text-sm font-bold text-amber-100">✚ {hurtName} se machucou. O jogo do seu time está parado. Escolha quem entra no lugar dele no banco abaixo.</p>

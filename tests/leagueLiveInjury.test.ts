@@ -112,6 +112,15 @@ describe('lesão na partida ao vivo online: o técnico escolhe quem entra', () =
     expect(JSON.stringify(replayResult(record))).toBe(JSON.stringify(dg.live.result()))
   })
 
+  it('no teto do relógio (minuto 120) a lesão que espera é resolvida na hora e a partida termina', () => {
+    const f = withInjury()
+    const capped = { ...f.event, clock: 120 }
+    const step = stepLiveEvent(capped, f.seats, f.now + 500 * MINUTE_MS)
+    const g = step.event.games.find((x) => x.matchId === f.game.matchId)!
+    expect(g.live.injuryPending).toBeUndefined()
+    expect(g.live.finished).toBe(true)
+  })
+
   it('técnico que cai: o melhor reserva entra no minuto seguinte, sem esperar', () => {
     const f = withInjury()
     const who = ownerOf(f)

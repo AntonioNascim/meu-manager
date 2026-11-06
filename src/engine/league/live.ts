@@ -335,6 +335,15 @@ export function stepLiveEvent(from: LiveEvent, seats: readonly Seat[], now: numb
     }
     e = { ...e, clock: minute }
   }
+  // O relógio parou no teto (120'): lesão que ainda espera não tem mais tempo de esperar, entra o melhor reserva e a partida termina.
+  if (e.clock >= MAX_MINUTE && !isFinished(e)) {
+    settleInjuries(e, seats, true)
+    for (const g of e.games) {
+      if (g.live.finished) continue
+      g.live.playUntil(MAX_MINUTE)
+      g.clock = MAX_MINUTE
+    }
+  }
   markInjuries(e)
   return { event: e, outcomes, minute: e.clock, finished: isFinished(e) }
 }
@@ -346,7 +355,7 @@ const humanHere = (e: LiveEvent, seats: readonly Seat[], teamId: TeamId): boolea
 }
 
 /** Resolve, como a IA, as lesões que esperam um técnico que não está mais ali ou que demorou demais. Anota no registro para a reprodução refazer igual. */
-function settleInjuries(e: LiveEvent, seats: readonly Seat[]): void {
+function settleInjuries(e: LiveEvent, seats: readonly Seat[], force = false): void {
   const t = e.clock * e.minuteMs // relógio do evento (os minutos já jogados): vale também quando o servidor recupera vários minutos de uma vez
   for (const g of e.games) {
     if (g.live.finished) continue
@@ -358,7 +367,7 @@ function settleInjuries(e: LiveEvent, seats: readonly Seat[]): void {
     }
     g.injuryAt ??= t
     const teamId = pending.side === 'home' ? g.homeTeamId : g.awayTeamId
-    if (humanHere(e, seats, teamId) && t - g.injuryAt < INJURY_WAIT_MS) continue
+    if (!force && humanHere(e, seats, teamId) && t - g.injuryAt < INJURY_WAIT_MS) continue
     g.live.autoResolveInjury(pending.side)
     g.commands.push({ minute: g.clock, side: pending.side, command: { type: 'injury-auto' }, by: 'system' })
     delete g.injuryAt

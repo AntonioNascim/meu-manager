@@ -910,3 +910,9 @@ Pendência obrigatória 2 antes do lançamento (seção 29). Agora a partida ao 
 4. **B9**: painel de moderação (denúncias, banimento de identidade, filtro de apelidos), limites finais, teste de carga e teste fechado.
 
 **Publicação:** nada publicado desta parte (precisa de `wrangler deploy`, sem migração de banco).
+
+### 31.1 Quem espera quando um jogo para por lesão (revisão de 06/11/2026)
+- **O adversário** está na mesma partida, então o jogo dele para junto. Antes ele via o jogo parado sem explicação; agora vê "adversário se machucou, volta em até N s" (`live-rival-injury`) e ainda pode mudar a tática (os comandos entram na fila e valem quando o jogo voltar). Se os dois forem humanos, só o lado que se machucou escolhe; o outro espera no máximo `INJURY_WAIT_MS`.
+- **Os outros jogos da rodada** seguem normalmente: o relógio do evento é um só e cada jogo guarda o próprio minuto. O jogo parado recupera todo o atraso de uma vez quando a lesão é resolvida (os lances aparecem juntos) e o evento só termina quando ele também termina, no máximo 45 s depois do que terminaria.
+- **Pausa do ADM:** o prazo conta no relógio do evento, que não anda pausado.
+- **Problema achado e corrigido:** com o relógio no teto (120', prorrogação) uma lesão que ainda esperava nunca venceria o prazo e o evento travaria. Agora, no teto, entra o melhor reserva e a partida termina (`tests/leagueLiveInjury.test.ts`).
