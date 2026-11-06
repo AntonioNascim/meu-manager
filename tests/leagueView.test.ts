@@ -78,6 +78,16 @@ describe('visão da liga (B8.4)', () => {
     expect(replanForPace(mid, world, 'calm')).toBe(mid)
   })
 
+  it('durante o evento, só quem tem partida nele aparece em "playing" (quem não joga não tem o que ver ao vivo)', () => {
+    const l = make()
+    const ana = l.seats[0]!
+    const mine = world.matches.find((m) => m.homeTeamId === ana.teamId || m.awayTeamId === ana.teamId)!
+    const other = world.matches.find((m) => ![m.homeTeamId, m.awayTeamId].includes(l.seats[0]!.teamId) && ![m.homeTeamId, m.awayTeamId].includes(l.seats[1]!.teamId))!
+    const during = (ids: string[]) => ({ ...l, current: { date: mine.date, startedAt: T0, pending: ids, all: ids, reason: 'time' as const } })
+    expect(leagueView(during([mine.id]), world, T0, joined).current?.playing).toContain('ana')
+    expect(leagueView(during([other.id]), world, T0, joined).current?.playing).toEqual([])
+  })
+
   it('sugestões de ausência aparecem na visão (a API só as entrega ao ADM)', () => {
     const l = make()
     const stale = { ...l, seats: l.seats.map((s) => (s.playerId === 'ana' ? { ...s, missed: 9 } : s)) }

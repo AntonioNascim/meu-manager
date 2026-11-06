@@ -48,11 +48,20 @@ export interface LeagueView {
   next?: ViewEvent & { roomOpensAt: number; required: string[]; notReady: string[] }
   /** Calendário das próximas semanas (só eventos com partidas). */
   events: ViewEvent[]
-  current?: { date: IsoDate; startedAt: number; pending: number; all: number }
+  /** `playing`: técnicos cujo clube tem partida neste evento (quem não joga não tem o que ver ao vivo). */
+  current?: { date: IsoDate; startedAt: number; pending: number; all: number; playing: string[] }
   seats: ViewSeat[]
   log: ViewLog[]
   /** Só para o ADM (a API tira dos outros): quem passaria do limite de ausência. */
   suggestions: AbsenceSuggestion[]
+}
+
+/** Técnicos cujo clube joga no evento em andamento. */
+function playingIn(league: LeagueState, world: SeasonState): string[] {
+  const ids = new Set(league.current?.all ?? [])
+  const teams = new Set<string>()
+  for (const m of world.matches) if (ids.has(m.id)) (teams.add(m.homeTeamId), teams.add(m.awayTeamId))
+  return league.seats.filter((s) => teams.has(s.teamId)).map((s) => s.playerId)
 }
 
 export function leagueView(league: LeagueState, world: SeasonState, now: number, joinedAt: (playerId: string) => number): LeagueView {
@@ -73,7 +82,7 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
       ? { next: { date: dateOfDay(firstMatch.day), startAt: firstMatch.startAt, kind: 'match' as const, roomOpensAt: firstMatch.startAt - ROOM_OPENS_BEFORE_MS, required: [...required], notReady: notReady(league, world).map((s) => s.playerId) } }
       : {}),
     events: matchEvents.slice(0, 12),
-    ...(league.current ? { current: { date: league.current.date, startedAt: league.current.startedAt, pending: league.current.pending.length, all: league.current.all.length } } : {}),
+    ...(league.current ? { current: { date: league.current.date, startedAt: league.current.startedAt, pending: league.current.pending.length, all: league.current.all.length, playing: playingIn(league, world) } } : {}),
     seats: league.seats.map((s) => ({ playerId: s.playerId, teamId: s.teamId, status: s.status, ready: s.ready, required: required.has(s.playerId), missed: s.missed ?? 0, leaving: s.leaving === true })),
     log: league.log.filter((l) => l.type !== 'tick').slice(-15).map((l) => ({ at: l.at, type: l.type, ...(l.by ? { by: l.by } : {}), ...(l.date ? { date: l.date } : {}) })),
     suggestions: suggestionsFor(league.seats, now, joinedAt),

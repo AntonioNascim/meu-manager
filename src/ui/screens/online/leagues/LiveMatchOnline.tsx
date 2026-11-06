@@ -98,6 +98,9 @@ export function LiveMatchOnline({ leagueId, onClose }: { leagueId: string; onClo
         {state.status === 'no-event' && (
           <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted" data-testid="live-no-event">Nenhuma partida acontecendo agora. A sala volta ao andamento da liga.</p>
         )}
+        {state.status === 'live' && !game && (
+          <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted" data-testid="live-not-playing">Seu clube não joga nesta rodada. Volte para a sala.</p>
+        )}
         {state.status === 'connecting' && !roster && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">Conectando à partida…</p>}
 
         {game && data && roster && (

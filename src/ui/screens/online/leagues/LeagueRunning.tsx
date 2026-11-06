@@ -79,8 +79,8 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
         <Card title="Pronto">
           {view.current ? (
             <>
-              <p className="text-sm text-muted">A rodada está acontecendo ({view.current.all - view.current.pending} de {view.current.all} partidas dos técnicos terminaram).</p>
-              {!view.directResult && (
+              <p className="text-sm text-muted">{view.directResult || view.current.playing.includes(me.playerId) ? '' : 'Seu clube não joga nesta rodada. '}A rodada está acontecendo ({view.current.all - view.current.pending} de {view.current.all} partidas dos técnicos terminaram).</p>
+              {!view.directResult && view.current.playing.includes(me.playerId) && (
                 <Button className="mt-3 w-full" onClick={() => setWatching(true)} data-testid="live-enter">
                   Entrar na partida
                 </Button>
