@@ -21,6 +21,8 @@ export const COMMAND_EXPIRES_MS = 2 * 60_000
 export const RESUME_WARNING_MS = 10_000
 /** Último minuto possível (90 + prorrogação). */
 export const MAX_MINUTE = 120
+/** Quanto tempo de relógio do evento (sem contar pausas) o jogo de um técnico espera a escolha do reserva depois de uma lesão; passado isso entra o melhor reserva, como a IA faria. */
+export const INJURY_WAIT_MS = 45_000
 
 export type LiveCommand =
   | { type: 'style'; style: PlayStyle }
@@ -28,8 +30,12 @@ export type LiveCommand =
   | { type: 'formation'; formationId: string }
   | { type: 'position'; playerId: string; point: GridPoint }
   | { type: 'substitute'; outgoingId: string; incomingId: string }
+  /** O técnico resolve a lesão que parou o jogo dele: com `incomingId` entra o reserva; sem ele o time segue com um a menos. */
+  | { type: 'injury'; incomingId?: string }
   /** Só o servidor emite: o time passa à IA (técnico caiu) ou volta ao técnico. */
   | { type: 'control'; controlled: boolean }
+  /** Só o servidor emite: a lesão esperou demais (ou o técnico caiu) e entrou o melhor reserva. */
+  | { type: 'injury-auto' }
 
 export interface CommandRecord {
   /** Minuto do relógio da partida em que o comando valeu (a partida já tinha sido jogada até aqui). */
@@ -58,12 +64,15 @@ export interface LiveGame {
   clock: number
   /** Só em memória: reconstruído a partir de `input` e `commands` quando falta. */
   live: LiveMatch
+  /** Só em memória: quando (tempo do evento, sem pausas) a lesão pendente foi vista e quanto falta para entrar o melhor reserva. */
+  injuryAt?: number
+  injuryLeftMs?: number
 }
 
 export interface QueuedCommand {
   id: string
   playerId: string
-  command: Exclude<LiveCommand, { type: 'control' }>
+  command: Exclude<LiveCommand, { type: 'control' } | { type: 'injury-auto' }>
   receivedAt: number
 }
 
@@ -119,8 +128,12 @@ function applyCommand(live: LiveMatch, side: MatchSide, c: LiveCommand): void {
       return live.setPosition(side, c.playerId, c.point)
     case 'substitute':
       return live.substitute(side, c.outgoingId, c.incomingId)
+    case 'injury':
+      return live.resolveInjury(side, c.incomingId)
     case 'control':
       return live.setControlled(side, c.controlled)
+    case 'injury-auto':
+      return live.autoResolveInjury(side)
   }
 }
 
@@ -168,6 +181,8 @@ export function startLiveEvent(
   now: number,
   minuteMs: number,
   connected: readonly string[] = [],
+  /** Só em laboratório: multiplica a chance de lesão para o teste de ponta a ponta provocar uma cedo. */
+  injuryRate?: number,
 ): LiveEvent {
   const current = league.current
   if (!current) throw new Error('Não há evento em andamento')
@@ -176,7 +191,8 @@ export function startLiveEvent(
   const away = new Set(league.seats.filter((s) => s.status !== 'active' || !here.has(s.playerId)).map((s) => s.teamId))
   const games = current.pending.map((id) => {
     const match = world.matches.find((m) => m.id === id) as Match
-    return startGame(id, humanMatchInput(world, match, humans, away))
+    // `holdInjurySubs`: a lesão de um time com técnico para o jogo dele até a escolha do reserva (ou até `INJURY_WAIT_MS`).
+    return startGame(id, { ...humanMatchInput(world, match, humans, away), holdInjurySubs: true, ...(injuryRate !== undefined ? { injuryRate } : {}) })
   })
   const present = league.seats.filter((s) => here.has(s.playerId)).map((s) => s.playerId)
   return { date: current.date, startedAt: now, minuteMs, pausedTotal: 0, clock: 0, games, queue: [], connected: [...here], present }
@@ -309,7 +325,9 @@ export function stepLiveEvent(from: LiveEvent, seats: readonly Seat[], now: numb
         outcomes.push({ id: q.id, playerId: q.playerId, ok: false, reason: 'engine', detail: err instanceof Error ? err.message : String(err) })
       }
     }
-    // 2. o minuto
+    // 2. lesões que esperam o técnico: sem ele (caiu ou é a IA) ou depois de `INJURY_WAIT_MS`, entra o melhor reserva
+    settleInjuries(e, seats)
+    // 3. o minuto
     for (const g of e.games) {
       if (g.live.finished) continue
       g.live.playUntil(minute)
@@ -317,7 +335,45 @@ export function stepLiveEvent(from: LiveEvent, seats: readonly Seat[], now: numb
     }
     e = { ...e, clock: minute }
   }
+  markInjuries(e)
   return { event: e, outcomes, minute: e.clock, finished: isFinished(e) }
+}
+
+/** O técnico do time está conectado e ativo (é ele quem escolhe, não a IA)? */
+const humanHere = (e: LiveEvent, seats: readonly Seat[], teamId: TeamId): boolean => {
+  const seat = seats.find((s) => s.teamId === teamId)
+  return !!seat && seat.status === 'active' && e.connected.includes(seat.playerId)
+}
+
+/** Resolve, como a IA, as lesões que esperam um técnico que não está mais ali ou que demorou demais. Anota no registro para a reprodução refazer igual. */
+function settleInjuries(e: LiveEvent, seats: readonly Seat[]): void {
+  const t = e.clock * e.minuteMs // relógio do evento (os minutos já jogados): vale também quando o servidor recupera vários minutos de uma vez
+  for (const g of e.games) {
+    if (g.live.finished) continue
+    const pending = g.live.injuryPending
+    if (!pending) {
+      delete g.injuryAt
+      delete g.injuryLeftMs
+      continue
+    }
+    g.injuryAt ??= t
+    const teamId = pending.side === 'home' ? g.homeTeamId : g.awayTeamId
+    if (humanHere(e, seats, teamId) && t - g.injuryAt < INJURY_WAIT_MS) continue
+    g.live.autoResolveInjury(pending.side)
+    g.commands.push({ minute: g.clock, side: pending.side, command: { type: 'injury-auto' }, by: 'system' })
+    delete g.injuryAt
+    delete g.injuryLeftMs
+  }
+}
+
+/** Depois do passo: para cada lesão pendente, anota desde quando espera e quanto falta (a tela mostra a contagem). */
+function markInjuries(e: LiveEvent): void {
+  const t = e.clock * e.minuteMs
+  for (const g of e.games) {
+    if (g.live.finished || !g.live.injuryPending) continue
+    g.injuryAt ??= t
+    g.injuryLeftMs = Math.max(0, INJURY_WAIT_MS - (t - g.injuryAt))
+  }
 }
 
 // -------------------------------------------------------- reconexão e telas
@@ -327,6 +383,8 @@ export interface LiveView {
   snapshot: MatchSnapshot
   /** Quem controla cada lado agora (`false` = IA). */
   controlled: { home: boolean; away: boolean }
+  /** Lesão à espera da escolha do técnico: quanto tempo real falta para entrar o melhor reserva. */
+  injuryLeftMs?: number
 }
 
 /** O estado de todas as partidas, para quem conecta ou reconecta (o servidor manda o que o cliente perdeu: o snapshot traz todos os eventos até agora). */
@@ -335,7 +393,7 @@ export function viewOf(e: LiveEvent, seats: readonly Seat[]): LiveView[] {
     const seat = seats.find((s) => s.teamId === teamId)
     return !!seat && seat.status === 'active' && e.connected.includes(seat.playerId)
   }
-  return e.games.map((g) => ({ matchId: g.matchId, snapshot: g.live.snapshot(), controlled: { home: humanOf(g.homeTeamId), away: humanOf(g.awayTeamId) } }))
+  return e.games.map((g) => ({ matchId: g.matchId, snapshot: g.live.snapshot(), controlled: { home: humanOf(g.homeTeamId), away: humanOf(g.awayTeamId) }, ...(g.injuryLeftMs !== undefined && g.live.injuryPending ? { injuryLeftMs: g.injuryLeftMs } : {}) }))
 }
 
 /** Eventos da partida depois do minuto que o cliente já viu (reconexão). */

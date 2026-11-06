@@ -129,6 +129,8 @@ interface RoomEnv {
   TRUST_PLAYER_HEADER?: string
   /** Só em testes locais (`wrangler dev --var LIVE_MINUTE_MS:600`): tempo real de cada minuto de jogo. Em produção não existe. */
   LIVE_MINUTE_MS?: string
+  /** Só em testes locais (`--var LIVE_INJURY_RATE:60`): multiplica a chance de lesão para provocar uma cedo. Em produção não existe. */
+  LIVE_INJURY_RATE?: string
   PACKAGES?: { get(key: string): Promise<{ body: ReadableStream } | null> }
   /** Bucket opcional dos registros de reprodução (`meu-manager-replays`). */
   REPLAYS?: { put(key: string, value: string): Promise<unknown> }
@@ -304,7 +306,7 @@ export class LeagueRoom {
         this.world = stepped.world
         if (!stepped.league.current) break
         // Evento ao vivo: abre as partidas dos técnicos (resultado direto já terminou dentro de processLeague).
-        this.live = startLiveEvent(stepped.league, stepped.world, now, this.minuteMs(), this.connectedPlayers())
+        this.live = startLiveEvent(stepped.league, stepped.world, now, this.minuteMs(), this.connectedPlayers(), Number(this.env.LIVE_INJURY_RATE) > 0 ? Number(this.env.LIVE_INJURY_RATE) : undefined)
         this.cursor = {}
       }
       const live = this.live as LiveEvent

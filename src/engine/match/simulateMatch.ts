@@ -123,6 +123,10 @@ export interface LiveMatch {
   reorganize(side: MatchSide): void
   /** Resolve a lesão que parou o jogo: com `incomingId` o reserva entra na vaga; sem ele o time segue com um a menos. */
   resolveInjury(side: MatchSide, incomingId?: string): void
+  /** Lesão que espera a escolha do técnico agora (o jogo está parado até `resolveInjury` ou `autoResolveInjury`). */
+  readonly injuryPending: { side: MatchSide; playerId: string } | undefined
+  /** Resolve a lesão como a IA: entra o melhor reserva possível (limite de estrangeiros respeitado); sem reserva o time segue com um a menos. */
+  autoResolveInjury(side: MatchSide): void
   /** Passa o time ao técnico (`true`) ou à IA completa do motor (`false`), valendo do próximo lance (liga online: técnico desconectado, Fase 6, B7). */
   setControlled(side: MatchSide, controlled: boolean): void
   /** Resultado completo (só depois do apito final). */
@@ -204,6 +208,7 @@ export function startMatch(input: MatchInput): LiveMatch {
     minute: 0,
     events: [],
     trace: [],
+    ...(input.injuryRate !== undefined ? { injuryRate: input.injuryRate } : {}),
   }
   if (input.holdInjurySubs) {
     if (input.userControlled?.home) ctx.home.holdInjury = true
@@ -364,10 +369,24 @@ export function startMatch(input: MatchInput): LiveMatch {
       if (s.userControlled === controlled) return
       s.userControlled = controlled
       s.underdogShift = 0
+      // Volta ao técnico: a lesão seguinte espera a escolha dele de novo (se a partida foi aberta com essa opção).
+      if (controlled && input.holdInjurySubs) s.holdInjury = true
       if (!controlled) {
         s.holdInjury = false
         applyUnderdogPosture(s, side === 'home' ? ctx.away : ctx.home)
       }
+    },
+    get injuryPending() {
+      return ctx.pendingInjury
+    },
+    autoResolveInjury(side) {
+      const pending = ctx.pendingInjury
+      if (!pending || pending.side !== side) throw new Error('Não há lesão à espera de troca')
+      const s = sideOf(side)
+      const injured = s.players.find((p) => p.player.id === pending.playerId)
+      const incoming = injured ? bestReplacement(s, injured) : undefined
+      if (injured && incoming) substitute(ctx, s, injured, incoming)
+      ctx.pendingInjury = undefined
     },
     resolveInjury(side, incomingId) {
       const pending = ctx.pendingInjury
@@ -934,7 +953,7 @@ function checkInjury(ctx: MatchContext): void {
   const risk = (p: PitchPlayer) =>
     (p.player.hidden.injuryProneness / 50) * (p.fitness < MATCH.injuryLowFitness ? MATCH.injuryLowFitnessFactor : 1)
   const totalRisk = candidates.reduce((sum, p) => sum + risk(p), 0)
-  if (!rng.chance(MATCH.injuryPerMoment * totalRisk)) return
+  if (!rng.chance(MATCH.injuryPerMoment * (ctx.injuryRate ?? 1) * totalRisk)) return
 
   const injured = rng.weighted(candidates, risk)
   const side = ctx.home.players.includes(injured) ? ctx.home : ctx.away

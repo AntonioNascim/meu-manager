@@ -40,6 +40,8 @@ function parseCommand(c: unknown): QueuedCommand['command'] | undefined {
     }
     case 'substitute':
       return isId(o.outgoingId) && isId(o.incomingId) ? { type: 'substitute', outgoingId: o.outgoingId, incomingId: o.incomingId } : undefined
+    case 'injury':
+      return o.incomingId === undefined ? { type: 'injury' } : isId(o.incomingId) ? { type: 'injury', incomingId: o.incomingId } : undefined
     default:
       return undefined // inclusive 'control': só o servidor decide quem controla
   }
@@ -72,6 +74,8 @@ export interface GameFrame {
   awayGoals: number
   finished: boolean
   controlled: { home: boolean; away: boolean }
+  /** Lesão à espera da escolha do técnico (o jogo dele está parado): quem se machucou e quanto falta para entrar o melhor reserva. */
+  injury?: { side: 'home' | 'away'; playerId: string; leftMs: number }
   /** Só o que o cliente ainda não tinha. */
   events: MatchEvent[]
   trace: PlayTrace[]
@@ -134,6 +138,7 @@ export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cur
       awayGoals: v.snapshot.awayGoals,
       finished: v.snapshot.finished,
       controlled: v.controlled,
+      ...(v.snapshot.injuryPending ? { injury: { ...v.snapshot.injuryPending, leftMs: v.injuryLeftMs ?? 0 } } : {}),
       events: v.snapshot.events.slice(seen.events),
       trace: v.snapshot.trace.slice(seen.trace),
       home: v.snapshot.home,

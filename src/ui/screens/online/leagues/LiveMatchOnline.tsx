@@ -9,6 +9,9 @@ import { Button, Card, Segmented, TeamBadge } from '../../../components/ui'
 import { LIVE_REJECT_LABELS, MENTALITY_LABELS, PLAY_STYLE_LABELS } from '../../../labels'
 import { buildLog } from '../../Match'
 import { Pitch, type PitchData } from '../../match/Pitch'
+import { assignNumber, kitsFor } from '../../match/pitchModel'
+import { FieldLineup } from '../../../components/FieldLineup'
+import type { GridPoint, Player } from '../../../../engine/types'
 import { Pill } from './parts'
 
 const STYLES: PlayStyle[] = ['possession', 'counter-attack', 'high-press']
@@ -28,6 +31,7 @@ export function LiveMatchOnline({ leagueId, onClose }: { leagueId: string; onClo
   const [attempt, setAttempt] = useState(0)
   const [now, setNow] = useState(Date.now())
   const [leaving, setLeaving] = useState(false)
+  const numbers = useRef(new Map<string, number>())
 
   useEffect(() => {
     const s = openLiveSession(leagueId)
@@ -106,8 +110,8 @@ export function LiveMatchOnline({ leagueId, onClose }: { leagueId: string; onClo
         {game && data && roster && (
           <>
             <Scoreboard state={state} />
-            <Pitch data={data} snap={game.snapshot} speed={1} running={state.status === 'live' && !state.paused} />
-            {side && !game.snapshot.finished && state.status !== 'no-event' && <Controls state={state} side={side} session={session.current} />}
+            <Pitch data={data} snap={game.snapshot} speed={1} running={state.status === 'live' && !state.paused} numbers={numbers.current} />
+            {side && !game.snapshot.finished && state.status !== 'no-event' && <Controls state={state} side={side} session={session.current} now={now} numbers={numbers.current} />}
             {state.games.length > 1 && (
               <Card title="Outros jogos desta rodada" className="!p-3">
                 <ul className="space-y-1.5" data-testid="live-others">
@@ -196,27 +200,79 @@ function Scoreboard({ state }: { state: LiveClientState }) {
   )
 }
 
-function Controls({ state, side, session }: { state: LiveClientState; side: 'home' | 'away'; session: LiveSession | null }) {
+function Controls({ state, side, session, now, numbers }: { state: LiveClientState; side: 'home' | 'away'; session: LiveSession | null; now: number; numbers: Map<string, number> }) {
   const game = myGame(state)
   const roster = state.roster
   const [out, setOut] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  /** Posições que acabei de arrastar e o servidor ainda não confirmou (vale no próximo minuto): aparecem já no campo e saem quando o minuto avança. */
+  const [moves, setMoves] = useState<Record<string, { point: GridPoint; minute: number }>>({})
   const mine = game?.snapshot[side]
+  const minute = game?.snapshot.minute ?? 0
   const byId = useMemo(() => new Map((roster?.players ?? []).map((p) => [p.id, p])), [roster])
+  const players = useMemo(() => new Map((roster?.players ?? []).map((p) => [p.id, { id: p.id, name: p.name, nickname: p.nickname, position: p.position } as unknown as Player])), [roster])
+  const kit = useMemo(() => {
+    const home = roster?.teams.find((t) => t.id === game?.snapshot.home.teamId)
+    const away = roster?.teams.find((t) => t.id === game?.snapshot.away.teamId)
+    if (!home || !away) return null
+    const kits = kitsFor(home.colors, away.colors)[side]
+    return { kit: { shirt: kits.shirt, trim: kits.trim }, keeper: { shirt: kits.keeper, trim: kits.shirt } }
+  }, [roster, game?.snapshot.home.teamId, game?.snapshot.away.teamId, side])
   const lastOutcome = state.outcomes.at(-1)
   useEffect(() => {
     if (!lastOutcome) return
     setNote(lastOutcome.ok ? 'Pronto, valeu a partir deste minuto.' : (LIVE_REJECT_LABELS[lastOutcome.reason as RejectReason] ?? 'O comando não foi aceito.'))
   }, [lastOutcome])
-  if (!game || !mine) return null
+  useEffect(() => {
+    setMoves((m) => {
+      const keep = Object.fromEntries(Object.entries(m).filter(([, v]) => v.minute >= minute))
+      return Object.keys(keep).length === Object.keys(m).length ? m : keep
+    })
+  }, [minute])
+  if (!game || !mine || !kit) return null
   const waiting = state.pending.length > 0
+  const injury = game.injury && game.injury.side === side ? game.injury : undefined
   const send = (command: Parameters<LiveSession['send']>[0]): void => {
     const id = session?.send(command)
     setNote(id ? 'Enviado: vale no próximo minuto de jogo.' : 'Sem conexão para enviar agora.')
   }
+  const lineup = mine.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: moves[p.playerId]?.point ?? p.point }))
+  const move = (playerId: string, point: GridPoint): void => {
+    const there = lineup.find((l) => l.playerId !== playerId && l.point && l.point.row === point.row && l.point.lane === point.lane)
+    const own = lineup.find((l) => l.playerId === playerId)?.point
+    setMoves((m) => ({
+      ...m,
+      [playerId]: { point, minute },
+      ...(there && own ? { [there.playerId]: { point: own, minute } } : {}),
+    }))
+    send({ type: 'position', playerId, point })
+  }
+  const leftSeconds = injury ? Math.max(0, Math.ceil((injury.deadline - now) / 1000)) : 0
+  const hurt = injury ? byId.get(injury.playerId) : undefined
+  const hurtName = hurt ? playerLabel(hurt) : (injury?.playerId ?? '')
+  const chooseIn = (id: string): void => {
+    if (injury) {
+      send({ type: 'injury', incomingId: id })
+      return
+    }
+    if (!out) return
+    send({ type: 'substitute', outgoingId: out, incomingId: id })
+    setOut(null)
+  }
   return (
     <Card title="Seu time" className="!p-3">
       <div className="space-y-3" data-testid="live-controls">
+        {injury && (
+          <div className="rounded-xl border border-amber-400/60 bg-amber-950/50 p-3" data-testid="live-injury">
+            <p className="text-sm font-bold text-amber-100">✚ {hurtName} se machucou. O jogo do seu time está parado. Escolha quem entra no lugar dele no banco abaixo.</p>
+            <p className="mt-1 text-xs text-amber-200" data-testid="live-injury-left">
+              Se você não escolher, entra o melhor reserva em {leftSeconds} s.
+            </p>
+            <Button className="mt-2" variant="secondary" onClick={() => send({ type: 'injury' })} data-testid="live-injury-short">
+              Seguir com um a menos
+            </Button>
+          </div>
+        )}
         <div>
           <p className="mb-1 text-xs font-semibold text-muted">Estilo de jogo</p>
           <Segmented value={mine.style} options={STYLES.map((id) => ({ id, label: PLAY_STYLE_LABELS[id] }))} onChange={(style) => send({ type: 'style', style })} />
@@ -254,42 +310,38 @@ function Controls({ state, side, session }: { state: LiveClientState; side: 'hom
         </div>
         <div>
           <p className="mb-1 text-xs font-semibold text-muted">
-            Trocas: {mine.subsLeft} restantes · {mine.stopsLeft} paradas
+            Em campo · trocas: {mine.subsLeft} restantes · {mine.stopsLeft} paradas
           </p>
-          <p className="mb-1 text-[11px] text-muted">Toque em quem sai e depois em quem entra.</p>
-          <ul className="grid grid-cols-2 gap-1" data-testid="live-onpitch">
-            {mine.onPitch.map((p) => {
-              const info = byId.get(p.playerId)
-              return (
-                <li key={p.playerId}>
-                  <button
-                    type="button"
-                    onClick={() => setOut(out === p.playerId ? null : p.playerId)}
-                    className={`min-h-11 w-full rounded-lg px-2 text-left text-xs ${out === p.playerId ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-200'}`}
-                  >
-                    <span className="block truncate font-semibold">{info ? playerLabel(info) : p.playerId}</span>
-                    <span className="opacity-80">{p.slot} · {Math.round(p.fitness)}%{p.yellowCards ? ' · 🟨' : ''}</span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-          {out && (
+          <p className="mb-1 text-[11px] text-muted">Arraste um jogador para outro ponto do campo (vale no próximo minuto) ou toque em quem sai e depois em quem entra.</p>
+          <FieldLineup
+            formationId={mine.formationId}
+            lineup={lineup}
+            players={players}
+            kit={kit.kit}
+            keeperKit={kit.keeper}
+            numberOf={(id, slot) => assignNumber(numbers, side, id, slot)}
+            fitnessOf={(id) => mine.onPitch.find((p) => p.playerId === id)?.fitness ?? 0}
+            yellowOf={(id) => (mine.onPitch.find((p) => p.playerId === id)?.yellowCards ?? 0) > 0}
+            selectedId={out}
+            onMove={move}
+            onTap={(id) => {
+              if (injury) {
+                setNote('Escolha quem entra no lugar de quem se machucou (banco abaixo).')
+                return
+              }
+              setOut(out === id ? null : id)
+            }}
+          />
+          {(out || injury) && (
             <div className="mt-2" data-testid="live-bench">
               <p className="mb-1 text-xs font-semibold">Quem entra?</p>
+              {mine.bench.length === 0 && <p className="text-xs text-muted">Não há reservas no banco.</p>}
               <ul className="grid grid-cols-2 gap-1">
                 {mine.bench.map((id) => {
                   const info = byId.get(id)
                   return (
                     <li key={id}>
-                      <button
-                        type="button"
-                        className="min-h-11 w-full rounded-lg bg-slate-700 px-2 text-left text-xs text-slate-200"
-                        onClick={() => {
-                          send({ type: 'substitute', outgoingId: out, incomingId: id })
-                          setOut(null)
-                        }}
-                      >
+                      <button type="button" className="min-h-11 w-full rounded-lg bg-slate-700 px-2 text-left text-xs text-slate-200" onClick={() => chooseIn(id)} data-testid={`bench-${id}`}>
                         <span className="block truncate font-semibold">{info ? playerLabel(info) : id}</span>
                         <span className="opacity-80">{info?.position} · força {info?.overall}</span>
                       </button>
@@ -305,4 +357,3 @@ function Controls({ state, side, session }: { state: LiveClientState; side: 'hom
     </Card>
   )
 }
-

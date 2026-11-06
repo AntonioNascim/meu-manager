@@ -44,6 +44,8 @@ export interface MatchInput {
    * avança) e o técnico escolhe quem entra (`resolveInjury`). Sem isso (padrão), o melhor reserva entra na hora.
    */
   holdInjurySubs?: boolean
+  /** Só para testes: multiplica a chance de lesão por momento (padrão 1). Serve para provocar uma lesão cedo numa partida de laboratório. */
+  injuryRate?: number
   /** Jogo de mata-mata: prorrogação e pênaltis se o confronto está empatado depois dos 90 minutos. */
   knockout?: KnockoutRules
   /** Estádio neutro: sem vantagem de casa. */
@@ -170,6 +172,8 @@ export interface MatchContext {
   extra?: boolean
   /** Lesão de um time do jogador à espera da troca (o jogo fica parado até `resolveInjury`). */
   pendingInjury?: { side: 'home' | 'away'; playerId: string }
+  /** Multiplicador de teste da chance de lesão (ver `MatchInput.injuryRate`). */
+  injuryRate?: number
 }
 
 export const emptyTally = (): PlayerTally => ({

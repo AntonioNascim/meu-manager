@@ -888,3 +888,25 @@ Pendência obrigatória 1 antes do lançamento (seção 29). O técnico da liga 
 **Testes:** `tests/leagueSellMarket.test.ts` (6), `tests/onlineLeagueApi.test.ts` (corpos válidos e inválidos), ponta a ponta `tools/online-lab/b8-9-e2e.mjs` (anunciar e tirar o anúncio, venda direta recusada com motivo e depois aceita, pré-contrato aberto no meio da temporada, proposta aceita e o jogador em "Chegam na virada"; capturas `.shots/b8-9-*.png`). **Não coberto no navegador:** a venda de empréstimo e a proposta da IA pelo jogador anunciado (cobertas em teste de unidade).
 
 **Publicação:** nada publicado (precisa de `wrangler deploy`, sem migração de banco).
+
+## 31. Partida ao vivo online: arrastar jogadores e escolher quem entra na lesão (06/11/2026)
+
+Pendência obrigatória 2 antes do lançamento (seção 29). Agora a partida ao vivo online tem o que o jogo solo tem na tela de partida.
+
+**Arrastar no campo.** A área "Em campo" de `LiveMatchOnline` usa o `FieldLineup` do solo (camisa com número, nome, condição e cartão): arrastar leva o jogador ao ponto mais perto da grade (ponto ocupado = os dois trocam), tocar escolhe quem sai. O comando `position` (que o servidor já aceitava desde a B7) vale no próximo minuto, como os outros; a tela mostra o jogador no ponto novo na hora (e o troca-troca) até o servidor confirmar.
+
+**Lesão: o jogo para e o técnico escolhe.** Todo jogo de técnico começa com `holdInjurySubs` (`startLiveEvent`): quando alguém do time dele se machuca, o jogador sai e o **jogo dele para** (os outros seguem; o relógio do evento anda e o jogo parado recupera quando volta). O quadro leva `injury` (quem se machucou e quanto falta) e a tela mostra o aviso com o banco e "Seguir com um a menos"; a escolha é o comando novo `injury` (com `incomingId`, ou sem ele para seguir com um a menos), que entra no minuto seguinte. **Prazo:** `INJURY_WAIT_MS` = 45 s do relógio do evento (sem contar pausas): passado isso, ou na hora se o técnico caiu ou o time é da IA, entra o melhor reserva (`autoResolveInjury`, comando `injury-auto` só do servidor, anotado no registro para a reprodução refazer idêntica). O prazo é medido no relógio do evento (`clock × minuteMs`) e não no relógio da máquina, então vale também quando o servidor recupera vários minutos de uma vez. Quando o time volta ao técnico (`setControlled(true)`) a próxima lesão espera de novo.
+
+**Motor.** `LiveMatch.injuryPending` e `autoResolveInjury(side)` (mesmo "melhor reserva" da lesão sem espera, estrangeiros respeitados) e `MatchInput.injuryRate` (só para testes: multiplica a chance de lesão; o servidor só o liga com `LIVE_INJURY_RATE` em testes locais, como `LIVE_MINUTE_MS`). Nada muda para quem não usa `holdInjurySubs`: `tests/matchGolden.test.ts` passa sem regravar.
+
+**Testes:** `tests/leagueLiveInjury.test.ts` (7: o jogo para e a tela recebe a contagem; escolha do reserva e reprodução idêntica; "um a menos"; prazo de 45 s; técnico que cai; limpeza no estado do cliente; protocolo), ponta a ponta `tools/online-lab/b8-10-e2e.mjs` (com `LIVE_MINUTE_MS=600` e `LIVE_INJURY_RATE=60` no `server/.dev.vars`: a lesão aparece, o jogo fica parado, a contagem aparece, o reserva entra e o jogo volta; arrasta um jogador, o servidor aceita e ele muda de lugar; capturas `.shots/b8-10-*.png`). **Não coberto no navegador:** o prazo de 45 s vencendo (coberto em teste de unidade; no laboratório o minuto é curto e o prazo seria de 75 minutos de jogo) e a lesão com dois técnicos ao mesmo tempo na mesma partida.
+
+**Dica de laboratório:** o `wrangler dev --var` não chega ao Worker nesta máquina; as variáveis de teste vão no `server/.dev.vars` (que o Git ignora). E confira que só há um `wrangler`/`workerd` rodando: instâncias antigas seguem respondendo na mesma porta com código velho.
+
+### Pendências obrigatórias antes do lançamento (consolidado, 06/11/2026)
+1. ~~Partida ao vivo online: arrastar e escolher na lesão~~ (feito, esta seção).
+2. ~~Mercado online: anunciar, vender direto à IA e pré-contrato~~ (feito, seção 30). Opcional: transferências com a IA no histórico público.
+3. **Privacidade**: revisão do aviso por quem entenda de LGPD; decisão sobre a limpeza de contas sem uso (seção 17).
+4. **B9**: painel de moderação (denúncias, banimento de identidade, filtro de apelidos), limites finais, teste de carga e teste fechado.
+
+**Publicação:** nada publicado desta parte (precisa de `wrangler deploy`, sem migração de banco).

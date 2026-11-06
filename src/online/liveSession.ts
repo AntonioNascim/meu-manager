@@ -13,6 +13,8 @@ export interface ClientGame {
   matchId: string
   snapshot: MatchSnapshot
   controlled: { home: boolean; away: boolean }
+  /** Lesão à espera do técnico: quem saiu e o instante (ms, relógio desta máquina) em que entra o melhor reserva se ele não escolher. */
+  injury?: { side: 'home' | 'away'; playerId: string; deadline: number }
 }
 
 export interface LiveClientState {
@@ -57,14 +59,15 @@ export function applyMessage(state: LiveClientState, msg: ServerMessage): LiveCl
         roster: msg.roster,
         myTeamId: msg.me.teamId,
         labels: msg.labels,
-        games: msg.games.map((g) => ({ matchId: g.matchId, snapshot: g.snapshot, controlled: g.controlled })),
+        games: msg.games.map((g) => ({ matchId: g.matchId, snapshot: g.snapshot, controlled: g.controlled, ...(g.snapshot.injuryPending ? { injury: { ...g.snapshot.injuryPending, deadline: Date.now() + (g.injuryLeftMs ?? 0) } } : {}) })),
       }
     case 'frame': {
       const games = state.games.map((g) => {
         const f = msg.games.find((x) => x.matchId === g.matchId)
         if (!f) return g
+        const { injuryPending: _stale, ...before } = g.snapshot
         const snapshot: MatchSnapshot = {
-          ...g.snapshot,
+          ...before,
           minute: f.minute,
           finished: f.finished,
           homeGoals: f.homeGoals,
@@ -79,7 +82,8 @@ export function applyMessage(state: LiveClientState, msg: ServerMessage): LiveCl
           ...(f.penalties ? { penalties: f.penalties } : {}),
           ...(f.shootout ? { shootout: f.shootout } : {}),
         }
-        return { ...g, snapshot, controlled: f.controlled }
+        const { injury: _gone, ...rest } = g
+        return { ...rest, snapshot: f.injury ? { ...snapshot, injuryPending: { side: f.injury.side, playerId: f.injury.playerId } } : snapshot, controlled: f.controlled, ...(f.injury ? { injury: { side: f.injury.side, playerId: f.injury.playerId, deadline: Date.now() + f.injury.leftMs } } : {}) }
       })
       return { ...state, minute: msg.minute, games }
     }
