@@ -71,3 +71,32 @@ describe('SqlGuard: códigos de uso único', () => {
     expect(new SqlGuard(sql).hit('createIdentity', 'ip', 1).allowed).toBe(true)
   })
 })
+
+describe('SqlGuard: limpeza dos contadores (o IP não fica no disco)', () => {
+  it('apaga os registros vencidos de chaves que nunca mais voltaram, e só eles', () => {
+    const sql = memorySql()
+    const guard = new SqlGuard(sql)
+    const T = 10_000_000
+    // Dois endereços fazem um pedido uma vez e nunca mais voltam; um terceiro faz um pedido agora.
+    guard.hit('createIdentity', '203.0.113.7', T)
+    guard.hit('read', '203.0.113.8', T)
+    guard.hit('saveBlobIp', '203.0.113.9', T + 23 * 3_600_000)
+    // Antes de vencer nada some.
+    expect(guard.purge(T + 30_000)).toBe(3)
+    // Depois de 24 h + um pouco, os dois primeiros somem (o `read` já vencia em 1 min); o terceiro ainda vale.
+    expect(guard.purge(T + 24 * 3_600_000 + 1_000)).toBe(1)
+    // Passados mais 24 h, não sobra nenhum endereço no disco.
+    expect(guard.purge(T + 49 * 3_600_000)).toBe(0)
+    expect(sql.exec('SELECT COUNT(*) AS n FROM hits').toArray()[0]!.n).toBe(0)
+  })
+
+  it('apaga também os códigos de uso único vencidos', () => {
+    const sql = memorySql()
+    let now = 1_000
+    const guard = new SqlGuard(sql, () => now)
+    expect(guard.claim('p', 'n1', 60_000)).toBe(true)
+    now += 120_000
+    guard.purge(now)
+    expect(sql.exec('SELECT COUNT(*) AS n FROM nonces').toArray()[0]!.n).toBe(0)
+  })
+})

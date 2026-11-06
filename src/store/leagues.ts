@@ -40,6 +40,7 @@ export const leagueApi = {
   ready: (leagueId: string, ready: boolean) => withIdentity((id) => client.sendReady(deps(), id, leagueId, ready)),
   control: (leagueId: string, action: ControlAction) => withIdentity((id) => client.controlLeague(deps(), id, leagueId, action)),
   pace: (leagueId: string, pace: PaceId) => withIdentity((id) => client.changePace(deps(), id, leagueId, pace)),
+  cups: (leagueId: string) => withIdentity((id) => client.cupsState(deps(), id, leagueId)),
   tradeSearch: (leagueId: string, f: AiSearchFilters) => withIdentity((id) => client.tradeSearch(deps(), id, leagueId, f)),
   tradeListings: (leagueId: string) => withIdentity((id) => client.tradeListings(deps(), id, leagueId)),
   tradeAi: (leagueId: string) => withIdentity((id) => client.tradeAi(deps(), id, leagueId)),

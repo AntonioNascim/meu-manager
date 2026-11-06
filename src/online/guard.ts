@@ -2,7 +2,7 @@
  * Limites de pedidos e códigos de uso único guardados em SQL (Fase 6, B2). No Cloudflare roda dentro de um Durable Object, cujo SQLite sobrevive
  * a reinícios; os testes usam o `node:sqlite`. Só precisa de um `exec` com `toArray()`, que é o que o SQLite do Durable Object oferece.
  */
-import { decide, longestWindow, type LimitAction, type LimitResult, type RateLimit } from './rateLimit'
+import { RATE_LIMITS, decide, longestWindow, type LimitAction, type LimitResult, type RateLimit } from './rateLimit'
 import type { NonceStore } from './signedRequest'
 
 export interface SqlLike {
@@ -26,6 +26,18 @@ export class SqlGuard implements RateLimit, NonceStore {
     const result = decide(action, times, now)
     if (result.allowed) this.sql.exec('INSERT INTO hits (id, at) VALUES (?, ?)', id, now)
     return result
+  }
+
+  /**
+   * Apaga TODOS os registros vencidos (os de chaves que nunca mais voltaram também): sem isto o endereço de IP de quem fez um pedido uma vez ficaria no
+   * disco para sempre, e o aviso de privacidade promete que os contadores somem em até 24 horas. Devolve quantas linhas de contadores restam.
+   */
+  purge(now: number): number {
+    for (const action of Object.keys(RATE_LIMITS) as LimitAction[]) this.sql.exec('DELETE FROM hits WHERE id LIKE ? AND at <= ?', `${action}:%`, now - longestWindow(action))
+    // Contador de uma ação que já não existe: vale a regra mais longa.
+    this.sql.exec('DELETE FROM hits WHERE at <= ?', now - Math.max(...(Object.keys(RATE_LIMITS) as LimitAction[]).map(longestWindow)))
+    this.sql.exec('DELETE FROM nonces WHERE until <= ?', now)
+    return Number(this.sql.exec('SELECT COUNT(*) AS n FROM hits').toArray()[0]?.n ?? 0)
   }
 
   claim(playerId: string, nonce: string, ttlMs: number): boolean {

@@ -10,6 +10,7 @@ import type { ClubAction, ClubView } from '../engine/league/club'
 import type { TradeReply, TradeOp } from './leagueApi'
 import type { TradeReport } from '../engine/league/trade'
 import type { AiSearchFilters } from '../engine/league/aimarket'
+import type { CupsBody } from '../engine/league/cupsView'
 
 export type LeagueClientDeps = IdentityClientDeps
 
@@ -102,3 +103,6 @@ export const tradeAi = (deps: LeagueClientDeps, identity: Identity, id: string) 
 export const tradeAiOffer = (deps: LeagueClientDeps, identity: Identity, id: string, o: { kind: 'purchase' | 'loan' | 'free'; playerId: string; fee: number; salary: number; contractEnd: string }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-offer`, o)
 export const tradeAiRespond = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string, accept: boolean) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-respond`, { offerId, accept })
 export const tradeAiWithdraw = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-withdraw`, { offerId })
+
+/** As copas do mundo da liga e o caminho do meu clube nelas (B8.8). */
+export const cupsState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ cups: CupsBody }>(deps, identity, 'GET', `/api/leagues/${id}/cups`)

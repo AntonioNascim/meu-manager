@@ -10,7 +10,7 @@ import { Turnstile } from './Turnstile'
  * O código de recuperação NÃO aparece aqui; o menu avisa para guardá-lo até ela tocar em "Já guardei".
  * A conta só é gravada no aparelho depois de o servidor aceitar.
  */
-export function CreateAccount({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+export function CreateAccount({ onDone, onBack, onPrivacy }: { onDone: () => void; onBack: () => void; onPrivacy?: () => void }) {
   const [nickname, setNickname] = useState('')
   const [token, setToken] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -62,6 +62,15 @@ export function CreateAccount({ onDone, onBack }: { onDone: () => void; onBack: 
       {error && (
         <p role="alert" className="text-sm text-loss" data-testid="create-error">
           {error}
+        </p>
+      )}
+      {onPrivacy && (
+        <p className="text-xs text-muted">
+          Ao criar a conta você concorda com o{' '}
+          <button type="button" className="font-semibold underline" onClick={onPrivacy} data-testid="open-privacy">
+            aviso de privacidade
+          </button>
+          : sem e-mail, sem nome real, sem anúncios.
         </p>
       )}
       <div className="mt-auto flex flex-col gap-3">

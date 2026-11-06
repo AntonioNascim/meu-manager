@@ -8,6 +8,7 @@ import { dateOfDay, type ScheduledEvent } from './clock'
 import { markPresent, suggestionsFor, type AbsenceSuggestion } from './absence'
 import { bookOf, type TradeRecord, type TradeReport } from './trade'
 import { LEAGUE_TRADE } from '../config'
+import { fixturesOn, type LeagueFixture } from './cupsView'
 import { MAX_PAUSE_MS, ROOM_OPENS_BEFORE_MS, type PaceId } from './pace'
 import { notReady, requiredSeats, upcoming, type LeagueState, type LogType, type SeatStatus } from './runner'
 
@@ -15,6 +16,8 @@ export interface ViewEvent {
   date: IsoDate
   startAt: number
   kind: ScheduledEvent['kind']
+  /** Os jogos de técnicos humanos nesta data (liga ou copa, com a fase). */
+  fixtures?: LeagueFixture[]
 }
 
 export interface ViewSeat {
@@ -51,7 +54,7 @@ export interface LeagueView {
   /** Calendário das próximas semanas (só eventos com partidas). */
   events: ViewEvent[]
   /** `playing`: técnicos cujo clube tem partida neste evento (quem não joga não tem o que ver ao vivo). */
-  current?: { date: IsoDate; startedAt: number; pending: number; all: number; playing: string[] }
+  current?: { date: IsoDate; startedAt: number; pending: number; all: number; playing: string[]; fixtures: LeagueFixture[] }
   seats: ViewSeat[]
   log: ViewLog[]
   /** Só para o ADM (a API tira dos outros): quem passaria do limite de ausência. */
@@ -75,6 +78,13 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
   const matchEvents = upcoming(league, now).filter((e) => e.kind === 'match')
   const firstMatch = league.clock.events.find((e) => e.kind === 'match')
   const paused = league.clock.pausedAt !== undefined
+  // Os jogos de técnicos humanos de cada data que a tela mostra (liga ou copa, com a fase), numa passada só pelas partidas.
+  const shown = matchEvents.slice(0, 12)
+  const humans = new Set(league.seats.map((s) => s.teamId))
+  const dates = new Set<string>(shown.map((e) => e.date))
+  if (firstMatch) dates.add(dateOfDay(firstMatch.day))
+  if (league.current) dates.add(league.current.date)
+  const fixtures = fixturesOn(world, humans, dates, true)
   return {
     now,
     worldDate: world.season.currentDate,
@@ -85,10 +95,10 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
     paused,
     ...(paused ? { pausedAt: league.clock.pausedAt as number, autoResumeAt: (league.clock.pausedAt as number) + MAX_PAUSE_MS } : {}),
     ...(firstMatch
-      ? { next: { date: dateOfDay(firstMatch.day), startAt: firstMatch.startAt, kind: 'match' as const, roomOpensAt: firstMatch.startAt - ROOM_OPENS_BEFORE_MS, required: [...required], notReady: notReady(league, world).map((s) => s.playerId) } }
+      ? { next: { date: dateOfDay(firstMatch.day), startAt: firstMatch.startAt, kind: 'match' as const, fixtures: fixtures.get(dateOfDay(firstMatch.day)) ?? [], roomOpensAt: firstMatch.startAt - ROOM_OPENS_BEFORE_MS, required: [...required], notReady: notReady(league, world).map((s) => s.playerId) } }
       : {}),
-    events: matchEvents.slice(0, 12),
-    ...(league.current ? { current: { date: league.current.date, startedAt: league.current.startedAt, pending: league.current.pending.length, all: league.current.all.length, playing: playingIn(league, world) } } : {}),
+    events: shown.map((e) => ({ ...e, fixtures: fixtures.get(e.date) ?? [] })),
+    ...(league.current ? { current: { date: league.current.date, startedAt: league.current.startedAt, pending: league.current.pending.length, all: league.current.all.length, playing: playingIn(league, world), fixtures: fixtures.get(league.current.date) ?? [] } } : {}),
     seats: league.seats.map((s) => ({ playerId: s.playerId, teamId: s.teamId, status: s.status, ready: s.ready, required: required.has(s.playerId), missed: s.missed ?? 0, leaving: s.leaving === true })),
     log: league.log.filter((l) => l.type !== 'tick').slice(-15).map((l) => ({ at: l.at, type: l.type, ...(l.by ? { by: l.by } : {}), ...(l.date ? { date: l.date } : {}) })),
     suggestions: suggestionsFor(league.seats, now, joinedAt),

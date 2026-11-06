@@ -6,7 +6,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 import { replayResult, type CommandOutcome, type LiveEvent, type LiveView, type QueuedCommand, type ReplayRecord } from '../engine/league/live'
 import type { MatchEvent, Mentality, PlayStyle, TeamMatchStats } from '../engine/types'
-import type { PlayTrace, SideSnapshot } from '../engine/match'
+import type { MatchSnapshot, PlayTrace, SideSnapshot } from '../engine/match'
 import type { MatchResult } from '../engine/types'
 
 export const MAX_MESSAGE_BYTES = 4096
@@ -81,6 +81,9 @@ export interface GameFrame {
   homeStats: TeamMatchStats
   awayStats: TeamMatchStats
   extraTime?: boolean
+  /** Disputa de pênaltis (mata-mata empatado): o placar dela e as cobranças. */
+  penalties?: { home: number; away: number }
+  shootout?: MatchSnapshot['shootout']
 }
 
 /** Quem joga: o suficiente para desenhar o campo e montar as trocas sem baixar o mundo (a tela online não tem o mundo). */
@@ -106,7 +109,7 @@ export interface Roster {
 
 export type ServerMessage =
   /** `resumeAt`: instante (ms) em que o jogo volta depois do aviso de retomada, se ainda não passou. */
-  | { t: 'full'; minute: number; paused: boolean; games: LiveView[]; roster: Roster; me: { teamId: string }; resumeAt?: number }
+  | { t: 'full'; minute: number; paused: boolean; games: LiveView[]; roster: Roster; me: { teamId: string }; resumeAt?: number; labels?: Record<string, { competition: string; detail: string; cup: boolean }> }
   | { t: 'frame'; minute: number; games: GameFrame[] }
   | { t: 'result'; outcomes: CommandOutcome[] }
   | { t: 'paused'; minute: number }
@@ -138,6 +141,8 @@ export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cur
       homeStats: v.snapshot.homeStats,
       awayStats: v.snapshot.awayStats,
       ...(v.snapshot.extraTime ? { extraTime: true } : {}),
+      ...(v.snapshot.penalties ? { penalties: v.snapshot.penalties } : {}),
+      ...(v.snapshot.shootout ? { shootout: v.snapshot.shootout } : {}),
     }
   })
   return { frame: { t: 'frame', minute: e.clock, games }, cursor: next }

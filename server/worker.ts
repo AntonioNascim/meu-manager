@@ -22,7 +22,8 @@ import type { LeagueView } from '../src/engine/league/view'
 import type { ClubAction, ClubError, ClubView } from '../src/engine/league/club'
 import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer } from '../src/engine/league/trade'
 import type { AiOffersBody, MarketRow } from '../src/engine/league/aimarket'
-import { adminAction, changePace, clubDecision, clubState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
+import type { CupsBody } from '../src/engine/league/cupsView'
+import { adminAction, changePace, clubDecision, clubState, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
@@ -115,13 +116,22 @@ class RemoteGuard implements RateLimit, NonceStore {
 /** Durable Object: um pedaço dos limites e nonces, em SQLite (sobrevive a reinícios). */
 export class Guard {
   private guard: SqlGuard
-  constructor(state: { storage: { sql: SqlLike } }) {
+  constructor(private state: { storage: { sql: SqlLike; getAlarm(): Promise<number | null>; setAlarm(at: number): Promise<void> } }) {
     this.guard = new SqlGuard(state.storage.sql)
+  }
+
+  /** Limpeza horária de contadores e nonces vencidos (os endereços de IP não ficam no disco além da janela mais longa, 24 h). */
+  async alarm(): Promise<void> {
+    if (this.guard.purge(Date.now()) > 0) await this.state.storage.setAlarm(Date.now() + 3_600_000)
   }
 
   async fetch(req: Request): Promise<Response> {
     const m = (await req.json()) as { op: string; action: LimitAction; key: string; now: number; playerId: string; nonce: string; ttlMs: number }
-    if (m.op === 'hit') return Response.json(this.guard.hit(m.action, m.key, m.now))
+    if (m.op === 'hit') {
+      const result = this.guard.hit(m.action, m.key, m.now)
+      if ((await this.state.storage.getAlarm()) === null) await this.state.storage.setAlarm(Date.now() + 3_600_000)
+      return Response.json(result)
+    }
     if (m.op === 'claim') return Response.json({ ok: this.guard.claim(m.playerId, m.nonce, m.ttlMs) })
     return new Response('bad op', { status: 400 })
   }
@@ -171,6 +181,16 @@ class DoRooms implements RoomPort {
   }
   setPace(leagueId: string, pace: PaceId) {
     return this.call(leagueId, '/internal/pace', { pace })
+  }
+  async cups(leagueId: string, playerId: string) {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch('https://room/internal/cups', { method: 'POST', body: JSON.stringify({ playerId }) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; cups?: CupsBody }
+      return json.ok && json.cups ? { ok: true as const, cups: json.cups } : { ok: false as const, error: json.error ?? ('unavailable' as const) }
+    } catch {
+      return { ok: false as const, error: 'unavailable' as const }
+    }
   }
   async trade(leagueId: string, playerId: string, op: TradeOp) {
     try {
@@ -260,6 +280,7 @@ async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDe
   if (second === 'state' && method === 'GET') return respondLeague(await leagueState(request, deps, first), cors)
   if (second === 'ready' && method === 'POST') return respondLeague(await setReady(request, deps, first), cors)
   if ((second === 'advance' || second === 'pause' || second === 'resume') && method === 'POST') return respondLeague(await controlLeague(request, deps, first, second), cors)
+  if (second === 'cups' && method === 'GET') return respondLeague(await cupsState(request, deps, first), cors)
   if (second === 'trade' && method === 'GET') return respondLeague(await tradeRead(request, deps, first, { op: 'body' }), cors)
   if (second === 'trade-squad' && method === 'GET') {
     const team = url.searchParams.get('team') ?? ''

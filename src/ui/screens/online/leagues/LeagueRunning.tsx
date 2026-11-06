@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PaceId } from '../../../../engine/league/pace'
 import type { LeagueView, ViewSeat } from '../../../../engine/league/view'
+import type { LeagueFixture } from '../../../../engine/league/cupsView'
 import type { ControlAction, LeagueDetail, LeagueStateBody } from '../../../../online/leagueApi'
 import type { Answer } from '../../../../online/leagueClient'
 import { leagueApi, type LeagueTeam } from '../../../../store/leagues'
@@ -8,6 +9,7 @@ import { Button, Card } from '../../../components/ui'
 import { LEAGUE_ERROR_LABELS, LEAGUE_LOG_LABELS, PACE_LABELS, SEAT_STATUS_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
 import { ClubCard } from './ClubCard'
+import { CupsCard } from './CupsCard'
 import { LeagueMarket } from './LeagueMarket'
 import { LiveMatchOnline } from './LiveMatchOnline'
 import { formatMoney } from '../../../format'
@@ -78,7 +80,7 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
     <>
       {market && <LeagueMarket league={league} teams={teams} worldDate={view.worldDate} onClose={() => setMarket(false)} />}
       {watching && <LiveMatchOnline leagueId={id} onClose={() => setWatching(false)} />}
-      <Status view={view} />
+      <Status view={view} clubOf={clubOf} />
 
       {me && (
         <Card title="Pronto">
@@ -115,6 +117,7 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
         </Card>
       )}
       {me && <ClubCard leagueId={id} />}
+      {me && <CupsCard leagueId={id} clubOf={clubOf} />}
 
       <Card title="Quem está pronto">
         <ul className="flex flex-col gap-2" data-testid="ready-list">
@@ -138,9 +141,18 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
         ) : (
           <ol className="flex flex-col gap-1.5" data-testid="calendar">
             {view.events.map((e, i) => (
-              <li key={e.startAt} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">
-                <span className="font-semibold">{whenLabel(e.startAt)}</span>
-                <span className="text-xs text-muted">{view.paused && i === 0 ? 'horário refeito ao retomar' : `jogos de ${dateLabel(e.date)}`}</span>
+              <li key={e.startAt} className="rounded-xl bg-surface-2 px-3 py-2 text-sm">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{whenLabel(e.startAt)}</span>
+                  <span className="text-xs text-muted">{view.paused && i === 0 ? 'horário refeito ao retomar' : `jogos de ${dateLabel(e.date)}`}</span>
+                </span>
+                {competitionsOf(e.fixtures).length > 0 && (
+                  <span className="mt-1 flex flex-wrap gap-1" data-testid="calendar-competitions">
+                    {competitionsOf(e.fixtures).map((c) => (
+                      <Pill key={c.name} tone={c.cup ? 'accent' : 'muted'}>{c.name}</Pill>
+                    ))}
+                  </span>
+                )}
               </li>
             ))}
           </ol>
@@ -295,7 +307,34 @@ function SeatPill({ seat }: { seat: ViewSeat }) {
   return seat.ready ? <Pill tone="win">Pronto</Pill> : <Pill tone="warn">Falta</Pill>
 }
 
-function Status({ view }: { view: LeagueView }) {
+/** As competições (liga e copas) que um evento tem, sem repetir. */
+const competitionsOf = (fixtures: LeagueFixture[] | undefined): { name: string; cup: boolean }[] => {
+  const seen = new Map<string, boolean>()
+  for (const f of fixtures ?? []) seen.set(f.competition, f.cup)
+  return [...seen].map(([name, cup]) => ({ name, cup }))
+}
+
+/** Os jogos dos técnicos nesta data: liga ou copa (com a fase) e os dois clubes. */
+function Fixtures({ fixtures, clubOf }: { fixtures: LeagueFixture[] | undefined; clubOf: (teamId: string) => string }) {
+  if (!fixtures || fixtures.length === 0) return null
+  return (
+    <ul className="mt-3 flex flex-col gap-1.5" data-testid="fixtures">
+      {fixtures.map((f) => (
+        <li key={`${f.homeTeamId}-${f.awayTeamId}`} className="rounded-xl bg-surface-2 px-3 py-2 text-sm">
+          <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+            {f.competition}
+            {f.detail ? ` · ${f.detail}` : ''}
+          </span>
+          <span className="block font-semibold">
+            {clubOf(f.homeTeamId)} x {clubOf(f.awayTeamId)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Status({ view, clubOf }: { view: LeagueView; clubOf: (teamId: string) => string }) {
   if (view.paused) {
     return (
       <div className="rounded-2xl border border-yellow-500/50 bg-yellow-500/10 p-4" data-testid="status-paused">
@@ -309,6 +348,7 @@ function Status({ view }: { view: LeagueView }) {
       <div className="rounded-2xl border border-win/50 bg-win/10 p-4" data-testid="status-event">
         <p className="font-bold text-win">Rodada em andamento</p>
         <p className="mt-1 text-sm text-muted">Jogos de {dateLabel(view.current.date)}. Faltam {view.current.pending} de {view.current.all} partidas dos técnicos.</p>
+        <Fixtures fixtures={view.current.fixtures} clubOf={clubOf} />
       </div>
     )
   }
@@ -321,7 +361,8 @@ function Status({ view }: { view: LeagueView }) {
         <p className="mt-1 text-sm text-muted">
           Jogos de {dateLabel(view.next.date)} · {inLabel(view.next.startAt - view.now)}
         </p>
-        <p className="mt-1 text-xs text-muted">{open ? 'A sala está aberta: quando todos derem Pronto, a rodada começa.' : `A sala abre às ${hourLabel(view.next.roomOpensAt)}.`}</p>
+        <Fixtures fixtures={view.next.fixtures} clubOf={clubOf} />
+        <p className="mt-2 text-xs text-muted">{open ? 'A sala está aberta: quando todos derem Pronto, a rodada começa.' : `A sala abre às ${hourLabel(view.next.roomOpensAt)}.`}</p>
       </div>
     )
   }
