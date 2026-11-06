@@ -69,6 +69,8 @@ const COMMANDS_PER_WINDOW = 12
 const COMMAND_WINDOW_MS = 10_000
 /** O ticket do WebSocket vale 30 s e uma vez só (B8.5). */
 export const TICKET_TTL_MS = 30_000
+/** No máximo tantos tickets vivos por técnico. */
+export const MAX_TICKETS_PER_PLAYER = 6
 
 interface SocketLike {
   send(data: string): void
@@ -343,16 +345,27 @@ export class LeagueRoom {
   }
 
   async alarm(): Promise<void> {
-    await this.run()
+    try {
+      await this.run()
+    } catch (e) {
+      console.error('[sala] erro no alarme', String((e as Error)?.stack ?? e))
+      throw e
+    }
   }
 
   // --------------------------------------------------------------- WebSocket
   /** Emite um ticket de uso único para o técnico abrir o WebSocket (o navegador não consegue mandar cabeçalhos no WebSocket). */
   protected issueTicket(playerId: string, now: number): string {
+    // Tickets vencidos saem. Os outros do mesmo técnico FICAM (dois pedidos quase juntos, como numa reconexão em cima de outra, não podem
+    // invalidar um ao outro); só se limita quantos há de uma vez.
+    const mine: { k: string; exp: number }[] = []
     for (const row of this.sql.exec("SELECT k, v FROM kv WHERE k LIKE 'ticket:%'").toArray()) {
       const t = JSON.parse(String(row.v)) as { playerId: string; exp: number }
-      if (t.exp < now || t.playerId === playerId) this.sql.exec('DELETE FROM kv WHERE k = ?', String(row.k))
+      if (t.exp < now) this.sql.exec('DELETE FROM kv WHERE k = ?', String(row.k))
+      else if (t.playerId === playerId) mine.push({ k: String(row.k), exp: t.exp })
     }
+    mine.sort((a, b) => a.exp - b.exp)
+    for (const old of mine.slice(0, Math.max(0, mine.length - (MAX_TICKETS_PER_PLAYER - 1)))) this.sql.exec('DELETE FROM kv WHERE k = ?', old.k)
     const bytes = crypto.getRandomValues(new Uint8Array(24))
     const ticket = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
     this.set(`ticket:${ticket}`, JSON.stringify({ playerId, exp: now + TICKET_TTL_MS }))
@@ -431,10 +444,12 @@ export class LeagueRoom {
     else this.persist()
   }
 
-  async webSocketClose(ws: SocketLike): Promise<void> {
+  async webSocketClose(ws: SocketLike, code?: number, reason?: string): Promise<void> {
+    console.log('[sala] websocket fechado', code, reason)
     await this.dropped(ws)
   }
-  async webSocketError(ws: SocketLike): Promise<void> {
+  async webSocketError(ws: SocketLike, error?: unknown): Promise<void> {
+    console.error('[sala] websocket com erro', String(error))
     await this.dropped(ws)
   }
 

@@ -70,9 +70,37 @@ b.on('response', async (res) => {
   if (res.url().endsWith('/live-ticket') && res.status() === 200) tickets.push((await res.json()).ticket)
 })
 const sockets = []
+const wslog = []
+let probing = false
+const t0 = Date.now()
 await b.routeWebSocket(/\/live/, (ws) => {
-  ws.connectToServer()
+  const server = ws.connectToServer()
+  if (probing) return
   sockets.push(ws)
+  const n = sockets.length
+  wslog.push(`+${Date.now() - t0}ms socket#${n} aberto`)
+  server.onMessage((m) => {
+    try {
+      const j = JSON.parse(String(m))
+      wslog.push(`+${Date.now() - t0}ms #${n} <- ${j.t}${j.minute !== undefined ? ' min ' + j.minute : ''}`)
+      if (j.t === 'full') wslog.push(`   full: me=${JSON.stringify(j.me)} jogos=${j.games.map((g) => g.snapshot.home.teamId + ' x ' + g.snapshot.away.teamId).join(' | ')} times=${j.roster.teams.length} jogadores=${j.roster.players.length}`)
+    } catch {
+      /* ignora */
+    }
+    ws.send(m)
+  })
+  ws.onMessage((m) => {
+    wslog.push(`+${Date.now() - t0}ms #${n} -> ${String(m).slice(0, 60)}`)
+    server.send(m)
+  })
+  ws.onClose((code, reason) => {
+    wslog.push(`+${Date.now() - t0}ms #${n} fechado (cliente)`)
+    server.close({ code: code ?? 1000, reason })
+  })
+  server.onClose((code, reason) => {
+    wslog.push(`+${Date.now() - t0}ms #${n} fechado (servidor) ${code} ${reason ?? ''}`)
+    ws.close({ code: code ?? 1000, reason })
+  })
 })
 
 await a.reload()
@@ -87,15 +115,31 @@ await b.getByRole('button', { name: 'Voltar' }).click()
 await b.getByText('Abrir a sala').first().click()
 await b.getByTestId('calendar').waitFor({ timeout: 30000 })
 check('antes da rodada não há botão de entrar na partida', (await b.getByTestId('live-enter').count()) === 0)
-await a.getByTestId('advance-league').click()
-await a.getByTestId('confirm-advance').click()
-await b.getByTestId('live-enter').waitFor({ timeout: 30000 })
-check('com a rodada em andamento a Bia vê "Entrar na partida"', true)
+// Nem todo clube joga em toda data: se a Bia não joga neste evento, ela NÃO vê o botão (conferido) e o ADM avança para o seguinte.
+let skipped = 0
+for (let tries = 0; tries < 6; tries++) {
+  await a.getByTestId('advance-league').click()
+  await a.getByTestId('confirm-advance').click()
+  await b.getByTestId('status-event').waitFor({ timeout: 30000 })
+  const shown = await b.getByTestId('live-enter').waitFor({ timeout: 7000 }).then(() => true, () => false)
+  if (shown) break
+  skipped++
+  check('quem não joga neste evento não vê "Entrar na partida"', (await b.getByTestId('live-enter').count()) === 0 && (await b.getByText('Seu clube não joga nesta rodada').count()) > 0)
+  await a.getByTestId('status-next').waitFor({ timeout: 120000 })
+  await b.getByTestId('status-next').waitFor({ timeout: 30000 })
+}
+await b.getByTestId('live-enter').waitFor({ timeout: 5000 })
+check('com a rodada em andamento a Bia vê "Entrar na partida"', true, skipped ? `(${skipped} evento(s) sem jogo dela antes)` : '')
 await shoot(b, '01-sala-rodada-em-andamento')
 
 await b.getByTestId('live-enter').click()
 await b.getByTestId('live-online').waitFor()
-await b.getByTestId('live-score').waitFor({ timeout: 30000 })
+await b.getByTestId('live-score').waitFor({ timeout: 30000 }).catch(async (e) => {
+  console.log('  [log do WebSocket]')
+  for (const l of wslog.filter((x) => !x.includes('frame')).slice(0, 12)) console.log('   ' + l)
+  console.log('  [estado na tela]', (await b.getByTestId('live-online').innerText()).replace(/s+/g, ' ').slice(0, 300))
+  throw e
+})
 check('a tela da partida abre com placar, minuto e campo', (await b.getByTestId('pitch').count()) === 1 && (await b.getByTestId('live-minute').count()) === 1)
 const minute = async () => (await b.getByTestId('live-minute').innerText()).trim()
 const m0 = await minute()
@@ -150,14 +194,19 @@ const tryOpen = (target) =>
   )
 const reqUrl = sockets.length ? sockets[0].url() : ''
 const live = reqUrl.replace(/ticket=[0-9a-f]+/, '')
-const used = await tryOpen(`${live}ticket=${tickets[0]}`)
+probing = true
+const spent = /ticket=([0-9a-f]+)/.exec(reqUrl)?.[1] // o ticket que a primeira conexão gastou
+const used = await tryOpen(`${live}ticket=${spent}`)
 check('um ticket já usado não abre outra conexão', used === 'recusou', used)
 const fake = await tryOpen(`${live}ticket=${'0'.repeat(48)}`)
 check('um ticket inventado não abre conexão', fake === 'recusou', fake)
+probing = false
 
 // ------------------------------------------------------------------ o fim da partida
 await waitFor(b, () => document.querySelector('[data-testid=live-minute]')?.textContent?.includes('Fim de jogo'), undefined, 120000).catch(async (e) => {
-  console.log('  [estado na tela]', (await b.getByTestId('live-online').innerText()).replace(/s+/g, ' ').slice(0, 300))
+  console.log('  [log do WebSocket]')
+  for (const l of wslog.slice(-40)) console.log('   ' + l)
+  console.log('  [estado na tela]', (await b.getByTestId('live-online').innerText()).replace(/\s+/g, ' ').slice(0, 300))
   throw e
 })
 check('a partida termina e mostra "Fim de jogo"', true, (await b.getByTestId('live-result').innerText()).trim())
