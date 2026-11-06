@@ -1,6 +1,7 @@
 /** Virada de temporada da base: evolução, decisões dos 20 anos, promoções da IA e chegada dos jovens novos. */
 import { ACADEMY } from '../config'
 import { squadForeignBlocked } from '../foreign'
+import { isProtected, type TeamRef } from '../teamRef'
 import { ageOneYear } from '../offseason/evolution'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits } from '../offseason/squad'
 import type { Rng } from '../rng'
@@ -21,7 +22,7 @@ export interface AcademyTurnInput {
   year: number
   /** A temporada do país atravessa o ano. */
   split?: boolean
-  userTeamId?: TeamId
+  userTeamId?: TeamRef
   createYouth: YouthFactory
   taken: Set<string>
   counter: number
@@ -54,7 +55,7 @@ export function turnAcademy(input: AcademyTurnInput): AcademyTurn {
   const released: Record<TeamId, number> = {}
 
   for (const team of input.teams) {
-    const isUser = team.id === input.userTeamId
+    const isUser = isProtected(input.userTeamId, team.id)
     const squad = players.filter((p) => p.teamId === team.id)
     const count = (map: Record<TeamId, number>) => (map[team.id] = (map[team.id] ?? 0) + 1)
     const promote = (p: Player) => {

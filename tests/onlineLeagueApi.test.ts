@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -43,6 +43,17 @@ class FakeRoom implements RoomPort {
   }
   calls: string[] = []
   running = new Set<string>()
+  clubCalls: string[] = []
+  async club(id: string, playerId: string) {
+    this.clubCalls.push(`club:${id}:${playerId}`)
+    if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
+    return { ok: true as const, view: { teamId: 'team-1', seasonLabel: '2026', seasonEnd: '2026-12-31', objective: { targetPosition: 5, sackingPosition: 11 }, squadSize: 24, payroll: 1, salaryBudget: 2, expiring: [], academyPending: [], academySize: 8 } }
+  }
+  async clubAction(id: string, playerId: string, action: { type: string; playerId: string }) {
+    this.clubCalls.push(`${action.type}:${id}:${playerId}:${action.playerId}`)
+    if (action.playerId === 'recusa') return { ok: false as const, refused: 'salary' as const, minimumSalary: 5000 }
+    return { ok: true as const, view: (await this.club(id, playerId)).view as never }
+  }
   async ticket(id: string, playerId: string) {
     this.calls.push(`ticket:${id}:${playerId}`)
     if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
@@ -272,6 +283,28 @@ describe('andamento da liga (B8.4)', () => {
     expect(s.room.calls).toContain(`ready:${id}:${bia.playerId}:true`)
     expect((await setReady(s.req(dudu, 'POST', `/api/leagues/${id}/ready`, { ready: true }), s.deps, id)).status).toBe(404)
     expect((await setReady(s.req(bia, 'POST', `/api/leagues/${id}/ready`, { ready: 'sim' }), s.deps, id)).status).toBe(400)
+  })
+
+  it('Meu clube: só membro, só com a liga em andamento; decisões com corpo conferido e recusa devolve o motivo', async () => {
+    const { s, ana, bia, dudu, id } = await running()
+    expect((await clubState(s.req(bia, 'GET', `/api/leagues/${id}/club`), s.deps, id)).status).toBe(409)
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    const ok = await clubState(s.req(bia, 'GET', `/api/leagues/${id}/club`), s.deps, id)
+    expect(ok.status).toBe(200)
+    expect((await clubState(s.req(dudu, 'GET', `/api/leagues/${id}/club`), s.deps, id)).status).toBe(404)
+    const post = (who: Identity, body: unknown) => clubDecision(s.req(who, 'POST', `/api/leagues/${id}/club`, body), s.deps, id)
+    expect((await post(bia, { type: 'renew', playerId: 'player-9', years: 2 })).status).toBe(200)
+    expect(s.room.clubCalls).toContain(`renew:${id}:${bia.playerId}:player-9`)
+    expect((await post(bia, { type: 'promote', playerId: 'player-9' })).status).toBe(200)
+    expect((await post(bia, { type: 'release-youth', playerId: 'player-9' })).status).toBe(200)
+    // corpo ruim: tipo desconhecido, anos fora de 1..5, salário negativo, campo a mais, id feio
+    for (const bad of [{ type: 'x', playerId: 'p' }, { type: 'renew', playerId: 'p', years: 9 }, { type: 'renew', playerId: 'p', years: 2, salary: -1 }, { type: 'promote', playerId: 'p', years: 1 }, { type: 'promote', playerId: 'a b' }, { type: 'renew', playerId: 'p' }]) {
+      expect((await post(bia, bad)).status).toBe(400)
+    }
+    const refused = await post(bia, { type: 'renew', playerId: 'recusa', years: 1 })
+    expect(refused.status).toBe(409)
+    expect(refused.body).toEqual({ error: 'club-refused', reason: 'salary', minimumSalary: 5000 })
+    expect((await post(dudu, { type: 'promote', playerId: 'player-9' })).status).toBe(404)
   })
 
   it('ticket do WebSocket: só membro, só com a liga em andamento, e o ticket é de uso único na sala', async () => {

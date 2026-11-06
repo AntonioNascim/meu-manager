@@ -8,6 +8,7 @@ import type { PaceId, BandId } from '../engine/league/pace'
 import { OPEN_LEAGUE_PACE, PACES } from '../engine/league/pace'
 import type { SeatError } from '../engine/league/seats'
 import type { LeagueView } from '../engine/league/view'
+import type { ClubAction, ClubError, ClubView } from '../engine/league/club'
 import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
 import { checkName, type NameIssue } from './nameFilter'
 
@@ -90,6 +91,10 @@ export interface RoomPort {
   control(leagueId: string, action: ControlAction, by: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   setPace(leagueId: string, pace: PaceId): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   /** Ticket de uso único (30 s) para abrir o WebSocket da partida ao vivo (B8.5). */
+  /** O clube do técnico: meta, contratos que vencem e base (B8.7). */
+  club(leagueId: string, playerId: string): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure }>
+  /** Renovar, promover ou dispensar um jovem; a sala aplica as regras do jogo solo. */
+  clubAction(leagueId: string, playerId: string, action: ClubAction): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure } | { ok: false; refused: ClubError; minimumSalary?: number }>
   ticket(leagueId: string, playerId: string): Promise<{ ok: true; ticket: string; expiresInMs: number } | { ok: false; error: RoomFailure }>
 }
 
@@ -121,6 +126,8 @@ export type LeagueError =
   | { error: 'unknown-team' }
   | { error: 'room-failed'; detail: string }
   | { error: 'bad-state' }
+  /** O clube não pôde fazer o que o técnico pediu (renovação recusada, elenco cheio...): `reason` é o código das regras do jogo. */
+  | { error: 'club-refused'; reason: ClubError; minimumSalary?: number }
 
 export type LeagueResult<T> = { status: 200 | 201; body: T } | { status: 400 | 401 | 403 | 404 | 409 | 429 | 502; body: LeagueError }
 
@@ -513,6 +520,48 @@ export async function leagueState(req: ApiRequest, deps: LeagueDeps, id: string)
   if (!room.ok) return roomFailure(room.error)
   const view = room.view ? { ...room.view, suggestions: who.isAdmin ? room.view.suggestions : [] } : undefined
   return { status: 200, body: { phase: room.phase, ...(view ? { view } : {}), isAdmin: who.isAdmin } }
+}
+
+/** Corpo do pedido de decisão do clube: só os campos conhecidos, números inteiros e ids no formato dos ids do jogo. */
+export function parseClubAction(body: ApiRequest['body']): ClubAction | undefined {
+  const o = parseJson(body)
+  if (!o || typeof o.playerId !== 'string' || !TEAM_ID.test(o.playerId)) return undefined
+  if (o.type === 'renew') {
+    if (!onlyKeys(o, ['type', 'playerId', 'years', 'salary']) || typeof o.years !== 'number' || !Number.isInteger(o.years) || o.years < 1 || o.years > 5) return undefined
+    if (o.salary !== undefined && (typeof o.salary !== 'number' || !Number.isFinite(o.salary) || o.salary <= 0 || o.salary > 1e9)) return undefined
+    return { type: 'renew', playerId: o.playerId, years: o.years, ...(o.salary !== undefined ? { salary: o.salary } : {}) }
+  }
+  if ((o.type === 'promote' || o.type === 'release-youth') && onlyKeys(o, ['type', 'playerId'])) return { type: o.type, playerId: o.playerId }
+  return undefined
+}
+
+/** O clube do técnico (meta, contratos que vencem, base). Só quem tem clube na liga em andamento. */
+export async function clubState(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ view: ClubView }>> {
+  const auth = await requireIdentity(req, 'read', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (!(await deps.leagues.members(id)).some((m) => m.playerId === auth.record.playerId)) return fail(404, { error: 'not-found' })
+  if (league.status !== 'running') return fail(409, { error: 'bad-state' })
+  const r = await deps.rooms.club(id, auth.record.playerId)
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { view: r.view } }
+}
+
+/** Renovar um contrato, promover ou dispensar um jovem da base. Devolve a visão nova do clube. */
+export async function clubDecision(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ view: ClubView }>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const action = parseClubAction(req.body)
+  if (!action) return fail(400, { error: 'bad-body' })
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (!(await deps.leagues.members(id)).some((m) => m.playerId === auth.record.playerId)) return fail(404, { error: 'not-found' })
+  if (league.status !== 'running') return fail(409, { error: 'bad-state' })
+  const r = await deps.rooms.clubAction(id, auth.record.playerId, action)
+  if (!r.ok && 'refused' in r) return fail(409, { error: 'club-refused', reason: r.refused, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) })
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { view: r.view } }
 }
 
 /** "Pronto" (ou desfazer) de um técnico com clube na liga em andamento. */

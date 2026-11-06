@@ -114,7 +114,8 @@ export interface AdvanceOptions {
   humanTeamIds?: readonly TeamId[]
 }
 
-export type TurnRunner = (state: SeasonState, pyramid: string) => { state: SeasonState; report: OffseasonReport }
+/** Vira a temporada de um país. `humans` = clubes humanos da liga online (a virada os protege da IA); no solo não vem. */
+export type TurnRunner = (state: SeasonState, pyramid: string, humans?: ReadonlySet<TeamId>) => { state: SeasonState; report: OffseasonReport }
 
 export interface AdvanceResult {
   state: SeasonState
@@ -204,7 +205,7 @@ function runDueTurns(state: SeasonState, options: AdvanceOptions): { state: Seas
     const cycle = cycleOfPyramid(current, pyramid)
     if (current.season.currentDate < cycle.end || !pyramidFinished(current, pyramid)) continue
     const tables = finalTables(current, pyramid)
-    const run = (options.turn as TurnRunner)(current, pyramid)
+    const run = (options.turn as TurnRunner)(current, pyramid, options.humanTeamIds ? new Set(options.humanTeamIds) : undefined)
     current = run.state
     turned.push({ pyramid, year: cycle.year, label: seasonLabel(cycle), report: run.report, tables })
   }

@@ -9,6 +9,7 @@
 import { DYNASTY, MARKET } from '../config'
 import { isContinental } from '../cups'
 import { squadForeignBlocked } from '../foreign'
+import { isProtected, type TeamRef } from '../teamRef'
 import { monthlyPayroll } from '../finance'
 import { needsOf } from '../market/ai'
 import { executeTransfer } from '../market/transfer'
@@ -53,7 +54,7 @@ export interface DynastyRaid {
 /** Quantas estrelas um clube com `titles` títulos na janela perde: nenhuma abaixo do limiar, uma no limiar, mais a cada título além, até `maxRaids`. */
 export const raidsFor = (titles: number): number => (titles < DYNASTY.threshold ? 0 : Math.min(DYNASTY.maxRaids, titles - DYNASTY.threshold + 1))
 
-export function dynastyRaids(state: SeasonState, pyramid: string, userTeamId?: TeamId): { state: SeasonState; raids: DynastyRaid[] } {
+export function dynastyRaids(state: SeasonState, pyramid: string, userTeamId?: TeamRef): { state: SeasonState; raids: DynastyRaid[] } {
   const raids: DynastyRaid[] = []
   const first = state.season.competitions.filter((c) => pyramidOf(c) === pyramid && c.tier === 1)
   if (first.length === 0) return { state, raids }
@@ -65,7 +66,7 @@ export function dynastyRaids(state: SeasonState, pyramid: string, userTeamId?: T
     const champion = computeStandings(comp.teamIds, current.matches.filter((m) => m.competitionId === comp.id))[0]?.teamId
     // Os clubes da liga por ordem de títulos (liga e copas continentais): o mais dominante perde primeiro.
     const dominant = comp.teamIds
-      .filter((id) => id !== userTeamId)
+      .filter((id) => !isProtected(userTeamId, id))
       .map((id) => {
         const team = current.teams.find((t) => t.id === id) as Team
         return { id, titles: titlesInWindow(team, id === champion) + continentalTitles(current, id, year) }
@@ -85,7 +86,7 @@ export function dynastyRaids(state: SeasonState, pyramid: string, userTeamId?: T
 }
 
 /** Uma estrela do clube dominante vai para o rival que mais ganha com ela e pode pagar. */
-function oneRaid(state: SeasonState, leagueIds: readonly TeamId[], sellerId: TeamId, userTeamId: TeamId | undefined, years: number, date: string, year: number): { state: SeasonState; raid: DynastyRaid } | undefined {
+function oneRaid(state: SeasonState, leagueIds: readonly TeamId[], sellerId: TeamId, userTeamId: TeamRef | undefined, years: number, date: string, year: number): { state: SeasonState; raid: DynastyRaid } | undefined {
   const seller = state.teams.find((t) => t.id === sellerId) as Team
   const sellerSquad = state.players.filter((p) => p.teamId === sellerId)
   // Quem tem o contrato acabando agora sai de graça de qualquer jeito.
@@ -96,7 +97,7 @@ function oneRaid(state: SeasonState, leagueIds: readonly TeamId[], sellerId: Tea
     .slice(0, DYNASTY.starPool)
   const squads = new Map<TeamId, Player[]>()
   for (const p of state.players) if (p.teamId) squads.set(p.teamId, [...(squads.get(p.teamId) ?? []), p])
-  const rivals = state.teams.filter((t) => leagueIds.includes(t.id) && t.id !== sellerId && t.id !== userTeamId)
+  const rivals = state.teams.filter((t) => leagueIds.includes(t.id) && t.id !== sellerId && !isProtected(userTeamId, t.id))
   for (const star of stars) {
     // O clube não fica sem cobertura da posição nem com elenco curto demais.
     if (sellerSquad.length - 1 < MARKET.minSquadAfterSale) return undefined
