@@ -49,6 +49,13 @@ import {
   respondAiOffer,
   searchAi,
   withdrawAiOffer,
+  mineBody,
+  buyersFor,
+  listOwn,
+  unlistOwn,
+  sellToAi,
+  preTargets,
+  preOffer,
   freeAgentsFor,
   makeTradeOffer,
   reportTrade,
@@ -75,6 +82,7 @@ import {
   type StoredLiveEvent,
 } from '../src/engine/league'
 import type { SeasonState } from '../src/engine/season'
+import type { Position } from '../src/engine/types'
 import { turnRunner } from '../src/store/game'
 import { createLeagueWorld } from '../src/store/leagueWorld'
 import type { LeagueRecord, TradeOp } from '../src/online/leagueApi'
@@ -600,6 +608,28 @@ export class LeagueRoom {
       this.world = r.world
       this.persist({ world: true })
       return reply({ ok: true, ai: aiOffers(this.league, r.world, playerId) })
+    }
+    // Vender, anunciar e pré-contrato com os clubes da IA e os jogadores livres de contrato. Vender mexe nos elencos: só fora de uma rodada em andamento.
+    if (op.op === 'mine') return reply({ ok: true, mine: mineBody(this.league, world, playerId) })
+    if (op.op === 'buyers') return reply({ ok: true, buyers: buyersFor(this.league, world, playerId, op.playerId, op.kind) ?? [] })
+    if (op.op === 'pre-targets') return reply({ ok: true, pre: preTargets(this.league, world, playerId, { ...(op.query ? { query: op.query } : {}), ...(op.position ? { position: op.position as Position } : {}) }) })
+    if (op.op === 'list' || op.op === 'unlist' || op.op === 'sell' || op.op === 'pre-offer') {
+      if (op.op === 'sell' && (this.league.current || this.live)) return refuse('event-running')
+      const r =
+        op.op === 'list'
+          ? listOwn(this.league, world, playerId, { playerId: op.playerId, kind: op.kind, price: op.price })
+          : op.op === 'unlist'
+            ? unlistOwn(this.league, world, playerId, op.playerId)
+            : op.op === 'sell'
+              ? sellToAi(this.league, world, playerId, { playerId: op.playerId, buyerId: op.buyerId, kind: op.kind, fee: op.fee })
+              : preOffer(this.league, world, playerId, { playerId: op.playerId, salary: op.salary, years: op.years })
+      if (!r.ok) return refuse(r.error)
+      if (r.world !== world) {
+        this.world = r.world
+        this.persist({ world: true })
+      }
+      const sale = r.accepted === undefined ? undefined : { accepted: r.accepted, ...(r.reason ? { reason: r.reason } : {}), ...(r.counter !== undefined ? { counter: r.counter } : {}) }
+      return reply({ ok: true, mine: mineBody(this.league, r.world, playerId), ...(sale ? { sale } : {}) })
     }
     if (this.league.current || this.live) return refuse('event-running')
     let result: TradeResult

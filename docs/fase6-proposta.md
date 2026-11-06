@@ -874,3 +874,17 @@ Sem isto o mercado online ficaria vazio (numa liga quase todos os clubes são da
 4. **B9**: painel de moderação (denúncias, banimento de identidade, filtro de apelidos), limites finais, teste de carga e teste fechado.
 
 **Publicação:** nada publicado; as rotas de copas e a limpeza horária do `Guard` só valem na nuvem depois de `wrangler deploy` (parte nova: precisa de autorização; sem migração de banco).
+
+## 30. Mercado online: anunciar, vender direto à IA e pré-contrato (06/11/2026)
+
+Pendência obrigatória 1 antes do lançamento (seção 29). O técnico da liga online passa a ter o que o jogo solo tem: **anunciar os próprios jogadores**, **vender ou emprestar direto a um clube da IA** e **pré-contrato**. As regras são as do solo (`listUserPlayer`, `sellPlayer`/`buyerInterest`, `offerPreContract`), aplicadas pelo servidor ao mundo da liga.
+
+**Motor** (`engine/league/sellmarket.ts`, puro). `mineBody` (meu elenco com valor, anúncio, preços sugeridos, quem pode assinar pré-contrato, quem sai e quem chega); `listOwn`/`unlistOwn` (anúncio de venda ou empréstimo; a IA passa a fazer propostas por ele pelo preço anunciado, `runMarketTick` já sorteava entre os clubes humanos); `buyersFor` (até 12 clubes da IA interessados, com o máximo que pagam) e `sellToAi` (o clube responde na hora; contrato novo de 3 anos, empréstimo até o fim da temporada dele; clube de técnico não é comprador: isso é o mercado entre técnicos); `preTargets` (jogadores de clubes da IA no último ano de contrato, até 40) e `preOffer` (o jogador responde na hora; recusa por salário devolve o mínimo). A virada de temporada já aplicava os pré-contratos (`applyPreContracts`) e a IA já podia levar jogadores de técnicos (`pre-contract-lost`).
+
+**API** (`GET trade-mine`, `trade-buyers?player=&kind=`, `trade-pre?q=&pos=`; `POST trade-list|unlist|sell|pre-offer`, corpos conferidos campo a campo em `parseTradeOp`). Vender (`sell`) só vale fora de uma rodada em andamento (`event-running`, como aceitar proposta da IA); anunciar e pré-contrato valem a qualquer hora. Recusa do clube ou do jogador volta como `sale: { accepted: false, reason, counter }` (a tela mostra o motivo na própria janela).
+
+**Tela** (`LeagueMarketSell.tsx`): o Mercado ganhou as abas **Vender** (meu elenco, Negociar, Anunciar/Tirar anúncio) e **Pré-contrato** (chegam e saem na virada, busca por nome, proposta com salário e anos). A barra de abas (`Tabs`) agora rola na horizontal.
+
+**Testes:** `tests/leagueSellMarket.test.ts` (6), `tests/onlineLeagueApi.test.ts` (corpos válidos e inválidos), ponta a ponta `tools/online-lab/b8-9-e2e.mjs` (anunciar e tirar o anúncio, venda direta recusada com motivo e depois aceita, pré-contrato aberto no meio da temporada, proposta aceita e o jogador em "Chegam na virada"; capturas `.shots/b8-9-*.png`). **Não coberto no navegador:** a venda de empréstimo e a proposta da IA pelo jogador anunciado (cobertas em teste de unidade).
+
+**Publicação:** nada publicado (precisa de `wrangler deploy`, sem migração de banco).

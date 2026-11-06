@@ -11,7 +11,7 @@ import { Sheet } from '../../../theme'
 import { Pill } from './parts'
 
 type Body = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
-export type Act = (call: () => Promise<Answer<Body>>, onRefuse?: (minimumSalary: number) => void) => Promise<boolean>
+export type Act = (call: () => Promise<Answer<Body>>, onRefuse?: (minimumSalary: number) => void, onReply?: (reply: Body) => void) => Promise<boolean>
 type Teams = { byId: Map<string, LeagueTeam> } | undefined
 
 const pos = (p: string): string => POSITION_SHORT_LABELS[p as Position] ?? p

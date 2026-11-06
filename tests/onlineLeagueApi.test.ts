@@ -373,6 +373,19 @@ describe('andamento da liga (B8.4)', () => {
       const r = await tradeRead(s.req(bia, 'GET', `/api/leagues/${id}/trade`), s.deps, id, op === 'search' ? { op, filters: {} } : { op })
       expect(r.status).toBe(200)
     }
+    // Vender, anunciar e pré-contrato
+    expect((await act('list', { playerId: 'player-9', kind: 'transfer', price: 900000 })).status).toBe(200)
+    expect((await act('list', { playerId: 'player-9', kind: 'loan', price: 5000 })).status).toBe(200)
+    expect((await act('unlist', { playerId: 'player-9' })).status).toBe(200)
+    expect((await act('sell', { playerId: 'player-9', buyerId: 'team-3', kind: 'purchase', fee: 0 })).status).toBe(200)
+    expect((await act('pre-offer', { playerId: 'player-9', salary: 30000, years: 3 })).status).toBe(200)
+    for (const [kind, body] of [['list', { playerId: 'player-9', kind: 'swap', price: 1 }], ['list', { playerId: 'player-9', kind: 'loan', price: 0 }], ['list', { playerId: 'player-9', kind: 'loan', price: 1, x: 1 }], ['unlist', {}], ['sell', { playerId: 'player-9', buyerId: 'team-3', kind: 'free', fee: 1 }], ['sell', { playerId: 'player-9', buyerId: 'team-3', kind: 'loan', fee: -1 }], ['pre-offer', { playerId: 'player-9', salary: 30000, years: 6 }], ['pre-offer', { playerId: 'player-9', salary: 30000, years: 2.5 }], ['pre-offer', { playerId: 'player-9', salary: 0, years: 2 }]] as [Parameters<typeof tradeAct>[3], unknown][]) {
+      expect((await act(kind, body)).status).toBe(400)
+    }
+    for (const op of [{ op: 'mine' }, { op: 'buyers', playerId: 'player-9', kind: 'loan' }, { op: 'pre-targets' }] as const) {
+      expect((await tradeRead(s.req(bia, 'GET', `/api/leagues/${id}/trade`), s.deps, id, op)).status).toBe(200)
+    }
+    expect(s.room.tradeOps).toEqual(expect.arrayContaining([`mine:${id}:${bia.playerId}`, `sell:${id}:${bia.playerId}`, `pre-offer:${id}:${bia.playerId}`]))
     expect(s.room.tradeOps).toEqual(expect.arrayContaining([`ai-offer:${id}:${bia.playerId}`, `search:${id}:${bia.playerId}`, `listings:${id}:${bia.playerId}`, `ai:${id}:${bia.playerId}`]))
   })
 

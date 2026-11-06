@@ -82,6 +82,21 @@ export const tradeSign = (deps: LeagueClientDeps, identity: Identity, id: string
 export const tradeReport = (deps: LeagueClientDeps, identity: Identity, id: string, recordId: string, reason: TradeReport['reason']) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-report`, { recordId, reason })
 export type { TradeOp }
 
+/** Vender, anunciar e pré-contrato (pendências antes do lançamento). */
+export const tradeMine = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-mine`)
+export const tradeBuyers = (deps: LeagueClientDeps, identity: Identity, id: string, playerId: string, kind: 'purchase' | 'loan') => ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-buyers?player=${encodeURIComponent(playerId)}&kind=${kind}`)
+export const tradePre = (deps: LeagueClientDeps, identity: Identity, id: string, f: { query?: string; position?: string }) => {
+  const p = new URLSearchParams()
+  if (f.query) p.set('q', f.query)
+  if (f.position) p.set('pos', f.position)
+  const q = p.toString()
+  return ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-pre${q ? `?${q}` : ''}`)
+}
+export const tradeList = (deps: LeagueClientDeps, identity: Identity, id: string, o: { playerId: string; kind: 'transfer' | 'loan'; price: number }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-list`, o)
+export const tradeUnlist = (deps: LeagueClientDeps, identity: Identity, id: string, playerId: string) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-unlist`, { playerId })
+export const tradeSell = (deps: LeagueClientDeps, identity: Identity, id: string, o: { playerId: string; buyerId: string; kind: 'purchase' | 'loan'; fee: number }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-sell`, o)
+export const tradePreOffer = (deps: LeagueClientDeps, identity: Identity, id: string, o: { playerId: string; salary: number; years: number }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-pre-offer`, o)
+
 /** Mercado com os clubes da IA (B8.6b): busca com filtros, anúncios, minhas propostas e as da IA. */
 export const tradeSearch = (deps: LeagueClientDeps, identity: Identity, id: string, f: AiSearchFilters) => {
   const p = new URLSearchParams()

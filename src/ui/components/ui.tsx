@@ -48,13 +48,13 @@ export function Button({
 /** Barra de abas (rolável no celular). */
 export function Tabs<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (id: T) => void }) {
   return (
-    <div className="flex gap-1 rounded-xl bg-slate-800 p-1">
+    <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-800 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
       {options.map((o) => (
         <button
           key={o.id}
           type="button"
           onClick={() => onChange(o.id)}
-          className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold ${value === o.id ? 'bg-emerald-500 text-slate-950' : 'text-slate-300'}`}
+          className={`min-h-10 flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-semibold ${value === o.id ? 'bg-emerald-500 text-slate-950' : 'text-slate-300'}`}
         >
           {o.label}
         </button>

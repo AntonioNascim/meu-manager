@@ -12,6 +12,7 @@ import type { ClubAction, ClubError, ClubView } from '../engine/league/club'
 import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer, TradeReport, TradeResponse } from '../engine/league/trade'
 import type { AiOffersBody, AiSearchFilters, MarketRow } from '../engine/league/aimarket'
 import type { CupsBody } from '../engine/league/cupsView'
+import type { ArrivingRow, BuyerRow, MineBody, PreRow } from '../engine/league/sellmarket'
 import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
 import { checkName, type NameIssue } from './nameFilter'
 
@@ -121,8 +122,29 @@ export type TradeOp =
   | { op: 'ai-offer'; kind: 'purchase' | 'loan' | 'free'; playerId: string; fee: number; salary: number; contractEnd: string }
   | { op: 'ai-respond'; offerId: string; accept: boolean }
   | { op: 'ai-withdraw'; offerId: string }
+  // Vender, anunciar e pré-contrato (pendências antes do lançamento)
+  | { op: 'mine' }
+  | { op: 'buyers'; playerId: string; kind: 'purchase' | 'loan' }
+  | { op: 'pre-targets'; query?: string; position?: string }
+  | { op: 'list'; playerId: string; kind: 'transfer' | 'loan'; price: number }
+  | { op: 'unlist'; playerId: string }
+  | { op: 'sell'; playerId: string; buyerId: string; kind: 'purchase' | 'loan'; fee: number }
+  | { op: 'pre-offer'; playerId: string; salary: number; years: number }
 
-export type TradeReply = { ok: true; body?: TradeBody; squad?: SquadRow[]; free?: FreeAgentRow[]; offer?: TradeOffer; rows?: MarketRow[]; ai?: AiOffersBody } | { ok: false; refused: string; minimumSalary?: number }
+/** Resultado de uma venda direta ou de um pré-contrato: o clube ou o jogador responde na hora. */
+export interface SaleOutcome {
+  accepted: boolean
+  reason?: string
+  /** Venda recusada pelo valor: o máximo que o clube pagaria; pré-contrato recusado pelo salário: o mínimo que o jogador aceitaria. */
+  counter?: number
+}
+
+export type { ArrivingRow, BuyerRow, MineBody, PreRow }
+
+export type TradeReply = { ok: true; body?: TradeBody; squad?: SquadRow[]; free?: FreeAgentRow[]; offer?: TradeOffer; rows?: MarketRow[]; ai?: AiOffersBody; mine?: MineBody; buyers?: BuyerRow[]; pre?: PreRow[]; sale?: SaleOutcome } | { ok: false; refused: string; minimumSalary?: number }
+
+/** Decisões do mercado aceitas por `tradeAct` (o nome da rota é `trade-<tipo>`). */
+export type TradeActKind = 'offer' | 'respond' | 'withdraw' | 'sign' | 'report' | 'ai-offer' | 'ai-respond' | 'ai-withdraw' | 'list' | 'unlist' | 'sell' | 'pre-offer'
 
 export type ControlAction = 'advance' | 'pause' | 'resume'
 
@@ -608,10 +630,14 @@ const MONEY_MAX = 10_000_000_000
 const money = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MONEY_MAX
 
 /** Corpo de cada pedido do mercado, conferido campo a campo (`undefined` = corpo inválido). */
-export function parseTradeOp(kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report' | 'ai-offer' | 'ai-respond' | 'ai-withdraw', body: ApiRequest['body']): TradeOp | undefined {
+export function parseTradeOp(kind: TradeActKind, body: ApiRequest['body']): TradeOp | undefined {
   const o = parseJson(body)
   if (!o) return undefined
   const id = (v: unknown): v is string => typeof v === 'string' && TEAM_ID.test(v)
+  if (kind === 'list') return onlyKeys(o, ['playerId', 'kind', 'price']) && id(o.playerId) && (o.kind === 'transfer' || o.kind === 'loan') && money(o.price) ? { op: 'list', playerId: o.playerId, kind: o.kind, price: o.price } : undefined
+  if (kind === 'unlist') return onlyKeys(o, ['playerId']) && id(o.playerId) ? { op: 'unlist', playerId: o.playerId } : undefined
+  if (kind === 'sell') return onlyKeys(o, ['playerId', 'buyerId', 'kind', 'fee']) && id(o.playerId) && id(o.buyerId) && (o.kind === 'purchase' || o.kind === 'loan') && typeof o.fee === 'number' && Number.isFinite(o.fee) && o.fee >= 0 && o.fee <= MONEY_MAX ? { op: 'sell', playerId: o.playerId, buyerId: o.buyerId, kind: o.kind, fee: o.fee } : undefined
+  if (kind === 'pre-offer') return onlyKeys(o, ['playerId', 'salary', 'years']) && id(o.playerId) && money(o.salary) && typeof o.years === 'number' && Number.isInteger(o.years) && o.years >= 1 && o.years <= 5 ? { op: 'pre-offer', playerId: o.playerId, salary: o.salary, years: o.years } : undefined
   if (kind === 'ai-offer') {
     if (!onlyKeys(o, ['kind', 'playerId', 'fee', 'salary', 'contractEnd']) || (o.kind !== 'purchase' && o.kind !== 'loan' && o.kind !== 'free') || !id(o.playerId) || !money(o.salary) || typeof o.contractEnd !== 'string' || !ISO_DATE.test(o.contractEnd)) return undefined
     // Jogador livre não tem taxa; compra e empréstimo têm.
@@ -647,7 +673,7 @@ async function memberOf(deps: LeagueDeps, id: string, playerId: string): Promise
 type TradeBodyOut = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
 
 /** Consultas do mercado: o painel (propostas, histórico), o elenco de outro técnico e os jogadores livres. */
-export async function tradeRead(req: ApiRequest, deps: LeagueDeps, id: string, op: Extract<TradeOp, { op: 'body' | 'squad' | 'free' | 'search' | 'listings' | 'ai' }>): Promise<LeagueResult<TradeBodyOut>> {
+export async function tradeRead(req: ApiRequest, deps: LeagueDeps, id: string, op: Extract<TradeOp, { op: 'body' | 'squad' | 'free' | 'search' | 'listings' | 'ai' | 'mine' | 'buyers' | 'pre-targets' }>): Promise<LeagueResult<TradeBodyOut>> {
   const auth = await requireIdentity(req, 'read', deps)
   if (!auth.ok) return auth.result as LeagueResult<never>
   const m = await memberOf(deps, id, auth.record.playerId)
@@ -663,7 +689,7 @@ export async function tradeRead(req: ApiRequest, deps: LeagueDeps, id: string, o
 }
 
 /** Decisões do mercado (propor, responder, retirar, contratar livre, denunciar). A recusa devolve o motivo das regras. */
-export async function tradeAct(req: ApiRequest, deps: LeagueDeps, id: string, kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report' | 'ai-offer' | 'ai-respond' | 'ai-withdraw'): Promise<LeagueResult<TradeBodyOut>> {
+export async function tradeAct(req: ApiRequest, deps: LeagueDeps, id: string, kind: TradeActKind): Promise<LeagueResult<TradeBodyOut>> {
   const auth = await requireIdentity(req, 'write', deps)
   if (!auth.ok) return auth.result as LeagueResult<never>
   const op = parseTradeOp(kind, req.body)

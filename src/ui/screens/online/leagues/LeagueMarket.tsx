@@ -12,8 +12,10 @@ import { inLabel } from './LeagueRunning'
 import { AiOffers, ListingsTab, SearchTab } from './LeagueMarketAi'
 import type { AiOffersBody } from '../../../../engine/league/aimarket'
 import { Pill } from './parts'
+import { MineTab, PreTab } from './LeagueMarketSell'
+import type { MineBody } from '../../../../engine/league/sellmarket'
 
-type Tab = 'offers' | 'search' | 'listings' | 'coaches' | 'history'
+type Tab = 'offers' | 'search' | 'listings' | 'mine' | 'pre' | 'coaches' | 'history'
 type Body = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
 const POLL_MS = 8000
 const pos = (p: string): string => POSITION_SHORT_LABELS[p as Position] ?? p
@@ -32,6 +34,7 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
   const [tab, setTab] = useState<Tab>('offers')
   const [body, setBody] = useState<TradeBody | null>(null)
   const [ai, setAi] = useState<AiOffersBody | null>(null)
+  const [mine, setMine] = useState<MineBody | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const clubOf = (teamId: string | null): string => (teamId === null ? 'Livre' : (teams?.byId.get(teamId)?.team.shortName ?? teams?.byId.get(teamId)?.team.name ?? teamId))
@@ -43,6 +46,8 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
     else if (!r.ok) setError(LEAGUE_ERROR_LABELS[r.error])
     const a = await leagueApi.tradeAi(id)
     if (a.ok && a.ai) setAi(a.ai)
+    const m = await leagueApi.tradeMine(id)
+    if (m.ok && m.mine) setMine(m.mine)
   }, [id])
   useEffect(() => {
     void load()
@@ -51,7 +56,7 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
   }, [load])
 
   /** Roda uma decisão; a resposta traz o painel novo. Devolve se deu certo. */
-  const act = async (call: () => Promise<Answer<Body>>, onRefuse?: (minimumSalary: number) => void): Promise<boolean> => {
+  const act = async (call: () => Promise<Answer<Body>>, onRefuse?: (minimumSalary: number) => void, onReply?: (reply: Body) => void): Promise<boolean> => {
     setBusy(true)
     setError(null)
     const r = await call()
@@ -59,6 +64,8 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
     if (r.ok) {
       if (r.body) setBody(r.body)
       if (r.ai) setAi(r.ai)
+      if (r.mine) setMine(r.mine)
+      onReply?.(r)
       return true
     }
     const d = r.detail as { reason?: string; minimumSalary?: number } | undefined
@@ -84,6 +91,8 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
               { id: 'offers', label: awaiting > 0 ? `Propostas (${awaiting})` : 'Propostas' },
               { id: 'search', label: 'Buscar' },
               { id: 'listings', label: 'Anúncios' },
+              { id: 'mine', label: 'Vender' },
+              { id: 'pre', label: 'Pré-contrato' },
               { id: 'coaches', label: 'Técnicos' },
               { id: 'history', label: 'Histórico' },
             ]}
@@ -99,6 +108,8 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
         )}
         {body && tab === 'search' && <SearchTab league={league} teams={teams} worldDate={worldDate} busy={busy} act={act} windowOpen={body.windowOpen} />}
         {body && tab === 'listings' && <ListingsTab league={league} teams={teams} worldDate={worldDate} busy={busy} act={act} windowOpen={body.windowOpen} />}
+        {body && tab === 'mine' && <MineTab league={league} mine={mine} teams={teams} busy={busy} act={act} id={id} />}
+        {body && tab === 'pre' && <PreTab mine={mine} teams={teams} busy={busy} act={act} id={id} />}
         {body && tab === 'coaches' && <Coaches league={league} clubOf={clubOf} worldDate={worldDate} busy={busy} act={act} id={id} windowOpen={body.windowOpen} />}
         {body && tab === 'history' && <History body={body} clubOf={clubOf} act={act} id={id} isAdmin={league.isAdmin} />}
       </div>
