@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, cupsState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -43,6 +43,11 @@ class FakeRoom implements RoomPort {
   }
   calls: string[] = []
   running = new Set<string>()
+  async cups(id: string, playerId: string) {
+    this.tradeOps.push(`cups:${id}:${playerId}`)
+    if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
+    return { ok: true as const, cups: { mine: [], others: [], history: [] } }
+  }
   tradeOps: string[] = []
   async trade(id: string, playerId: string, op: { op: string; offerId?: string; playerId?: string }) {
     this.tradeOps.push(`${op.op}:${id}:${playerId}`)
@@ -369,6 +374,17 @@ describe('andamento da liga (B8.4)', () => {
       expect(r.status).toBe(200)
     }
     expect(s.room.tradeOps).toEqual(expect.arrayContaining([`ai-offer:${id}:${bia.playerId}`, `search:${id}:${bia.playerId}`, `listings:${id}:${bia.playerId}`, `ai:${id}:${bia.playerId}`]))
+  })
+
+  it('Copas: só membro e liga em andamento', async () => {
+    const { s, ana, bia, dudu, id } = await running()
+    const get = (who: Identity) => cupsState(s.req(who, 'GET', `/api/leagues/${id}/cups`), s.deps, id)
+    expect((await get(bia)).status).toBe(409)
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    const ok = await get(bia)
+    expect(ok.status).toBe(200)
+    expect(ok.body).toEqual({ cups: { mine: [], others: [], history: [] } })
+    expect((await get(dudu)).status).toBe(404)
   })
 
   it('ticket do WebSocket: só membro, só com a liga em andamento, e o ticket é de uso único na sala', async () => {

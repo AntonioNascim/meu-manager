@@ -23,6 +23,8 @@ export interface LiveClientState {
   resumeAt?: number
   roster?: Roster
   myTeamId?: string
+  /** Onde é cada partida (liga ou copa, e a fase), por id da partida. */
+  labels?: Record<string, { competition: string; detail: string; cup: boolean }>
   games: ClientGame[]
   /** Respostas aos meus comandos (as últimas), para a tela mostrar "trocou" ou o motivo da recusa. */
   outcomes: CommandOutcome[]
@@ -54,6 +56,7 @@ export function applyMessage(state: LiveClientState, msg: ServerMessage): LiveCl
         resumeAt: msg.resumeAt,
         roster: msg.roster,
         myTeamId: msg.me.teamId,
+        labels: msg.labels,
         games: msg.games.map((g) => ({ matchId: g.matchId, snapshot: g.snapshot, controlled: g.controlled })),
       }
     case 'frame': {
@@ -73,6 +76,8 @@ export function applyMessage(state: LiveClientState, msg: ServerMessage): LiveCl
           homeStats: f.homeStats,
           awayStats: f.awayStats,
           ...(f.extraTime ? { extraTime: true } : {}),
+          ...(f.penalties ? { penalties: f.penalties } : {}),
+          ...(f.shootout ? { shootout: f.shootout } : {}),
         }
         return { ...g, snapshot, controlled: f.controlled }
       })

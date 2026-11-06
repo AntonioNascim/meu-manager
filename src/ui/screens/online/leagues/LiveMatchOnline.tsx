@@ -164,8 +164,15 @@ function Scoreboard({ state }: { state: LiveClientState }) {
   const away = roster.teams.find((t) => t.id === game.snapshot.away.teamId)
   if (!home || !away) return null
   const s = game.snapshot
+  const label = state.labels?.[game.matchId]
   return (
     <div className="rounded-2xl border border-line bg-surface p-3" data-testid="live-score">
+      {label && (
+        <p className="mb-2 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-muted" data-testid="live-competition">
+          {label.competition}
+          {label.detail ? ` · ${label.detail}` : ''}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
           <TeamBadge team={home} />
@@ -173,7 +180,12 @@ function Scoreboard({ state }: { state: LiveClientState }) {
         </div>
         <div className="text-center">
           <p className="text-3xl font-bold tabular-nums" data-testid="live-result">{s.homeGoals} x {s.awayGoals}</p>
-          <p className="text-xs text-muted" data-testid="live-minute">{s.finished ? 'Fim de jogo' : `${s.minute}'`}</p>
+          <p className="text-xs text-muted" data-testid="live-minute">{s.finished ? 'Fim de jogo' : s.extraTime ? `${s.minute}' · prorrogação` : `${s.minute}'`}</p>
+          {s.penalties && (
+            <p className="text-sm font-semibold" data-testid="live-penalties">
+              Pênaltis: {s.penalties.home} x {s.penalties.away}
+            </p>
+          )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
           <TeamBadge team={away} />

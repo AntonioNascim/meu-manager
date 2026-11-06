@@ -40,6 +40,7 @@ import {
   setPlayerReady,
   leagueView,
   clubView,
+  cupsBody,
   awaitingFor,
   aiAwaiting,
   aiOffers,
@@ -81,6 +82,7 @@ import type { DataPackage } from '../src/data/package/types'
 import { SqliteWorldStore, type WorldSql } from '../src/store/worldStore'
 import { frameSince, makeStoredReplay, parseClientMessage, replayKey, type Cursor, type Roster, type ServerMessage } from '../src/online/liveProtocol'
 import { playerOverall } from '../src/engine/overall'
+import { matchLabel } from '../src/engine/cups'
 import { fingerprintResult } from '../src/online/liveProtocol'
 
 /** Versão do motor registrada nos replays (aumente quando o motor de partida mudar de resultado). */
@@ -438,7 +440,13 @@ export class LeagueRoom {
     const seats = (this.league as LeagueState).seats
     const seat = seats.find((s) => s.playerId === playerId)
     const resumeAt = this.resumeAt !== undefined && this.resumeAt > this.now() ? this.resumeAt : undefined
-    return { t: 'full', minute: live.clock, paused: live.pausedAt !== undefined, games: viewOf(live, seats), roster: this.rosterOf(live), me: { teamId: seat?.teamId ?? '' }, ...(resumeAt !== undefined ? { resumeAt } : {}) }
+    const world = this.world as SeasonState
+    const labels: Record<string, { competition: string; detail: string; cup: boolean }> = {}
+    for (const g of live.games) {
+      const m = world.matches.find((x) => x.id === g.matchId)
+      if (m) labels[g.matchId] = { ...matchLabel(world, m), cup: m.cup !== undefined }
+    }
+    return { t: 'full', minute: live.clock, paused: live.pausedAt !== undefined, games: viewOf(live, seats), roster: this.rosterOf(live), me: { teamId: seat?.teamId ?? '' }, labels, ...(resumeAt !== undefined ? { resumeAt } : {}) }
   }
 
   async webSocketMessage(ws: SocketLike, data: string | ArrayBuffer): Promise<void> {
@@ -684,6 +692,10 @@ export class LeagueRoom {
       return Response.json({ ok: true, phase: 'running', view: leagueView(this.league, world, now, () => meta.createdAt), ...(awaiting > 0 ? { awaiting } : {}) })
     }
     if (path === '/internal/trade') return await this.trade(playerId, body.op as TradeOp, now)
+    if (path === '/internal/cups') {
+      const seat = this.league?.seats.find((s) => s.playerId === playerId)
+      return seat ? Response.json({ ok: true, cups: cupsBody(world, seat.teamId) }) : no('not-seated')
+    }
     if (path === '/internal/ready') {
       if (!this.league) return no('bad-state')
       if (!this.league.seats.some((x) => x.playerId === playerId)) return no('not-seated')

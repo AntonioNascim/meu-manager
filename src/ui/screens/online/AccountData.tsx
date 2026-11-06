@@ -7,7 +7,7 @@ import { ACCOUNT_REASON_LABELS, NAME_ISSUE_LABELS } from '../../labels'
 import { Sheet } from '../../theme'
 
 /** Dados e conta (B8.1/B8.2): trocar o apelido, ver o código, exportar o que o servidor guarda e apagar a conta. */
-export function AccountData({ onBack, onShowCode, onDeleted }: { onBack: () => void; onShowCode: () => void; onDeleted: () => void }) {
+export function AccountData({ onBack, onShowCode, onDeleted, onPrivacy }: { onBack: () => void; onShowCode: () => void; onDeleted: () => void; onPrivacy?: () => void }) {
   const { account } = useAccount()
   const [nickname, setNickname] = useState(account?.nickname ?? '')
   const [nickMessage, setNickMessage] = useState<{ ok: boolean; text: string } | null>(null)
@@ -101,6 +101,15 @@ export function AccountData({ onBack, onShowCode, onDeleted }: { onBack: () => v
           Ver o código
         </Button>
       </Card>
+
+      {onPrivacy && (
+        <Card title="Privacidade">
+          <p className="text-xs text-muted">O que guardamos, o que não guardamos e por quanto tempo.</p>
+          <Button className="mt-3 w-full" variant="secondary" onClick={onPrivacy} data-testid="open-privacy">
+            Ler o aviso de privacidade
+          </Button>
+        </Card>
+      )}
 
       <Card title="Exportar meus dados">
         <p className="text-xs text-muted">Baixa um arquivo com tudo o que o servidor guarda sobre você: apelido, saves da nuvem e ligas.</p>

@@ -11,6 +11,7 @@ import type { LeagueView } from '../engine/league/view'
 import type { ClubAction, ClubError, ClubView } from '../engine/league/club'
 import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer, TradeReport, TradeResponse } from '../engine/league/trade'
 import type { AiOffersBody, AiSearchFilters, MarketRow } from '../engine/league/aimarket'
+import type { CupsBody } from '../engine/league/cupsView'
 import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
 import { checkName, type NameIssue } from './nameFilter'
 
@@ -97,6 +98,8 @@ export interface RoomPort {
   club(leagueId: string, playerId: string): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure }>
   /** Renovar, promover ou dispensar um jovem; a sala aplica as regras do jogo solo. */
   clubAction(leagueId: string, playerId: string, action: ClubAction): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure } | { ok: false; refused: ClubError; minimumSalary?: number }>
+  /** As copas do mundo da liga e o caminho do clube do técnico nelas (B8.8). */
+  cups(leagueId: string, playerId: string): Promise<{ ok: true; cups: CupsBody } | { ok: false; error: RoomFailure }>
   /** Mercado entre técnicos (B8.6): a sala aplica as regras e devolve o que a tela precisa. */
   trade(leagueId: string, playerId: string, op: TradeOp): Promise<TradeReply | { ok: false; error: RoomFailure }>
   ticket(leagueId: string, playerId: string): Promise<{ ok: true; ticket: string; expiresInMs: number } | { ok: false; error: RoomFailure }>
@@ -685,6 +688,17 @@ export function parseClubAction(body: ApiRequest['body']): ClubAction | undefine
   }
   if ((o.type === 'promote' || o.type === 'release-youth') && onlyKeys(o, ['type', 'playerId'])) return { type: o.type, playerId: o.playerId }
   return undefined
+}
+
+/** As copas do mundo da liga: o caminho do meu clube, as outras copas e os campeões das edições passadas. */
+export async function cupsState(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ cups: CupsBody }>> {
+  const auth = await requireIdentity(req, 'read', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const m = await memberOf(deps, id, auth.record.playerId)
+  if (m !== 'ok') return m
+  const r = await deps.rooms.cups(id, auth.record.playerId)
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { cups: r.cups } }
 }
 
 /** O clube do técnico (meta, contratos que vencem, base). Só quem tem clube na liga em andamento. */

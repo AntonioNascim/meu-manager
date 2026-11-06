@@ -4,6 +4,7 @@ import { AccountData } from './AccountData'
 import { CloudSaves } from './CloudSaves'
 import { CreateAccount } from './CreateAccount'
 import { RecoverAccount } from './RecoverAccount'
+import { PrivacyNotice } from './PrivacyNotice'
 import { RecoveryCodeView } from './RecoveryCode'
 import { CreateLeague } from './leagues/CreateLeague'
 import { JoinByCode } from './leagues/JoinByCode'
@@ -11,7 +12,7 @@ import { LeagueRoomScreen } from './leagues/LeagueRoomScreen'
 import { LeaguesHub } from './leagues/LeaguesHub'
 import { OpenLeagues } from './leagues/OpenLeagues'
 
-export type OnlineView = 'create' | 'recover' | 'cloud' | 'data' | 'code' | 'leagues' | 'create-league' | 'open-leagues' | 'join-code' | 'league'
+export type OnlineView = 'create' | 'recover' | 'cloud' | 'data' | 'code' | 'leagues' | 'create-league' | 'open-leagues' | 'join-code' | 'league' | 'privacy'
 
 /**
  * As telas da conta online (B8.1), dos saves na nuvem (B8.2) e das ligas online (B8.3). O menu inicial abre numa delas e `onClose` volta ao menu.
@@ -20,6 +21,12 @@ export type OnlineView = 'create' | 'recover' | 'cloud' | 'data' | 'code' | 'lea
 export function OnlineArea({ start, onClose, invite }: { start: OnlineView; onClose: () => void; invite?: string }) {
   const { account } = useAccount()
   const [view, setView] = useState<OnlineView>(start)
+  const [before, setBefore] = useState<OnlineView>(start)
+  /** Abre o aviso de privacidade e volta para a tela de onde veio. */
+  const showPrivacy = () => {
+    setBefore(view)
+    setView('privacy')
+  }
   const [leagueId, setLeagueId] = useState<string>('')
   const [leagueCode, setLeagueCode] = useState<string | undefined>(undefined)
   const toHub = () => setView('leagues')
@@ -29,7 +36,8 @@ export function OnlineArea({ start, onClose, invite }: { start: OnlineView; onCl
     setView('league')
   }
 
-  if (view === 'create') return <CreateAccount onDone={() => (invite ? setView('join-code') : onClose())} onBack={onClose} />
+  if (view === 'privacy') return <PrivacyNotice onBack={() => setView(before)} />
+  if (view === 'create') return <CreateAccount onDone={() => (invite ? setView('join-code') : onClose())} onBack={onClose} onPrivacy={showPrivacy} />
   if (view === 'recover') return <RecoverAccount onDone={() => (invite ? setView('join-code') : onClose())} onBack={onClose} />
   if (!account) return null
   if (view === 'cloud') return <CloudSaves onBack={onClose} />
@@ -54,5 +62,5 @@ export function OnlineArea({ start, onClose, invite }: { start: OnlineView; onCl
       </div>
     )
   }
-  return <AccountData onBack={onClose} onShowCode={() => setView('code')} onDeleted={onClose} />
+  return <AccountData onBack={onClose} onShowCode={() => setView('code')} onDeleted={onClose} onPrivacy={showPrivacy} />
 }
