@@ -3,7 +3,7 @@
  * então tudo roda em teste sem nuvem. O Worker só liga estas peças a `Request`/`Response`.
  */
 import { checkName, type NameIssue } from './nameFilter'
-import type { LimitAction, RateLimit } from './rateLimit'
+import { IP_ACTION, type LimitAction, type RateLimit } from './rateLimit'
 import { verifyRequest, type NonceStore, type RequestParts, type VerifyError } from './signedRequest'
 
 export interface IdentityRecord {
@@ -68,7 +68,7 @@ export async function authenticate(
   req: ApiRequest,
   action: LimitAction,
   deps: ApiDeps,
-  ipAction: LimitAction = action,
+  ipAction: LimitAction = IP_ACTION[action] ?? action,
 ): Promise<{ ok: true; playerId: string } | { ok: false; result: ApiResult<never> }> {
   const now = deps.now()
   // O limite por IP e a conferência da assinatura (que gasta o código de uso único) não dependem um do outro: andam juntos, para não somar as idas ao servidor.
@@ -134,7 +134,7 @@ export async function registerIdentity(req: ApiRequest, deps: ApiDeps): Promise<
 }
 
 /** Um pedido comum de uma identidade que já existe: confere limite, assinatura e cadastro, e marca a última visita. */
-export async function requireIdentity(req: ApiRequest, action: LimitAction, deps: ApiDeps, ipAction: LimitAction = action): Promise<{ ok: true; record: IdentityRecord } | { ok: false; result: ApiResult<never> }> {
+export async function requireIdentity(req: ApiRequest, action: LimitAction, deps: ApiDeps, ipAction: LimitAction = IP_ACTION[action] ?? action): Promise<{ ok: true; record: IdentityRecord } | { ok: false; result: ApiResult<never> }> {
   const auth = await authenticate(req, action, deps, ipAction)
   if (!auth.ok) return auth
   // Cadastro e limite por identidade andam juntos (trocar de IP não livra do teto).

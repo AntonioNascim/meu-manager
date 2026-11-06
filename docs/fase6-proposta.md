@@ -916,3 +916,50 @@ Pendência obrigatória 2 antes do lançamento (seção 29). Agora a partida ao 
 - **Os outros jogos da rodada** seguem normalmente: o relógio do evento é um só e cada jogo guarda o próprio minuto. O jogo parado recupera todo o atraso de uma vez quando a lesão é resolvida (os lances aparecem juntos) e o evento só termina quando ele também termina, no máximo 45 s depois do que terminaria.
 - **Pausa do ADM:** o prazo conta no relógio do evento, que não anda pausado.
 - **Problema achado e corrigido:** com o relógio no teto (120', prorrogação) uma lesão que ainda esperava nunca venceria o prazo e o evento travaria. Agora, no teto, entra o melhor reserva e a partida termina (`tests/leagueLiveInjury.test.ts`).
+
+
+## 32. B9: moderação, limites finais e teste de carga (06/11/2026; parte local, sem custo)
+
+### 32.1 Moderação (seções 6.2 e 6.3)
+- **Denunciar** (`POST /api/report`, `src/online/moderation.ts`): na sala da liga, "Denunciar" ao lado de cada técnico (apelido) e "Denunciar esta liga" (só quem é membro). Motivos fechados (ofensivo, finge ser outro, propaganda, outro), **uma denúncia por pessoa e alvo**, ninguém denuncia a si mesmo. **3 pessoas diferentes** tiram o apelido (volta a "Técnico 4821", estável por identidade; as denúncias viram "atendidas") ou escondem a liga do diretório até o painel decidir.
+- **Painel** (`/admin`, `server/admin.ts` e `adminPage.ts`): uma página só, sem bibliotecas, que fala com `/admin/api/*`. Só existe com o segredo **`ADMIN_TOKEN`** do Worker (guardado no painel do Cloudflare, mínimo de 16 caracteres; sem ele `/admin` responde 404). Mostra números (contas, ligas, técnicos, denúncias abertas, escondidas, banidos), denúncias abertas agrupadas por alvo (com o apelido ou nome de hoje), ligas escondidas e banidos, e faz: dispensar, trocar o apelido à força, **banir** e desbanir uma identidade, esconder, mostrar e fechar uma liga. Todo texto de gente entra na página por `textContent`; resposta com CSP sem fontes externas; tentativas erradas esbarram em `adminIp` (30 por minuto por IP).
+- **Banir** = a chave passa a levar 403 `banned` em qualquer pedido (inclusive ao tentar entrar de novo com o código), o apelido volta ao pronto e a identidade sai de todas as ligas (cada clube volta à IA; se era ADM, o humano mais antigo assume). **Desbanir** devolve.
+- **Banco:** migração `0003_moderation.sql` (tabelas `reports` e `bans`; só ids, motivo fechado e datas; sem IP). **Precisa ser aplicada no D1 remoto antes de publicar** (`wrangler d1 migrations apply meu-manager --remote`).
+- **Filtro de apelidos:** entraram "bundão", "bundinha", "escroto", "vadia" e outras; "Bundesliga" continua passando (palavra inteira).
+- **Testes:** `tests/onlineModeration.test.ts` (6), ponta a ponta `tools/online-lab/b9-mod-e2e.mjs` (4 técnicos, denúncia repetida recusada, 3 denúncias tiram o apelido e escondem a liga, painel com segredo errado e certo, banir e desbanir; capturas `.shots/b9-mod-*.png`).
+
+### 32.2 Limites finais (seção 6.1)
+Achado: o limite por **IP** das leituras e escritas era o mesmo número do limite por **identidade** (120 e 30 por minuto). A sala da liga consulta a cada poucos segundos e o mercado a cada 8 s (~35 pedidos por minuto por pessoa): **3 a 4 pessoas no mesmo Wi-Fi (ou numa operadora com CGNAT) se bloqueariam**. Agora o IP tem `readIp` (2.400 por minuto) e `writeIp` (600 por minuto) e a identidade continua em 120 e 30; as demais ações ficam como estavam (os tetos por IP de saves, criar liga e entrar por código já eram folgados). Novos: `report` (10 por hora e 30 por dia por identidade, 300 por dia por IP) e `adminIp`. Teste: `tests/onlineLimits.test.ts` (5 pessoas no mesmo IP, 100 consultas por minuto cada, ninguém bloqueado; uma pessoa só passando de 120 é barrada). **Os valores finais só se confirmam com gente de verdade no teste fechado.**
+
+### 32.3 Teste de carga: liga cheia passando pela virada (`tools/loadLeague.ts`)
+`PACOTE_REAL=1 node --expose-gc tools/run.mjs loadLeague --humans 20`: mundo real de 370 clubes e 10.471 jogadores, **20 técnicos em 19 países**, resultado direto, passos de 2 h, cada mudança do mundo gravada no `SqliteWorldStore` (mesmo formato do Durable Object), **420 dias de mundo** com as viradas de temporada dos países (dias 179, 274 e 369; alguns países dos humanos ainda não tinham virado no dia 420).
+
+| Medida (Node, máquina de desenvolvimento) | Valor |
+|---|---|
+| Passos do alarme / com partida humana | 5.040 / 330 |
+| CPU por passo: mediana / p95 / p99 / pior | 0 ms / 156 ms / 953 ms / **3.265 ms** (uma virada) |
+| CPU total dos 420 dias | 171 s |
+| Viradas de temporada (CPU) | 1,1 a 3,3 s cada |
+| Gravações / linhas gravadas | 526 / 34.603 (mediana 56 por gravação, máx 231) |
+| Gravar: mediana / pior | 135 ms / 329 ms |
+| Maior linha | 926 KB (limite do SQLite do Durable Object: 2 MB) |
+| Banco no fim | 225 linhas, 22,9 M caracteres |
+| Heap vivo no começo / maior vivo / **depois de recarregar do SQLite** | 32 MB / 65 MB / **90 MB** (carga de 208 ms) |
+| Pico com lixo (o coletor do Node não aperta) | 262 MB |
+
+**Leitura honesta da memória:** o limite é de **128 MB por Durable Object**. O mundo vivo cabe (65 MB) e a pior carga (recarregar tudo do SQLite depois de reiniciar) chega a **90 MB só de dados**, fora o código do motor e o "lastro" que a plataforma põe ao reiniciar o objeto (~75 MB medidos na B5). **Em Node isso não prova nada a favor nem contra**; a folga real só aparece no Cloudflare. Se a medição na nuvem mostrar que a recarga completa não cabe com 20 técnicos, a saída já prevista é a **etapa 2 da B5 (carga por partes)**: abrir só os blocos dos clubes que jogam naquela data; a recarga completa é o pior momento e só acontece depois de reinício.
+
+**Projeção de custo** (preços do Cloudflare como eu os conheço, a confirmar na página de preços; premissas escritas na saída da ferramenta: 20 técnicos, 51 sessões de 10 minutos cada, 150 pedidos por sessão, objeto de 128 MB, ~420 dias de mundo por temporada):
+
+| Ligas cheias ativas | Pedidos/mês | GB-s/mês | Linhas/mês | CPU/mês | Armazenamento | Custo |
+|---|---|---|---|---|---|---|
+| 1 | 11 mil | 866 | 2,5 mil | 12 s | ~0 | US$ 5 (plano) |
+| 100 | 1,1 M | 87 mil | 249 mil | 20 min | 2,2 GB | ~US$ 5 |
+| **500** | 5,6 M | 433 mil | 1,24 M | 1,7 h | 11,2 GB | **~US$ 7,35** |
+
+Tudo dentro do que o plano de US$ 5 já inclui, exceto o armazenamento acima de 5 GB (US$ 0,20 por GB). O que mais pesa é o **tempo de objeto ativo durante as sessões dos técnicos** (premissa de 15% de uso em 10 minutos), não o motor. **500 ligas cheias de verdade (10 mil pessoas) só se medem no Cloudflare**, com gente conectada (partidas ao vivo mantêm o objeto acordado por 6 a 20 minutos por evento): fica para o teste fechado e para a medição na nuvem abaixo.
+
+### 32.4 O que falta da B9 (precisa de você)
+1. **Publicar a moderação:** aplicar a migração `0003` no D1 remoto, criar o segredo `ADMIN_TOKEN` no painel do Cloudflare (você escolhe; 32 caracteres aleatórios) e `wrangler deploy`. Sem custo novo.
+2. **Medir a memória no Cloudflare** com a liga cheia (Worker de laboratório descartável, como na B5: 20 técnicos, o mundo real, a virada de temporada, com lastro crescente até achar o teto): custo desprezível dentro do plano de US$ 5 (alguns minutos de objeto), mas é uso de conta.
+3. **Teste fechado** com 50 a 100 pessoas (custo real e limites) e a **revisão de LGPD** do aviso de privacidade.

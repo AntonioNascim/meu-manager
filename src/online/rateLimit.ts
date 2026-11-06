@@ -27,6 +27,10 @@ export const RATE_LIMITS = {
   joinByCodeIp: [{ limit: 300, windowMs: HOUR }],
   // Abrir o WebSocket da partida (B8.5): por IP, folgado para o CGNAT; tickets errados também contam.
   liveConnectIp: [{ limit: 300, windowMs: MINUTE }],
+  // Leituras e escritas comuns por IP (B9): o limite por identidade é 120 e 30 por minuto; por IP precisa caber uma casa ou um CGNAT inteiro (a sala da liga consulta
+  // a cada poucos segundos e o mercado a cada 8 s, ~35 pedidos por minuto por pessoa). Antes valia o mesmo número por IP e por identidade: 4 pessoas no mesmo Wi-Fi se bloqueavam.
+  readIp: [{ limit: 2400, windowMs: MINUTE }],
+  writeIp: [{ limit: 600, windowMs: MINUTE }],
   // Denunciar (B9): por identidade, o suficiente para um dia ruim sem virar arma contra os outros; por IP, folgado para o CGNAT.
   report: [{ limit: 10, windowMs: HOUR }, { limit: 30, windowMs: DAY }],
   reportIp: [{ limit: 300, windowMs: DAY }],
@@ -35,6 +39,9 @@ export const RATE_LIMITS = {
 } as const satisfies Record<string, readonly LimitRule[]>
 
 export type LimitAction = keyof typeof RATE_LIMITS
+
+/** A ação que conta por IP quando é diferente da por identidade (o resto conta igual nos dois). */
+export const IP_ACTION: Partial<Record<LimitAction, LimitAction>> = { read: 'readIp', write: 'writeIp' }
 
 export type LimitResult = { allowed: true } | { allowed: false; retryAfterMs: number }
 
