@@ -40,6 +40,18 @@ import {
   setPlayerReady,
   leagueView,
   clubView,
+  awaitingFor,
+  freeAgentsFor,
+  makeTradeOffer,
+  reportTrade,
+  respondTrade,
+  signFreeAgent,
+  squadOfHuman,
+  sweepTrades,
+  tradeBody,
+  tradeWakeup,
+  withdrawTrade,
+  type TradeResult,
   applyClubAction,
   type ClubAction,
   replanForPace,
@@ -57,7 +69,7 @@ import {
 import type { SeasonState } from '../src/engine/season'
 import { turnRunner } from '../src/store/game'
 import { createLeagueWorld } from '../src/store/leagueWorld'
-import type { LeagueRecord } from '../src/online/leagueApi'
+import type { LeagueRecord, TradeOp } from '../src/online/leagueApi'
 import type { DataPackage } from '../src/data/package/types'
 import { SqliteWorldStore, type WorldSql } from '../src/store/worldStore'
 import { frameSince, makeStoredReplay, parseClientMessage, replayKey, type Cursor, type Roster, type ServerMessage } from '../src/online/liveProtocol'
@@ -263,6 +275,7 @@ export class LeagueRoom {
   protected async run(): Promise<void> {
     if (!this.ensureLoaded()) return
     const now = this.now()
+    this.league = sweepTrades(this.league as LeagueState, this.world as SeasonState, now)
     const league0 = this.league as LeagueState
     let worldChanged = false
     for (let guard = 0; guard < 400; guard++) {
@@ -343,6 +356,9 @@ export class LeagueRoom {
     let at: number | undefined
     if (this.live) at = nextMinuteAt(this.live, now)
     else at = nextWakeup(league, now)
+    // Prazo da proposta aberta mais próxima (o relógio dos prazos congela na pausa)
+    const trade = tradeWakeup(league, now)
+    if (trade !== undefined && (at === undefined || trade < at)) at = trade
     if (at === undefined) await this.ctx.storage.deleteAlarm()
     else await this.ctx.storage.setAlarm(Math.max(at, now + 25))
   }
@@ -538,6 +554,46 @@ export class LeagueRoom {
     return createLeagueWorld(record.seed, JSON.parse(text) as DataPackage)
   }
 
+  /** Mercado entre técnicos (B8.6). Propostas e contratações só valem fora de uma rodada em andamento (o mundo não muda no meio das partidas). */
+  private async trade(playerId: string, op: TradeOp, now: number): Promise<Response> {
+    const reply = (r: unknown) => Response.json(r)
+    const refuse = (refused: string, minimumSalary?: number) => reply({ ok: false, refused, ...(minimumSalary ? { minimumSalary } : {}) })
+    if (!this.league) return reply({ ok: false, error: 'bad-state' })
+    const world = this.world as SeasonState
+    this.league = sweepTrades(this.league, world, now)
+    const seat = this.league.seats.find((s) => s.playerId === playerId)
+    if (!seat) return reply({ ok: false, error: 'not-seated' })
+    if (op.op === 'body') return reply({ ok: true, body: tradeBody(this.league, world, now, playerId) })
+    if (op.op === 'squad') {
+      const rows = squadOfHuman(this.league, world, op.teamId, playerOverall)
+      return rows ? reply({ ok: true, squad: rows }) : refuse('not-human-club')
+    }
+    if (op.op === 'free') return reply({ ok: true, free: freeAgentsFor(world, seat.teamId, playerOverall, op.position) })
+    if (this.league.current || this.live) return refuse('event-running')
+    let result: TradeResult
+    if (op.op === 'offer') result = makeTradeOffer(this.league, world, now, playerId, { kind: op.kind, playerId: op.playerId, fee: op.fee, salary: op.salary, contractEnd: op.contractEnd })
+    else if (op.op === 'respond') result = respondTrade(this.league, world, now, playerId, op.offerId, op.response)
+    else if (op.op === 'withdraw') result = withdrawTrade(this.league, world, playerId, op.offerId)
+    else if (op.op === 'sign') result = signFreeAgent(this.league, world, now, playerId, { playerId: op.playerId, salary: op.salary, contractEnd: op.contractEnd })
+    else {
+      const r = reportTrade(this.league, now, playerId, op.recordId, op.reason)
+      if (!r.ok) return refuse(r.error)
+      this.league = r.league
+      this.persist()
+      return reply({ ok: true })
+    }
+    if (!result.ok) {
+      if (result.league) this.league = result.league
+      return refuse(result.error, result.minimumSalary)
+    }
+    const worldChanged = result.world !== world
+    this.league = result.league
+    this.world = result.world
+    this.persist({ world: worldChanged })
+    await this.schedule(now)
+    return reply({ ok: true, ...(result.offer ? { offer: result.offer } : {}), body: tradeBody(result.league, result.world, now, playerId) })
+  }
+
   /** Pedidos do Worker da frente (só ele alcança o objeto): criar a sala, entrar, sair, iniciar e apagar. */
   protected async internal(path: string, body: Record<string, unknown>): Promise<Response> {
     const now = this.now()
@@ -600,8 +656,10 @@ export class LeagueRoom {
     // ---- andamento da liga (B8.4)
     if (path === '/internal/state') {
       if (!this.league) return Response.json({ ok: true, phase: 'lobby' })
-      return Response.json({ ok: true, phase: 'running', view: leagueView(this.league, world, now, () => meta.createdAt) })
+      const awaiting = playerId ? awaitingFor(this.league, now, playerId) : 0
+      return Response.json({ ok: true, phase: 'running', view: leagueView(this.league, world, now, () => meta.createdAt), ...(awaiting > 0 ? { awaiting } : {}) })
     }
+    if (path === '/internal/trade') return await this.trade(playerId, body.op as TradeOp, now)
     if (path === '/internal/ready') {
       if (!this.league) return no('bad-state')
       if (!this.league.seats.some((x) => x.playerId === playerId)) return no('not-seated')

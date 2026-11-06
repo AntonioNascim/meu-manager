@@ -6,6 +6,8 @@ import type { IsoDate } from '../types'
 import type { SeasonState } from '../season'
 import { dateOfDay, type ScheduledEvent } from './clock'
 import { markPresent, suggestionsFor, type AbsenceSuggestion } from './absence'
+import { bookOf, type TradeRecord, type TradeReport } from './trade'
+import { LEAGUE_TRADE } from '../config'
 import { MAX_PAUSE_MS, ROOM_OPENS_BEFORE_MS, type PaceId } from './pace'
 import { notReady, requiredSeats, upcoming, type LeagueState, type LogType, type SeatStatus } from './runner'
 
@@ -54,6 +56,10 @@ export interface LeagueView {
   log: ViewLog[]
   /** Só para o ADM (a API tira dos outros): quem passaria do limite de ausência. */
   suggestions: AbsenceSuggestion[]
+  /** Histórico público de transferências entre técnicos e contratações de jogador livre (as mais recentes primeiro). */
+  transfers: TradeRecord[]
+  /** Só para o ADM (a API tira dos outros): denúncias de transferências. */
+  reports: TradeReport[]
 }
 
 /** Técnicos cujo clube joga no evento em andamento. */
@@ -86,6 +92,8 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
     seats: league.seats.map((s) => ({ playerId: s.playerId, teamId: s.teamId, status: s.status, ready: s.ready, required: required.has(s.playerId), missed: s.missed ?? 0, leaving: s.leaving === true })),
     log: league.log.filter((l) => l.type !== 'tick').slice(-15).map((l) => ({ at: l.at, type: l.type, ...(l.by ? { by: l.by } : {}), ...(l.date ? { date: l.date } : {}) })),
     suggestions: suggestionsFor(league.seats, now, joinedAt),
+    transfers: [...bookOf(league).history].reverse().slice(0, LEAGUE_TRADE.historyShown),
+    reports: bookOf(league).reports,
   }
 }
 

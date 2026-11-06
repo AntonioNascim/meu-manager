@@ -7,6 +7,8 @@ import { signedCall, type IdentityClientDeps } from './identityClient'
 import type { LeagueDetail, LeagueSummary, LeagueError, AdminAction, WorldRef, LeagueStateBody, ControlAction } from './leagueApi'
 import type { PaceId } from '../engine/league/pace'
 import type { ClubAction, ClubView } from '../engine/league/club'
+import type { TradeReply, TradeOp } from './leagueApi'
+import type { TradeReport } from '../engine/league/trade'
 
 export type LeagueClientDeps = IdentityClientDeps
 
@@ -65,3 +67,15 @@ export const clubState = (deps: LeagueClientDeps, identity: Identity, id: string
 
 /** Renovar um contrato, promover ou dispensar um jovem da base (B8.7). */
 export const clubDecision = (deps: LeagueClientDeps, identity: Identity, id: string, action: ClubAction) => ask<{ view: ClubView }>(deps, identity, 'POST', `/api/leagues/${id}/club`, action)
+
+/** Mercado entre técnicos (B8.6): consultas e decisões. A recusa vem como `trade-refused` com o motivo em `detail`. */
+type TradeBodyOut = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
+export const tradeBody = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade`)
+export const tradeSquad = (deps: LeagueClientDeps, identity: Identity, id: string, teamId: string) => ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-squad?team=${encodeURIComponent(teamId)}`)
+export const tradeFree = (deps: LeagueClientDeps, identity: Identity, id: string, position?: string) => ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-free${position ? `?pos=${encodeURIComponent(position)}` : ''}`)
+export const tradeOffer = (deps: LeagueClientDeps, identity: Identity, id: string, o: { kind: 'purchase' | 'loan'; playerId: string; fee: number; salary: number; contractEnd: string }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-offer`, o)
+export const tradeRespond = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string, type: 'accept' | 'decline' | 'counter', fee?: number) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-respond`, { offerId, type, ...(fee !== undefined ? { fee } : {}) })
+export const tradeWithdraw = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-withdraw`, { offerId })
+export const tradeSign = (deps: LeagueClientDeps, identity: Identity, id: string, o: { playerId: string; salary: number; contractEnd: string }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-sign`, o)
+export const tradeReport = (deps: LeagueClientDeps, identity: Identity, id: string, recordId: string, reason: TradeReport['reason']) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-report`, { recordId, reason })
+export type { TradeOp }

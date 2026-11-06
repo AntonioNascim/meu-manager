@@ -87,6 +87,8 @@ export interface LeagueState {
   /** Próxima passagem diária. */
   nextTick: number
   log: LogEntry[]
+  /** Mercado entre técnicos humanos (B8.6, `trade.ts`); ausente nas ligas de antes dela. */
+  trades?: import('./trade').TradeBook
 }
 
 export interface LeagueDeps {

@@ -529,6 +529,31 @@ export const LEAGUE_LOG_LABELS: Record<import('../engine/league/runner').LogType
   'auto-resume': 'Liga retomada sozinha (30 dias)',
   tick: 'Dia passou',
 }
+/** Por que o mercado entre técnicos recusou (B8.6): códigos próprios; os demais vêm de `OFFER_REASON_LABELS`. */
+export const TRADE_ERROR_LABELS: Record<string, string> = {
+  'not-seated': 'Você não tem clube nesta liga.',
+  'not-human-club': 'Este jogador é de um clube da IA. Por enquanto só dá para negociar com técnicos da liga.',
+  unavailable: 'O jogador não está mais disponível.',
+  'own-player': 'Este jogador já é seu.',
+  'window-closed': 'A janela de transferências está fechada para um dos clubes.',
+  invalid: 'Confira os valores e as datas.',
+  'fee-too-low': 'O preço está abaixo do mínimo permitido entre técnicos (60% do valor do jogador; no empréstimo, 50% da taxa padrão).',
+  'fee-too-high': 'O preço está acima do máximo permitido entre técnicos (250% do valor do jogador).',
+  duplicate: 'Já existe uma proposta aberta por este jogador.',
+  'too-many-offers': 'Você já tem 5 propostas abertas. Espere uma resposta ou retire alguma.',
+  'pair-limit': 'Estes dois técnicos já fizeram 2 negócios nesta janela. Só é possível de novo na próxima.',
+  'pair-money': 'O dinheiro entre estes dois técnicos nesta janela passaria de 3 vezes o valor do jogador mais caro negociado.',
+  'return-blocked': 'Quem vendeu este jogador não pode recomprá-lo do mesmo técnico por 90 dias.',
+  'not-your-turn': 'Não é a sua vez de responder.',
+  'max-rounds': 'Já houve 3 contrapropostas. Aceite ou recuse.',
+  'not-found': 'Não encontrado.',
+  closed: 'Esta proposta já foi encerrada.',
+  'squad-size': 'O clube ficaria com menos jogadores que o mínimo.',
+  'position-cover': 'O clube ficaria sem jogadores suficientes nessa posição.',
+  'event-running': 'Há uma rodada em andamento. O mercado volta quando ela terminar.',
+}
+export const TRADE_STATUS_LABELS: Record<string, string> = { open: 'Aberta', accepted: 'Aceita', declined: 'Recusada', expired: 'Vencida', withdrawn: 'Retirada', refused: 'Jogador recusou' }
+
 /** Por que o servidor recusou um comando na partida ao vivo (B8.5). */
 export const LIVE_REJECT_LABELS: Record<import('../engine/league/live').RejectReason, string> = {
   'not-your-team': 'Você não joga nesta rodada.',
@@ -548,6 +573,7 @@ export const LEAGUE_ERROR_LABELS: Record<import('../online/leagueApi').LeagueErr
   'unknown-identity': 'Esta conta ainda não existe no servidor.',
   'bad-body': 'O pedido não está certo. Confira os campos e tente de novo.',
   'club-refused': 'O clube não pôde fazer isso agora.',
+  'trade-refused': 'O mercado recusou este negócio.',
   'turnstile-failed': 'A verificação de que você é uma pessoa não passou. Tente de novo.',
   'bad-name': 'Esse nome não serve.',
   'not-found': 'Não encontramos essa liga.',

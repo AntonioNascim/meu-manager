@@ -20,7 +20,8 @@ import { LeagueRoom } from './leagueRoom'
 import type { PaceId } from '../src/engine/league/pace'
 import type { LeagueView } from '../src/engine/league/view'
 import type { ClubAction, ClubError, ClubView } from '../src/engine/league/club'
-import { adminAction, changePace, clubDecision, clubState, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
+import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer } from '../src/engine/league/trade'
+import { adminAction, changePace, clubDecision, clubState, tradeAct, tradeRead, type TradeOp, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
@@ -151,12 +152,12 @@ class DoRooms implements RoomPort {
   start(leagueId: string) {
     return this.call(leagueId, '/internal/start', {})
   }
-  async state(leagueId: string) {
+  async state(leagueId: string, playerId?: string) {
     try {
       const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
-      const res = await stub.fetch('https://room/internal/state', { method: 'POST', body: '{}' })
-      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; phase?: 'lobby' | 'running'; view?: LeagueView }
-      return json.ok ? { ok: true as const, phase: json.phase ?? 'lobby', ...(json.view ? { view: json.view } : {}) } : { ok: false as const, error: json.error ?? 'unavailable' }
+      const res = await stub.fetch('https://room/internal/state', { method: 'POST', body: JSON.stringify({ playerId: playerId ?? '' }) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; phase?: 'lobby' | 'running'; view?: LeagueView; awaiting?: number }
+      return json.ok ? { ok: true as const, phase: json.phase ?? 'lobby', ...(json.view ? { view: json.view } : {}), ...(json.awaiting ? { awaiting: json.awaiting } : {}) } : { ok: false as const, error: json.error ?? 'unavailable' }
     } catch {
       return { ok: false as const, error: 'unavailable' as const }
     }
@@ -169,6 +170,18 @@ class DoRooms implements RoomPort {
   }
   setPace(leagueId: string, pace: PaceId) {
     return this.call(leagueId, '/internal/pace', { pace })
+  }
+  async trade(leagueId: string, playerId: string, op: TradeOp) {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch('https://room/internal/trade', { method: 'POST', body: JSON.stringify({ playerId, op }) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; refused?: string; minimumSalary?: number; body?: TradeBody; squad?: SquadRow[]; free?: FreeAgentRow[]; offer?: TradeOffer }
+      if (json.ok) return { ok: true as const, ...(json.body ? { body: json.body } : {}), ...(json.squad ? { squad: json.squad } : {}), ...(json.free ? { free: json.free } : {}), ...(json.offer ? { offer: json.offer } : {}) }
+      if (json.refused) return { ok: false as const, refused: json.refused, ...(json.minimumSalary !== undefined ? { minimumSalary: json.minimumSalary } : {}) }
+      return { ok: false as const, error: json.error ?? ('unavailable' as const) }
+    } catch {
+      return { ok: false as const, error: 'unavailable' as const }
+    }
   }
   async club(leagueId: string, playerId: string) {
     try {
@@ -246,6 +259,18 @@ async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDe
   if (second === 'state' && method === 'GET') return respondLeague(await leagueState(request, deps, first), cors)
   if (second === 'ready' && method === 'POST') return respondLeague(await setReady(request, deps, first), cors)
   if ((second === 'advance' || second === 'pause' || second === 'resume') && method === 'POST') return respondLeague(await controlLeague(request, deps, first, second), cors)
+  if (second === 'trade' && method === 'GET') return respondLeague(await tradeRead(request, deps, first, { op: 'body' }), cors)
+  if (second === 'trade-squad' && method === 'GET') {
+    const team = url.searchParams.get('team') ?? ''
+    return /^[A-Za-z0-9_.:-]{1,64}$/.test(team) ? respondLeague(await tradeRead(request, deps, first, { op: 'squad', teamId: team }), cors) : Response.json({ error: 'bad-body' }, { status: 400, headers: cors })
+  }
+  if (second === 'trade-free' && method === 'GET') {
+    const pos = url.searchParams.get('pos') ?? undefined
+    return pos === undefined || /^[A-Z]{2,3}$/.test(pos) ? respondLeague(await tradeRead(request, deps, first, { op: 'free', ...(pos ? { position: pos } : {}) }), cors) : Response.json({ error: 'bad-body' }, { status: 400, headers: cors })
+  }
+  if (method === 'POST' && (second === 'trade-offer' || second === 'trade-respond' || second === 'trade-withdraw' || second === 'trade-sign' || second === 'trade-report')) {
+    return respondLeague(await tradeAct(request, deps, first, second.slice(6) as 'offer' | 'respond' | 'withdraw' | 'sign' | 'report'), cors)
+  }
   if (second === 'club' && method === 'GET') return respondLeague(await clubState(request, deps, first), cors)
   if (second === 'club' && method === 'POST') return respondLeague(await clubDecision(request, deps, first), cors)
   if (second === 'live-ticket' && method === 'POST') return respondLeague(await liveTicket(request, deps, first), cors)
