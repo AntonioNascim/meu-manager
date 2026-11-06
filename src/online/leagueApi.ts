@@ -10,6 +10,7 @@ import type { SeatError } from '../engine/league/seats'
 import type { LeagueView } from '../engine/league/view'
 import type { ClubAction, ClubError, ClubView } from '../engine/league/club'
 import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer, TradeReport, TradeResponse } from '../engine/league/trade'
+import type { AiOffersBody, AiSearchFilters, MarketRow } from '../engine/league/aimarket'
 import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
 import { checkName, type NameIssue } from './nameFilter'
 
@@ -110,8 +111,15 @@ export type TradeOp =
   | { op: 'withdraw'; offerId: string }
   | { op: 'sign'; playerId: string; salary: number; contractEnd: string }
   | { op: 'report'; recordId: string; reason: TradeReport['reason'] }
+  // Clubes da IA (B8.6b)
+  | { op: 'search'; filters: AiSearchFilters }
+  | { op: 'listings' }
+  | { op: 'ai' }
+  | { op: 'ai-offer'; kind: 'purchase' | 'loan' | 'free'; playerId: string; fee: number; salary: number; contractEnd: string }
+  | { op: 'ai-respond'; offerId: string; accept: boolean }
+  | { op: 'ai-withdraw'; offerId: string }
 
-export type TradeReply = { ok: true; body?: TradeBody; squad?: SquadRow[]; free?: FreeAgentRow[]; offer?: TradeOffer } | { ok: false; refused: string; minimumSalary?: number }
+export type TradeReply = { ok: true; body?: TradeBody; squad?: SquadRow[]; free?: FreeAgentRow[]; offer?: TradeOffer; rows?: MarketRow[]; ai?: AiOffersBody } | { ok: false; refused: string; minimumSalary?: number }
 
 export type ControlAction = 'advance' | 'pause' | 'resume'
 
@@ -541,15 +549,74 @@ export async function leagueState(req: ApiRequest, deps: LeagueDeps, id: string)
   return { status: 200, body: { phase: room.phase, ...(view ? { view } : {}), isAdmin: who.isAdmin, ...(room.awaiting ? { awaiting: room.awaiting } : {}) } }
 }
 
+const GROUPS = ['all', 'GK', 'DEF', 'MID', 'FWD'] as const
+const POSITIONS = ['GK', 'RB', 'LB', 'CB', 'DM', 'CM', 'AM', 'RW', 'LW', 'ST'] as const
+const SITUATIONS = ['all', 'free', 'club', 'expiring'] as const
+const QUICKS = ['budget', 'bargain', 'prospect', 'expiring'] as const
+const SORTS = ['overall', 'age', 'value-desc', 'value-asc', 'salary'] as const
+
+/** Filtros da busca (parâmetros da URL), com lista fechada de valores e números limitados; valor desconhecido ou fora da faixa = `undefined`. */
+export function parseSearchFilters(params: URLSearchParams): AiSearchFilters | undefined {
+  const out: AiSearchFilters = {}
+  const num = (key: string, min: number, max: number): number | undefined | 'bad' => {
+    const raw = params.get(key)
+    if (raw === null || raw === '') return undefined
+    const n = Number(raw)
+    return Number.isFinite(n) && n >= min && n <= max ? n : 'bad'
+  }
+  const pick = <T extends string>(key: string, allowed: readonly T[]): T | undefined | 'bad' => {
+    const raw = params.get(key)
+    if (raw === null || raw === '') return undefined
+    return (allowed as readonly string[]).includes(raw) ? (raw as T) : 'bad'
+  }
+  const q = params.get('q')
+  if (q !== null) {
+    if (q.length > 40) return undefined
+    if (q.trim() !== '') out.query = q.trim()
+  }
+  const group = pick('group', GROUPS)
+  const position = pick('pos', POSITIONS)
+  const situation = pick('sit', SITUATIONS)
+  const sort = pick('sort', SORTS)
+  const tier = num('tier', 1, 3)
+  const ageMax = num('age', 14, 50)
+  const valueMax = num('value', 0, MONEY_MAX)
+  const overallMin = num('ovr', 1, 100)
+  if ([group, position, situation, sort, tier, ageMax, valueMax, overallMin].includes('bad')) return undefined
+  if (group) out.group = group as AiSearchFilters['group']
+  if (position) out.position = position as AiSearchFilters['position']
+  if (situation) out.situation = situation as AiSearchFilters['situation']
+  if (sort) out.sort = sort as AiSearchFilters['sort']
+  if (typeof tier === 'number') out.tier = tier as 1 | 2 | 3
+  if (typeof ageMax === 'number') out.ageMax = ageMax
+  if (typeof valueMax === 'number') out.valueMax = valueMax
+  if (typeof overallMin === 'number') out.overallMin = overallMin
+  const quick = params.get('quick')
+  if (quick) {
+    const parts = quick.split(',')
+    if (parts.length > QUICKS.length || !parts.every((x) => (QUICKS as readonly string[]).includes(x))) return undefined
+    out.quick = parts as NonNullable<AiSearchFilters['quick']>
+  }
+  return out
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 const MONEY_MAX = 10_000_000_000
 const money = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MONEY_MAX
 
 /** Corpo de cada pedido do mercado, conferido campo a campo (`undefined` = corpo inválido). */
-export function parseTradeOp(kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report', body: ApiRequest['body']): TradeOp | undefined {
+export function parseTradeOp(kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report' | 'ai-offer' | 'ai-respond' | 'ai-withdraw', body: ApiRequest['body']): TradeOp | undefined {
   const o = parseJson(body)
   if (!o) return undefined
   const id = (v: unknown): v is string => typeof v === 'string' && TEAM_ID.test(v)
+  if (kind === 'ai-offer') {
+    if (!onlyKeys(o, ['kind', 'playerId', 'fee', 'salary', 'contractEnd']) || (o.kind !== 'purchase' && o.kind !== 'loan' && o.kind !== 'free') || !id(o.playerId) || !money(o.salary) || typeof o.contractEnd !== 'string' || !ISO_DATE.test(o.contractEnd)) return undefined
+    // Jogador livre não tem taxa; compra e empréstimo têm.
+    if (o.kind === 'free' ? o.fee !== 0 : !money(o.fee)) return undefined
+    return { op: 'ai-offer', kind: o.kind, playerId: o.playerId, fee: o.fee as number, salary: o.salary, contractEnd: o.contractEnd }
+  }
+  if (kind === 'ai-respond') return onlyKeys(o, ['offerId', 'accept']) && id(o.offerId) && typeof o.accept === 'boolean' ? { op: 'ai-respond', offerId: o.offerId, accept: o.accept } : undefined
+  if (kind === 'ai-withdraw') return onlyKeys(o, ['offerId']) && id(o.offerId) ? { op: 'ai-withdraw', offerId: o.offerId } : undefined
   if (kind === 'offer') {
     if (!onlyKeys(o, ['kind', 'playerId', 'fee', 'salary', 'contractEnd']) || (o.kind !== 'purchase' && o.kind !== 'loan') || !id(o.playerId) || !money(o.fee) || !money(o.salary) || typeof o.contractEnd !== 'string' || !ISO_DATE.test(o.contractEnd)) return undefined
     return { op: 'offer', kind: o.kind, playerId: o.playerId, fee: o.fee, salary: o.salary, contractEnd: o.contractEnd }
@@ -577,7 +644,7 @@ async function memberOf(deps: LeagueDeps, id: string, playerId: string): Promise
 type TradeBodyOut = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
 
 /** Consultas do mercado: o painel (propostas, histórico), o elenco de outro técnico e os jogadores livres. */
-export async function tradeRead(req: ApiRequest, deps: LeagueDeps, id: string, op: Extract<TradeOp, { op: 'body' | 'squad' | 'free' }>): Promise<LeagueResult<TradeBodyOut>> {
+export async function tradeRead(req: ApiRequest, deps: LeagueDeps, id: string, op: Extract<TradeOp, { op: 'body' | 'squad' | 'free' | 'search' | 'listings' | 'ai' }>): Promise<LeagueResult<TradeBodyOut>> {
   const auth = await requireIdentity(req, 'read', deps)
   if (!auth.ok) return auth.result as LeagueResult<never>
   const m = await memberOf(deps, id, auth.record.playerId)
@@ -593,7 +660,7 @@ export async function tradeRead(req: ApiRequest, deps: LeagueDeps, id: string, o
 }
 
 /** Decisões do mercado (propor, responder, retirar, contratar livre, denunciar). A recusa devolve o motivo das regras. */
-export async function tradeAct(req: ApiRequest, deps: LeagueDeps, id: string, kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report'): Promise<LeagueResult<TradeBodyOut>> {
+export async function tradeAct(req: ApiRequest, deps: LeagueDeps, id: string, kind: 'offer' | 'respond' | 'withdraw' | 'sign' | 'report' | 'ai-offer' | 'ai-respond' | 'ai-withdraw'): Promise<LeagueResult<TradeBodyOut>> {
   const auth = await requireIdentity(req, 'write', deps)
   if (!auth.ok) return auth.result as LeagueResult<never>
   const op = parseTradeOp(kind, req.body)

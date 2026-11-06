@@ -149,5 +149,12 @@ export function respondToOffer(state: SeasonState, offerId: string, accept: bool
   return updateOffer(done, offerId, { status: 'accepted', decidedOn: date })
 }
 
+/** O comprador retira uma proposta sua que ainda espera resposta (B8.6b: técnicos de liga online). */
+export function withdrawOffer(state: SeasonState, offerId: string, buyerId: TeamId, date: IsoDate = state.season.currentDate): SeasonState {
+  const offer = state.market.offers.find((o) => o.id === offerId)
+  if (!offer || offer.direction !== 'outgoing' || offer.buyerId !== buyerId || offer.status !== 'pending') throw new OfferError('invalid')
+  return updateOffer(state, offerId, { status: 'withdrawn', decidedOn: date })
+}
+
 export const pendingIncoming = (state: Pick<SeasonState, 'market'>): TransferOffer[] =>
   state.market.offers.filter((o) => o.status === 'pending' && o.direction === 'incoming')

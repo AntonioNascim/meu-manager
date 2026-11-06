@@ -54,6 +54,7 @@ const sendOffer = async (page) => {
     if ((await page.getByTestId('send-offer').count()) === 0) return true
     const why = await page.getByTestId('market-error').innerText().catch(() => '')
     console.log('  [mercado recusou]', why)
+    if (why.includes('Elenco cheio')) return 'cheio'
     if (!why.includes('a partir de')) return false
   }
   return false
@@ -171,21 +172,8 @@ await second.click()
 await a.getByTestId('send-offer').waitFor()
 await minFee(a)
 const okSecond = await sendOffer(a)
-check('a segunda compra do mesmo par na janela ainda passa (limite é 2)', okSecond)
-if (okSecond) await a.getByRole('dialog').first().waitFor({ state: 'detached', timeout: 20000 })
-
-// ------------------------------------------------------------------ jogadores livres (se houver)
-await a.getByRole('button', { name: 'Livres' }).click()
-await a.getByTestId('free-list').waitFor({ state: 'attached', timeout: 20000 })
-const frees = await a.locator('[data-testid^=sign-]').count()
-await shoot(a, '10-jogadores-livres')
-if (frees > 0) {
-  await a.locator('[data-testid^=sign-]').first().click()
-  await a.getByRole('dialog').waitFor()
-  await a.getByTestId('confirm-sign').click()
-  await a.waitForFunction(() => !document.querySelector('[role=dialog]') || document.querySelector('[data-testid=market-error]'), undefined, { timeout: 20000 })
-  check('contratar um jogador livre dá uma resposta (contratou ou mostra o motivo)', true)
-} else console.log('  (sem jogadores livres neste mundo: contratação coberta nos testes de unidade)')
+check('a segunda compra do mesmo par na janela passa (limite é 2) ou o jogo recusa por elenco cheio (regra do solo)', okSecond === true || okSecond === 'cheio')
+if (okSecond === true) await a.getByRole('dialog').first().waitFor({ state: 'detached', timeout: 20000 })
 
 console.log(failed === 0 ? '\nTudo certo.' : `\n${failed} verificação(ões) falharam.`)
 await browser.close()

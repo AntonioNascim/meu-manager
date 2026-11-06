@@ -9,6 +9,7 @@ import type { PaceId } from '../engine/league/pace'
 import type { ClubAction, ClubView } from '../engine/league/club'
 import type { TradeReply, TradeOp } from './leagueApi'
 import type { TradeReport } from '../engine/league/trade'
+import type { AiSearchFilters } from '../engine/league/aimarket'
 
 export type LeagueClientDeps = IdentityClientDeps
 
@@ -79,3 +80,25 @@ export const tradeWithdraw = (deps: LeagueClientDeps, identity: Identity, id: st
 export const tradeSign = (deps: LeagueClientDeps, identity: Identity, id: string, o: { playerId: string; salary: number; contractEnd: string }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-sign`, o)
 export const tradeReport = (deps: LeagueClientDeps, identity: Identity, id: string, recordId: string, reason: TradeReport['reason']) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-report`, { recordId, reason })
 export type { TradeOp }
+
+/** Mercado com os clubes da IA (B8.6b): busca com filtros, anúncios, minhas propostas e as da IA. */
+export const tradeSearch = (deps: LeagueClientDeps, identity: Identity, id: string, f: AiSearchFilters) => {
+  const p = new URLSearchParams()
+  if (f.query) p.set('q', f.query)
+  if (f.group) p.set('group', f.group)
+  if (f.position) p.set('pos', f.position)
+  if (f.situation) p.set('sit', f.situation)
+  if (f.tier) p.set('tier', String(f.tier))
+  if (f.ageMax !== undefined) p.set('age', String(f.ageMax))
+  if (f.valueMax !== undefined) p.set('value', String(f.valueMax))
+  if (f.overallMin !== undefined) p.set('ovr', String(f.overallMin))
+  if (f.quick && f.quick.length > 0) p.set('quick', f.quick.join(','))
+  if (f.sort) p.set('sort', f.sort)
+  const q = p.toString()
+  return ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-search${q ? `?${q}` : ''}`)
+}
+export const tradeListings = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-listings`)
+export const tradeAi = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<TradeBodyOut>(deps, identity, 'GET', `/api/leagues/${id}/trade-ai`)
+export const tradeAiOffer = (deps: LeagueClientDeps, identity: Identity, id: string, o: { kind: 'purchase' | 'loan' | 'free'; playerId: string; fee: number; salary: number; contractEnd: string }) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-offer`, o)
+export const tradeAiRespond = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string, accept: boolean) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-respond`, { offerId, accept })
+export const tradeAiWithdraw = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-withdraw`, { offerId })

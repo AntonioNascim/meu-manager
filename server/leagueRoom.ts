@@ -41,6 +41,13 @@ import {
   leagueView,
   clubView,
   awaitingFor,
+  aiAwaiting,
+  aiOffers,
+  listingsAi,
+  makeAiOffer,
+  respondAiOffer,
+  searchAi,
+  withdrawAiOffer,
   freeAgentsFor,
   makeTradeOffer,
   reportTrade,
@@ -569,6 +576,23 @@ export class LeagueRoom {
       return rows ? reply({ ok: true, squad: rows }) : refuse('not-human-club')
     }
     if (op.op === 'free') return reply({ ok: true, free: freeAgentsFor(world, seat.teamId, playerOverall, op.position) })
+    // Clubes da IA (B8.6b): consultas e propostas. Aceitar uma proposta da IA mexe nos elencos: só fora de uma rodada em andamento.
+    if (op.op === 'search') return reply({ ok: true, rows: searchAi(this.league, world, playerId, op.filters) })
+    if (op.op === 'listings') return reply({ ok: true, rows: listingsAi(this.league, world, playerId) })
+    if (op.op === 'ai') return reply({ ok: true, ai: aiOffers(this.league, world, playerId) })
+    if (op.op === 'ai-offer' || op.op === 'ai-respond' || op.op === 'ai-withdraw') {
+      if (op.op === 'ai-respond' && op.accept && (this.league.current || this.live)) return refuse('event-running')
+      const r =
+        op.op === 'ai-offer'
+          ? makeAiOffer(this.league, world, playerId, { kind: op.kind === 'free' ? 'purchase' : op.kind, playerId: op.playerId, fee: op.fee, salary: op.salary, contractEnd: op.contractEnd })
+          : op.op === 'ai-respond'
+            ? respondAiOffer(this.league, world, playerId, op.offerId, op.accept)
+            : withdrawAiOffer(this.league, world, playerId, op.offerId)
+      if (!r.ok) return refuse(r.error)
+      this.world = r.world
+      this.persist({ world: true })
+      return reply({ ok: true, ai: aiOffers(this.league, r.world, playerId) })
+    }
     if (this.league.current || this.live) return refuse('event-running')
     let result: TradeResult
     if (op.op === 'offer') result = makeTradeOffer(this.league, world, now, playerId, { kind: op.kind, playerId: op.playerId, fee: op.fee, salary: op.salary, contractEnd: op.contractEnd })
@@ -656,7 +680,7 @@ export class LeagueRoom {
     // ---- andamento da liga (B8.4)
     if (path === '/internal/state') {
       if (!this.league) return Response.json({ ok: true, phase: 'lobby' })
-      const awaiting = playerId ? awaitingFor(this.league, now, playerId) : 0
+      const awaiting = playerId ? awaitingFor(this.league, now, playerId) + aiAwaiting(this.league, world, playerId) : 0
       return Response.json({ ok: true, phase: 'running', view: leagueView(this.league, world, now, () => meta.createdAt), ...(awaiting > 0 ? { awaiting } : {}) })
     }
     if (path === '/internal/trade') return await this.trade(playerId, body.op as TradeOp, now)
