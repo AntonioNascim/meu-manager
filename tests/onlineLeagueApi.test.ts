@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -343,6 +343,32 @@ describe('andamento da liga (B8.4)', () => {
     expect(refused.status).toBe(409)
     expect(refused.body).toEqual({ error: 'trade-refused', reason: 'fee-too-low', minimumSalary: 7000 })
     expect((await act(dudu, 'offer', good)).status).toBe(404)
+  })
+
+  it('Mercado com a IA: filtros da busca com lista fechada e corpos das propostas à IA conferidos', async () => {
+    const ok = parseSearchFilters(new URLSearchParams('q=silva&group=FWD&pos=ST&sit=club&tier=1&age=23&value=5000000&ovr=60&quick=budget,bargain&sort=value-asc'))
+    expect(ok).toEqual({ query: 'silva', group: 'FWD', position: 'ST', situation: 'club', tier: 1, ageMax: 23, valueMax: 5_000_000, overallMin: 60, quick: ['budget', 'bargain'], sort: 'value-asc' })
+    expect(parseSearchFilters(new URLSearchParams(''))).toEqual({})
+    for (const bad of ['group=ZZ', 'pos=XX', 'sit=talvez', 'tier=9', 'age=3', 'age=abc', 'value=-1', 'ovr=500', 'quick=budget,tudo', 'sort=nome', `q=${'a'.repeat(41)}`]) {
+      expect(parseSearchFilters(new URLSearchParams(bad))).toBeUndefined()
+    }
+    const { s, ana, bia, id } = await running()
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    const act = (kind: Parameters<typeof tradeAct>[3], body: unknown) => tradeAct(s.req(bia, 'POST', `/api/leagues/${id}/trade-${kind}`, body), s.deps, id, kind)
+    const good = { kind: 'purchase', playerId: 'player-9', fee: 900000, salary: 30000, contractEnd: '2029-01-01' }
+    expect((await act('ai-offer', good)).status).toBe(200)
+    expect((await act('ai-offer', { ...good, kind: 'loan', fee: 5000 })).status).toBe(200)
+    expect((await act('ai-offer', { ...good, kind: 'free', fee: 0 })).status).toBe(200)
+    expect((await act('ai-respond', { offerId: 'offer-1', accept: true })).status).toBe(200)
+    expect((await act('ai-withdraw', { offerId: 'offer-1' })).status).toBe(200)
+    for (const [kind, body] of [['ai-offer', { ...good, kind: 'free', fee: 5 }], ['ai-offer', { ...good, kind: 'purchase', fee: 0 }], ['ai-offer', { ...good, kind: 'troca' }], ['ai-offer', { ...good, extra: 1 }], ['ai-respond', { offerId: 'offer-1', accept: 'sim' }], ['ai-respond', { offerId: 'offer-1' }], ['ai-withdraw', {}]] as [Parameters<typeof tradeAct>[3], unknown][]) {
+      expect((await act(kind, body)).status).toBe(400)
+    }
+    for (const op of ['search', 'listings', 'ai'] as const) {
+      const r = await tradeRead(s.req(bia, 'GET', `/api/leagues/${id}/trade`), s.deps, id, op === 'search' ? { op, filters: {} } : { op })
+      expect(r.status).toBe(200)
+    }
+    expect(s.room.tradeOps).toEqual(expect.arrayContaining([`ai-offer:${id}:${bia.playerId}`, `search:${id}:${bia.playerId}`, `listings:${id}:${bia.playerId}`, `ai:${id}:${bia.playerId}`]))
   })
 
   it('ticket do WebSocket: só membro, só com a liga em andamento, e o ticket é de uso único na sala', async () => {

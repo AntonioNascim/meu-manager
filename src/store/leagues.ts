@@ -9,6 +9,7 @@ import type { Answer, CreateLeagueInput } from '../online/leagueClient'
 import type { AdminAction, ControlAction, LeagueDetail, LeagueSummary } from '../online/leagueApi'
 import type { PaceId } from '../engine/league/pace'
 import type { ClubAction } from '../engine/league/club'
+import type { AiSearchFilters } from '../engine/league/aimarket'
 import { loadWorld } from '../data/package/defaultPackage'
 import type { CompetitionSetup } from '../engine/season/calendar'
 import type { Team } from '../engine/types'
@@ -39,6 +40,12 @@ export const leagueApi = {
   ready: (leagueId: string, ready: boolean) => withIdentity((id) => client.sendReady(deps(), id, leagueId, ready)),
   control: (leagueId: string, action: ControlAction) => withIdentity((id) => client.controlLeague(deps(), id, leagueId, action)),
   pace: (leagueId: string, pace: PaceId) => withIdentity((id) => client.changePace(deps(), id, leagueId, pace)),
+  tradeSearch: (leagueId: string, f: AiSearchFilters) => withIdentity((id) => client.tradeSearch(deps(), id, leagueId, f)),
+  tradeListings: (leagueId: string) => withIdentity((id) => client.tradeListings(deps(), id, leagueId)),
+  tradeAi: (leagueId: string) => withIdentity((id) => client.tradeAi(deps(), id, leagueId)),
+  tradeAiOffer: (leagueId: string, o: Parameters<typeof client.tradeAiOffer>[3]) => withIdentity((id) => client.tradeAiOffer(deps(), id, leagueId, o)),
+  tradeAiRespond: (leagueId: string, offerId: string, accept: boolean) => withIdentity((id) => client.tradeAiRespond(deps(), id, leagueId, offerId, accept)),
+  tradeAiWithdraw: (leagueId: string, offerId: string) => withIdentity((id) => client.tradeAiWithdraw(deps(), id, leagueId, offerId)),
   tradeBody: (leagueId: string) => withIdentity((id) => client.tradeBody(deps(), id, leagueId)),
   tradeSquad: (leagueId: string, teamId: string) => withIdentity((id) => client.tradeSquad(deps(), id, leagueId, teamId)),
   tradeFree: (leagueId: string, position?: string) => withIdentity((id) => client.tradeFree(deps(), id, leagueId, position)),

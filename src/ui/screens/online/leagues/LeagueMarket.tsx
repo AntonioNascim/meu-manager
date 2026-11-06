@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FreeAgentRow, SquadRow, TradeBody, TradeOfferView, TradeRecord } from '../../../../engine/league/trade'
+import type { SquadRow, TradeBody, TradeOfferView, TradeRecord } from '../../../../engine/league/trade'
 import type { LeagueDetail, TradeReply } from '../../../../online/leagueApi'
 import type { Answer } from '../../../../online/leagueClient'
 import { leagueApi, type LeagueTeam } from '../../../../store/leagues'
@@ -9,13 +9,14 @@ import { LEAGUE_ERROR_LABELS, OFFER_REASON_LABELS, POSITION_SHORT_LABELS, TRADE_
 import { Sheet } from '../../../theme'
 import type { Position } from '../../../../engine/types'
 import { inLabel } from './LeagueRunning'
+import { AiOffers, ListingsTab, SearchTab } from './LeagueMarketAi'
+import type { AiOffersBody } from '../../../../engine/league/aimarket'
 import { Pill } from './parts'
 
-type Tab = 'offers' | 'coaches' | 'free' | 'history'
+type Tab = 'offers' | 'search' | 'listings' | 'coaches' | 'history'
 type Body = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
 const POLL_MS = 8000
 const pos = (p: string): string => POSITION_SHORT_LABELS[p as Position] ?? p
-const POSITIONS: Position[] = ['GK', 'CB', 'RB', 'LB', 'DM', 'CM', 'AM', 'RW', 'LW', 'ST']
 const dateLabel = (iso: string): string => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`))
 const reasonText = (code: string): string => TRADE_ERROR_LABELS[code] ?? OFFER_REASON_LABELS[code as keyof typeof OFFER_REASON_LABELS] ?? 'O mercado recusou este negócio.'
 
@@ -30,6 +31,7 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
   const id = league.id
   const [tab, setTab] = useState<Tab>('offers')
   const [body, setBody] = useState<TradeBody | null>(null)
+  const [ai, setAi] = useState<AiOffersBody | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const clubOf = (teamId: string | null): string => (teamId === null ? 'Livre' : (teams?.byId.get(teamId)?.team.shortName ?? teams?.byId.get(teamId)?.team.name ?? teamId))
@@ -39,6 +41,8 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
     const r = await leagueApi.tradeBody(id)
     if (r.ok && r.body) setBody(r.body)
     else if (!r.ok) setError(LEAGUE_ERROR_LABELS[r.error])
+    const a = await leagueApi.tradeAi(id)
+    if (a.ok && a.ai) setAi(a.ai)
   }, [id])
   useEffect(() => {
     void load()
@@ -54,6 +58,7 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
     setBusy(false)
     if (r.ok) {
       if (r.body) setBody(r.body)
+      if (r.ai) setAi(r.ai)
       return true
     }
     const d = r.detail as { reason?: string; minimumSalary?: number } | undefined
@@ -62,7 +67,7 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
     return false
   }
 
-  const awaiting = body?.offers.filter((o) => o.mine).length ?? 0
+  const awaiting = (body?.offers.filter((o) => o.mine).length ?? 0) + (ai?.incoming.length ?? 0)
   return (
     <div className="fixed inset-0 z-30 overflow-y-auto bg-bg" data-testid="league-market">
       <div className="mx-auto max-w-md space-y-3 px-3 pb-10">
@@ -77,17 +82,24 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
             onChange={setTab}
             options={[
               { id: 'offers', label: awaiting > 0 ? `Propostas (${awaiting})` : 'Propostas' },
+              { id: 'search', label: 'Buscar' },
+              { id: 'listings', label: 'Anúncios' },
               { id: 'coaches', label: 'Técnicos' },
-              { id: 'free', label: 'Livres' },
               { id: 'history', label: 'Histórico' },
             ]}
           />
           {error && <p className="rounded-xl border border-loss/40 bg-loss/10 p-2 text-sm text-loss" data-testid="market-error">{error}</p>}
         </div>
         {!body ? <p className="text-sm text-muted">Carregando o mercado…</p> : null}
-        {body && tab === 'offers' && <Offers body={body} busy={busy} nick={nick} clubOf={clubOf} act={act} id={id} myTeamId={league.myTeamId} />}
+        {body && tab === 'offers' && (
+          <>
+            <AiOffers ai={ai} teams={teams} busy={busy} act={act} id={id} />
+            <Offers body={body} busy={busy} nick={nick} clubOf={clubOf} act={act} id={id} myTeamId={league.myTeamId} />
+          </>
+        )}
+        {body && tab === 'search' && <SearchTab league={league} teams={teams} worldDate={worldDate} busy={busy} act={act} windowOpen={body.windowOpen} />}
+        {body && tab === 'listings' && <ListingsTab league={league} teams={teams} worldDate={worldDate} busy={busy} act={act} windowOpen={body.windowOpen} />}
         {body && tab === 'coaches' && <Coaches league={league} clubOf={clubOf} worldDate={worldDate} busy={busy} act={act} id={id} windowOpen={body.windowOpen} />}
-        {body && tab === 'free' && <FreeAgents worldDate={worldDate} busy={busy} act={act} id={id} windowOpen={body.windowOpen} />}
         {body && tab === 'history' && <History body={body} clubOf={clubOf} act={act} id={id} isAdmin={league.isAdmin} />}
       </div>
     </div>
@@ -105,7 +117,7 @@ function Offers({ body, busy, nick, clubOf, act, id, myTeamId }: { myTeamId?: st
         {body.reserved > 0 ? `${formatMoney(body.reserved)} do seu orçamento de compras está reservado nas propostas abertas. ` : ''}
         Propostas abertas como comprador: {body.openAsBuyer} de 5. Cada proposta vale 48 h (24 h por contraproposta); o prazo congela se a liga for pausada.
       </p>
-      {open.length === 0 && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted" data-testid="no-offers">Nenhuma proposta aberta. Veja os elencos dos outros técnicos na aba "Técnicos".</p>}
+      {open.length === 0 && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted" data-testid="no-offers">Nenhuma proposta aberta com técnicos da liga. Procure jogadores na aba "Buscar" ou veja os elencos na aba "Técnicos".</p>}
       <ul className="flex flex-col gap-3" data-testid="offers-list">
         {open.map((o) => {
           const iAmBuyer = o.buyer.teamId === myTeamId
@@ -289,71 +301,6 @@ function Coaches({ league, clubOf, worldDate, busy, act, id, windowOpen }: { lea
               </>
             )
           })()}
-        </Sheet>
-      )}
-    </>
-  )
-}
-
-function FreeAgents({ worldDate, busy, act, id, windowOpen }: { worldDate: string; busy: boolean; act: (c: () => Promise<Answer<Body>>, onRefuse?: (minimumSalary: number) => void) => Promise<boolean>; id: string; windowOpen: boolean }) {
-  const [position, setPosition] = useState('')
-  const [rows, setRows] = useState<FreeAgentRow[] | null>(null)
-  const [pick, setPick] = useState<FreeAgentRow | null>(null)
-  const [salary, setSalary] = useState(0)
-  const [years, setYears] = useState(2)
-  const load = useCallback(async () => {
-    const r = await leagueApi.tradeFree(id, position || undefined)
-    if (r.ok && r.free) setRows(r.free)
-  }, [id, position])
-  useEffect(() => {
-    void load()
-  }, [load])
-  return (
-    <>
-      <label className="block text-xs font-semibold text-muted" htmlFor="free-pos">Posição</label>
-      <select id="free-pos" value={position} onChange={(e) => setPosition(e.target.value)} className="min-h-11 w-full rounded-lg border border-line bg-bg px-2 text-sm" data-testid="free-position">
-        <option value="">Todas</option>
-        {POSITIONS.map((p) => (
-          <option key={p} value={p}>{pos(p)}</option>
-        ))}
-      </select>
-      {!windowOpen && <p className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-2 text-sm text-yellow-300">A janela está fechada: não dá para contratar agora.</p>}
-      {rows && rows.length === 0 && <p className="text-sm text-muted" data-testid="no-free">Nenhum jogador livre nesta posição.</p>}
-      <ul className="flex flex-col gap-2" data-testid="free-list">
-        {rows?.map((r) => (
-          <li key={r.playerId} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">
-            <span className="min-w-0">
-              <span className="block truncate font-semibold">{r.name}</span>
-              <span className="block text-xs text-muted">{pos(r.position)} · {r.age} anos · força {r.overall} · costuma pedir {formatMoney(r.salaryHint)}/mês</span>
-            </span>
-            <Button variant="secondary" disabled={busy || !windowOpen} onClick={() => (setSalary(r.salaryHint), setYears(2), setPick(r))} data-testid={`sign-${r.playerId}`}>Contratar</Button>
-          </li>
-        ))}
-      </ul>
-      {pick && (
-        <Sheet
-          title={`Contratar ${pick.name}`}
-          onClose={() => setPick(null)}
-          footer={
-            <Button
-              disabled={busy}
-              onClick={async () => {
-                if (await act(() => leagueApi.tradeSign(id, { playerId: pick.playerId, salary, contractEnd: endAfter(worldDate, years) }), (min) => setSalary(min))) {
-                  setPick(null)
-                  void load()
-                }
-              }}
-              data-testid="confirm-sign"
-            >
-              Contratar por {formatMoney(salary)}/mês
-            </Button>
-          }
-        >
-          <p className="text-sm text-muted">Jogador livre: sem taxa, só o salário. Se ele não aceitar, o jogo diz o mínimo que ele quer.</p>
-          <input type="range" min={Math.max(1_000, Math.round(pick.salaryHint * 0.5))} max={Math.round(pick.salaryHint * 3)} step={1_000} value={salary} onChange={(e) => setSalary(Number(e.target.value))} className="mt-4 w-full" data-testid="sign-salary" />
-          <p className="text-center text-lg font-bold">{formatMoney(salary)}</p>
-          <p className="mb-1 mt-3 text-xs font-semibold text-muted">Contrato por</p>
-          <Segmented value={years} options={[1, 2, 3, 4, 5].map((n) => ({ id: n, label: `${n} ${n === 1 ? 'ano' : 'anos'}` }))} onChange={setYears} />
         </Sheet>
       )}
     </>

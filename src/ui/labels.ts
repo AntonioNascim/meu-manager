@@ -532,7 +532,8 @@ export const LEAGUE_LOG_LABELS: Record<import('../engine/league/runner').LogType
 /** Por que o mercado entre técnicos recusou (B8.6): códigos próprios; os demais vêm de `OFFER_REASON_LABELS`. */
 export const TRADE_ERROR_LABELS: Record<string, string> = {
   'not-seated': 'Você não tem clube nesta liga.',
-  'not-human-club': 'Este jogador é de um clube da IA. Por enquanto só dá para negociar com técnicos da liga.',
+  'not-human-club': 'Este jogador é de um clube da IA: use a aba Buscar.',
+  'human-club': 'Este jogador é de outro técnico da liga: negocie pela aba Técnicos.',
   unavailable: 'O jogador não está mais disponível.',
   'own-player': 'Este jogador já é seu.',
   'window-closed': 'A janela de transferências está fechada para um dos clubes.',

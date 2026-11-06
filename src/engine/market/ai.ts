@@ -225,6 +225,8 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
   let current = state
   const incoming: TransferOffer[] = []
   const quick = quickTeamIds(state)
+  /** Os clubes humanos que a IA pode procurar com propostas: o do jogador (solo) ou todos os da liga online. */
+  const humans: TeamId[] = typeof userTeamId === 'string' ? [userTeamId] : userTeamId ? [...userTeamId].sort() : []
   // Série e liga de cada clube não mudam dentro da rodada: o preço de quem vende vem daqui.
   const clubs = new Map(state.teams.map((t) => [t.id, t]))
   const aiTeams = rng.shuffle(state.teams.filter((t) => !isProtected(userTeamId, t.id))).filter((t) => actsThisRound(quick, t.id, date))
@@ -263,9 +265,10 @@ export function runMarketTick(state: SeasonState, date: IsoDate, userTeamId?: Te
     const squad = sellers.get(team.id) ?? []
     if (signingsInWindow(current, team.id, window) >= MARKET.ai.maxSigningsPerWindow) continue
     const spendable = Math.min(spendableOf(team, squad), Math.max(0, MARKET.ai.windowSpendShare * expectedAnnualRevenue(team) - spentInWindow(current, team.id, window)))
-    // 1) Propostas pelos jogadores do time do jogador.
-    if (typeof userTeamId === 'string' && incomingCount(current) < MARKET.ai.maxPendingIncoming && rng.chance(MARKET.ai.userOfferChance)) {
-      const offer = proposeToUser(current, team, squad, userTeamId, date, window, spendable, rng, sellers, clubs)
+    // 1) Propostas pelos jogadores do time do jogador (ou dos técnicos humanos de uma liga online: o alvo é sorteado entre eles e o limite de propostas pendentes cresce com o número de humanos).
+    if (humans.length > 0 && incomingCount(current) < MARKET.ai.maxPendingIncoming * humans.length && rng.chance(MARKET.ai.userOfferChance)) {
+      const target = humans.length === 1 ? (humans[0] as TeamId) : rng.pick(humans)
+      const offer = proposeToUser(current, team, squad, target, date, window, spendable, rng, sellers, clubs)
       if (offer) {
         current = { ...current, market: { ...current.market, offers: [...current.market.offers, offer], counter: current.market.counter + 1 } }
         incoming.push(offer)
