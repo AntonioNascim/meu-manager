@@ -111,7 +111,9 @@ export interface Stepped {
 const LOG_MAX = 200
 const log = (league: LeagueState, entry: LogEntry): LeagueState => ({ ...league, log: [...league.log, entry].slice(-LOG_MAX) })
 const humanIds = (league: LeagueState): TeamId[] => league.seats.map((s) => s.teamId)
-const optionsOf = (league: LeagueState, deps: LeagueDeps) => ({ humanTeamIds: humanIds(league), market: deps.market ?? true, turn: deps.turn })
+/** Na virada de temporada só os técnicos ativos decidem contratos e base; os ausentes e em piloto automático ficam com a IA (B8.7). */
+const activeIds = (league: LeagueState): TeamId[] => league.seats.filter((s) => s.status === 'active').map((s) => s.teamId)
+const optionsOf = (league: LeagueState, deps: LeagueDeps) => ({ humanTeamIds: humanIds(league), turnHumanTeamIds: activeIds(league), market: deps.market ?? true, turn: deps.turn })
 
 /** Dias (do relógio) de todos os eventos que o mundo ainda tem: datas com partida de humano e âncoras (último dia da temporada de cada país). */
 export function eventDaysOf(world: SeasonState, seats: readonly Seat[]): { day: number; kind: ScheduledEvent['kind'] }[] {

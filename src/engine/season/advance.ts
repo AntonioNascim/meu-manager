@@ -112,6 +112,11 @@ export interface AdvanceOptions {
    * A IA não mexe nesses clubes (mercado, contratos que vencem, treino). Sem ela, o avanço é o de sempre (carreira solo).
    */
   humanTeamIds?: readonly TeamId[]
+  /**
+   * Quais clubes humanos a virada de temporada protege da IA (B8.7). Sem ela valem todos os `humanTeamIds`. A liga passa só os de técnicos ativos:
+   * a IA cuida dos contratos e da base de quem está ausente ou em piloto automático, para o clube não ser desmontado enquanto a pessoa está fora.
+   */
+  turnHumanTeamIds?: readonly TeamId[]
 }
 
 /** Vira a temporada de um país. `humans` = clubes humanos da liga online (a virada os protege da IA); no solo não vem. */
@@ -205,7 +210,7 @@ function runDueTurns(state: SeasonState, options: AdvanceOptions): { state: Seas
     const cycle = cycleOfPyramid(current, pyramid)
     if (current.season.currentDate < cycle.end || !pyramidFinished(current, pyramid)) continue
     const tables = finalTables(current, pyramid)
-    const run = (options.turn as TurnRunner)(current, pyramid, options.humanTeamIds ? new Set(options.humanTeamIds) : undefined)
+    const run = (options.turn as TurnRunner)(current, pyramid, (options.turnHumanTeamIds ?? options.humanTeamIds) ? new Set(options.turnHumanTeamIds ?? options.humanTeamIds) : undefined)
     current = run.state
     turned.push({ pyramid, year: cycle.year, label: seasonLabel(cycle), report: run.report, tables })
   }
