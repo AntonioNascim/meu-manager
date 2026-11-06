@@ -7,6 +7,7 @@ import { leagueApi, type LeagueTeam } from '../../../../store/leagues'
 import { Button, Card } from '../../../components/ui'
 import { LEAGUE_ERROR_LABELS, LEAGUE_LOG_LABELS, PACE_LABELS, SEAT_STATUS_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
+import { ClubCard } from './ClubCard'
 import { LiveMatchOnline } from './LiveMatchOnline'
 import { Pill } from './parts'
 
@@ -100,6 +101,8 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
           )}
         </Card>
       )}
+
+      {me && <ClubCard leagueId={id} />}
 
       <Card title="Quem está pronto">
         <ul className="flex flex-col gap-2" data-testid="ready-list">

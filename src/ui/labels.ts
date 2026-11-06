@@ -547,6 +547,7 @@ export const LEAGUE_ERROR_LABELS: Record<import('../online/leagueApi').LeagueErr
   unauthorized: 'O servidor recusou o pedido. Confira a data e a hora do aparelho.',
   'unknown-identity': 'Esta conta ainda não existe no servidor.',
   'bad-body': 'O pedido não está certo. Confira os campos e tente de novo.',
+  'club-refused': 'O clube não pôde fazer isso agora.',
   'turnstile-failed': 'A verificação de que você é uma pessoa não passou. Tente de novo.',
   'bad-name': 'Esse nome não serve.',
   'not-found': 'Não encontramos essa liga.',

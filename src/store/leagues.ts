@@ -8,6 +8,7 @@ import * as client from '../online/leagueClient'
 import type { Answer, CreateLeagueInput } from '../online/leagueClient'
 import type { AdminAction, ControlAction, LeagueDetail, LeagueSummary } from '../online/leagueApi'
 import type { PaceId } from '../engine/league/pace'
+import type { ClubAction } from '../engine/league/club'
 import { loadWorld } from '../data/package/defaultPackage'
 import type { CompetitionSetup } from '../engine/season/calendar'
 import type { Team } from '../engine/types'
@@ -38,6 +39,8 @@ export const leagueApi = {
   ready: (leagueId: string, ready: boolean) => withIdentity((id) => client.sendReady(deps(), id, leagueId, ready)),
   control: (leagueId: string, action: ControlAction) => withIdentity((id) => client.controlLeague(deps(), id, leagueId, action)),
   pace: (leagueId: string, pace: PaceId) => withIdentity((id) => client.changePace(deps(), id, leagueId, pace)),
+  club: (leagueId: string) => withIdentity((id) => client.clubState(deps(), id, leagueId)),
+  clubAction: (leagueId: string, action: ClubAction) => withIdentity((id) => client.clubDecision(deps(), id, leagueId, action)),
   liveTicket: (leagueId: string) => withIdentity((id) => client.requestLiveTicket(deps(), id, leagueId)),
 }
 

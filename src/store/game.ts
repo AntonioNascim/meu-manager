@@ -136,7 +136,7 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
 }
 
 /** Vira a temporada de um país da IA (gera os jovens com o gerador de dados e traz as copas padrão a saves antigos). */
-export const turnRunner: TurnRunner = (state, pyramid) => advanceSeason(state, { createYouth, defaultCupSpecs: defaultCupSpecsForCompetitions, pyramid })
+export const turnRunner: TurnRunner = (state, pyramid, humans) => advanceSeason(state, { createYouth, defaultCupSpecs: defaultCupSpecsForCompetitions, pyramid, ...(humans ? { humanTeamIds: humans } : {}) })
 
 /** Guarda a classificação final dos países da IA que viraram a temporada. */
 function archiveTurns(archive: SeasonArchive[], turned: readonly TurnRecord[] | undefined): SeasonArchive[] {

@@ -6,6 +6,7 @@ import type { Identity } from './identity'
 import { signedCall, type IdentityClientDeps } from './identityClient'
 import type { LeagueDetail, LeagueSummary, LeagueError, AdminAction, WorldRef, LeagueStateBody, ControlAction } from './leagueApi'
 import type { PaceId } from '../engine/league/pace'
+import type { ClubAction, ClubView } from '../engine/league/club'
 
 export type LeagueClientDeps = IdentityClientDeps
 
@@ -58,3 +59,9 @@ export const requestLiveTicket = (deps: LeagueClientDeps, identity: Identity, id
 
 /** Endereço do WebSocket da partida: o ticket vai na própria URL (o navegador não manda cabeçalhos no WebSocket). */
 export const liveSocketUrl = (base: string, leagueId: string, ticket: string): string => `${base.replace(/^http/, 'ws')}/api/leagues/${leagueId}/live?ticket=${encodeURIComponent(ticket)}`
+
+/** O clube do técnico: meta, contratos que vencem e base (B8.7). */
+export const clubState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ view: ClubView }>(deps, identity, 'GET', `/api/leagues/${id}/club`)
+
+/** Renovar um contrato, promover ou dispensar um jovem da base (B8.7). */
+export const clubDecision = (deps: LeagueClientDeps, identity: Identity, id: string, action: ClubAction) => ask<{ view: ClubView }>(deps, identity, 'POST', `/api/leagues/${id}/club`, action)

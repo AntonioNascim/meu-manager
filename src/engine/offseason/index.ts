@@ -27,6 +27,7 @@ import { expireContracts } from './contracts'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { retires, startNewSeason } from './evolution'
 import { dynastyRaids } from './dynasty'
+import { isProtected, type TeamRef } from '../teamRef'
 
 export * from './contracts'
 export * from './dynasty'
@@ -42,6 +43,8 @@ export interface OffseasonOptions {
   createYouth: YouthFactory
   /** O time do jogador: não tem elenco cortado nem tática refeita pela IA. */
   userTeamId?: TeamId
+  /** Os clubes dos técnicos humanos de uma liga online (B8.7): tratados como o clube do jogador no solo (a IA não corta, não renova, não promove a base nem refaz a tática). */
+  humanTeamIds?: ReadonlySet<TeamId>
   /**
    * Copas padrão do mundo para um jogo de antes das copas (`SeasonState.cupSpecs` ausente): entram na temporada que começa. Quem escolheu
    * jogar sem copas tem `cupSpecs: []` e não ganha nenhuma.
@@ -107,10 +110,13 @@ function mergeReports(reports: readonly OffseasonReport[], focus: string): Offse
 }
 
 function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOptions, multi = false): { state: SeasonState; report: OffseasonReport } {
+  /** Quem a IA não toca na virada: o clube do jogador (solo) ou os clubes humanos da liga. */
+  const protectedRef: TeamRef | undefined = options.humanTeamIds ?? options.userTeamId
+  const isHuman = (id: TeamId | null | undefined) => isProtected(protectedRef, id)
   // `season.phase` é a fase da pirâmide do foco: declarada `end-of-season`, ela vale como encerrada.
   if (!pyramidFinished(state, pyramid) && !(pyramid === focusPyramid(state) && state.season.phase === 'end-of-season')) throw new Error('A temporada ainda não acabou')
   // Freio contra dinastias: o campeão que domina há anos perde estrelas para os rivais da liga antes de tudo.
-  state = dynastyRaids(state, pyramid, options.userTeamId).state
+  state = dynastyRaids(state, pyramid, protectedRef).state
   const cycle = cycleOfPyramid(state, pyramid)
   const year = cycle.year
   const split = cycle.split
@@ -198,7 +204,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     const pulled = t.reputation + (delta - rawDelta) + rawDelta * results + pull * (target - t.reputation) + (continental.get(t.id) ?? 0) * results
     const reputation = clamp(Math.floor(pulled) + (reputationRng.chance(pulled - Math.floor(pulled)) ? 1 : 0), 1, 20)
     reputationChanges[t.id] = { from: t.reputation, to: reputation }
-    const ai = t.id !== options.userTeamId
+    const ai = !isHuman(t.id)
     return {
       ...t,
       tier,
@@ -241,7 +247,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
   players = preContracts.players
 
   // 5) Fim dos contratos (empréstimos voltam para casa; a IA renova o que faz sentido).
-  const contracts = expireContracts({ players, teams, year, split, scope, rng: rng.fork('contracts'), ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}) })
+  const contracts = expireContracts({ players, teams, year, split, scope, rng: rng.fork('contracts'), ...(protectedRef ? { userTeamId: protectedRef } : {}) })
   players = contracts.players
   const released = contracts.released
 
@@ -250,14 +256,14 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
   // O corte vem antes da reposição: os jovens que chegam cobrem as posições que o corte deixou descobertas.
   const payrollCut = new Set<PlayerId>()
   for (const team of scopeTeams()) {
-    if (team.id === options.userTeamId) continue
+    if (isHuman(team.id)) continue
     for (const p of payrollCuts(players.filter((x) => x.teamId === team.id), sustainablePayroll(team), team.finances.balance)) payrollCut.add(p.id)
   }
   const release = (ids: ReadonlySet<PlayerId>) => (players = players.map((p) => (ids.has(p.id) ? { ...p, teamId: null, contract: { ...p.contract, endDate: cycle.end } } : p)))
   if (payrollCut.size > 0) release(payrollCut)
   const youthRng = rng.fork('youth')
   const taken = new Set([...players, ...state.academy].map((p) => p.name))
-  const academyTurn = turnAcademy({ teams: scopeTeams(), players, academy: state.academy.filter((p) => p.teamId !== null && scope.has(p.teamId)), rng: rng.fork('academy'), year, split, ...(options.userTeamId ? { userTeamId: options.userTeamId } : {}), createYouth: options.createYouth, taken, counter: state.playerCounter })
+  const academyTurn = turnAcademy({ teams: scopeTeams(), players, academy: state.academy.filter((p) => p.teamId !== null && scope.has(p.teamId)), rng: rng.fork('academy'), year, split, ...(protectedRef ? { userTeamId: protectedRef } : {}), createYouth: options.createYouth, taken, counter: state.playerCounter })
   players = academyTurn.players
   const academy = [...state.academy.filter((p) => p.teamId === null || !scope.has(p.teamId)), ...academyTurn.academy]
   let counter = academyTurn.counter
@@ -265,7 +271,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
   const nextYear = year + 1
   for (const team of scopeTeams()) {
     let squad = players.filter((p) => p.teamId === team.id)
-    const isUser = team.id === options.userTeamId
+    const isUser = isHuman(team.id)
     const deficits = positionDeficits(squad)
     // Elenco cheio com posição descoberta (a base promoveu gente demais): a IA libera os sobrantes mais fracos para abrir as vagas.
     if (!isUser && deficits.length > SQUAD_MAX - squad.length) {
@@ -293,7 +299,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
   }
   const trimmed = new Set<PlayerId>()
   for (const team of scopeTeams()) {
-    if (team.id === options.userTeamId) continue
+    if (isHuman(team.id)) continue
     const squad = players.filter((p) => p.teamId === team.id)
     for (const p of trimExcess(squad)) trimmed.add(p.id)
   }
@@ -313,7 +319,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     const squad = players.filter((p) => p.teamId === t.id)
     const summary = summarizeLedger(t.finances.ledger)
     const payroll = monthlyPayroll(squad)
-    const isUser = t.id === options.userTeamId
+    const isUser = isHuman(t.id)
     const tactic = isUser ? repairTactic(t.tactic, squad, lineupForeign(t)) : buildTactic(squad, { formationId: t.tactic.formationId, style: t.tactic.style, mentality: t.tactic.mentality }, { ...(lineupForeign(t) ? { foreign: lineupForeign(t) } : {}) })
     return {
       ...t,
@@ -362,14 +368,14 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     ...state.market,
     // Propostas, anúncios e pré-contratos dos clubes que viraram a temporada acabam com ela; os dos outros países seguem.
     offers: state.market.offers.filter((o) => !gone.has(o.buyerId) && !gone.has(o.sellerId as TeamId)),
-    listings: state.market.listings.filter((l) => !gone.has(l.teamId) && l.teamId !== options.userTeamId),
+    listings: state.market.listings.filter((l) => !gone.has(l.teamId) && !isHuman(l.teamId)),
     preContracts: state.market.preContracts.filter((c) => !gone.has(c.fromTeamId)),
     history: [
       ...state.market.history.filter((h) => daysBetween(h.date, turnDate) <= OFFSEASON.historyDays),
       ...preContracts.applied.map((a) => ({ date: turnDate, playerId: a.playerId, fromTeamId: a.fromTeamId, toTeamId: a.toTeamId, kind: 'purchase' as const, fee: 0 })),
     ],
   }
-  const squadIds = new Set(players.filter((p) => p.teamId === options.userTeamId).map((p) => p.id))
+  const squadIds = new Set(players.filter((p) => isHuman(p.teamId)).map((p) => p.id))
   const training = {
     ...state.training,
     individual: Object.fromEntries(Object.entries(state.training.individual).filter(([teamId, slot]) => players.some((p) => p.id === slot.playerId && p.teamId === teamId))),
@@ -414,7 +420,7 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
     academyArrivals: academyTurn.arrivals,
     academyPromoted: academyTurn.promoted,
     academyReleased: academyTurn.released,
-    academyPending: academy.filter((p) => p.teamId === options.userTeamId && p.age >= ACADEMY.graduationAge).map((p) => p.id),
+    academyPending: academy.filter((p) => isHuman(p.teamId) && p.age >= ACADEMY.graduationAge).map((p) => p.id),
     reputationChanges,
     preContracts: preContracts.applied,
   }

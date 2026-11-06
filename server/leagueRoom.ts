@@ -39,6 +39,9 @@ import {
   setReady,
   setPlayerReady,
   leagueView,
+  clubView,
+  applyClubAction,
+  type ClubAction,
   replanForPace,
   PACES,
   startLiveEvent,
@@ -630,6 +633,20 @@ export class LeagueRoom {
       this.persist()
       await this.schedule(now)
       return ok()
+    }
+    if (path === '/internal/club') {
+      const seat = this.league?.seats.find((s) => s.playerId === playerId)
+      const view = seat ? clubView(world, seat.teamId) : undefined
+      return view ? Response.json({ ok: true, view }) : no('not-seated')
+    }
+    if (path === '/internal/club/action') {
+      const seat = this.league?.seats.find((s) => s.playerId === playerId)
+      if (!seat) return no('not-seated')
+      const result = applyClubAction(world, seat.teamId, body.action as ClubAction)
+      if (!result.ok) return Response.json({ ok: false, refused: result.error, ...(result.minimumSalary !== undefined ? { minimumSalary: result.minimumSalary } : {}) })
+      this.world = result.world
+      this.persist({ world: true })
+      return Response.json({ ok: true, view: clubView(result.world, seat.teamId) })
     }
     if (path === '/internal/ticket') {
       if (!this.league?.seats.some((s) => s.playerId === playerId)) return no('not-seated')
