@@ -963,3 +963,24 @@ Tudo dentro do que o plano de US$ 5 já inclui, exceto o armazenamento acima de 
 1. **Publicar a moderação:** aplicar a migração `0003` no D1 remoto, criar o segredo `ADMIN_TOKEN` no painel do Cloudflare (você escolhe; 32 caracteres aleatórios) e `wrangler deploy`. Sem custo novo.
 2. **Medir a memória no Cloudflare** com a liga cheia (Worker de laboratório descartável, como na B5: 20 técnicos, o mundo real, a virada de temporada, com lastro crescente até achar o teto): custo desprezível dentro do plano de US$ 5 (alguns minutos de objeto), mas é uso de conta.
 3. **Teste fechado** com 50 a 100 pessoas (custo real e limites) e a **revisão de LGPD** do aviso de privacidade.
+
+
+## 33. B9: moderação publicada e memória da liga cheia no Cloudflare (06/11/2026)
+
+**Publicação da moderação.** Migração `0003_moderation.sql` aplicada no D1 remoto e `wrangler deploy` (versão `d10697fc`). `/admin` responde 200 e a API do painel 401 sem o segredo `ADMIN_TOKEN` (criado por você no Worker, em Produção).
+
+**Memória no Cloudflare (Worker de laboratório descartável).** A `LeagueRoom` de verdade (`server/leagueRoom.ts`) com o mundo real lido do bucket de pacotes (370 clubes, 10.471 jogadores), **20 técnicos em 19 países**, resultado direto, o ADM avançando até **todas as pirâmides virarem a temporada** (225 avanços, 2026-01 a 2027-07-04, banco de 21,3 MB), com recarga completa do SQLite no meio (o pior momento), repetido com lastro crescente no heap (cada bloco ≈ 0,75 MB; `tools/online-lab/ceiling-liga.mjs`).
+
+| Lastro (blocos ≈ MB) | Resultado |
+|---|---|
+| 0, 30, 60, 90, 120, 135 | concluiu, sem reiniciar o objeto |
+| 150 | concluiu, mas a plataforma **reiniciou o objeto uma vez** (bloco 14) e ele seguiu certo, recarregando do SQLite |
+| 180, 240 | o objeto morreu (falha de conexão) |
+
+**Leitura.** O teto fica entre ~135 e ~150 blocos de lastro (~100 a 110 MB de heap extra) além do que a liga cheia já usa: a liga cheia de 20 técnicos **cabe com folga de cerca de 2 a 3 vezes**, inclusive na recarga completa do SQLite (360 a 600 ms normais; até 1,4 a 1,6 s quando o heap já está apertado). Nada indica a necessidade da etapa 2 da B5 (carga por partes). Quando a plataforma reinicia o objeto, a liga se recupera sozinha do SQLite.
+
+**Tempos.** Criar a sala: 1,8 a 2,9 s; iniciar: ~0,25 s. O pior bloco de **15 avanços do ADM numa só chamada** levou 19 a 28 s (inclui viradas de temporada); um avanço de cada vez é o uso real (o pior é uma virada, ~3 s no Node). Atenção: o limite de 30 s de CPU por chamada vale para uma chamada; blocos desse tamanho só existem no laboratório.
+
+**Limpeza.** Worker de laboratório apagado (`wrangler delete`, o que remove o armazenamento dos objetos), a `LAB_KEY` descartada (nunca esteve no repositório), nada de teste no D1 nem no R2.
+
+**Falta da B9:** teste fechado com 50 a 100 pessoas (custo real e limites) e a revisão de LGPD do aviso de privacidade.
