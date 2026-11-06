@@ -119,5 +119,8 @@ export const tradeAiOffer = (deps: LeagueClientDeps, identity: Identity, id: str
 export const tradeAiRespond = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string, accept: boolean) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-respond`, { offerId, accept })
 export const tradeAiWithdraw = (deps: LeagueClientDeps, identity: Identity, id: string, offerId: string) => ask<TradeBodyOut>(deps, identity, 'POST', `/api/leagues/${id}/trade-ai-withdraw`, { offerId })
 
+/** Denunciar um apelido ou uma liga (B9). */
+export const sendReport = (deps: LeagueClientDeps, identity: Identity, body: { kind: 'nickname' | 'league'; target: string; reason: string }) => ask<{ ok: true }>(deps, identity, 'POST', '/api/report', body)
+
 /** As copas do mundo da liga e o caminho do meu clube nelas (B8.8). */
 export const cupsState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ cups: CupsBody }>(deps, identity, 'GET', `/api/leagues/${id}/cups`)

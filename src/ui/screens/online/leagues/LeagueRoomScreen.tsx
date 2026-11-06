@@ -1,3 +1,4 @@
+import { ReportSheet } from './ReportSheet'
 import { useCallback, useEffect, useState } from 'react'
 import type { LeagueDetail } from '../../../../online/leagueApi'
 import type { AdminAction } from '../../../../online/leagueApi'
@@ -17,6 +18,7 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
   const [missing, setMissing] = useState(false)
   const [picking, setPicking] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [reporting, setReporting] = useState<{ kind: 'nickname' | 'league'; target: string; title: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pickError, setPickError] = useState<string | null>(null)
@@ -142,6 +144,11 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
                   </span>
                   <span className="block truncate text-xs text-muted">{club ? `${club.team.name} · ${club.competition}` : m.teamId}</span>
                 </span>
+                {league.myTeamId !== m.teamId && (
+                  <button type="button" className="min-h-12 rounded-lg px-2 text-xs text-muted hover:bg-surface" onClick={() => setReporting({ kind: 'nickname', target: m.playerId, title: `Denunciar o apelido ${m.nickname ?? 'Técnico'}` })} data-testid={`report-${m.nickname}`}>
+                    Denunciar
+                  </button>
+                )}
                 {league.isAdmin && !m.isAdmin && (
                   <span className="flex gap-1">
                     <button type="button" className="min-h-12 rounded-lg px-2 text-xs text-muted hover:bg-surface" disabled={busy} onClick={() => void act('make-admin', m.playerId)}>
@@ -201,6 +208,14 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
           Sair da liga
         </button>
       )}
+
+      {member && (
+        <button type="button" className="min-h-12 rounded-xl text-sm text-muted" onClick={() => setReporting({ kind: 'league', target: league.id, title: 'Denunciar esta liga' })} data-testid="report-league">
+          Denunciar esta liga
+        </button>
+      )}
+
+      {reporting && <ReportSheet kind={reporting.kind} target={reporting.target} title={reporting.title} onClose={() => setReporting(null)} />}
 
       {leaving && (
         <Sheet

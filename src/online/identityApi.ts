@@ -12,6 +12,8 @@ export interface IdentityRecord {
   lastSeen: number
   /** Apelido que a pessoa escolheu para si (único por liga, não global: a liga confere). Sem ele vale o apelido pronto. */
   nickname?: string
+  /** Banida pelo painel (B9): a identidade deixa de passar em qualquer pedido. */
+  bannedAt?: number
 }
 
 export interface IdentityStore {
@@ -49,6 +51,7 @@ export type ApiError =
   | { error: 'rate-limited'; retryAfterMs: number }
   | { error: 'unauthorized'; reason: VerifyError }
   | { error: 'unknown-identity' }
+  | { error: 'banned' }
   | { error: 'bad-body' }
   | { error: 'turnstile-failed' }
   | { error: 'bad-nickname'; issue: NameIssue }
@@ -114,6 +117,7 @@ export async function registerIdentity(req: ApiRequest, deps: ApiDeps): Promise<
   }
   const now = deps.now()
   const existing = await deps.store.get(auth.playerId)
+  if (existing?.bannedAt) return fail(403, { error: 'banned' })
   if (existing) {
     await deps.store.setLastSeen(auth.playerId, now)
     return { status: 200, body: { playerId: existing.playerId, created: false, nickname: existing.nickname } }
@@ -136,6 +140,7 @@ export async function requireIdentity(req: ApiRequest, action: LimitAction, deps
   // Cadastro e limite por identidade andam juntos (trocar de IP não livra do teto).
   const [record, byId] = await Promise.all([deps.store.get(auth.playerId), deps.limiter.hit(action, `id:${auth.playerId}`, deps.now())])
   if (!record) return { ok: false, result: fail(404, { error: 'unknown-identity' }) }
+  if (record.bannedAt) return { ok: false, result: fail(403, { error: 'banned' }) }
   if (!byId.allowed) return { ok: false, result: fail(429, { error: 'rate-limited', retryAfterMs: byId.retryAfterMs }) }
   // A última visita só é regravada de hora em hora: cada gravação no banco custa.
   if (deps.now() - record.lastSeen > LAST_SEEN_EVERY_MS) await deps.store.setLastSeen(auth.playerId, deps.now())

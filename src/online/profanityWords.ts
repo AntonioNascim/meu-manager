@@ -7,7 +7,7 @@
  */
 export const WORDS: ReadonlySet<string> = new Set([
   // português
-  'puta', 'puto', 'putas', 'putaria', 'merda', 'bosta', 'caralho', 'porra', 'cacete', 'foder', 'fodido', 'fodase', 'viado', 'viadinho', 'bicha', 'boiola', 'buceta', 'xoxota', 'xereca', 'punheta', 'cuzao', 'cuzinho', 'arrombado', 'vagabundo', 'vagabunda', 'safado', 'safada', 'piranha', 'corno', 'corna', 'otario', 'babaca', 'idiota', 'imbecil', 'retardado', 'crioulo', 'neguinho', 'bunda', 'cocô',
+  'puta', 'puto', 'putas', 'putaria', 'merda', 'bosta', 'caralho', 'porra', 'cacete', 'foder', 'fodido', 'fodase', 'viado', 'viadinho', 'bicha', 'boiola', 'buceta', 'xoxota', 'xereca', 'punheta', 'cuzao', 'cuzinho', 'arrombado', 'vagabundo', 'vagabunda', 'safado', 'safada', 'piranha', 'corno', 'corna', 'otario', 'babaca', 'idiota', 'imbecil', 'retardado', 'crioulo', 'neguinho', 'bunda', 'cocô', 'bundao', 'bundão', 'bundinha', 'escroto', 'escrota', 'vadia', 'mongoloide', 'paneleiro', 'sapatao', 'traveco', 'tarado', 'estuprador', 'pedofilo', 'pedófilo',
   // espanhol
   'mierda', 'puta', 'puto', 'pendejo', 'pendeja', 'cabron', 'cabrona', 'coño', 'joder', 'gilipollas', 'capullo', 'maricon', 'maricona', 'boludo', 'boluda', 'pelotudo', 'pelotuda', 'conchudo', 'culo', 'culiao', 'culiado', 'verga', 'chingada', 'chingado', 'chinga', 'cagon', 'cagado', 'mamon', 'mamada', 'hijueputa', 'malparido', 'gonorrea', 'hdp', 'ctm', 'sudaca',
   // inglês

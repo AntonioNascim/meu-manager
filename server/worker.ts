@@ -22,6 +22,9 @@ import type { LeagueView } from '../src/engine/league/view'
 import type { ClubAction, ClubError, ClubView } from '../src/engine/league/club'
 import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer } from '../src/engine/league/trade'
 import type { BuyerRow, MineBody, PreRow } from '../src/engine/league/sellmarket'
+import { fileReport, parseReport, type ModerationDeps } from '../src/online/moderation'
+import { D1ModerationStore } from './moderationStore'
+import { serveAdmin } from './admin'
 import type { AiOffersBody, MarketRow } from '../src/engine/league/aimarket'
 import type { CupsBody } from '../src/engine/league/cupsView'
 import { adminAction, changePace, clubDecision, clubState, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
@@ -52,6 +55,8 @@ interface Env {
   LEAGUES: { idFromName(name: string): unknown; get(id: unknown): DurableObjectStubLike }
   /** Segredo do Turnstile: guardado no painel do Cloudflare (Worker › Configurações › Variáveis e segredos), nunca no repositório. */
   TURNSTILE_SECRET?: string
+  /** Segredo do painel de moderação (B9), também no painel do Cloudflare. Sem ele, `/admin` não existe. */
+  ADMIN_TOKEN?: string
   ALLOWED_ORIGINS: string
 }
 
@@ -418,6 +423,13 @@ export default {
     const url = new URL(req.url)
     const pkg = await servePackage(req, url, env, cors)
     if (pkg) return pkg
+    const adminDeps = (): ModerationDeps => {
+      const g = new RemoteGuard(env)
+      const base = identityDeps(env, g)
+      return { identities: base.store, leagues: new D1LeagueStore(env.DB), mod: new D1ModerationStore(env.DB), now: Date.now, randomId: () => crypto.randomUUID(), leaveAll: (id) => leaveAllLeagues(leagueDeps(env, base), id) }
+    }
+    const admin = await serveAdmin(req, url, env, new RemoteGuard(env), adminDeps)
+    if (admin) return admin
     if (!env.TURNSTILE_SECRET) return Response.json({ error: 'not-configured' }, { status: 503, headers: cors })
 
     if (isCloudPath(url.pathname)) return serveCloud(req, url, env, cors)
@@ -457,6 +469,20 @@ export default {
       const auth = await requireIdentity(request, 'read', deps)
       if (!auth.ok) return respond(auth.result, cors)
       return Response.json({ playerId: auth.record.playerId, nickname: auth.record.nickname ?? null, createdAt: auth.record.createdAt }, { headers: cors })
+    }
+    if (url.pathname === '/api/report' && req.method === 'POST') {
+      const auth = await requireIdentity(request, 'report', deps, 'reportIp')
+      if (!auth.ok) return respond(auth.result, cors)
+      let raw: unknown
+      try {
+        raw = JSON.parse(String(request.body))
+      } catch {
+        raw = undefined
+      }
+      const parsed = parseReport(raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : undefined)
+      if (!parsed) return Response.json({ error: 'bad-body' }, { status: 400, headers: cors })
+      const out = await fileReport(adminDeps(), auth.record.playerId, parsed)
+      return out.ok ? Response.json({ ok: true }, { headers: cors }) : Response.json({ error: out.error }, { status: out.error === 'not-found' ? 404 : out.error === 'duplicate' ? 409 : 400, headers: cors })
     }
     if (url.pathname === '/api/me' && req.method === 'PUT') return respond(await changeNickname(request, deps), cors)
     const leagues = await serveLeagues(request, url, env, deps, cors)

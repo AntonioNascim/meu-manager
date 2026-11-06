@@ -47,6 +47,7 @@ export const leagueApi = {
   tradeAiOffer: (leagueId: string, o: Parameters<typeof client.tradeAiOffer>[3]) => withIdentity((id) => client.tradeAiOffer(deps(), id, leagueId, o)),
   tradeAiRespond: (leagueId: string, offerId: string, accept: boolean) => withIdentity((id) => client.tradeAiRespond(deps(), id, leagueId, offerId, accept)),
   tradeAiWithdraw: (leagueId: string, offerId: string) => withIdentity((id) => client.tradeAiWithdraw(deps(), id, leagueId, offerId)),
+  report: (body: Parameters<typeof client.sendReport>[2]) => withIdentity((id) => client.sendReport(deps(), id, body)),
   tradeMine: (leagueId: string) => withIdentity((id) => client.tradeMine(deps(), id, leagueId)),
   tradeBuyers: (leagueId: string, playerId: string, kind: 'purchase' | 'loan') => withIdentity((id) => client.tradeBuyers(deps(), id, leagueId, playerId, kind)),
   tradePre: (leagueId: string, f: { query?: string; position?: string }) => withIdentity((id) => client.tradePre(deps(), id, leagueId, f)),

@@ -16,13 +16,17 @@ export class D1IdentityStore implements IdentityStore {
   constructor(private db: D1Like) {}
 
   async get(playerId: string): Promise<IdentityRecord | undefined> {
-    const row = await this.db.prepare('SELECT player_id, created_at, last_seen, nickname FROM identities WHERE player_id = ?').bind(playerId).first<{
-      player_id: string
-      created_at: number
-      last_seen: number
-      nickname: string | null
-    }>()
-    return row ? { playerId: row.player_id, createdAt: row.created_at, lastSeen: row.last_seen, nickname: row.nickname ?? undefined } : undefined
+    const row = await this.db
+      .prepare('SELECT i.player_id, i.created_at, i.last_seen, i.nickname, b.banned_at FROM identities i LEFT JOIN bans b ON b.player_id = i.player_id WHERE i.player_id = ?')
+      .bind(playerId)
+      .first<{
+        player_id: string
+        created_at: number
+        last_seen: number
+        nickname: string | null
+        banned_at: number | null
+      }>()
+    return row ? { playerId: row.player_id, createdAt: row.created_at, lastSeen: row.last_seen, nickname: row.nickname ?? undefined, ...(row.banned_at !== null ? { bannedAt: row.banned_at } : {}) } : undefined
   }
 
   async create(record: IdentityRecord): Promise<boolean> {
