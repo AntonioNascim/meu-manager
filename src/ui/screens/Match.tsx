@@ -637,7 +637,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
           </p>
         )}
 
-        <Pitch game={game} snap={snap} speed={speed} running={running} numbers={numbers.current} />
+        <Pitch data={game.season} snap={snap} speed={speed} running={running} numbers={numbers.current} />
 
         <Tabs
           value={tab}

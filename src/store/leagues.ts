@@ -12,6 +12,7 @@ import { loadWorld } from '../data/package/defaultPackage'
 import type { CompetitionSetup } from '../engine/season/calendar'
 import type { Team } from '../engine/types'
 import { loadRealPackage } from '../data/package/realPackage'
+import { LiveSession, type SocketLike } from '../online/liveSession'
 import { getAccount } from './onlineAccount'
 
 const randomBytes = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
@@ -37,6 +38,22 @@ export const leagueApi = {
   ready: (leagueId: string, ready: boolean) => withIdentity((id) => client.sendReady(deps(), id, leagueId, ready)),
   control: (leagueId: string, action: ControlAction) => withIdentity((id) => client.controlLeague(deps(), id, leagueId, action)),
   pace: (leagueId: string, pace: PaceId) => withIdentity((id) => client.changePace(deps(), id, leagueId, pace)),
+  liveTicket: (leagueId: string) => withIdentity((id) => client.requestLiveTicket(deps(), id, leagueId)),
+}
+
+/** Abre a sessão da partida ao vivo da liga (B8.5): pede um ticket novo a cada conexão e reconecta sozinha. */
+export function openLiveSession(leagueId: string): LiveSession {
+  return new LiveSession({
+    getTicket: async () => {
+      const r = await leagueApi.liveTicket(leagueId)
+      return r.ok ? { ok: true, ticket: r.ticket } : { ok: false, error: r.error }
+    },
+    openSocket: (ticket) => new WebSocket(client.liveSocketUrl(ONLINE_CONFIG.apiBase, leagueId, ticket)) as unknown as SocketLike,
+    now: Date.now,
+    setTimer: (fn, ms) => window.setTimeout(fn, ms),
+    clearTimer: (h) => window.clearTimeout(h as number),
+    randomId: () => Array.from(randomBytes(4), (b) => b.toString(16).padStart(2, '0')).join(''),
+  })
 }
 
 /** Um clube do mundo da liga, com o nome da liga em que joga. */

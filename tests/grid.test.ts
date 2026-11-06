@@ -307,7 +307,7 @@ describe('partida com posicionamento livre', () => {
     const side = live.side === 'home' ? snap.home : snap.away
     expect(side.formationId).toBe('custom')
     expect(side.onPitch.every((p) => p.point)).toBe(true)
-    const pitch = renderToStaticMarkup(createElement(Pitch, { game: g, snap, speed: 2, running: false }))
+    const pitch = renderToStaticMarkup(createElement(Pitch, { data: g.season, snap, speed: 2, running: false }))
     expect(pitch.match(/data-side="home"/g)).toHaveLength(snap.home.onPitch.length)
     clearLive()
   })

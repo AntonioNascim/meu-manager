@@ -52,3 +52,9 @@ export const leagueState = (deps: LeagueClientDeps, identity: Identity, id: stri
 export const sendReady = (deps: LeagueClientDeps, identity: Identity, id: string, ready: boolean) => ask<{ ready: boolean }>(deps, identity, 'POST', `/api/leagues/${id}/ready`, { ready })
 export const controlLeague = (deps: LeagueClientDeps, identity: Identity, id: string, action: ControlAction) => ask<{ done: true }>(deps, identity, 'POST', `/api/leagues/${id}/${action}`, {})
 export const changePace = (deps: LeagueClientDeps, identity: Identity, id: string, pace: PaceId) => ask<{ pace: PaceId }>(deps, identity, 'POST', `/api/leagues/${id}/pace`, { pace })
+
+/** Ticket de uso único (30 s) para abrir o WebSocket da partida ao vivo (B8.5). */
+export const requestLiveTicket = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ ticket: string; expiresInMs: number }>(deps, identity, 'POST', `/api/leagues/${id}/live-ticket`, {})
+
+/** Endereço do WebSocket da partida: o ticket vai na própria URL (o navegador não manda cabeçalhos no WebSocket). */
+export const liveSocketUrl = (base: string, leagueId: string, ticket: string): string => `${base.replace(/^http/, 'ws')}/api/leagues/${leagueId}/live?ticket=${encodeURIComponent(ticket)}`

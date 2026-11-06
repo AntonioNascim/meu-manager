@@ -266,7 +266,7 @@ describe('campo na tela', () => {
     while (!g.pendingUserMatch) g = advanceToMatchday(g)
     const live = beginLive(g)
     live.match.playUntil(30)
-    const html = renderToStaticMarkup(createElement(Pitch, { game: g, snap: live.match.snapshot(), speed: 2, running: false }))
+    const html = renderToStaticMarkup(createElement(Pitch, { data: g.season, snap: live.match.snapshot(), speed: 2, running: false }))
     expect(html.match(/data-side="home"/g)).toHaveLength(11)
     expect(html.match(/data-side="away"/g)).toHaveLength(11)
     expect(html).toContain('aria-label="Bola"')
@@ -284,7 +284,7 @@ describe('campo na tela', () => {
     m.substitute('home', out, inn)
     const after = m.snapshot()
     const g: Game = { ...game, season: { ...game.season, teams: game.season.teams.map((t) => t), players: world.players } }
-    const render = (s: MatchSnapshot) => renderToStaticMarkup(createElement(Pitch, { game: { ...g, season: { ...g.season, teams: world.teams } }, snap: s, speed: 1, running: false }))
+    const render = (s: MatchSnapshot) => renderToStaticMarkup(createElement(Pitch, { data: { ...g.season, teams: world.teams }, snap: s, speed: 1, running: false }))
     expect(render(before)).toContain(`data-player="${out}"`)
     const html = render(after)
     expect(html).not.toContain(`data-player="${out}"`)

@@ -7,6 +7,7 @@ import { leagueApi, type LeagueTeam } from '../../../../store/leagues'
 import { Button, Card } from '../../../components/ui'
 import { LEAGUE_ERROR_LABELS, LEAGUE_LOG_LABELS, PACE_LABELS, SEAT_STATUS_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
+import { LiveMatchOnline } from './LiveMatchOnline'
 import { Pill } from './parts'
 
 const POLL_MS = 5000
@@ -38,6 +39,7 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
   const [busy, setBusy] = useState(false)
   const [confirmAdvance, setConfirmAdvance] = useState(false)
   const [pacing, setPacing] = useState(false)
+  const [watching, setWatching] = useState(false)
 
   const load = useCallback(async () => {
     const r = await leagueApi.state(id)
@@ -70,12 +72,20 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
 
   return (
     <>
+      {watching && <LiveMatchOnline leagueId={id} onClose={() => setWatching(false)} />}
       <Status view={view} />
 
       {me && (
         <Card title="Pronto">
           {view.current ? (
-            <p className="text-sm text-muted">A rodada está acontecendo ({view.current.all - view.current.pending} de {view.current.all} partidas dos técnicos terminaram).</p>
+            <>
+              <p className="text-sm text-muted">A rodada está acontecendo ({view.current.all - view.current.pending} de {view.current.all} partidas dos técnicos terminaram).</p>
+              {!view.directResult && (
+                <Button className="mt-3 w-full" onClick={() => setWatching(true)} data-testid="live-enter">
+                  Entrar na partida
+                </Button>
+              )}
+            </>
           ) : view.paused ? (
             <p className="text-sm text-muted">A liga está pausada. O Pronto volta a valer quando o ADM retomar.</p>
           ) : myTurn ? (

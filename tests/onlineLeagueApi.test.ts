@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, leagueState, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -43,6 +43,11 @@ class FakeRoom implements RoomPort {
   }
   calls: string[] = []
   running = new Set<string>()
+  async ticket(id: string, playerId: string) {
+    this.calls.push(`ticket:${id}:${playerId}`)
+    if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
+    return { ok: true as const, ticket: 'a'.repeat(48), expiresInMs: 30000 }
+  }
   async state(id: string) {
     if (!this.seats.has(id)) return { ok: false as const, error: 'not-found' as const }
     if (!this.started.has(id)) return { ok: true as const, phase: 'lobby' as const }
@@ -267,6 +272,17 @@ describe('andamento da liga (B8.4)', () => {
     expect(s.room.calls).toContain(`ready:${id}:${bia.playerId}:true`)
     expect((await setReady(s.req(dudu, 'POST', `/api/leagues/${id}/ready`, { ready: true }), s.deps, id)).status).toBe(404)
     expect((await setReady(s.req(bia, 'POST', `/api/leagues/${id}/ready`, { ready: 'sim' }), s.deps, id)).status).toBe(400)
+  })
+
+  it('ticket do WebSocket: só membro, só com a liga em andamento, e o ticket é de uso único na sala', async () => {
+    const { s, ana, bia, dudu, id } = await running()
+    expect((await liveTicket(s.req(bia, 'POST', `/api/leagues/${id}/live-ticket`, {}), s.deps, id)).status).toBe(409)
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    const ok = await liveTicket(s.req(bia, 'POST', `/api/leagues/${id}/live-ticket`, {}), s.deps, id)
+    expect(ok.status).toBe(200)
+    expect(ok.body).toEqual({ ticket: 'a'.repeat(48), expiresInMs: 30000 })
+    expect(s.room.calls).toContain(`ticket:${id}:${bia.playerId}`)
+    expect((await liveTicket(s.req(dudu, 'POST', `/api/leagues/${id}/live-ticket`, {}), s.deps, id)).status).toBe(404)
   })
 
   it('Avançar, Pausar e Retomar são só do ADM e só com a liga em andamento', async () => {

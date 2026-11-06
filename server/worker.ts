@@ -19,11 +19,11 @@ import { D1LeagueStore } from './leagueStore'
 import { LeagueRoom } from './leagueRoom'
 import type { PaceId } from '../src/engine/league/pace'
 import type { LeagueView } from '../src/engine/league/view'
-import { adminAction, changePace, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
+import { adminAction, changePace, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
-  fetch(url: string, init: { method: string; body: string }): Promise<Response>
+  fetch(url: string, init: { method?: string; body?: string; headers?: Record<string, string> }): Promise<Response>
 }
 /** O pedaço do R2 que usamos. */
 interface R2Like {
@@ -169,6 +169,16 @@ class DoRooms implements RoomPort {
   setPace(leagueId: string, pace: PaceId) {
     return this.call(leagueId, '/internal/pace', { pace })
   }
+  async ticket(leagueId: string, playerId: string) {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch('https://room/internal/ticket', { method: 'POST', body: JSON.stringify({ playerId }) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; ticket?: string; expiresInMs?: number }
+      return json.ok && json.ticket ? { ok: true as const, ticket: json.ticket, expiresInMs: json.expiresInMs ?? 30000 } : { ok: false as const, error: json.error ?? ('unavailable' as const) }
+    } catch {
+      return { ok: false as const, error: 'unavailable' as const }
+    }
+  }
   async destroy(leagueId: string) {
     await this.call(leagueId, '/internal/destroy', {})
   }
@@ -213,6 +223,7 @@ async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDe
   if (second === 'state' && method === 'GET') return respondLeague(await leagueState(request, deps, first), cors)
   if (second === 'ready' && method === 'POST') return respondLeague(await setReady(request, deps, first), cors)
   if ((second === 'advance' || second === 'pause' || second === 'resume') && method === 'POST') return respondLeague(await controlLeague(request, deps, first, second), cors)
+  if (second === 'live-ticket' && method === 'POST') return respondLeague(await liveTicket(request, deps, first), cors)
   if (second === 'pace' && method === 'POST') return respondLeague(await changePace(request, deps, first), cors)
   if (second === 'join' && method === 'POST') return respondLeague(await joinLeague(request, deps, first), cors)
   if (second === 'leave' && method === 'POST') return respondLeague(await leaveLeague(request, deps, first), cors)
@@ -341,6 +352,15 @@ export default {
       authorization: req.headers.get('Authorization'),
     }
 
+    // WebSocket da partida ao vivo: o ticket de uso único (pedido assinado em .../live-ticket) é a autenticação; o limite por IP segura quem tenta adivinhar.
+    const ws = /^\/api\/leagues\/([A-Za-z0-9]+)\/live$/.exec(url.pathname)
+    if (ws && req.headers.get('Upgrade') === 'websocket') {
+      const hit = await guard.hit('liveConnectIp', request.ip, Date.now())
+      if (!hit.allowed) return Response.json({ error: 'rate-limited' }, { status: 429, headers: cors })
+      const stub = env.LEAGUES.get(env.LEAGUES.idFromName(ws[1] as string))
+      // Só o necessário segue para a sala: nada de cabeçalhos do cliente (a sala confia só no ticket).
+      return stub.fetch(`https://room/ws?ticket=${encodeURIComponent(url.searchParams.get('ticket') ?? '')}`, { headers: { Upgrade: 'websocket' } })
+    }
     if (url.pathname === '/api/identity' && req.method === 'POST') return respond(await registerIdentity(request, deps), cors)
     if (url.pathname === '/api/me' && req.method === 'GET') {
       const auth = await requireIdentity(request, 'read', deps)

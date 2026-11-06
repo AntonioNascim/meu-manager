@@ -34,6 +34,7 @@ import {
   replayOf,
   resumeLeague,
   resumeLiveEvent,
+  RESUME_WARNING_MS,
   setConnected,
   setReady,
   setPlayerReady,
@@ -56,7 +57,8 @@ import { createLeagueWorld } from '../src/store/leagueWorld'
 import type { LeagueRecord } from '../src/online/leagueApi'
 import type { DataPackage } from '../src/data/package/types'
 import { SqliteWorldStore, type WorldSql } from '../src/store/worldStore'
-import { frameSince, makeStoredReplay, parseClientMessage, replayKey, type Cursor, type ServerMessage } from '../src/online/liveProtocol'
+import { frameSince, makeStoredReplay, parseClientMessage, replayKey, type Cursor, type Roster, type ServerMessage } from '../src/online/liveProtocol'
+import { playerOverall } from '../src/engine/overall'
 import { fingerprintResult } from '../src/online/liveProtocol'
 
 /** Versão do motor registrada nos replays (aumente quando o motor de partida mudar de resultado). */
@@ -65,6 +67,8 @@ export const ENGINE_VERSION = 'b7-1'
 /** No máximo isto de comandos por técnico a cada 10 s (limite final: B9). */
 const COMMANDS_PER_WINDOW = 12
 const COMMAND_WINDOW_MS = 10_000
+/** O ticket do WebSocket vale 30 s e uma vez só (B8.5). */
+export const TICKET_TTL_MS = 30_000
 
 interface SocketLike {
   send(data: string): void
@@ -87,6 +91,10 @@ interface RoomCtx {
 }
 interface RoomEnv {
   /** Bucket dos pacotes de dados (`meu-manager-pacotes`): o mundo real de uma liga é lido dele. */
+  /** Só em laboratório: aceita o `x-player-id` no lugar do ticket. */
+  TRUST_PLAYER_HEADER?: string
+  /** Só em testes locais (`wrangler dev --var LIVE_MINUTE_MS:600`): tempo real de cada minuto de jogo. Em produção não existe. */
+  LIVE_MINUTE_MS?: string
   PACKAGES?: { get(key: string): Promise<{ body: ReadableStream } | null> }
   /** Bucket opcional dos registros de reprodução (`meu-manager-replays`). */
   REPLAYS?: { put(key: string, value: string): Promise<unknown> }
@@ -114,6 +122,8 @@ export class LeagueRoom {
   private inputSaved = new Set<string>()
   private cmdsSaved = new Map<string, number>()
   private recent = new Map<string, number[]>()
+  /** Quando o jogo volta depois do aviso de retomada (só em memória: o aviso dura 10 s). */
+  private resumeAt?: number
   /** Quantas vezes esta instância foi criada (sobe a cada reinício; serve de prova nos testes). */
   readonly boot: number
 
@@ -277,7 +287,8 @@ export class LeagueRoom {
 
   private minuteMs(): number {
     const league = this.league as LeagueState
-    return this.meta?.minuteMs ?? liveMinuteMs(league.config.clock.pace)
+    const test = Number(this.env.LIVE_MINUTE_MS)
+    return this.meta?.minuteMs ?? (test > 0 ? test : liveMinuteMs(league.config.clock.pace))
   }
 
   private sendFrame(): void {
@@ -336,15 +347,59 @@ export class LeagueRoom {
   }
 
   // --------------------------------------------------------------- WebSocket
+  /** Emite um ticket de uso único para o técnico abrir o WebSocket (o navegador não consegue mandar cabeçalhos no WebSocket). */
+  protected issueTicket(playerId: string, now: number): string {
+    for (const row of this.sql.exec("SELECT k, v FROM kv WHERE k LIKE 'ticket:%'").toArray()) {
+      const t = JSON.parse(String(row.v)) as { playerId: string; exp: number }
+      if (t.exp < now || t.playerId === playerId) this.sql.exec('DELETE FROM kv WHERE k = ?', String(row.k))
+    }
+    const bytes = crypto.getRandomValues(new Uint8Array(24))
+    const ticket = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    this.set(`ticket:${ticket}`, JSON.stringify({ playerId, exp: now + TICKET_TTL_MS }))
+    return ticket
+  }
+
+  /** Quem está abrindo o WebSocket: o dono do ticket (que é gasto aqui). */
+  protected socketPlayer(req: Request): string | undefined {
+    if (this.env.TRUST_PLAYER_HEADER === '1') return req.headers.get('x-player-id') ?? undefined
+    const ticket = new URL(req.url).searchParams.get('ticket') ?? ''
+    if (!/^[0-9a-f]{48}$/.test(ticket)) return undefined
+    const raw = this.get(`ticket:${ticket}`)
+    if (!raw) return undefined
+    this.sql.exec('DELETE FROM kv WHERE k = ?', `ticket:${ticket}`)
+    const t = JSON.parse(raw) as { playerId: string; exp: number }
+    return t.exp >= this.now() ? t.playerId : undefined
+  }
+
   protected async upgrade(req: Request): Promise<Response> {
-    const playerId = req.headers.get('x-player-id')
-    if (!playerId || !this.ensureLoaded()) return new Response('not found', { status: 404 })
+    const playerId = this.socketPlayer(req)
+    if (!playerId) return new Response('unauthorized', { status: 401 })
+    if (!this.ensureLoaded()) return new Response('not found', { status: 404 })
     if (!(this.league as LeagueState).seats.some((s) => s.playerId === playerId)) return new Response('forbidden', { status: 403 })
     const Pair = (globalThis as unknown as { WebSocketPair: new () => { 0: SocketLike; 1: SocketLike } }).WebSocketPair
     const pair = new Pair()
     this.ctx.acceptWebSocket(pair[1], [playerId])
     pair[1].serializeAttachment({ playerId })
     return new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit)
+  }
+
+  /** Quem joga em cada partida do evento (times e jogadores), para a tela desenhar sem ter o mundo. */
+  private rosterOf(live: LiveEvent): Roster {
+    const world = this.world as SeasonState
+    const ids = new Set(live.games.flatMap((g) => [g.homeTeamId, g.awayTeamId]))
+    const teams = world.teams.filter((t) => ids.has(t.id)).map((t) => ({ id: t.id, name: t.name, abbreviation: t.abbreviation, colors: [t.colors[0], t.colors[1]] as [string, string], ...(t.shortName ? { shortName: t.shortName } : {}) }))
+    const players = world.players
+      .filter((p) => typeof p.teamId === 'string' && ids.has(p.teamId))
+      .map((p) => ({ id: p.id, teamId: p.teamId as string, name: p.name, ...(p.nickname ? { nickname: p.nickname } : {}), position: p.position, overall: Math.round(playerOverall(p)) }))
+    return { teams, players }
+  }
+
+  private fullFor(playerId: string): ServerMessage {
+    const live = this.live as LiveEvent
+    const seats = (this.league as LeagueState).seats
+    const seat = seats.find((s) => s.playerId === playerId)
+    const resumeAt = this.resumeAt !== undefined && this.resumeAt > this.now() ? this.resumeAt : undefined
+    return { t: 'full', minute: live.clock, paused: live.pausedAt !== undefined, games: viewOf(live, seats), roster: this.rosterOf(live), me: { teamId: seat?.teamId ?? '' }, ...(resumeAt !== undefined ? { resumeAt } : {}) }
   }
 
   async webSocketMessage(ws: SocketLike, data: string | ArrayBuffer): Promise<void> {
@@ -361,7 +416,7 @@ export class LeagueRoom {
       if (this.live) {
         this.live = setConnected(this.live, (this.league as LeagueState).seats, playerId, true)
         this.persist()
-        ws.send(JSON.stringify({ t: 'full', minute: this.live.clock, paused: this.live.pausedAt !== undefined, games: viewOf(this.live, (this.league as LeagueState).seats) } satisfies ServerMessage))
+        ws.send(JSON.stringify(this.fullFor(playerId)))
       } else ws.send(JSON.stringify({ t: 'error', problem: 'not-in-event' } satisfies ServerMessage))
       return
     }
@@ -419,7 +474,8 @@ export class LeagueRoom {
       this.league = resumeLeague(league, this.world as SeasonState, now, String(body.by ?? 'adm'))
       if (this.live) this.live = resumeLiveEvent(this.live, now)
       this.persist()
-      this.broadcast({ t: 'resumed', minute: this.live?.clock ?? 0 })
+      this.resumeAt = this.live ? now + RESUME_WARNING_MS : undefined
+      this.broadcast({ t: 'resumed', minute: this.live?.clock ?? 0, resumeAt: this.resumeAt ?? now })
       await this.run()
     } else if (path === '/admin/run') {
       await this.run()
@@ -559,6 +615,10 @@ export class LeagueRoom {
       this.persist()
       await this.schedule(now)
       return ok()
+    }
+    if (path === '/internal/ticket') {
+      if (!this.league?.seats.some((s) => s.playerId === playerId)) return no('not-seated')
+      return Response.json({ ok: true, ticket: this.issueTicket(playerId, now), expiresInMs: TICKET_TTL_MS, live: this.live !== undefined })
     }
     if (path === '/internal/start') {
       if (this.league || !meta.record) return no('bad-state')

@@ -529,6 +529,14 @@ export const LEAGUE_LOG_LABELS: Record<import('../engine/league/runner').LogType
   'auto-resume': 'Liga retomada sozinha (30 dias)',
   tick: 'Dia passou',
 }
+/** Por que o servidor recusou um comando na partida ao vivo (B8.5). */
+export const LIVE_REJECT_LABELS: Record<import('../engine/league/live').RejectReason, string> = {
+  'not-your-team': 'Você não joga nesta rodada.',
+  'game-finished': 'A partida já terminou.',
+  expired: 'O comando demorou demais e foi descartado. Mande de novo.',
+  invalid: 'Comando inválido.',
+  engine: 'A troca não é permitida agora (limite de trocas, paradas ou estrangeiros).',
+}
 /** Estado de um técnico na liga (B8.4). */
 export const SEAT_STATUS_LABELS: Record<import('../engine/league/runner').SeatStatus, string> = { active: 'Presente', absent: 'Ausente (IA joga)', autopilot: 'Piloto automático' }
 export const LEAGUE_STATUS_LABELS: Record<'lobby' | 'running' | 'closed', string> = { lobby: 'Aguardando início', running: 'Em andamento', closed: 'Encerrada' }

@@ -5,8 +5,8 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 import { replayResult, type CommandOutcome, type LiveEvent, type LiveView, type QueuedCommand, type ReplayRecord } from '../engine/league/live'
-import type { MatchEvent, Mentality, PlayStyle } from '../engine/types'
-import type { PlayTrace } from '../engine/match'
+import type { MatchEvent, Mentality, PlayStyle, TeamMatchStats } from '../engine/types'
+import type { PlayTrace, SideSnapshot } from '../engine/match'
 import type { MatchResult } from '../engine/types'
 
 export const MAX_MESSAGE_BYTES = 4096
@@ -75,14 +75,42 @@ export interface GameFrame {
   /** Só o que o cliente ainda não tinha. */
   events: MatchEvent[]
   trace: PlayTrace[]
+  /** O resto do retrato da partida (quem está em campo, tática, banco, estatísticas): pequeno e sempre inteiro. */
+  home: SideSnapshot
+  away: SideSnapshot
+  homeStats: TeamMatchStats
+  awayStats: TeamMatchStats
+  extraTime?: boolean
+}
+
+/** Quem joga: o suficiente para desenhar o campo e montar as trocas sem baixar o mundo (a tela online não tem o mundo). */
+export interface RosterTeam {
+  id: string
+  name: string
+  abbreviation: string
+  colors: [string, string]
+  shortName?: string
+}
+export interface RosterPlayer {
+  id: string
+  teamId: string
+  name: string
+  nickname?: string
+  position: string
+  overall: number
+}
+export interface Roster {
+  teams: RosterTeam[]
+  players: RosterPlayer[]
 }
 
 export type ServerMessage =
-  | { t: 'full'; minute: number; paused: boolean; games: LiveView[] }
+  /** `resumeAt`: instante (ms) em que o jogo volta depois do aviso de retomada, se ainda não passou. */
+  | { t: 'full'; minute: number; paused: boolean; games: LiveView[]; roster: Roster; me: { teamId: string }; resumeAt?: number }
   | { t: 'frame'; minute: number; games: GameFrame[] }
   | { t: 'result'; outcomes: CommandOutcome[] }
   | { t: 'paused'; minute: number }
-  | { t: 'resumed'; minute: number }
+  | { t: 'resumed'; minute: number; resumeAt: number }
   | { t: 'end' }
   | { t: 'error'; problem: ParseProblem | 'rate-limited' | 'not-in-event' }
   | { t: 'pong' }
@@ -105,6 +133,11 @@ export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cur
       controlled: v.controlled,
       events: v.snapshot.events.slice(seen.events),
       trace: v.snapshot.trace.slice(seen.trace),
+      home: v.snapshot.home,
+      away: v.snapshot.away,
+      homeStats: v.snapshot.homeStats,
+      awayStats: v.snapshot.awayStats,
+      ...(v.snapshot.extraTime ? { extraTime: true } : {}),
     }
   })
   return { frame: { t: 'frame', minute: e.clock, games }, cursor: next }
