@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LeagueDetail } from '../../../../online/leagueApi'
 import type { AdminAction } from '../../../../online/leagueApi'
 import { leagueApi, useLeagueTeams } from '../../../../store/leagues'
+import { openLeagueGame } from '../../../../store/leagueSession'
 import { Button, Card, TeamBadge } from '../../../components/ui'
 import { BAND_LABELS, LEAGUE_ERROR_LABELS, LEAGUE_KIND_LABELS, LEAGUE_STATUS_LABELS, PACE_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
@@ -26,6 +27,15 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
   const [pickError, setPickError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const { data: teams } = useLeagueTeams(league ?? undefined)
+
+  const [opening, setOpening] = useState(false)
+  const enterGame = async () => {
+    setOpening(true)
+    setError(null)
+    const r = await openLeagueGame(id)
+    setOpening(false)
+    if (r !== 'ok') setError(r === 'no-account' ? 'Crie ou recupere a conta online para abrir o jogo.' : 'Não consegui carregar o jogo da liga. Confira a conexão e tente de novo.')
+  }
 
   const load = useCallback(async () => {
     let r = await leagueApi.get(id)
@@ -113,6 +123,11 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
         {PACE_LABELS[league.pace]} · {BAND_LABELS[league.band]} · {league.directResult ? 'Resultado direto' : 'Partidas ao vivo'}
       </p>
       {league.status === 'lobby' && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">A liga ainda não começou. Cada técnico escolhe um clube e o ADM inicia quando todos estiverem prontos.</p>}
+      {league.status === 'running' && member && (
+        <Button className="w-full" disabled={opening} onClick={() => void enterGame()} data-testid="open-league-game">
+          {opening ? 'Carregando o jogo…' : 'Abrir o jogo do clube'}
+        </Button>
+      )}
       {league.status === 'running' && <LeagueRunning league={league} teams={teams ?? undefined} onRefresh={() => void load()} />}
       {league.status === 'running' && !member && <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">Quem entra agora assume um clube livre.</p>}
 

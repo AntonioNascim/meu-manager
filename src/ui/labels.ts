@@ -231,6 +231,20 @@ export const OFFER_REASON_LABELS: Record<OfferReason, string> = {
   'not-eligible': 'Só vale para quem está no último ano de contrato, a partir de julho',
 }
 
+/** Por que um comando do técnico foi recusado (regras do jogo, ligação com o servidor e liga online). */
+export const COMMAND_ERROR_LABELS: Record<string, string> = {
+  ...OFFER_REASON_LABELS,
+  'not-found': 'Não encontrado: o jogador ou o jovem não é mais do seu clube',
+  busy: 'A vaga de treino individual já está ocupada',
+  'squad-full': 'O elenco profissional já está cheio: venda, empreste ou libere alguém antes',
+  'foreign-limit': 'Limite de estrangeiros da liga',
+  invalid: 'Escolha inválida: confira a escalação e os valores',
+  offline: 'Sem conexão: reconecte para fazer isso',
+  'no-mirror': 'A liga ainda não carregou: tente de novo em instantes',
+  server: 'O servidor não respondeu: tente de novo',
+}
+export const commandErrorText = (error: string): string => COMMAND_ERROR_LABELS[error] ?? 'Não foi possível fazer isso agora'
+
 export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   pending: 'Aguardando',
   accepted: 'Aceita',

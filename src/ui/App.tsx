@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { pendingIncoming } from '../engine/market'
 import { academyAlert, lastYearContracts, userTeam } from '../store/game'
 import { flushAutosave, useSaveStatus } from '../store/autosave'
 import { setGame, useGame } from '../store/gameStore'
 import { useBusy } from '../store/heavy'
 import { clearLive } from '../store/liveMatch'
+import { closeLeague } from '../store/leagueSession'
+import { LeagueScreen } from './screens/online/leagues/LeagueScreen'
 import { BusyOverlay } from './components/BusyOverlay'
 import { TeamBadge } from './components/ui'
 import { formatDate } from './format'
@@ -56,6 +58,21 @@ export function App() {
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
   // Aba pedida por quem navegou (atalhos e avisos do painel); some ao trocar de tela pela barra de baixo.
   const [hint, setHint] = useState<string | undefined>(undefined)
+  // Ação do jogo que ainda não funciona na liga online (as do mercado chegam na próxima parte): avisa em vez de parecer quebrada.
+  const [blocked, setBlocked] = useState(false)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const on = () => {
+      setBlocked(true)
+      if (timer !== undefined) clearTimeout(timer)
+      timer = setTimeout(() => setBlocked(false), 4000)
+    }
+    window.addEventListener('mm-online-blocked', on)
+    return () => {
+      window.removeEventListener('mm-online-blocked', on)
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }, [])
   const navigate = (to: ScreenId, tab?: string) => {
     setHint(tab)
     setScreen(to)
@@ -109,6 +126,12 @@ export function App() {
           type="button"
           className="min-h-10 rounded-lg px-3 text-xs font-bold uppercase tracking-wider text-muted hover:bg-surface"
           onClick={() => {
+            if (game.online) {
+              // A liga é do servidor: sair do jogo só fecha o espelho (nada a salvar neste aparelho).
+              clearLive()
+              closeLeague()
+              return
+            }
             void flushAutosave().then(() => {
               clearLive()
               setGame(null)
@@ -119,8 +142,21 @@ export function App() {
         </button>
       </header>
 
+      {game.online?.connection === 'offline' && (
+        <div className="border-b border-loss/50 bg-loss/10 px-4 py-2 text-xs font-bold text-loss" data-testid="offline-banner" role="status">
+          Sem conexão: você vê o último estado da liga e as ações ficam bloqueadas até reconectar.
+        </div>
+      )}
+
+      {blocked && (
+        <div className="border-b border-accent/50 bg-accent/10 px-4 py-2 text-xs font-bold text-accent" data-testid="blocked-banner" role="status">
+          Esta ação ainda não está disponível na liga online. Compras, empréstimos e propostas ao vivo chegam na próxima atualização; por enquanto use o Mercado da sala da liga.
+        </div>
+      )}
+
       <main className="flex-1 px-4 pb-28 pt-4">
         {current === 'home' && <Dashboard game={game} onNavigate={navigate} />}
+        {current === 'league' && game.online && <LeagueScreen leagueId={game.online.leagueId} />}
         {current === 'career' && <Career game={game} onTaken={() => navigate('home')} />}
         {current === 'match' && <MatchScreen game={game} onNavigate={navigate} />}
         {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab(hint)} />}

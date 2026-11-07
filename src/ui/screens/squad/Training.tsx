@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { TRAINING } from '../../../engine/config'
 import { playerOverall } from '../../../engine/overall'
-import { GROUP_ATTRIBUTES, TrainingError, learnablePositions, minutesShareSoFar, potentialRange, projectedGrowth, trainableGroups } from '../../../engine/training'
+import { GROUP_ATTRIBUTES, learnablePositions, minutesShareSoFar, potentialRange, projectedGrowth, trainableGroups } from '../../../engine/training'
 import { TRAINING_FOCUSES, TRAINING_INTENSITIES } from '../../../engine/types'
 import type { IndividualGoal, Position, TrainingFocus, TrainingGroup, TrainingIntensity } from '../../../engine/types'
-import { cancelUserIndividualTraining, setUserTrainingPlan, squadOf, startUserIndividualTraining, userFinishedTraining, userIndividualTraining, userTeam, userTrainingPlan } from '../../../store/game'
+import { squadOf, userFinishedTraining, userIndividualTraining, userTeam, userTrainingPlan } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { getGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { PlayerDetail } from '../../components/PlayerDetail'
 import { formatDate, playerName } from '../../format'
 import {
@@ -17,6 +18,7 @@ import {
   TRAINING_FOCUS_LABELS,
   TRAINING_INTENSITY_LABELS,
   TRAINING_INTENSITY_LEVELS,
+  commandErrorText,
 } from '../../labels'
 import { ConditionBar, Eyebrow, Flag, MoodIcon, Panel, ProgressBar, ValueBadge } from '../../theme'
 
@@ -79,12 +81,7 @@ function IndividualSlot({ game, onMessage }: { game: Game; onMessage: (m: string
     if (!chosen) return
     const goal: IndividualGoal | null = kind === 'group' ? { type: 'group', group: groups.includes(group) ? group : (groups[0] as TrainingGroup) } : position ? { type: 'position', position } : null
     if (!goal) return
-    try {
-      updateGame((g) => startUserIndividualTraining(g, chosen.id, goal))
-      onMessage(`${playerName(chosen)} começou o treino individual.`)
-    } catch (e) {
-      onMessage(e instanceof TrainingError || e instanceof Error ? e.message : 'Não foi possível iniciar o treino.')
-    }
+    void perform({ type: 'individual-training', playerId: chosen.id, goal }).then((out) => onMessage(out.ok ? `${playerName(chosen)} começou o treino individual.` : commandErrorText(out.error)))
   }
 
   return (
@@ -103,7 +100,7 @@ function IndividualSlot({ game, onMessage }: { game: Game; onMessage: (m: string
             <span>
               Faltam {slot.daysLeft} {slot.daysLeft === 1 ? 'dia' : 'dias'}
             </span>
-            <button type="button" onClick={() => updateGame(cancelUserIndividualTraining)} className="min-h-10 rounded-lg px-2 font-bold text-loss">
+            <button type="button" onClick={() => void perform({ type: 'cancel-individual-training' })} className="min-h-10 rounded-lg px-2 font-bold text-loss">
               Cancelar
             </button>
           </div>
@@ -209,7 +206,10 @@ export function Training({ game }: { game: Game }) {
     [squad, plan, game.season, date],
   )
   const open = squad.find((p) => p.id === openId)
-  const setPlan = (next: Partial<{ intensity: TrainingIntensity; focus: TrainingFocus }>) => updateGame((g) => setUserTrainingPlan(g, { ...userTrainingPlan(g), ...next }))
+  const setPlan = (next: Partial<{ intensity: TrainingIntensity; focus: TrainingFocus }>) => {
+    const g = getGame() ?? game
+    void perform({ type: 'training-plan', plan: { ...userTrainingPlan(g), ...next } })
+  }
 
   return (
     <div className="space-y-3">

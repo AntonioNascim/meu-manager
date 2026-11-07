@@ -1,15 +1,15 @@
 import { useState } from 'react'
-import { AcademyError, potentialStars, youthSalary } from '../../../engine/academy'
+import { potentialStars, youthSalary } from '../../../engine/academy'
 import { ACADEMY } from '../../../engine/config'
 import { playerOverall } from '../../../engine/overall'
 import { SQUAD_MAX } from '../../../engine/types'
 import type { Player } from '../../../engine/types'
-import { academyAlert, promoteUserYouth, releaseUserYouth, squadOf, userAcademy, userTeam } from '../../../store/game'
+import { academyAlert, squadOf, userAcademy, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { PlayerDetail } from '../../components/PlayerDetail'
 import { formatMoney, playerName } from '../../format'
-import { POSITION_LABELS, POSITION_SHORT_LABELS } from '../../labels'
+import { POSITION_LABELS, POSITION_SHORT_LABELS, commandErrorText } from '../../labels'
 import { Flag, Panel, Stars, ValueBadge } from '../../theme'
 
 const mustDecide = (p: Player) => p.age >= ACADEMY.graduationAge
@@ -53,23 +53,21 @@ export function Academy({ game }: { game: Game }) {
 
   const promote = (p: Player) => {
     if (!window.confirm(`Promover ${playerName(p)} ao elenco profissional? Contrato de ${ACADEMY.contractYears} anos, salário de ${formatMoney(youthSalary(p, team))} por mês.`)) return
-    try {
-      updateGame((g) => promoteUserYouth(g, p.id))
-      setOpenId(null)
-      setMessage(`${playerName(p)} foi promovido ao elenco profissional.`)
-    } catch (e) {
-      setMessage(e instanceof AcademyError && e.code === 'squad-full' ? `O elenco profissional já tem ${SQUAD_MAX} jogadores: venda, empreste ou libere alguém antes.` : e instanceof Error ? e.message : 'Não foi possível promover.')
-    }
+    void perform({ type: 'club', action: { type: 'promote', playerId: p.id } }).then((out) => {
+      if (out.ok) {
+        setOpenId(null)
+        setMessage(`${playerName(p)} foi promovido ao elenco profissional.`)
+      } else setMessage(out.error === 'squad-full' ? `O elenco profissional já tem ${SQUAD_MAX} jogadores: venda, empreste ou libere alguém antes.` : commandErrorText(out.error))
+    })
   }
   const release = (p: Player) => {
     if (!window.confirm(`Dispensar ${playerName(p)}? Ele deixa o clube e o jogo.`)) return
-    try {
-      updateGame((g) => releaseUserYouth(g, p.id))
-      setOpenId(null)
-      setMessage(`${playerName(p)} foi dispensado.`)
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Não foi possível dispensar.')
-    }
+    void perform({ type: 'club', action: { type: 'release-youth', playerId: p.id } }).then((out) => {
+      if (out.ok) {
+        setOpenId(null)
+        setMessage(`${playerName(p)} foi dispensado.`)
+      } else setMessage(commandErrorText(out.error))
+    })
   }
 
   return (

@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { FINANCE } from '../../../engine/config'
 import { budgetTotal, monthlyPayroll, splitLimits } from '../../../engine/finance'
 import type { FundsReason, FundsResult } from '../../../engine/finance'
-import { requestUserFunds, setUserSalaryBudget, squadOf, userTeam } from '../../../store/game'
+import { requestUserFunds, squadOf, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { formatCompactMoney } from '../../format'
 import { Eyebrow, Icon, Panel, Sheet } from '../../theme'
 
@@ -27,7 +28,7 @@ export function BudgetBar({ game }: { game: Game }) {
     if (drag === null) return
     const value = clamp(drag)
     setDrag(null)
-    updateGame((g) => setUserSalaryBudget(g, value))
+    void perform({ type: 'salary-budget', salary: value })
   }
 
   return (

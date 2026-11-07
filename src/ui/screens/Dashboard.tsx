@@ -24,6 +24,7 @@ import {
 } from '../../store/game'
 import type { Game } from '../../store/game'
 import { runHeavy } from '../../store/heavy'
+import { LeagueCard } from './online/leagues/LeagueCard'
 import { Card } from '../components/ui'
 import { ReportProblem } from '../components/ReportProblem'
 import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
@@ -279,13 +280,18 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
           Condição média dos titulares: <b className="tabular-nums">{condition}</b>
         </div>
 
-        <button
-          type="button"
-          onClick={advance}
-          className="mt-5 flex min-h-14 w-full items-center justify-center rounded-xl bg-accent font-display text-2xl font-extrabold uppercase tracking-wide text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
-        >
-          {academy.pending > 0 ? 'Decidir sobre a base' : seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
-        </button>
+        {game.online ? (
+          // Na liga online quem avança o tempo é a liga: no lugar do botão Avançar entra o cartão da liga (Pronto e sala).
+          <LeagueCard leagueId={game.online.leagueId} teamId={game.userTeamId} onOpen={() => onNavigate('league')} />
+        ) : (
+          <button
+            type="button"
+            onClick={advance}
+            className="mt-5 flex min-h-14 w-full items-center justify-center rounded-xl bg-accent font-display text-2xl font-extrabold uppercase tracking-wide text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
+          >
+            {academy.pending > 0 ? 'Decidir sobre a base' : seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
+          </button>
+        )}
       </Panel>
 
       <div className="grid grid-cols-5 gap-1.5" data-testid="shortcuts">

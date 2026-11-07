@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { FINANCE } from '../../../engine/config'
 import { bestTicketPrice, matchAttendance, summarizeLedger } from '../../../engine/finance'
 import type { FinanceCategory } from '../../../engine/types'
-import { setUserTicketPrice, userSeasonLabel, userSeasonLabelOf, userTeam } from '../../../store/game'
+import { userSeasonLabel, userSeasonLabelOf, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { formatCompactMoney, formatDate, formatMoney } from '../../format'
 import { FINANCE_CATEGORY_LABELS } from '../../labels'
 import { Sheet } from '../../theme'
@@ -107,7 +107,7 @@ export function TicketSheet({ game, onClose }: { game: Game; onClose: () => void
   const attendance = matchAttendance(team, { reputation: 10 })
   const fill = Math.round((100 * attendance) / team.stadium.capacity)
   const best = bestTicketPrice(team)
-  const setPrice = (price: number) => updateGame((g) => setUserTicketPrice(g, Math.min(FINANCE.ticket.max, Math.max(FINANCE.ticket.min, price))))
+  const setPrice = (price: number) => void perform({ type: 'ticket-price', price: Math.min(FINANCE.ticket.max, Math.max(FINANCE.ticket.min, price)) })
   const step = 'flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-surface-2 text-2xl font-bold active:scale-95 disabled:opacity-40'
   return (
     <Sheet title="Ingresso" onClose={onClose}>

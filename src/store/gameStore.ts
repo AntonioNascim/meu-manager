@@ -24,7 +24,16 @@ export function openGame(game: Game, slot: number): void {
 
 /** Atualiza o jogo com uma transição pura (`advanceGame`, `setUserTactic`...). */
 export function updateGame(change: (game: Game) => Game): void {
-  if (current) setGame(change(current))
+  if (!current) return
+  const next = change(current)
+  // Numa liga online o mundo é do servidor: uma mudança de `season` só vale por `perform` (comando validado). Preferências do técnico (favoritos, escalações guardadas) seguem locais.
+  if (current.online && next.season !== current.season) {
+    if (import.meta.env?.DEV) console.warn('Ação do jogo solo ignorada na liga online: use perform()')
+    // A tela avisa o técnico (App): esta ação ainda não existe na liga online.
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mm-online-blocked'))
+    return
+  }
+  setGame(next)
 }
 
 export const getGame = (): Game | null => current

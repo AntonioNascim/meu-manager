@@ -270,3 +270,36 @@
 - **Detalhe ao tocar** (condição de um jogador de outro clube, tática de outro clube): C3.
 - **Comandos do mercado** (compra, empréstimo, propostas, pré-contrato, pedir verba): C4, junto com a tela.
 - **Preferências** (`favorites`, `savedLineups`) e `seasonLog`/`coach` do técnico: C3.
+
+---
+
+## 10. C3 feita (07/11/2026): a liga online com as telas do jogo solo
+
+**Nada publicado.** Testado com o servidor local (`wrangler dev --local`, sem custo) e o navegador de verdade (Playwright): `tools/online-lab/c3-e2e.mjs` (todas as verificações passam). Capturas de 380 px em `.shots/`: `c3-online-*.png`, `c3-solo-*.png` e, lado a lado, `c3-lado-painel|elenco|treino|base|tatica|tabela.png` (o solo à esquerda, o online à direita; as telas são as mesmas, só mudam os dados).
+
+### 10.1 O que o técnico faz agora
+
+1. Na sala da liga em andamento, o botão **Abrir o jogo do clube** baixa o espelho (carga completa, ~1,1 MB) e abre o jogo com **as mesmas telas do jogo solo**: Painel, Elenco (Jogadores, Escalação, Números, Base, Treino), Tática, Tabela (classificação, rodadas, artilharia, assistências, cartões, copas, histórico, página dos times), Mercado e Finanças (leitura) e a partida (ainda a da C5).
+2. **O botão Avançar do Painel vira o cartão da liga**: próxima rodada no fuso do aparelho, **Pronto** e **Sala da liga** (ADM: Avançar, Pausar, ritmo; técnicos, convite). A sala abre dentro do jogo (`ScreenId` `league`), sem os cartões simples antigos de Meu clube e Copas (`inGame`).
+3. **Ações já ligadas ao servidor** (comando validado, resultado na hora no aparelho): tática e escalação (formação, estilo, mentalidade, posições no campo, trocas de titular, escalação guardada carregada), treino coletivo (intensidade e foco), treino individual (iniciar e cancelar), promover e dispensar jovens da base, preço do ingresso e divisão do orçamento (barra de salários e compras).
+4. **O servidor guarda**: sair do jogo e abrir de novo mostra o treino e a tática que foram escolhidos (verificado no teste de ponta a ponta).
+5. **Sem internet**: aviso vermelho no topo; o espelho continua legível e as ações ficam bloqueadas (verificado).
+6. **Ação ainda não disponível** (compras, empréstimos, propostas, pré-contrato, pedir verba, vender, renovar pela tela de Contratos; chegam na C4): o aviso "Esta ação ainda não está disponível na liga online" aparece em vez de o botão parecer quebrado. Até a C4 o Mercado da sala da liga continua fazendo essas coisas.
+
+### 10.2 Mudanças no código
+
+- `store/gameStore.ts`: **no jogo online `updateGame` ignora mudança de `season`** (só vale por `perform`); preferências do técnico (favoritos, escalações guardadas) mudam localmente.
+- `store/actions.ts`: `perform(comando)` (solo: aplica na hora; online: manda ao servidor). **10 pontos das telas** trocaram `updateGame(...)` por `perform(...)`: `Tactics`, `Lineup` (2), `Training` (3), `Academy` (2), `Budget`, `Sheets`. Mensagens de erro em `labels.ts` (`COMMAND_ERROR_LABELS`, `commandErrorText`).
+- `ui/App.tsx`: menu fecha o espelho (sem salvar no aparelho), aviso de sem conexão e de ação indisponível, tela da liga; `Dashboard.tsx`: cartão da liga; `LeagueRoomScreen.tsx`: botão de abrir o jogo; `main.tsx`: `window.__mm.getGame()` só em desenvolvimento (para o teste de ponta a ponta).
+- O solo não mudou: `soloUnchanged`, `matchGolden`, `saveParts` e os 1.394 testes do `npm test` passam (+3 de `onlineGameGuard`).
+
+### 10.3 O que a C3 deixou para depois
+
+| O quê | Quando |
+|---|---|
+| Detalhe ao tocar (condição física e moral reais de um jogador de outro clube; tática real de outro clube, hoje é a "escalação provável" da IA, como no solo) | C6 (acabamentos); no aparelho aparecem 100 e 70 |
+| Favoritos e escalações guardadas **por conta** (hoje valem só neste aparelho) | C6 |
+| Aba Carreira só com o histórico do técnico; `seasonLog` e `coach` vindos do servidor | C6 |
+| Guardar o espelho no aparelho (abrir sem baixar tudo; ler sem internet depois de fechar o app) | C6 |
+| Partida com campo 2D e narração, velocidade e intervalo | C5 |
+| Mercado completo com propostas e técnicos | C4 |

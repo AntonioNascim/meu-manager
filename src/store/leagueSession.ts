@@ -9,6 +9,7 @@ import { mirrorFetch, sendCommand } from '../online/leagueClient'
 import { LeagueMirror, type MirrorTransport } from './leagueMirror'
 import { leagueGame } from './leagueGame'
 import { setGame } from './gameStore'
+import { getAccount } from './onlineAccount'
 
 const randomBytes = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
 const deps = (): IdentityClientDeps => ({ base: ONLINE_CONFIG.apiBase, fetchFn: (...args) => fetch(...args), now: Date.now, randomBytes })
@@ -59,6 +60,13 @@ export async function openLeague(id: string, identity: Identity, transport: Mirr
     if (typeof document === 'undefined' || document.visibilityState !== 'hidden') void mirror?.sync()
   }, POLL_MS)
   return true
+}
+
+/** Abre o jogo da liga com a conta deste aparelho (a tela da sala usa isto). */
+export async function openLeagueGame(id: string): Promise<'ok' | 'no-account' | 'failed'> {
+  const account = getAccount().account
+  if (!account) return 'no-account'
+  return (await openLeague(id, account.identity)) ? 'ok' : 'failed'
 }
 
 export function closeLeague(): void {

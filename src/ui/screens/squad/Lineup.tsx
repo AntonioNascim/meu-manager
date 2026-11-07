@@ -3,24 +3,23 @@ import { ForeignNote } from '../../components/ForeignNote'
 import { FORMATION_IDS, formationOf } from '../../../engine/formations'
 import { shapeOf } from '../../../engine/grid'
 import { overallAt, playerOverall } from '../../../engine/overall'
-import { changeFormation, movePlayerTo, swapPlayers } from '../../../engine/tacticEdit'
+import { applySavedLineup, changeFormation, movePlayerTo, swapPlayers } from '../../../engine/tacticEdit'
 import type { GridPoint, Player, Position, Tactic } from '../../../engine/types'
 import {
   LINEUP_SLOTS,
   deleteUserLineup,
-  loadUserLineup,
   saveUserLineup,
-  setUserTactic,
   squadOf,
   userTeam,
 } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { getGame, updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { getLive } from '../../../store/liveMatch'
 import { StatusTags } from '../../components/PlayerDetail'
 import { playerName } from '../../format'
 import { GridPitch } from '../../components/GridPitch'
-import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, formationLabel } from '../../labels'
+import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, commandErrorText, formationLabel } from '../../labels'
 import { isUnavailable } from '../../squadSort'
 import { ConditionBar, ConditionStrip, Eyebrow, Flag, Jersey, MoodIcon, Panel, ValueBadge } from '../../theme'
 
@@ -108,6 +107,13 @@ function SavedLineups({ game }: { game: Game }) {
       setMessage(e instanceof Error ? e.message : 'Não foi possível fazer isso')
     }
   }
+  // Carregar uma escalação guardada muda a tática do time: vai por comando (no online, ao servidor).
+  const loadSlot = (slot: number) => {
+    const g = getGame() ?? game
+    const saved = g.savedLineups?.[slot]
+    if (!saved) return setMessage('Não há escalação guardada neste espaço')
+    void perform({ type: 'tactic', tactic: applySavedLineup(userTeam(g).tactic, squadOf(g, g.userTeamId), saved) }).then((out) => setMessage(out.ok ? `${saved.name} carregada.` : commandErrorText(out.error)))
+  }
   const name = (slot: number) => window.prompt('Nome da escalação:', slots[slot]?.name ?? `Escalação ${slot + 1}`)
 
   return (
@@ -123,7 +129,7 @@ function SavedLineups({ game }: { game: Game }) {
           <div key={i} className="flex min-h-[4.5rem] overflow-hidden rounded-xl border border-line bg-surface-2">
             {saved ? (
               <>
-                <button type="button" className="min-w-0 flex-1 px-2.5 py-2 text-left" onClick={() => attempt((g) => loadUserLineup(g, i), `${saved.name} carregada.`)}>
+                <button type="button" className="min-w-0 flex-1 px-2.5 py-2 text-left" onClick={() => loadSlot(i)}>
                   <span className="block truncate text-sm font-bold">{saved.name}</span>
                   <span className="block truncate text-[11px] text-muted">
                     {formationLabel(saved.formationId)} · {PLAY_STYLE_LABELS[saved.style]}
@@ -178,8 +184,8 @@ export function Lineup({ game }: { game: Game }) {
 
   const apply = (change: (t: Tactic) => Tactic) => {
     try {
-      updateGame((g) => setUserTactic(g, change(userTeam(g).tactic)))
-      setError(null)
+      const g = getGame() ?? game
+      void perform({ type: 'tactic', tactic: change(userTeam(g).tactic) }).then((out) => setError(out.ok ? null : commandErrorText(out.error)))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível aplicar a mudança')
     }

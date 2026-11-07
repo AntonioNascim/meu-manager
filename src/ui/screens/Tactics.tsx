@@ -8,9 +8,10 @@ import { overallAt, playerOverall } from '../../engine/overall'
 import { MAX_TAKERS, changeFormation, movePlayerTo, setCaptain, setTaker, swapPlayers } from '../../engine/tacticEdit'
 import type { SetPieceKind } from '../../engine/tacticEdit'
 import type { GridPoint, Mentality, Player, PlayStyle, Tactic } from '../../engine/types'
-import { setUserTactic, squadOf, userTeam } from '../../store/game'
+import { squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
-import { updateGame } from '../../store/gameStore'
+import { getGame } from '../../store/gameStore'
+import { perform } from '../../store/actions'
 import { bandFor, conditionBand } from '../colors'
 import { getLive } from '../../store/liveMatch'
 import { StatusTags } from '../components/PlayerDetail'
@@ -22,6 +23,7 @@ import {
   PLAY_STYLE_LABELS,
   POSITION_SHORT_LABELS,
   SET_PIECE_LABELS,
+  commandErrorText,
 } from '../labels'
 import { GridPitch } from '../components/GridPitch'
 
@@ -127,8 +129,8 @@ export function Tactics({ game }: { game: Game }) {
 
   const apply = (change: (t: Tactic) => Tactic) => {
     try {
-      updateGame((g) => setUserTactic(g, change(userTeam(g).tactic)))
-      setError(null)
+      const g = getGame() ?? game
+      void perform({ type: 'tactic', tactic: change(userTeam(g).tactic) }).then((out) => setError(out.ok ? null : commandErrorText(out.error)))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível aplicar a mudança')
     }

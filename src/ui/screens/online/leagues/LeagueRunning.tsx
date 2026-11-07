@@ -37,7 +37,7 @@ export function inLabel(ms: number): string {
  * Liga em andamento (B8.4): calendário no fuso do aparelho, "Pronto" de quem tem partida no próximo evento e, para o ADM, Avançar (com
  * confirmação), Pausar/Retomar, ritmo e sugestões de ausência. Consulta a sala a cada poucos segundos.
  */
-export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; onRefresh: () => void }) {
+export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; onRefresh: () => void; inGame?: boolean }) {
   const id = league.id
   const [body, setBody] = useState<LeagueStateBody | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -116,8 +116,9 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
           </Button>
         </Card>
       )}
-      {me && <ClubCard leagueId={id} />}
-      {me && <CupsCard leagueId={id} clubOf={clubOf} />}
+      {/* Dentro do jogo (Fase 6C) o clube, as copas e o resto são as telas do jogo solo; estes cartões simples só existem fora dele. */}
+      {me && !inGame && <ClubCard leagueId={id} />}
+      {me && !inGame && <CupsCard leagueId={id} clubOf={clubOf} />}
 
       <Card title="Quem está pronto">
         <ul className="flex flex-col gap-2" data-testid="ready-list">

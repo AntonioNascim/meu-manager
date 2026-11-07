@@ -8,7 +8,7 @@ import { initPwa } from '../pwa/pwa'
 import { installErrorLog } from './techInfo'
 import { startAutosave } from '../store/autosave'
 import { flushCloud, loadAccount } from '../store/onlineAccount'
-import { setGame } from '../store/gameStore'
+import { getGame, setGame } from '../store/gameStore'
 import { beginLive } from '../store/liveMatch'
 import { loadWorld } from '../data/package/defaultPackage'
 import { REAL_PACKAGE_ID, loadRealPackage } from '../data/package/realPackage'
@@ -39,6 +39,8 @@ function startOnline() {
 }
 
 if (import.meta.env.DEV) {
+  // Só para os testes de ponta a ponta no navegador (tools/online-lab): lê o jogo que as telas estão mostrando.
+  ;(window as unknown as { __mm: { getGame: typeof getGame } }).__mm = { getGame }
   const params = new URLSearchParams(window.location.search)
   const team = params.get('time')
   const startDev = (team: string, real?: Awaited<ReturnType<typeof loadRealPackage>>) => {
