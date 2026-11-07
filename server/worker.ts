@@ -25,6 +25,8 @@ import type { BuyerRow, MineBody, PreRow } from '../src/engine/league/sellmarket
 import { fileReport, parseReport, type ModerationDeps } from '../src/online/moderation'
 import { D1ModerationStore } from './moderationStore'
 import { serveAdmin } from './admin'
+import { D1ProblemStore } from './problemStore'
+import { submitProblem, PROBLEM_LIMITS } from '../src/online/problemApi'
 import type { AiOffersBody, MarketRow } from '../src/engine/league/aimarket'
 import type { CupsBody } from '../src/engine/league/cupsView'
 import { adminAction, changePace, clubDecision, clubState, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
@@ -403,6 +405,7 @@ async function serveCloud(req: Request, url: URL, env: Env, cors: Record<string,
   const deps: CloudApiDeps = { ...identityDeps(env, new RemoteGuard(env)), blobs: r2Blobs(env.SAVES), deleteIdentity: async (id) => {
       // Sai de todas as ligas antes (cada clube volta à IA; se era o ADM, o humano mais antigo assume).
       await leaveAllLeagues(leagueDeps(env, identityDeps(env, new RemoteGuard(env))), id)
+      await new D1ModerationStore(env.DB).forgetPlayer(id)
       await new D1IdentityStore(env.DB).delete(id)
     } }
   const result = await handleCloudRequest(
@@ -428,8 +431,16 @@ export default {
       const base = identityDeps(env, g)
       return { identities: base.store, leagues: new D1LeagueStore(env.DB), mod: new D1ModerationStore(env.DB), now: Date.now, randomId: () => crypto.randomUUID(), leaveAll: (id) => leaveAllLeagues(leagueDeps(env, base), id) }
     }
-    const admin = await serveAdmin(req, url, env, new RemoteGuard(env), adminDeps)
+    const problemStore = () => new D1ProblemStore(env.DB, env.SAVES as never)
+    const admin = await serveAdmin(req, url, env, new RemoteGuard(env), adminDeps, problemStore())
     if (admin) return admin
+    // Relatar problema (teste fechado): anônimo, só por IP, corpo com teto próprio (a imagem vai junto em base64).
+    if (url.pathname === '/api/problem' && req.method === 'POST') {
+      const raw = await readCapped(req, PROBLEM_LIMITS.bodyBytes)
+      if (!raw) return Response.json({ error: 'too-large' }, { status: 413, headers: cors })
+      const out = await submitProblem({ store: problemStore(), limiter: new RemoteGuard(env), now: Date.now, randomId: () => crypto.randomUUID() }, req.headers.get('CF-Connecting-IP') ?? 'unknown', new TextDecoder().decode(raw))
+      return Response.json(out.body, { status: out.status, headers: { ...cors, ...(out.status === 429 && out.body.retryAfterMs ? { 'Retry-After': String(Math.ceil(out.body.retryAfterMs / 1000)) } : {}) } })
+    }
     if (!env.TURNSTILE_SECRET) return Response.json({ error: 'not-configured' }, { status: 503, headers: cors })
 
     if (isCloudPath(url.pathname)) return serveCloud(req, url, env, cors)

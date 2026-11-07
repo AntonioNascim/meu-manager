@@ -113,6 +113,19 @@ describe('moderação (B9)', () => {
     }
   })
 
+  it('retenção: denúncia decidida some em 90 dias e apagar a conta apaga as denúncias dela (o banimento fica)', async () => {
+    const { deps, mod } = await world()
+    for (const who of ['p-ana', 'p-bia', 'p-cris']) await fileReport(deps, who, { kind: 'nickname', target: 'p-edu', reason: 'offensive' })
+    await fileReport(deps, 'p-dani', { kind: 'nickname', target: 'p-ana', reason: 'spam' })
+    await mod.ban({ playerId: 'p-edu', reason: 'x', bannedAt: T0 })
+    expect(await mod.purgeDecided(T0 + 1)).toBe(3)
+    expect((await mod.counts()).openReports).toBe(1)
+    await mod.forgetPlayer('p-ana')
+    expect((await mod.counts()).openReports).toBe(0)
+    await mod.forgetPlayer('p-edu')
+    expect(mod.bans.has('p-edu')).toBe(true)
+  })
+
   it('o filtro de apelidos pega os acrescimos de moderacao', () => {
     for (const bad of ['Bundão', 'bundao', 'Escroto FC']) expect(checkName(bad).ok).toBe(false)
     expect(checkName('Bundesliga Fã').ok).toBe(true)

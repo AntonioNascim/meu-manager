@@ -1,4 +1,5 @@
 import { ReportSheet } from './ReportSheet'
+import { ReportProblem } from '../../../components/ReportProblem'
 import { useCallback, useEffect, useState } from 'react'
 import type { LeagueDetail } from '../../../../online/leagueApi'
 import type { AdminAction } from '../../../../online/leagueApi'
@@ -18,6 +19,7 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
   const [missing, setMissing] = useState(false)
   const [picking, setPicking] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [problem, setProblem] = useState(false)
   const [reporting, setReporting] = useState<{ kind: 'nickname' | 'league'; target: string; title: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -214,6 +216,11 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
           Denunciar esta liga
         </button>
       )}
+
+      <button type="button" className="min-h-12 rounded-xl text-sm text-muted underline" onClick={() => setProblem(true)} data-testid="report-problem">
+        Relatar problema
+      </button>
+      {problem && <ReportProblem context={{ screen: 'sala da liga', mode: 'online', worldSource: league.world.source, phase: league.status, leagueId: league.id }} onClose={() => setProblem(false)} />}
 
       {reporting && <ReportSheet kind={reporting.kind} target={reporting.target} title={reporting.title} onClose={() => setReporting(null)} />}
 

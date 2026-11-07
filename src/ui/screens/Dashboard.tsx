@@ -25,6 +25,7 @@ import {
 import type { Game } from '../../store/game'
 import { runHeavy } from '../../store/heavy'
 import { Card } from '../components/ui'
+import { ReportProblem } from '../components/ReportProblem'
 import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
 import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS } from '../labels'
@@ -134,6 +135,7 @@ function LastMatchCard({ game, match }: { game: Game; match: Match }) {
 /** Painel principal (aba Clube): situação do time, próximo jogo e o botão de avançar, atalhos, diretoria e orçamento. */
 export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId, tab?: string) => void }) {
   const [opponentOpen, setOpponentOpen] = useState(() => devFlag('oponente'))
+  const [reporting, setReporting] = useState(false)
   const team = userTeam(game)
   const competition = userCompetition(game)
   const table = standingsOf(game, competition)
@@ -357,6 +359,11 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
           </div>
         </div>
       </Panel>
+
+      <button type="button" className="min-h-12 w-full rounded-xl text-sm text-muted underline" onClick={() => setReporting(true)} data-testid="report-problem">
+        Relatar problema
+      </button>
+      {reporting && <ReportProblem context={{ screen: 'clube', mode: 'solo', worldSource: game.dataPackage?.id.split(':')[1] ?? 'ficticio', season: String(game.season.season.year), phase: game.season.season.phase }} onClose={() => setReporting(false)} />}
     </div>
   )
 }

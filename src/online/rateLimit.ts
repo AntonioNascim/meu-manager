@@ -34,6 +34,8 @@ export const RATE_LIMITS = {
   // Denunciar (B9): por identidade, o suficiente para um dia ruim sem virar arma contra os outros; por IP, folgado para o CGNAT.
   report: [{ limit: 10, windowMs: HOUR }, { limit: 30, windowMs: DAY }],
   reportIp: [{ limit: 300, windowMs: DAY }],
+  // Relatar problema (teste fechado): sem conta, só por IP; folgado para um grupo de amigos na mesma casa ou operadora.
+  problemIp: [{ limit: 6, windowMs: HOUR }, { limit: 20, windowMs: DAY }],
   // Painel de moderação (B9): quem tenta adivinhar o segredo esbarra aqui.
   adminIp: [{ limit: 30, windowMs: MINUTE }],
 } as const satisfies Record<string, readonly LimitRule[]>

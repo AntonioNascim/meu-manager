@@ -19,6 +19,18 @@ const SECTIONS: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: 'Denúncias e moderação',
+    body: [
+      'Quando você denuncia um apelido, uma liga ou uma transferência, guardamos quem denunciou, o alvo, o motivo (de uma lista) e a data. Três pessoas diferentes tiram o apelido ou escondem a liga até um moderador olhar. Denúncias decididas somem em 90 dias, e apagar a sua conta apaga as denúncias feitas por você ou contra você. Quem é banido fica com a chave bloqueada, e esse bloqueio permanece mesmo se a conta for apagada.',
+    ],
+  },
+  {
+    title: 'Relatar problema',
+    body: [
+      'O botão "Relatar problema" envia, de forma anônima (sem conta e sem gravar o seu IP), a descrição que você escrever, uma imagem de tela se você quiser e as informações técnicas que o próprio jogo mostra antes do envio (versão, tela, tipo de navegador e de aparelho). Não escreva dados pessoais. Os relatos ficam por 90 dias e só os moderadores veem.',
+    ],
+  },
+  {
     title: 'Sem internet',
     body: ['A carreira solo funciona sem internet e os jogos ficam no seu aparelho. Só as ligas online e a cópia na nuvem precisam de conexão.'],
   },

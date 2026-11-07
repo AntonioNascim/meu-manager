@@ -46,6 +46,15 @@ export class D1ModerationStore implements ModerationStore {
     return res.meta.changes === 1
   }
 
+  async purgeDecided(before: number): Promise<number> {
+    const res = await this.db.prepare("DELETE FROM reports WHERE status != 'open' AND created_at < ?").bind(before).run()
+    return res.meta.changes
+  }
+
+  async forgetPlayer(playerId: string): Promise<void> {
+    await this.db.prepare("DELETE FROM reports WHERE reporter = ? OR (kind = 'nickname' AND target = ?)").bind(playerId, playerId).run()
+  }
+
   async listBans(limit: number): Promise<BanRow[]> {
     const res = await this.db.prepare('SELECT player_id, reason, banned_at FROM bans ORDER BY banned_at DESC LIMIT ?').bind(limit).all<{ player_id: string; reason: string; banned_at: number }>()
     return res.results.map((r) => ({ playerId: r.player_id, reason: r.reason, bannedAt: r.banned_at }))

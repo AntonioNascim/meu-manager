@@ -984,3 +984,18 @@ Tudo dentro do que o plano de US$ 5 já inclui, exceto o armazenamento acima de 
 **Limpeza.** Worker de laboratório apagado (`wrangler delete`, o que remove o armazenamento dos objetos), a `LAB_KEY` descartada (nunca esteve no repositório), nada de teste no D1 nem no R2.
 
 **Falta da B9:** teste fechado com 50 a 100 pessoas (custo real e limites) e a revisão de LGPD do aviso de privacidade.
+
+
+## 34. Preparação do teste fechado e da revisão de LGPD (06/11/2026; código pronto, nada publicado)
+
+**Relatar problema** (`src/online/problemApi.ts`, `src/ui/techInfo.ts`, `src/ui/components/ReportProblem.tsx`; botão no menu inicial, no painel do clube e na sala da liga). Anônimo: sem conta e sem IP gravado. Categoria, descrição (até 1.000 caracteres), imagem opcional (reduzida no aparelho, JPEG de até ~150 KB, conferida no servidor pelos primeiros bytes) e informações técnicas de uma **lista fechada** (versão, tela, família do navegador e do sistema, tamanho de tela, últimas mensagens de erro sem endereços...) que a tela mostra antes do envio e a pessoa pode desmarcar; o identificador da liga só entra se ela marcar. Servidor: `POST /api/problem` (6 por hora e 20 por dia por IP, teto de 300 por dia no servidor, corpo de 300 KB), D1 `problem_reports` (migração `0004_problems.sql`) e imagem no R2 privado `problems/<id>.jpg`; retenção de **90 dias** (limpeza ao abrir o painel).
+
+**Painel de uso e custo** (`/admin`): ativos em 24 h, 7 e 30 dias, ligas rodando e técnicos nelas, contas, ligas e relatos novos por dia, estimativa do mês pelo modelo da B9 (`estimateMonth`) e a lista de problemas (abrir com imagem e dados técnicos, resolver, apagar). A conta de verdade continua sendo o painel de cobrança do Cloudflare (roteiro e alertas em `docs/teste-fechado.md`).
+
+**Retenção de denúncias** (achada na revisão para o LGPD): denúncia decidida some em 90 dias e "apagar minha conta" apaga as denúncias feitas por ou contra a pessoa (o banimento fica). O aviso de privacidade ganhou as seções "Denúncias e moderação" e "Relatar problema".
+
+**Documentos:** `docs/teste-fechado.md` (convite para o WhatsApp com o endereço `?online=1`, roteiro de teste, como ler relatos, como acompanhar uso e custo, alertas, lista antes de convidar) e `docs/lgpd-para-revisor.md` (todos os dados no aparelho e no servidor, onde, para quê, quanto tempo, como ver e apagar; lacunas marcadas como NÃO IMPLEMENTADO; perguntas ao revisor; **menores de idade: opções A a E com o que cada uma muda no jogo e a recomendação "A agora, B depois"**). Lacunas que o documento declara: limpeza de contas e saves por 12 meses sem uso (desligada), arquivar ou apagar ligas inativas e registros de ligas fechadas, exportação sem ligas e denúncias, nenhum canal de contato nem encarregado, nenhum termo de uso, chave e código sem criptografia no aparelho.
+
+**Testes:** `tests/onlineProblem.test.ts` (6), `tests/onlineModeration.test.ts` (7, com a retenção), ponta a ponta `tools/online-lab/b9-problem-e2e.mjs` (formulário com imagem, informações técnicas visíveis, envio, painel com imagem, resolver, limites; capturas `.shots/b9-problem-*.png`). Suíte rápida: 1357 testes passando.
+
+**Publicação (pendente, precisa do seu OK):** migração `0004` no D1 remoto, `wrangler deploy` do Worker e o site no GitHub Pages (as telas novas e o aviso de privacidade são do site).

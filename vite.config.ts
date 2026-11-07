@@ -7,6 +7,7 @@ import { pwaPlugin } from './tools/pwaPlugin.ts'
 export default defineConfig({
   // Caminhos relativos: o app funciona em qualquer pasta/endereço (e o service worker usa o escopo de onde está).
   base: './',
+  define: { __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 10)) },
   plugins: [react(), tailwindcss(), pwaPlugin()],
   test: {
     environment: 'node',

@@ -10,6 +10,8 @@ import type { IdentityStore } from './identityApi'
 import type { LeagueStore } from './leagueApi'
 
 export const REPORTS_TO_ACT = 3
+/** Denúncia decidida some depois disto. */
+export const DECIDED_REPORT_RETENTION_MS = 90 * 24 * 3_600_000
 export const REPORT_REASONS = ['offensive', 'impersonation', 'spam', 'other'] as const
 export type ReportReason = (typeof REPORT_REASONS)[number]
 export type ReportKind = 'nickname' | 'league'
@@ -42,6 +44,10 @@ export interface ModerationStore {
   ban(row: BanRow): Promise<void>
   unban(playerId: string): Promise<boolean>
   listBans(limit: number): Promise<BanRow[]>
+  /** Apaga denúncias já decididas (atendidas ou dispensadas) anteriores a `before`; devolve quantas. */
+  purgeDecided(before: number): Promise<number>
+  /** "Apagar minha conta": some toda denúncia feita por ou contra esta identidade. O banimento fica (impede voltar com a mesma chave). */
+  forgetPlayer(playerId: string): Promise<void>
   /** Números do painel. */
   counts(): Promise<{ openReports: number; bans: number }>
 }
@@ -220,6 +226,14 @@ export class MemoryModerationStore implements ModerationStore {
   }
   async unban(playerId: string) {
     return this.bans.delete(playerId)
+  }
+  async purgeDecided(before: number) {
+    const n = this.reports.length
+    this.reports = this.reports.filter((r) => r.status === 'open' || r.createdAt >= before)
+    return n - this.reports.length
+  }
+  async forgetPlayer(playerId: string) {
+    this.reports = this.reports.filter((r) => !(r.kind === 'nickname' && r.target === playerId) && r.reporter !== playerId)
   }
   async listBans(limit: number) {
     return [...this.bans.values()].slice(-limit).reverse()

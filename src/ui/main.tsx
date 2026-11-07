@@ -5,6 +5,7 @@ import { App } from './App'
 import { simulateToSeasonEnd } from '../engine/season'
 import { advanceGame, createGame, playPendingAuto, startNextSeason, setUserTrainingPlan, squadOf, startUserIndividualTraining } from '../store/game'
 import { initPwa } from '../pwa/pwa'
+import { installErrorLog } from './techInfo'
 import { startAutosave } from '../store/autosave'
 import { flushCloud, loadAccount } from '../store/onlineAccount'
 import { setGame } from '../store/gameStore'
@@ -100,6 +101,7 @@ if (diagnostic) {
   })
 } else {
   startAutosave()
+  installErrorLog()
   initPwa()
   startOnline()
   createRoot(document.getElementById('root')!).render(

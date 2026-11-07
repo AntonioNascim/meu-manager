@@ -14,6 +14,7 @@ import { downloadText } from '../download'
 import { ImportPackage } from './ImportPackage'
 import type { ChosenPackage } from './ImportPackage'
 import { Credits } from './Credits'
+import { ReportProblem } from '../components/ReportProblem'
 import { NewGame } from './NewGame'
 import { Editor } from './editor/Editor'
 import { OnlineArea } from './online/OnlineArea'
@@ -33,6 +34,7 @@ const inviteFromUrl = (): string | undefined => (typeof window === 'undefined' |
 /** Tela inicial: continuar o último save, começar um jogo novo ou carregar/excluir um dos 3 espaços. */
 export function Start() {
   // Em desenvolvimento, /?editor=zero|padrao|15|21 abre o editor direto (&aba=leagues|clubs|players|cups|sheets|issues); /?menu=novo|creditos abre essas telas.
+  const [reporting, setReporting] = useState(false)
   const [view, setView] = useState<View>(() => {
     if (inviteFromUrl()) return 'online'
     if (!import.meta.env.DEV || typeof window === 'undefined') return 'menu'
@@ -222,6 +224,10 @@ export function Start() {
           <Button className="w-full" variant="secondary" onClick={() => setView('credits')}>
             Créditos e avisos
           </Button>
+          <Button className="w-full" variant="secondary" onClick={() => setReporting(true)} data-testid="report-problem">
+            Relatar problema
+          </Button>
+          {reporting && <ReportProblem context={{ screen: 'menu', mode: account ? 'online' : 'solo', saveSlots: slots?.filter(Boolean).length ?? 0 }} onClose={() => setReporting(false)} />}
         </div>
       )}
 

@@ -15,6 +15,8 @@ table{width:100%;border-collapse:collapse} td,th{padding:6px 8px;border-bottom:1
 <div class="row"><input id="token" type="password" placeholder="Segredo do painel" size="34" autocomplete="off"><button id="enter">Entrar</button><span id="msg" class="muted"></span></div>
 <div id="app" hidden>
 <div class="cards" id="cards"></div>
+<h2>Uso e custo do teste</h2><div class="cards" id="usage"></div><p class="muted" id="usageNote"></p><table id="days"></table>
+<h2>Problemas relatados</h2><div class="row"><select id="pstatus"><option value="open">Abertos</option><option value="done">Resolvidos</option></select></div><table id="problems"></table><div id="pdetail"></div>
 <h2>Denúncias abertas</h2><table id="reports"></table>
 <h2>Ligas escondidas</h2><table id="hidden"></table>
 <h2>Banidos</h2><table id="bans"></table>
@@ -35,6 +37,7 @@ async function api(path, body) {
 const cell = (tr, text, tag) => { const c = document.createElement(tag || 'td'); c.textContent = text; tr.appendChild(c); return c }
 const btn = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; return b }
 const REASON = { offensive: 'ofensivo', impersonation: 'finge ser outro', spam: 'propaganda', other: 'outro' }
+const CAT = { bug: 'erro ou travou', match: 'partida', online: 'online', idea: 'sugestão', other: 'outro' }
 const when = (ms) => new Date(ms).toLocaleString('pt-BR')
 async function act(body) { try { await api('action', body); say('Feito.'); await load() } catch (e) { say(e.message, true) } }
 function fill(table, head, rows) {
@@ -48,6 +51,21 @@ async function load() {
   for (const [k, v] of [['Contas', o.identities], ['Ligas abertas', (o.leagues.lobby || 0) + (o.leagues.running || 0)], ['Técnicos em ligas', o.members], ['Denúncias abertas', o.openReports], ['Ligas escondidas', o.hiddenLeagues], ['Banidos', o.bans]]) {
     const d = document.createElement('div'); d.className = 'card'; const s = document.createElement('span'); s.textContent = k; s.className = 'muted'; const b = document.createElement('b'); b.textContent = String(v); d.append(s, b); $('cards').appendChild(d)
   }
+  const u = await api('usage')
+  $('usage').replaceChildren()
+  for (const [k, v] of [['Ativos em 24 h', u.active.day], ['Ativos em 7 dias', u.active.week], ['Ativos em 30 dias', u.active.month], ['Ligas rodando', u.leaguesRunning], ['Técnicos nelas', u.humansInRunningLeagues], ['Problemas abertos', u.openProblems], ['Custo estimado do mês (US$)', u.estimate.usd.toFixed(2)], ['Pedidos estimados/mês', u.estimate.requests.toLocaleString('pt-BR')], ['GB-s estimados/mês', u.estimate.gbSeconds.toLocaleString('pt-BR')]]) {
+    const d = document.createElement('div'); d.className = 'card'; const s = document.createElement('span'); s.textContent = k; s.className = 'muted'; const b = document.createElement('b'); b.textContent = String(v); d.append(s, b); $('usage').appendChild(d)
+  }
+  $('usageNote').textContent = 'A estimativa vem do modelo da B9 (ligas rodando e técnicos nelas); a conta de verdade está em Cloudflare › Faturamento › Uso. O plano de US$ 5 já inclui 1 M de pedidos de objeto, 400 mil GB-s e 50 M de linhas por mês.'
+  const days = {}
+  for (const [name, list] of [['Contas novas', u.newAccounts], ['Ligas novas', u.newLeagues], ['Relatos', u.newProblems]]) for (const x of list) (days[x.day] = days[x.day] || {})[name] = x.n
+  const dk = Object.keys(days).sort().reverse()
+  fill($('days'), ['Dia', 'Contas novas', 'Ligas novas', 'Relatos'], dk.map((d) => (tr) => { cell(tr, d); cell(tr, String(days[d]['Contas novas'] || 0)); cell(tr, String(days[d]['Ligas novas'] || 0)); cell(tr, String(days[d]['Relatos'] || 0)) }))
+  const pr = await api('problems?status=' + $('pstatus').value)
+  fill($('problems'), ['Quando', 'Tipo', 'Texto', ''], pr.problems.map((p) => (tr) => {
+    cell(tr, when(p.createdAt)); cell(tr, (CAT[p.category] || p.category) + (p.hasImage ? ' · imagem' : '')); cell(tr, p.text)
+    cell(tr, '').appendChild(btn('Abrir', '', async () => { try { showProblem(await api('problem?id=' + encodeURIComponent(p.id))) } catch (e) { say(e.message, true) } }))
+  }))
   const r = await api('reports?status=open')
   fill($('reports'), ['Alvo', 'Pessoas', 'Motivos', 'Última', ''], r.groups.map((g) => (tr) => {
     const t = cell(tr, (g.kind === 'nickname' ? 'Apelido: ' : 'Liga: ') + g.label); const code = document.createElement('code'); code.textContent = ' ' + g.target; t.appendChild(code)
@@ -67,6 +85,19 @@ async function load() {
     cell(tr, '').appendChild(btn('Desbanir', 'ok', () => act({ type: 'unban', playerId: x.playerId })))
   }))
 }
+function showProblem(p) {
+  const box = $('pdetail'); box.replaceChildren()
+  const card = document.createElement('div'); card.className = 'card'
+  const h = document.createElement('b'); h.textContent = (CAT[p.category] || p.category) + ' · ' + when(p.createdAt); card.appendChild(h)
+  const t = document.createElement('p'); t.textContent = p.text; t.style.whiteSpace = 'pre-wrap'; card.appendChild(t)
+  const tech = document.createElement('pre'); tech.textContent = Object.entries(p.tech).map(([k, v]) => k + ': ' + v).join('\\n'); tech.className = 'muted'; tech.style.fontSize = '12px'; tech.style.whiteSpace = 'pre-wrap'; card.appendChild(tech)
+  if (p.image) { const im = document.createElement('img'); im.src = p.image; im.style.maxWidth = '100%'; im.style.borderRadius = '8px'; card.appendChild(im) }
+  const row = document.createElement('div'); row.className = 'row'
+  row.appendChild(btn(p.status === 'open' ? 'Marcar como resolvido' : 'Reabrir', 'ok', () => act({ type: 'problem-status', id: p.id, status: p.status === 'open' ? 'done' : 'open' })))
+  row.appendChild(btn('Apagar', 'danger', () => { if (confirm('Apagar este relato?')) act({ type: 'problem-delete', id: p.id }) }))
+  card.appendChild(row); box.appendChild(card); box.scrollIntoView()
+}
+$('pstatus').onchange = () => load().catch((e) => say(e.message, true))
 async function enter() { try { sessionStorage.setItem('mm-admin', tokenBox.value); await load(); $('app').hidden = false; say('') } catch (e) { say(e.message, true); $('app').hidden = true } }
 $('enter').onclick = enter
 document.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => {
