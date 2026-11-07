@@ -43,7 +43,7 @@ if (mode === 'cloud') {
   const bad = await fetch(base + '/api/identity', { method: 'OPTIONS', headers: { Origin: 'https://exemplo.com', 'Access-Control-Request-Method': 'POST' } })
   check('CORS não libera outro site', bad.headers.get('access-control-allow-origin') === null)
 } else {
-  const created = await call(a, 'POST', '/api/identity', { turnstileToken: token, nickname: ' Mister  Pedro ' })
+  const created = await call(a, 'POST', '/api/identity', { turnstileToken: token, nickname: ' Mister  Pedro ', ageBand: '18+' })
   check('cria a identidade (201) com o apelido limpo', created.status === 201 && created.json.nickname === 'Mister Pedro' && created.json.playerId === a.playerId, `${created.status} ${JSON.stringify(created.json)}`)
 
   const replay = await fetch(base + '/api/identity', { method: 'POST', body: created.text, headers: { Authorization: created.authorization! } })
@@ -56,7 +56,7 @@ if (mode === 'cloud') {
   check('registrar de novo reconhece a identidade (200, created=false)', again.status === 200 && again.json.created === false, `${again.status} ${JSON.stringify(again.json)}`)
 
   const b = createIdentity(random).identity
-  const bad = await call(b, 'POST', '/api/identity', { turnstileToken: token, nickname: 'Admin' })
+  const bad = await call(b, 'POST', '/api/identity', { turnstileToken: token, nickname: 'Admin', ageBand: '18+' })
   check('apelido proibido (400)', bad.status === 400 && bad.json.issue === 'impersonal', `${bad.status} ${JSON.stringify(bad.json)}`)
 
   const extra = await call(b, 'POST', '/api/identity', { turnstileToken: token, admin: true })

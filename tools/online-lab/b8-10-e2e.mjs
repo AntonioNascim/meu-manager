@@ -162,8 +162,13 @@ check('o jogo dele fica parado enquanto espera a escolha', (await minuteOf()) ==
 check('a contagem de 45 s aparece', /entra o melhor reserva em \d+ s/.test(await h.getByTestId('live-injury-left').innerText()))
 const bench = h.getByTestId('live-bench').locator('button')
 check('o banco aparece para escolher', (await bench.count()) > 0, `${await bench.count()} reservas`)
+const injuryBefore = (await h.getByTestId('live-injury').innerText()).trim().split(String.fromCharCode(10))[0]
 await bench.first().click()
-await h.getByTestId('live-injury').waitFor({ state: 'detached', timeout: 20000 })
+// Com a taxa de lesão do teste (artificialmente alta) outro jogador pode se machucar logo depois da troca: vale o aviso sumir OU trocar de jogador.
+await waitFor(h, (before) => { const el = document.querySelector('[data-testid=live-injury]'); return !el || !(el.textContent ?? '').trim().startsWith(before) }, injuryBefore.slice(0, 20), 20000).catch(async (e) => {
+  console.log('  [a lesão não foi resolvida] antes:', injuryBefore, '| nota:', (await h.getByTestId('live-note').innerText().catch(() => '(sem nota)')).trim())
+  throw e
+})
 check('depois da escolha o aviso some e o reserva entra', true)
 await waitFor(h, (t) => document.querySelector('[data-testid=live-minute]')?.textContent !== t, stopped, 20000)
 check('o jogo volta a andar', true, `${stopped} → ${await minuteOf()}`)

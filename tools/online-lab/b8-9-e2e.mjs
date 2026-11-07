@@ -105,23 +105,26 @@ for (let i = count - 1; i >= 0 && !resolved; i--) {
   await a.getByTestId('buyer-select').waitFor()
   await a.waitForFunction(() => !document.querySelector('[data-testid=buyer-select]')?.textContent?.includes('Procurando'), undefined, { timeout: 20000 })
   const options = await a.getByTestId('buyer-select').locator('option').count()
-  if (options > 1) {
-    await a.getByTestId('buyer-select').selectOption({ index: 1 })
-    await shoot(a, '04-vender-a-clube-da-ia')
+  // Tenta vários compradores do mesmo jogador (a recusa depende do par jogador x clube) e para no primeiro que aceita.
+  for (let k = 1; k < Math.min(options, 7) && !resolved; k++) {
+    await a.getByTestId('buyer-select').selectOption({ index: k })
+    if (k === 1) await shoot(a, '04-vender-a-clube-da-ia')
     await a.getByTestId('confirm-sell').click()
-    await sleep(2000)
+    await a.waitForFunction(() => !document.querySelector('[data-testid=confirm-sell]') || document.querySelector('[data-testid=sale-refused]'), undefined, { timeout: 8000 }).catch(() => {})
     if ((await a.getByTestId('confirm-sell').count()) === 0) {
       accepted = true
       resolved = true
     } else if ((await a.getByTestId('sale-refused').count()) > 0) {
       const why = await a.getByTestId('sale-refused').innerText()
       console.log('  [clube recusou]', why)
-      if (!accepted) await shoot(a, '05-venda-recusada')
+      if (!accepted && k === 1) await shoot(a, '05-venda-recusada')
       check('a recusa mostra o motivo na própria janela', why.length > 10)
-      await a.getByRole('button', { name: /Fechar|×/ }).first().click().catch(() => a.keyboard.press('Escape'))
     }
-  } else await a.keyboard.press('Escape')
-  await sleep(500)
+  }
+  if (!resolved) {
+    await a.getByRole('button', { name: /Fechar|×/ }).first().click().catch(() => a.keyboard.press('Escape'))
+  }
+  await sleep(300)
   if ((await a.getByTestId('buyer-select').count()) > 0) await a.keyboard.press('Escape')
 }
 console.log(`  (venda direta: ${accepted ? 'aceita' : 'sem aceite nos jogadores tentados'})`)
