@@ -479,7 +479,7 @@ export default {
     if (url.pathname === '/api/me' && req.method === 'GET') {
       const auth = await requireIdentity(request, 'read', deps)
       if (!auth.ok) return respond(auth.result, cors)
-      return Response.json({ playerId: auth.record.playerId, nickname: auth.record.nickname ?? null, createdAt: auth.record.createdAt }, { headers: cors })
+      return Response.json({ playerId: auth.record.playerId, nickname: auth.record.nickname ?? null, ageBand: auth.record.ageBand ?? null, createdAt: auth.record.createdAt }, { headers: cors })
     }
     if (url.pathname === '/api/report' && req.method === 'POST') {
       const auth = await requireIdentity(request, 'report', deps, 'reportIp')

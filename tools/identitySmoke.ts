@@ -30,7 +30,7 @@ if (mode === 'real' && !process.env.TURNSTILE_TOKEN) throw new Error('Falta TURN
 const a = createIdentity(random).identity
 
 if (mode === 'cloud') {
-  const r = await call(a, 'POST', '/api/identity', { turnstileToken: token })
+  const r = await call(a, 'POST', '/api/identity', { turnstileToken: token, ageBand: '18+' })
   check('desafio de mentira é reprovado (403, falha fechada)', r.status === 403 && r.json.error === 'turnstile-failed', `${r.status} ${JSON.stringify(r.json)}`)
   const none = await call(undefined, 'GET', '/api/me', undefined)
   check('pedido sem assinatura é recusado (401)', none.status === 401, String(none.status))
@@ -52,7 +52,7 @@ if (mode === 'cloud') {
   const me = await call(a, 'GET', '/api/me', undefined)
   check('/api/me devolve a identidade', me.status === 200 && me.json.playerId === a.playerId && me.json.nickname === 'Mister Pedro', `${me.status} ${JSON.stringify(me.json)}`)
 
-  const again = await call(a, 'POST', '/api/identity', { turnstileToken: token })
+  const again = await call(a, 'POST', '/api/identity', { turnstileToken: token, ageBand: '18+' })
   check('registrar de novo reconhece a identidade (200, created=false)', again.status === 200 && again.json.created === false, `${again.status} ${JSON.stringify(again.json)}`)
 
   const b = createIdentity(random).identity
@@ -72,7 +72,7 @@ if (mode === 'cloud') {
   // Toda tentativa deste IP conta (as recusadas também): continue até bater no teto de 30 por dia.
   let blocked: { status: number; json: Record<string, unknown> } | undefined
   for (let i = 0; i < 40 && !blocked; i++) {
-    const r = await call(createIdentity(random).identity, 'POST', '/api/identity', { turnstileToken: token })
+    const r = await call(createIdentity(random).identity, 'POST', '/api/identity', { turnstileToken: token, ageBand: '18+' })
     if (r.status === 429) blocked = r
   }
   check('o limite de criações por IP bloqueia (429, com tempo de espera)', !!blocked && typeof blocked.json.retryAfterMs === 'number', JSON.stringify(blocked?.json))

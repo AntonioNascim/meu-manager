@@ -1,20 +1,23 @@
+import { FULL_ACCESS_AGE, ONLINE_MIN_AGE } from '../../../online/agePolicy'
 import { Button } from '../../components/ui'
 
 /** Versão do texto: se mudar, o aviso novo deve ser mostrado de novo antes de a pessoa continuar (seção 7.2 da proposta). */
-export const PRIVACY_VERSION = '2026-11-06'
+export const PRIVACY_VERSION = '2026-11-07'
 
+// ATENÇÃO (LGPD): `FULL_ACCESS_AGE` (16) e o modo protegido de 12 a 15 anos são uma DECISÃO A CONFIRMAR com o revisor de LGPD antes do lançamento
+// (`docs/lgpd-para-revisor.md`, seção 9.4). Se ele pedir 18, troque só `FULL_ACCESS_AGE` em `src/online/agePolicy.ts`: este texto acompanha.
 const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'O que guardamos',
     body: [
-      'Para você jogar online guardamos um identificador anônimo do seu aparelho (uma chave pública), o apelido que você escolher e a data em que a conta foi criada e usada pela última vez.',
+      'Para você jogar online guardamos um identificador anônimo do seu aparelho (uma chave pública), o apelido que você escolher e a data em que a conta foi criada e usada pela última vez e a sua faixa de idade (só a faixa que você marcou ao criar a conta, nunca a data de nascimento).',
       'Guardamos também as ligas de que você participa: o clube, a escalação, as propostas e transferências, os resultados e as denúncias feitas nelas. Se você ligar a opção "Guardar na nuvem", guardamos os seus jogos salvos da carreira solo. Nada disso está ligado ao seu nome.',
     ],
   },
   {
     title: 'O que não guardamos',
     body: [
-      'Não pedimos e-mail, senha, nome real, telefone, localização nem contatos. Não usamos anúncios nem rastreadores de terceiros. Não há chat no jogo.',
+      'Não pedimos e-mail, senha, nome real, data de nascimento, telefone, localização nem contatos. Não usamos anúncios nem rastreadores de terceiros. Não há chat no jogo.',
       'O seu endereço de IP não fica guardado em conta nenhuma: ele só serve, durante o pedido, para limitar abuso (por exemplo, quantas contas novas saem do mesmo lugar), e esses contadores temporários são apagados em até 24 horas.',
     ],
   },
@@ -64,8 +67,12 @@ const SECTIONS: { title: string; body: string[] }[] = [
     body: ['Os dados ficam em servidores do Cloudflare, que também mantém registros técnicos de tráfego. Ao criar a conta usamos a verificação anti-robô do Cloudflare (Turnstile). O jogo é independente e gratuito, sem ligação com clubes, federações ou campeonatos reais.'],
   },
   {
-    title: 'Crianças',
-    body: ['O jogo não pede idade nem dados pessoais. Pais e responsáveis podem apagar a conta pelo mesmo botão.'],
+    title: 'Crianças e adolescentes',
+    body: [
+      `A carreira solo é livre para todas as idades e não usa conta. O modo online é para quem tem ${ONLINE_MIN_AGE} anos ou mais: ao criar a conta você marca só a faixa de idade.`,
+      `De ${ONLINE_MIN_AGE} a ${FULL_ACCESS_AGE - 1} anos a conta é protegida: o jogo dá o apelido (como "Técnico 4821"), só valem ligas de amigos entrando por convite, sem ligas abertas, e o nome da liga é escolhido de uma lista. A partir dos ${FULL_ACCESS_AGE} anos tudo é liberado.`,
+      'Pais e responsáveis podem apagar a conta pelo mesmo botão, em Online › Minha conta.',
+    ],
   },
   {
     title: 'Mudanças',

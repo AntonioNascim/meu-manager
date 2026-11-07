@@ -2,6 +2,8 @@
  * Lado do servidor da identidade (Fase 6, B2). Lógica pura: o armazenamento (D1), o Turnstile, o relógio e os limites entram por `ApiDeps`,
  * então tudo roda em teste sem nuvem. O Worker só liga estas peças a `Request`/`Response`.
  */
+import { accessOf, isAgeBand, type AgeBand, type OnlineAccess } from './agePolicy'
+import { autoNickname } from './moderation'
 import { checkName, type NameIssue } from './nameFilter'
 import { IP_ACTION, type LimitAction, type RateLimit } from './rateLimit'
 import { verifyRequest, type NonceStore, type RequestParts, type VerifyError } from './signedRequest'
@@ -14,7 +16,12 @@ export interface IdentityRecord {
   nickname?: string
   /** Banida pelo painel (B9): a identidade deixa de passar em qualquer pedido. */
   bannedAt?: number
+  /** Faixa de idade informada na criação (nunca a data de nascimento). Ausente = conta antiga: vale o modo protegido. */
+  ageBand?: AgeBand
 }
+
+/** Nível de acesso online da conta (`agePolicy.ts`). */
+export const accessOfRecord = (r: IdentityRecord): OnlineAccess => accessOf(r.ageBand)
 
 export interface IdentityStore {
   get(playerId: string): Promise<IdentityRecord | undefined>
@@ -55,6 +62,12 @@ export type ApiError =
   | { error: 'bad-body' }
   | { error: 'turnstile-failed' }
   | { error: 'bad-nickname'; issue: NameIssue }
+  /** Conta nova sem a faixa de idade. */
+  | { error: 'age-required' }
+  /** Faixa abaixo da idade mínima do online. */
+  | { error: 'too-young' }
+  /** Modo protegido: o apelido é gerado pelo jogo e não se troca. */
+  | { error: 'protected-account' }
 
 export type ApiResult<T> = { status: 200 | 201; body: T } | { status: 400 | 401 | 403 | 404 | 429; body: ApiError }
 
@@ -81,6 +94,7 @@ export async function authenticate(
 export interface RegisterBody {
   turnstileToken: string
   nickname?: string
+  ageBand?: AgeBand
 }
 
 function parseRegisterBody(text: string): RegisterBody | undefined {
@@ -94,43 +108,51 @@ function parseRegisterBody(text: string): RegisterBody | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined
   const o = raw as Record<string, unknown>
   // Lista fechada de campos: o que sobra é recusado, não ignorado.
-  if (Object.keys(o).some((k) => k !== 'turnstileToken' && k !== 'nickname')) return undefined
+  if (Object.keys(o).some((k) => k !== 'turnstileToken' && k !== 'nickname' && k !== 'ageBand')) return undefined
   if (typeof o.turnstileToken !== 'string' || o.turnstileToken.length === 0 || o.turnstileToken.length > 2048) return undefined
   if (o.nickname !== undefined && typeof o.nickname !== 'string') return undefined
-  return { turnstileToken: o.turnstileToken, nickname: o.nickname as string | undefined }
+  if (o.ageBand !== undefined && !isAgeBand(o.ageBand)) return undefined
+  return { turnstileToken: o.turnstileToken, nickname: o.nickname as string | undefined, ageBand: o.ageBand as AgeBand | undefined }
 }
 
 /**
  * Cria a identidade (ou reconhece a que já existe, por exemplo ao digitar o código em outro aparelho).
  * O pedido é assinado com a chave nova: assim só quem tem a chave registra aquele `playerId`.
  */
-export async function registerIdentity(req: ApiRequest, deps: ApiDeps): Promise<ApiResult<{ playerId: string; created: boolean; nickname?: string }>> {
+export async function registerIdentity(req: ApiRequest, deps: ApiDeps): Promise<ApiResult<{ playerId: string; created: boolean; nickname?: string; ageBand?: AgeBand }>> {
   const auth = await authenticate(req, 'createIdentity', deps)
   if (!auth.ok) return auth.result
   const body = parseRegisterBody(typeof req.body === 'string' ? req.body : new TextDecoder().decode(req.body))
   if (!body) return fail(400, { error: 'bad-body' })
-  let nickname: string | undefined
-  if (body.nickname !== undefined) {
-    const checked = checkName(body.nickname)
-    if (!checked.ok) return fail(400, { error: 'bad-nickname', issue: checked.issue })
-    nickname = checked.name
-  }
   const now = deps.now()
   const existing = await deps.store.get(auth.playerId)
   if (existing?.bannedAt) return fail(403, { error: 'banned' })
   if (existing) {
     await deps.store.setLastSeen(auth.playerId, now)
-    return { status: 200, body: { playerId: existing.playerId, created: false, nickname: existing.nickname } }
+    return { status: 200, body: { playerId: existing.playerId, created: false, nickname: existing.nickname, ...(existing.ageBand ? { ageBand: existing.ageBand } : {}) } }
+  }
+  // Conta nova: a faixa de idade é obrigatória e conferida antes de gastar o desafio. Menos de 12 anos não cria conta.
+  if (!body.ageBand) return fail(400, { error: 'age-required' })
+  const access = accessOf(body.ageBand)
+  if (access === 'none') return fail(403, { error: 'too-young' })
+  let nickname: string | undefined
+  if (access === 'protected') {
+    // Modo protegido: o apelido é sempre o gerado pelo jogo; o que o aparelho mandar é ignorado.
+    nickname = autoNickname(auth.playerId)
+  } else if (body.nickname !== undefined) {
+    const checked = checkName(body.nickname)
+    if (!checked.ok) return fail(400, { error: 'bad-nickname', issue: checked.issue })
+    nickname = checked.name
   }
   // O Turnstile só é gasto para identidades novas: quem volta com o código não resolve desafio de novo.
   if (!(await deps.turnstile.verify(body.turnstileToken, req.ip))) return fail(403, { error: 'turnstile-failed' })
-  const created = await deps.store.create({ playerId: auth.playerId, createdAt: now, lastSeen: now, nickname })
+  const created = await deps.store.create({ playerId: auth.playerId, createdAt: now, lastSeen: now, nickname, ageBand: body.ageBand })
   if (!created) {
     // Duas criações ao mesmo tempo: a outra venceu, e esta vira um "já existe".
     await deps.store.setLastSeen(auth.playerId, now)
     return { status: 200, body: { playerId: auth.playerId, created: false } }
   }
-  return { status: 201, body: { playerId: auth.playerId, created: true, nickname } }
+  return { status: 201, body: { playerId: auth.playerId, created: true, nickname, ageBand: body.ageBand } }
 }
 
 /** Um pedido comum de uma identidade que já existe: confere limite, assinatura e cadastro, e marca a última visita. */
@@ -153,6 +175,7 @@ export async function requireIdentity(req: ApiRequest, action: LimitAction, deps
 export async function changeNickname(req: ApiRequest, deps: ApiDeps): Promise<ApiResult<{ playerId: string; nickname: string }>> {
   const auth = await requireIdentity(req, 'write', deps)
   if (!auth.ok) return auth.result
+  if (accessOfRecord(auth.record) !== 'full') return fail(403, { error: 'protected-account' })
   const text = typeof req.body === 'string' ? req.body : new TextDecoder().decode(req.body)
   let raw: unknown
   try {

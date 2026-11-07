@@ -68,10 +68,12 @@ check('menu sem conta mostra "Criar minha conta online"', await a.getByTestId('o
 await shoot(a, '01-menu-sem-conta')
 
 await a.getByRole('button', { name: 'Criar minha conta online' }).click()
+await a.getByTestId('age-18+').check()
 await a.getByTestId('nickname-input').fill('Fulano_Idiota')
 await sleep(200)
 check('apelido ofensivo recusado na hora, sem ir ao servidor', (await a.getByText('Esse nome não é permitido').count()) > 0 && (await a.getByRole('button', { name: 'Criar conta' }).isDisabled()))
 await shoot(a, '03-apelido')
+await a.getByTestId('age-18+').check()
 await a.getByTestId('nickname-input').fill('Craque Ana')
 await a.getByRole('button', { name: 'Criar conta' }).click()
 await a.getByTestId('online-account').waitFor()

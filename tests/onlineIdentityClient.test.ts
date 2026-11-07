@@ -29,24 +29,24 @@ describe('cliente da identidade (B8.1)', () => {
   it('cria a conta com apelido, volta com o mesmo código sem desafio e troca o apelido', async () => {
     const { deps, client } = world()
     const { identity } = createIdentity(random)
-    expect(await registerIdentity(client, identity, 'tok', 'Craque Ana')).toEqual({ ok: true, created: true, nickname: 'Craque Ana' })
+    expect(await registerIdentity(client, identity, 'tok', 'Craque Ana', '18+')).toEqual({ ok: true, created: true, nickname: 'Craque Ana', ageBand: '18+' })
     // Outro aparelho: a mesma identidade. O servidor não confere o desafio de contas que já existem.
     expect(await registerIdentity(client, identity, 'recuperar')).toMatchObject({ ok: true, created: false, nickname: 'Craque Ana' })
     expect(await changeNickname(client, identity, ' Mister  Pedro ')).toEqual({ ok: true, nickname: 'Mister Pedro' })
     expect((await deps.store.get(identity.playerId))?.nickname).toBe('Mister Pedro')
   })
 
-  it('conta que não existe, ao entrar com o código, vira "desafio recusado" (código errado)', async () => {
+  it('conta que não existe, ao entrar com o código, é recusada sem a faixa de idade (código errado)', async () => {
     const { client } = world(false)
     const { identity } = createIdentity(random)
-    expect(await registerIdentity(client, identity, 'recuperar')).toEqual({ ok: false, reason: 'turnstile-failed' })
+    expect(await registerIdentity(client, identity, 'recuperar')).toEqual({ ok: false, reason: 'age-required' })
   })
 
   it('apelido recusado pelo filtro aparece com o motivo, no cadastro e na troca', async () => {
     const { client } = world()
     const { identity } = createIdentity(random)
-    expect(await registerIdentity(client, identity, 'tok', 'Admin')).toEqual({ ok: false, reason: 'bad-nickname', issue: 'impersonal' })
-    await registerIdentity(client, identity, 'tok', 'Craque Ana')
+    expect(await registerIdentity(client, identity, 'tok', 'Admin', '18+')).toEqual({ ok: false, reason: 'bad-nickname', issue: 'impersonal' })
+    await registerIdentity(client, identity, 'tok', 'Craque Ana', '18+')
     expect(await changeNickname(client, identity, 'Admin')).toEqual({ ok: false, reason: 'bad-nickname', issue: 'impersonal' })
     expect(await changeNickname(client, identity, 'ab')).toEqual({ ok: false, reason: 'bad-nickname', issue: 'too-short' })
   })

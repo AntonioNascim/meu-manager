@@ -34,7 +34,7 @@ O `?online=1` é o que mostra o cartão "Online" no menu; ele fica lembrado no a
 > 3. Passe pelas abas **Elenco**, **Mercado** e **Finanças**.
 >
 > **Para testar o online (30 minutos, com amigos):**
-> 1. No menu, **Online › Criar minha conta online**. Escolha um apelido. (O código de recuperação aparece depois; **guarde-o**.)
+> 1. No menu, **Online › Criar minha conta online**. Marque a faixa de idade (**18 anos ou mais**) e escolha um apelido. (O código de recuperação aparece depois; **guarde-o**.)
 > 2. **Ligas online › Criar uma liga**. Escolha **Resultado direto** (mais rápido) ou **Assistir ao vivo**, e convide os amigos pelo **link ou código** de convite.
 > 3. Cada um escolhe um clube. Quem criou toca em **Iniciar a liga**.
 > 4. Toquem em **Pronto** e o criador em **Avançar**. Experimentem propostas entre vocês no **Mercado**, vender e anunciar jogadores e, numa partida ao vivo, **arrastar jogadores no campo**.
@@ -107,11 +107,11 @@ Entrar em `dash.cloudflare.com` com a conta do projeto:
 - [ ] Alerta de gasto em US$ 10 e US$ 20 criado.
 - [ ] Testar o botão "Relatar problema" no **celular** (envio com imagem) e abrir o relato no painel.
 - [ ] Um sócio testa **criar liga, convidar e jogar uma rodada** com outro aparelho.
-- [ ] Escolher a **opção para menores** (ver `docs/lgpd-para-revisor.md`, seção 9) ou, no teste, **convidar só maiores de 18**.
+- [ ] Confirmar com o revisor a **idade de liberação total** (16 ou 18; ver `docs/lgpd-para-revisor.md`, seção 9.4); no teste, **convidar só maiores de 18**. Na criação da conta o convidado marca "18 anos ou mais".
 - [ ] Combinar quem olha o painel em cada dia.
 
 ---
 
 ## 6. Nota sobre menores de idade no teste fechado
 
-Enquanto a revisão de LGPD não decide como tratar menores (`docs/lgpd-para-revisor.md`, seção 9), **convide apenas maiores de 18 anos para o modo online**. A carreira solo (sem conta) pode ser testada por qualquer pessoa. Acrescente no convite, se quiser: *"O modo online do teste é só para maiores de 18 anos."*
+O jogo já tem o **modo protegido** (12 a 15 anos) e pergunta a faixa de idade ao criar a conta online (`docs/lgpd-para-revisor.md`, seção 9.4), mas a idade de liberação total (16 ou 18) ainda **precisa ser confirmada pelo revisor de LGPD**. Por isso, **no teste fechado convide apenas maiores de 18 anos para o modo online**. A carreira solo (sem conta) pode ser testada por qualquer pessoa. Acrescente no convite, se quiser: *"O modo online do teste é só para maiores de 18 anos."*

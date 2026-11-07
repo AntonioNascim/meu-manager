@@ -111,7 +111,7 @@ function setup() {
   const people = new Map<string, Identity>()
   const person = async (name: string): Promise<Identity> => {
     const { identity } = createIdentity(random)
-    await identities.create({ playerId: identity.playerId, createdAt: now, lastSeen: now, nickname: name })
+    await identities.create({ playerId: identity.playerId, createdAt: now, lastSeen: now, nickname: name, ageBand: '18+' })
     people.set(name, identity)
     return identity
   }

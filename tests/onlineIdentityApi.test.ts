@@ -33,7 +33,9 @@ function setup(turnstileOk = true) {
 
 let seed = 100
 function request(identity: Identity, body: unknown, over: Partial<ApiRequest> = {}, at = T0): ApiRequest {
-  const text = typeof body === 'string' ? body : JSON.stringify(body)
+  // Conta nova exige a faixa de idade: por padrão, adulto (os casos de idade passam a sua em `onlineAge.test.ts`).
+  const full = body && typeof body === 'object' && !Array.isArray(body) && !('ageBand' in body) ? { ...(body as object), ageBand: '18+' } : body
+  const text = typeof full === 'string' ? full : JSON.stringify(full)
   const parts = { method: 'POST', path: '/api/identity', body: text }
   return { ...parts, ip: '203.0.113.5', authorization: signRequest(identity, parts, at, fakeRandom(seed++)), ...over }
 }
@@ -43,7 +45,7 @@ describe('registerIdentity', () => {
     const { deps, calls } = setup()
     const { identity } = createIdentity(fakeRandom(1))
     const res = await registerIdentity(request(identity, { turnstileToken: 'tok', nickname: ' Mister  Pedro ' }), deps)
-    expect(res).toEqual({ status: 201, body: { playerId: identity.playerId, created: true, nickname: 'Mister Pedro' } })
+    expect(res).toEqual({ status: 201, body: { playerId: identity.playerId, created: true, nickname: 'Mister Pedro', ageBand: '18+' } })
     expect(calls).toEqual([{ token: 'tok', ip: '203.0.113.5' }])
     expect((await deps.store.get(identity.playerId))?.createdAt).toBe(T0)
   })
@@ -78,7 +80,7 @@ describe('registerIdentity', () => {
     await registerIdentity(request(identity, { turnstileToken: 'a' }), deps)
     advance(60_000)
     const again = await registerIdentity(request(identity, { turnstileToken: 'b' }, {}, T0 + 60_000), deps)
-    expect(again).toEqual({ status: 200, body: { playerId: identity.playerId, created: false, nickname: undefined } })
+    expect(again).toEqual({ status: 200, body: { playerId: identity.playerId, created: false, nickname: undefined, ageBand: '18+' } })
     expect(calls).toHaveLength(1)
     expect((await deps.store.get(identity.playerId))?.lastSeen).toBe(T0 + 60_000)
   })

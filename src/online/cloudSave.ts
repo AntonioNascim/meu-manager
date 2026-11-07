@@ -353,13 +353,15 @@ export interface AccountExport {
   createdAt: number
   lastSeen: number
   nickname: string | null
+  /** Faixa de idade informada na criação (nunca a data de nascimento); null em conta antiga. */
+  ageBand: string | null
   /** Quando a conta seria apagada por falta de uso. */
   expiresAt: number
   saves: { slot: number; manifest: CloudManifest; usedBytes: number }[]
 }
 
 /** "Exportar meus dados": tudo que guardamos da pessoa (identidade e a lista dos saves; os pedaços saem pela rota de leitura). */
-export async function exportAccount(deps: CloudDeps, record: { playerId: string; createdAt: number; lastSeen: number; nickname?: string }): Promise<AccountExport> {
+export async function exportAccount(deps: CloudDeps, record: { playerId: string; createdAt: number; lastSeen: number; nickname?: string; ageBand?: string }): Promise<AccountExport> {
   const listing = await listSaves(deps, record.playerId)
   return {
     exportedAt: new Date(deps.now()).toISOString(),
@@ -367,6 +369,7 @@ export async function exportAccount(deps: CloudDeps, record: { playerId: string;
     createdAt: record.createdAt,
     lastSeen: record.lastSeen,
     nickname: record.nickname ?? null,
+    ageBand: record.ageBand ?? null,
     expiresAt: record.lastSeen + RETENTION_MS,
     saves: listing.filter((s) => s.manifest).map((s) => ({ slot: s.slot, manifest: s.manifest!, usedBytes: Object.values(s.manifest!.parts).reduce((n, p) => n + p.size, 0) })),
   }

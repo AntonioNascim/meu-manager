@@ -4,6 +4,7 @@
  * Nada aqui toca no save local, a não ser pelas escolhas explícitas de `CloudSync` (usar a nuvem, guardar as duas).
  */
 import { useSyncExternalStore } from 'react'
+import { accessOf, type AgeBand, type OnlineAccess } from '../online/agePolicy'
 import { ONLINE_CONFIG } from '../online/config'
 import { CloudClient } from '../online/cloudClient'
 import { identityFromRecoveryCode, type Identity } from '../online/identity'
@@ -56,6 +57,9 @@ export const useAccount = (): AccountState =>
 
 export const getAccount = (): AccountState => state
 
+/** Nível de acesso online da conta deste aparelho (`agePolicy.ts`). Sem conta, vale `full` só para não esconder nada de quem ainda vai criar uma. */
+export const accessOfAccount = (a: AccountState): OnlineAccess => (a.account ? accessOf(a.account.ageBand) : 'full')
+
 // ------------------------------------------------------------------ conta
 
 export type CreateResult = { ok: true; code: string } | Exclude<RegisterResult, { ok: true }>
@@ -64,18 +68,25 @@ export type CreateResult = { ok: true; code: string } | Exclude<RegisterResult, 
  * Cria a conta: confere o apelido aqui (o servidor confere de novo), sorteia o código no aparelho e registra no servidor. O código só é gravado
  * no aparelho depois de o servidor aceitar. Não mostra o código: a pessoa já sai jogando e o menu avisa para guardá-lo.
  */
-export async function createAccount(nickname: string, turnstileToken: string): Promise<CreateResult> {
-  const checked = checkName(nickname)
-  if (!checked.ok) return { ok: false, reason: 'bad-nickname', issue: checked.issue }
+export async function createAccount(ageBand: AgeBand, nickname: string | undefined, turnstileToken: string): Promise<CreateResult> {
+  const access = accessOf(ageBand)
+  if (access === 'none') return { ok: false, reason: 'too-young' }
+  // Modo protegido: sem apelido digitado, o servidor gera o apelido.
+  let name: string | undefined
+  if (access === 'full') {
+    const checked = checkName(nickname ?? '')
+    if (!checked.ok) return { ok: false, reason: 'bad-nickname', issue: checked.issue }
+    name = checked.name
+  }
   const made = createIdentity(randomBytes)
-  const result = await registerIdentity(clientDeps(), made.identity, turnstileToken, checked.name)
+  const result = await registerIdentity(clientDeps(), made.identity, turnstileToken, name, ageBand)
   if (!result.ok) return result
-  await mainIdentityStore.adopt(made, Date.now(), result.nickname ?? checked.name)
+  await mainIdentityStore.adopt(made, Date.now(), result.nickname ?? name, ageBand)
   await loadAccount()
   return { ok: true, code: made.recoveryCode }
 }
 
-export type RecoverResult = { ok: true; nickname?: string } | { ok: false; reason: 'format'; error: RecoveryError; index?: number } | { ok: false; reason: 'not-found' | 'offline' | 'rate-limited' | 'server' }
+export type RecoverResult = { ok: true; nickname?: string } | { ok: false; reason: 'format'; error: RecoveryError; index?: number } | { ok: false; reason: 'not-found' | 'offline' | 'rate-limited' | 'server' | 'banned' }
 
 /** Entra com o código em outro aparelho. Conta que não existe no servidor (código errado) volta como `not-found`. */
 export async function recoverAccount(text: string): Promise<RecoverResult> {
@@ -89,9 +100,9 @@ export async function recoverAccount(text: string): Promise<RecoverResult> {
   }
   // O servidor só pede o desafio para contas novas: com um código que não existe, ele recusa, e isso aqui quer dizer "não encontrei".
   const result = await registerIdentity(clientDeps(), identity, 'recuperar')
-  if (!result.ok) return { ok: false, reason: result.reason === 'turnstile-failed' || result.reason === 'bad-nickname' || result.reason === 'unauthorized' ? 'not-found' : result.reason }
+  if (!result.ok) return { ok: false, reason: result.reason === 'turnstile-failed' || result.reason === 'bad-nickname' || result.reason === 'unauthorized' || result.reason === 'too-young' || result.reason === 'age-required' ? 'not-found' : result.reason }
   await mainIdentityStore.recover(parsed.code, Date.now())
-  await mainIdentityStore.markRegistered(result.nickname)
+  await mainIdentityStore.markRegistered(result.nickname, result.ageBand)
   await loadAccount()
   return { ok: true, nickname: result.nickname }
 }

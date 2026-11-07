@@ -13,7 +13,8 @@ import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer, TradeReport, TradeR
 import type { AiOffersBody, AiSearchFilters, MarketRow } from '../engine/league/aimarket'
 import type { CupsBody } from '../engine/league/cupsView'
 import type { ArrivingRow, BuyerRow, MineBody, PreRow } from '../engine/league/sellmarket'
-import { authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
+import { isProtectedLeagueName } from './agePolicy'
+import { accessOfRecord, authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
 import { checkName, type NameIssue } from './nameFilter'
 
 export const LEAGUE_LIMITS = {
@@ -164,6 +165,10 @@ export type LeagueError =
   | { error: 'bad-name'; issue: NameIssue }
   | { error: 'not-found' }
   | { error: 'forbidden' }
+  /** Modo protegido (menor de idade): só ligas de amigos, por convite. */
+  | { error: 'protected-account' }
+  /** Modo protegido: o nome da liga tem de ser um da lista. */
+  | { error: 'protected-name' }
   | { error: 'too-many-created'; limit: number }
   | { error: 'too-many-joined'; limit: number }
   | { error: 'league-full' }
@@ -351,6 +356,9 @@ export async function createLeague(req: ApiRequest, deps: LeagueDeps): Promise<L
   if (!auth.ok) return auth.result as LeagueResult<never>
   const body = parseCreate(req.body)
   if (!body) return fail(400, { error: 'bad-body' })
+  const protectedMode = accessOfRecord(auth.record) !== 'full'
+  if (protectedMode && body.kind === 'open') return fail(403, { error: 'protected-account' })
+  if (protectedMode && !isProtectedLeagueName(body.name)) return fail(400, { error: 'protected-name' })
   const name = checkName(body.name, { min: LEAGUE_LIMITS.nameMin, max: LEAGUE_LIMITS.nameMax })
   if (!name.ok) return fail(400, { error: 'bad-name', issue: name.issue })
   const me = auth.record.playerId
@@ -398,6 +406,7 @@ export async function createLeague(req: ApiRequest, deps: LeagueDeps): Promise<L
 export async function listOpenLeagues(req: ApiRequest, deps: LeagueDeps, before?: number): Promise<LeagueResult<{ leagues: LeagueSummary[]; next?: number }>> {
   const auth = await requireIdentity(req, 'read', deps)
   if (!auth.ok) return auth.result as LeagueResult<never>
+  if (accessOfRecord(auth.record) !== 'full') return fail(403, { error: 'protected-account' })
   const rows = await deps.leagues.listOpen(LEAGUE_LIMITS.directoryPage + 1, before)
   const page = rows.slice(0, LEAGUE_LIMITS.directoryPage)
   return { status: 200, body: { leagues: await Promise.all(page.map((r) => summaryOf(deps, r))), ...(rows.length > page.length ? { next: page[page.length - 1]!.createdAt } : {}) } }
@@ -460,6 +469,7 @@ export async function joinLeague(req: ApiRequest, deps: LeagueDeps, id: string):
   if (!o || !onlyKeys(o, ['teamId', 'code']) || typeof o.teamId !== 'string' || !TEAM_ID.test(o.teamId) || (o.code !== undefined && typeof o.code !== 'string')) return fail(400, { error: 'bad-body' })
   const league = await deps.leagues.get(id)
   if (!league || league.status === 'closed' || league.hidden) return fail(404, { error: 'not-found' })
+  if (league.kind === 'open' && accessOfRecord(auth.record) !== 'full') return fail(403, { error: 'protected-account' })
   // Liga de amigos: o código vale; o ADM entra sem ele (a liga é dele).
   if (league.kind === 'friends' && league.adminId !== auth.record.playerId && !(typeof o.code === 'string' && league.code && sameText(normalizeCode(o.code), league.code))) {
     const hit = await deps.limiter.hit('joinByCode', `id:${auth.record.playerId}`, deps.now())

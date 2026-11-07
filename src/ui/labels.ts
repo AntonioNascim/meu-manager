@@ -482,8 +482,20 @@ export const RECOVERY_ERROR_LABELS: Record<RecoveryError, string> = {
 /** Apelido pronto de quem ainda não escolheu. */
 export const anonymousNicknameLabel = (n: number): string => `Técnico ${n}`
 
+/** Faixas de idade da criação da conta (só a faixa; nunca a data de nascimento). */
+export const AGE_BAND_LABELS: Record<import('../online/agePolicy').AgeBand, string> = {
+  under12: 'Menos de 12 anos',
+  '12-15': '12 a 15 anos',
+  '16-17': '16 ou 17 anos',
+  '18+': '18 anos ou mais',
+}
+
 /** Por que o cadastro ou a troca de apelido não deu certo (fora o filtro do apelido, que tem `NAME_ISSUE_LABELS`). */
-export const ACCOUNT_REASON_LABELS: Record<'turnstile-failed' | 'rate-limited' | 'offline' | 'unauthorized' | 'server' | 'unknown-identity', string> = {
+export const ACCOUNT_REASON_LABELS: Record<'turnstile-failed' | 'rate-limited' | 'offline' | 'unauthorized' | 'server' | 'unknown-identity' | 'too-young' | 'age-required' | 'banned' | 'protected', string> = {
+  'too-young': 'O modo online é para quem tem 12 anos ou mais. A carreira solo está liberada para todos.',
+  'age-required': 'Diga sua faixa de idade para criar a conta.',
+  banned: 'Esta conta foi bloqueada.',
+  protected: 'No modo protegido o apelido é gerado pelo jogo e não pode ser trocado.',
   'turnstile-failed': 'A verificação de que você é uma pessoa não passou. Tente de novo.',
   'rate-limited': 'Muitas tentativas seguidas. Espere um pouco e tente de novo.',
   offline: 'Sem conexão com o servidor. Confira a internet e tente de novo.',
@@ -579,6 +591,8 @@ export const LEAGUE_ERROR_LABELS: Record<import('../online/leagueApi').LeagueErr
   'bad-name': 'Esse nome não serve.',
   'not-found': 'Não encontramos essa liga.',
   forbidden: 'Só o ADM da liga pode fazer isso.',
+  'protected-account': 'No modo protegido só vale liga de amigos, entrando por convite.',
+  'protected-name': 'No modo protegido o nome da liga é escolhido da lista.',
   'too-many-created': 'Você já administra o máximo de 3 ligas.',
   'too-many-joined': 'Você já está no máximo de 5 ligas.',
   'league-full': 'A liga está cheia.',

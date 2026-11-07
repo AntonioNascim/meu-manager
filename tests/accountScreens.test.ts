@@ -9,9 +9,11 @@ import { ACCOUNT_REASON_LABELS, CLOUD_STATUS_LABELS } from '../src/ui/labels'
 const CODE = 'K7QP9X2MHT4R8WZC3NFB'
 
 describe('telas da conta online (B8.1)', () => {
-  it('criar conta começa pelo apelido, com as regras e o botão desligado', () => {
+  it('criar conta começa pela faixa de idade, sem data de nascimento, e o botão desligado', () => {
     const html = renderToStaticMarkup(createElement(CreateAccount, { onDone: () => undefined, onBack: () => undefined }))
-    expect(html).toContain('Escolha seu apelido')
+    expect(html).toContain('faixa de idade')
+    expect(html).toContain('nunca a data de nascimento')
+    expect(html).not.toContain('nickname-input')
     expect(html).not.toContain('Passo 1 de 2')
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Criar conta<\/button>/)
   })

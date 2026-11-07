@@ -5,6 +5,7 @@
  * semente (que já dá acesso à conta) está no mesmo banco, então guardá-lo não amplia o que quem tem o aparelho já alcança.
  */
 import Dexie, { type Table } from 'dexie'
+import type { AgeBand } from '../online/agePolicy'
 import { createIdentity, identityFromRecoveryCode, identityFromSeed, type Identity } from '../online/identity'
 
 interface IdentityRow {
@@ -13,6 +14,8 @@ interface IdentityRow {
   playerId: string
   secretKey: Uint8Array
   nickname?: string
+  /** Faixa de idade informada na criação (só a faixa). Ausente em conta antiga. */
+  ageBand?: AgeBand
   /** O código, para mostrar de novo no menu. Ausente se a identidade veio de um registro antigo. */
   recoveryCode?: string
   /** A pessoa tocou em "Já guardei". */
@@ -34,6 +37,7 @@ class IdentityDatabase extends Dexie {
 export interface StoredIdentity {
   identity: Identity
   nickname?: string
+  ageBand?: AgeBand
   recoveryCode?: string
   codeConfirmed: boolean
   createdAt: number
@@ -52,7 +56,7 @@ export class IdentityStore {
     const identity = identityFromSeed(row.secretKey)
     // Defesa contra um registro adulterado ou corrompido: o `playerId` precisa ser o da chave guardada.
     if (identity.playerId !== row.playerId) return undefined
-    return { identity, nickname: row.nickname, recoveryCode: row.recoveryCode, codeConfirmed: row.codeConfirmed, createdAt: row.createdAt, registered: row.registered }
+    return { identity, nickname: row.nickname, ageBand: row.ageBand, recoveryCode: row.recoveryCode, codeConfirmed: row.codeConfirmed, createdAt: row.createdAt, registered: row.registered }
   }
 
   /** Cria uma identidade nova neste aparelho e devolve o código de recuperação, que a tela mostra uma vez. Se já existe uma, não troca. */
@@ -67,8 +71,8 @@ export class IdentityStore {
    * Guarda uma identidade que o servidor já aceitou (criada na tela de cadastro: o código é sorteado antes e só é gravado depois de o servidor
    * aceitar, para uma falha de rede não deixar uma conta "meio criada" no aparelho). O aviso para guardar o código fica no menu até "Já guardei" (`confirmCode`).
    */
-  async adopt(made: { identity: Identity; recoveryCode: string }, now: number, nickname?: string): Promise<void> {
-    await this.db.identity.put({ id: 'me', playerId: made.identity.playerId, secretKey: made.identity.secretKey, nickname, recoveryCode: made.recoveryCode, codeConfirmed: false, createdAt: now, registered: true })
+  async adopt(made: { identity: Identity; recoveryCode: string }, now: number, nickname?: string, ageBand?: AgeBand): Promise<void> {
+    await this.db.identity.put({ id: 'me', playerId: made.identity.playerId, secretKey: made.identity.secretKey, nickname, ageBand, recoveryCode: made.recoveryCode, codeConfirmed: false, createdAt: now, registered: true })
   }
 
   /** Outro aparelho: a identidade volta a partir do código (já registrada no servidor, se foi criada lá antes). */
@@ -84,8 +88,8 @@ export class IdentityStore {
     await this.db.identity.update('me', { codeConfirmed: true })
   }
 
-  async markRegistered(nickname?: string): Promise<void> {
-    await this.db.identity.update('me', { registered: true, ...(nickname !== undefined ? { nickname } : {}) })
+  async markRegistered(nickname?: string, ageBand?: AgeBand): Promise<void> {
+    await this.db.identity.update('me', { registered: true, ...(nickname !== undefined ? { nickname } : {}), ...(ageBand !== undefined ? { ageBand } : {}) })
   }
 
   async setNickname(nickname: string | undefined): Promise<void> {

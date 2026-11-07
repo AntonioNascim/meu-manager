@@ -28,7 +28,7 @@ async function world() {
   const left: string[] = []
   let n = 0
   const deps: ModerationDeps = { identities, leagues, mod, now: () => T0, randomId: () => `r${++n}`, leaveAll: async (id) => void left.push(id) }
-  for (const name of ['ana', 'bia', 'cris', 'dani', 'edu']) await identities.create({ playerId: `p-${name}`, createdAt: T0, lastSeen: T0, nickname: `Nick ${name}` })
+  for (const name of ['ana', 'bia', 'cris', 'dani', 'edu']) await identities.create({ playerId: `p-${name}`, createdAt: T0, lastSeen: T0, nickname: `Nick ${name}`, ageBand: '18+' })
   await leagues.create({ id: 'liga1', name: 'Liga Ruim', kind: 'open', adminId: 'p-ana', pace: 'normal', band: 'evening', tzOffsetMin: -180, world: { source: 'ficticio' }, seed: 1, maxHumans: 8, status: 'lobby', entryClosed: false, hidden: false, directResult: false, createdAt: T0 } as never)
   for (const [i, who] of ['ana', 'bia', 'cris', 'dani'].entries()) await leagues.addMember({ leagueId: 'liga1', playerId: `p-${who}`, teamId: `team-${i}`, joinedAt: T0 })
   return { deps, mod, identities, leagues, left }
@@ -87,13 +87,13 @@ describe('moderação (B9)', () => {
       const parts = { method, path, body }
       return { ...parts, ip: '203.0.113.9', authorization: signRequest(who, parts, now, (n) => new Uint8Array(n).fill(++k)) }
     }
-    expect((await registerIdentity(req('POST', '/api/identity', JSON.stringify({ turnstileToken: 't', nickname: 'Fulano' })), deps)).status).toBe(201)
+    expect((await registerIdentity(req('POST', '/api/identity', JSON.stringify({ turnstileToken: 't', nickname: 'Fulano', ageBand: '18+' })), deps)).status).toBe(201)
     expect((await requireIdentity(req('GET', '/api/me', ''), 'read', deps)).ok).toBe(true)
     await mod.ban({ playerId: who.playerId, reason: 'x', bannedAt: now })
     const blocked = await requireIdentity(req('GET', '/api/me', ''), 'read', deps)
     expect(blocked.ok).toBe(false)
     expect(!blocked.ok && blocked.result).toMatchObject({ status: 403, body: { error: 'banned' } })
-    expect((await registerIdentity(req('POST', '/api/identity', JSON.stringify({ turnstileToken: 't' })), deps)).status).toBe(403)
+    expect((await registerIdentity(req('POST', '/api/identity', JSON.stringify({ turnstileToken: 't', ageBand: '18+' })), deps)).status).toBe(403)
   })
 
   it('o segredo do painel: vazio ou curto desliga; comparação exata; corpos fechados', () => {

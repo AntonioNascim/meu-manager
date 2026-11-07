@@ -24,6 +24,7 @@ const person = async (nick) => {
   page.on('pageerror', (e) => console.log(`  [erro na página de ${nick}]`, e.message))
   await page.goto(base)
   await page.getByRole('button', { name: 'Criar minha conta online' }).click()
+  await page.getByTestId('age-18+').check()
   await page.getByTestId('nickname-input').fill(nick)
   await page.getByRole('button', { name: 'Criar conta' }).click()
   await page.getByTestId('online-account').waitFor()

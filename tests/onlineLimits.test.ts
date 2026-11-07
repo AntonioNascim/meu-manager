@@ -23,7 +23,7 @@ describe('limites finais (B9)', () => {
     for (let i = 0; i < 5; i++) {
       const id = createIdentity(rnd).identity
       people.push(id)
-      await store.create({ playerId: id.playerId, createdAt: T0, lastSeen: T0, nickname: `P${i}` })
+      await store.create({ playerId: id.playerId, createdAt: T0, lastSeen: T0, nickname: `P${i}`, ageBand: '18+' })
     }
     let k = 0
     const askUnique = (who: Identity) => {

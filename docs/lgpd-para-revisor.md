@@ -2,20 +2,20 @@
 
 > **Para quem é este documento.** Para a pessoa (advogado ou consultor de proteção de dados) que vai revisar o jogo antes do lançamento público. Está em linguagem simples, sem jargão de programação, e descreve **o que o jogo realmente faz hoje** (conferido no código em 06/11/2026), não só o que pretendemos. Onde algo está **previsto mas ainda não existe**, está marcado como **[NÃO IMPLEMENTADO]**. Onde eu (o desenvolvedor, não jurista) tenho dúvida jurídica, está marcado como **[PERGUNTA]**. Nada aqui é aconselhamento jurídico.
 >
-> **Versão do aviso de privacidade mostrado no jogo:** 2026-11-06 (`src/ui/screens/online/PrivacyNotice.tsx`). Este documento descreve a realidade; o aviso deve ser ajustado ao que o revisor decidir.
+> **Versão do aviso de privacidade mostrado no jogo:** 2026-11-07 (`src/ui/screens/online/PrivacyNotice.tsx`). Este documento descreve a realidade; o aviso deve ser ajustado ao que o revisor decidir.
 
 ## 1. Resumo em dez linhas
 
 1. **Jogo de futebol (gerenciamento), gratuito, independente**, sem anúncios, sem compras, sem chat, sem rastreadores de terceiros.
 2. Funciona **sem internet e sem conta** (carreira solo): nesse modo **nenhum dado vai para servidor nenhum**; tudo fica no aparelho.
 3. Há um modo **online opcional** (ligas entre jogadores e cópia dos saves na nuvem) que exige uma **conta anônima**: um identificador técnico (chave pública), um **apelido** que a pessoa escolhe e um **código de recuperação** que fica só no aparelho dela.
-4. **Não pedimos** nome, e-mail, telefone, endereço, localização, contatos, data de nascimento nem idade.
+4. **Não pedimos** nome, e-mail, telefone, endereço, localização, contatos nem data de nascimento. Ao criar a conta online a pessoa informa **só a faixa de idade** (menos de 12 / 12 a 15 / 16 a 17 / 18 ou mais), que vira o modo de acesso (seção 9.4).
 5. Os servidores são do **Cloudflare** (Estados Unidos e rede global). Não temos servidor próprio.
 6. O endereço de **IP** é usado só para limitar abuso e fica em contadores temporários (**no máximo 24 horas**); não é ligado a conta.
 7. A pessoa pode **ver, exportar e apagar** os dados dela sozinha, dentro do jogo (com lacunas listadas na seção 7).
 8. Há um recurso de **denúncia** (apelidos e ligas) e um de **"Relatar problema"** (texto livre opcional e imagem de tela opcional): são os dois pontos em que a pessoa pode, por engano, escrever dado pessoal.
 9. Os elencos do "mundo real" usam **nomes, datas de nascimento e nacionalidades de jogadores de futebol reais**, vindos da Wikipedia e do Wikidata (dados de terceiros; seção 8).
-10. **Menores de idade** (seção 9) são o ponto mais delicado e a principal decisão que preciso do revisor.
+10. **Menores de idade** (seção 9) são o ponto mais delicado. **Já há um modo protegido implementado** (12 a 15 anos) e a pergunta explícita ao revisor sobre liberar tudo a partir de 16 anos (seção 9.4); **essa decisão precisa ser confirmada antes do lançamento**.
 
 ## 2. Quem faz o quê
 
@@ -33,7 +33,7 @@ Tudo isto fica no navegador (IndexedDB, `localStorage` e cache do navegador). Na
 | Dado | Onde no aparelho | Para quê | Por quanto tempo |
 |---|---|---|---|
 | Jogos salvos (3 espaços): o mundo do jogo, elencos, partidas, finanças, táticas | IndexedDB `meu-manager` | Continuar a carreira | Até a pessoa apagar o save ou os dados do site |
-| Identidade online: **chave secreta**, chave pública, apelido, **código de recuperação (20 caracteres)**, data de criação | IndexedDB `meu-manager-identidade` (**guardada sem criptografia no aparelho**) | Assinar os pedidos ao servidor; rever o código no menu | Até a pessoa apagar a conta ou os dados do site |
+| Identidade online: **chave secreta**, chave pública, apelido, **faixa de idade informada**, **código de recuperação (20 caracteres)**, data de criação | IndexedDB `meu-manager-identidade` (**guardada sem criptografia no aparelho**) | Assinar os pedidos ao servidor; rever o código no menu | Até a pessoa apagar a conta ou os dados do site |
 | Estado da cópia na nuvem de cada save (versão, fila de envio, conflitos, cópias locais de 7 dias) | IndexedDB `meu-manager-nuvem` | Sincronizar saves | Até a pessoa desligar a nuvem ou apagar os dados |
 | Pacote de elencos baixado (arquivo de dados dos clubes e jogadores) | IndexedDB `meu-manager-pacotes` | Jogar com elencos atualizados, também offline | As 2 versões mais novas |
 | Pacotes importados pela pessoa | IndexedDB `meu-manager` (tabela `packages`) | Mundos personalizados | Até apagar |
@@ -50,7 +50,7 @@ Todos os dados abaixo ficam em serviços do Cloudflare. Os tempos de retenção 
 
 | Tabela | Campos | Para quê | Retenção hoje |
 |---|---|---|---|
-| `identities` | identificador (chave pública, 43 letras), data de criação, **data da última visita (atualizada no máximo 1 vez por hora)**, **apelido** | Reconhecer a conta; mostrar o apelido nas ligas | Até a pessoa apagar a conta. **[NÃO IMPLEMENTADO]** apagar contas sem uso há 12 meses (a limpeza está desligada de propósito: não há como avisar quem sumiu) |
+| `identities` | identificador (chave pública, 43 letras), data de criação, **data da última visita (atualizada no máximo 1 vez por hora)**, **apelido**, **faixa de idade** (só a faixa: `12-15`, `16-17` ou `18+`; quem tem menos de 12 não cria conta e nada é gravado) | Reconhecer a conta; mostrar o apelido nas ligas; aplicar o modo protegido | Até a pessoa apagar a conta. **[NÃO IMPLEMENTADO]** apagar contas sem uso há 12 meses (a limpeza está desligada de propósito: não há como avisar quem sumiu) |
 | `leagues` | id, nome da liga (**texto livre escrito pelo criador**), tipo (aberta ou de amigos), código de convite, id do ADM, ritmo, fuso, mundo usado, data | Listar e organizar ligas | A sala (mundo e técnicos) é destruída quando a liga é fechada (o último técnico sai ou o ADM a fecha). **O registro da liga neste banco (nome, id do ADM, data) permanece com situação "fechada"**: **[NÃO IMPLEMENTADO]** apagá-lo depois de um prazo. **[NÃO IMPLEMENTADO]** arquivar e apagar ligas inativas (hoje uma liga abandonada com técnicos nela continua existindo) |
 | `league_members` | id da liga, id do técnico, clube escolhido, data de entrada | Saber quem joga em qual liga | Enquanto a pessoa está na liga; sai ao sair da liga ou apagar a conta |
 | `reports` | tipo (apelido ou liga), alvo, **quem denunciou**, motivo (lista fechada), data, situação | Moderação (3 pessoas diferentes tiram o apelido ou escondem a liga) | Aberta até o painel decidir; **decidida, some em 90 dias**; some também ao apagar a conta de quem denunciou ou do denunciado |
@@ -107,9 +107,9 @@ Tudo dentro do jogo, em **Menu › Online › "Dados e conta"** (sem falar com n
 
 | Direito | O que existe hoje | Lacunas |
 |---|---|---|
-| **Acesso e portabilidade** | "Exportar meus dados" gera um arquivo `.json` com identificador, datas, apelido e a lista dos saves na nuvem. O save de cada espaço pode ser exportado em arquivo à parte (menu inicial, botão Exportar) | **[NÃO IMPLEMENTADO]** a exportação **não** inclui as ligas de que a pessoa participa (clube, propostas, histórico) nem as denúncias que ela fez ou recebeu |
+| **Acesso e portabilidade** | "Exportar meus dados" gera um arquivo `.json` com identificador, datas, apelido, faixa de idade e a lista dos saves na nuvem. O save de cada espaço pode ser exportado em arquivo à parte (menu inicial, botão Exportar) | **[NÃO IMPLEMENTADO]** a exportação **não** inclui as ligas de que a pessoa participa (clube, propostas, histórico) nem as denúncias que ela fez ou recebeu |
 | **Eliminação** | "Apagar minha conta": sai de todas as ligas (cada clube volta ao computador; se era ADM, o técnico mais antigo assume), apaga os saves na nuvem, apaga as denúncias dela (feitas e recebidas) e o cadastro | O **banimento** (se houver) permanece. O que ela escreveu em relatos de problema anônimos **não pode ser localizado** (não há identificador): somem em 90 dias. O histórico de transferências de uma liga que continua existindo pode manter o apelido da época |
-| **Correção** | Trocar o apelido (Online › Minha conta) | — |
+| **Correção** | Trocar o apelido (Online › Minha conta) | No modo protegido o apelido é gerado e **não troca**; a faixa de idade não pode ser corrigida (só apagando a conta e criando outra) |
 | **Informação sobre tratamento** | Aviso de privacidade dentro do jogo (antes de criar a conta e na conta) | **[NÃO IMPLEMENTADO]** canal para dúvidas e reclamações (não há e-mail/formulário) |
 | **Revogação do consentimento / oposição** | Desligar a nuvem por espaço; apagar a conta | — |
 | **Dados em aparelhos** | Apagar os dados do site no navegador | — |
@@ -124,11 +124,11 @@ O "mundo real" contém **10 mil jogadores reais e 370 clubes** com nome, apelido
 
 ## 9. Crianças e adolescentes (o ponto mais delicado)
 
-### 9.1 Situação de hoje
-- O jogo **não pergunta idade** e não tem qualquer barreira. Futebol e jogos de gerenciamento atraem muitos jovens, e é razoável supor que **crianças (menores de 12) e adolescentes (12 a 17) jogarão**.
+### 9.1 Situação antes da decisão de 07/11/2026 (hoje já mudou: ver 9.4)
+- O jogo **não perguntava idade** e não tinha qualquer barreira. Futebol e jogos de gerenciamento atraem muitos jovens, e é razoável supor que **crianças (menores de 12) e adolescentes (12 a 17) jogarão**.
 - **Riscos concretos** (já que não há chat nem anúncios): (1) **contato com desconhecidos** em ligas abertas (veem apelido, clube, e jogam e negociam entre si); (2) **texto livre público** (apelido e nome de liga) e **texto livre privado** (relato de problema) onde se pode expor dado pessoal; (3) conta criada sem ciência dos responsáveis; (4) dados do aparelho e IP tratados pelo Cloudflare.
 - **O que reduz o risco hoje:** sem dados pessoais obrigatórios, sem localização, sem fotos de perfil, sem chat, sem mensagem privada, sem compras, sem anúncios, sem recomendação por perfil; apelido filtrado; denúncia por 3 pessoas; ADM pode remover participante; apagar tudo em um toque; a carreira solo é totalmente local.
-- O aviso atual diz apenas: "O jogo não pede idade nem dados pessoais. Pais e responsáveis podem apagar a conta pelo mesmo botão." **Isso é fraco** e provavelmente insuficiente (**[PERGUNTA]**).
+- O aviso antigo dizia apenas: "O jogo não pede idade nem dados pessoais. Pais e responsáveis podem apagar a conta pelo mesmo botão." Foi substituído (9.4).
 
 ### 9.2 O que a lei parece exigir (meu entendimento, a confirmar)
 - **LGPD, art. 14:** tratamento de dados de crianças e adolescentes no **melhor interesse** deles; de **crianças (até 12 anos incompletos)**, com **consentimento específico e em destaque dado por pelo menos um dos pais ou responsável legal**, e esforço razoável para verificá-lo; informações em linguagem simples e acessível, adequada ao entendimento da criança.
@@ -147,6 +147,28 @@ O "mundo real" contém **10 mil jogadores reais e 370 clubes** com nome, apelido
 
 **Minha recomendação técnica (a ser validada pelo revisor):** **E** — lançar com a **opção A** e construir o **modo protegido da opção B** em seguida, porque o risco maior (estranhos + texto livre) some no modo protegido e a carreira solo, que é o coração do jogo, continua livre para todos. Qualquer opção exige, como mínimo: (1) aviso de privacidade em linguagem simples e adequado a jovens, (2) revisão do que o aviso diz sobre crianças, (3) o "Relatar problema" avisar claramente para **não escrever dados pessoais** (já avisa) e (4) decidir se o relato de problema anônimo fica aberto a menores (não há conta nem identificador; guardamos 90 dias).
 
+### 9.4 Decisão tomada e implementada: opção B com faixas (A CONFIRMAR antes do lançamento)
+
+A decisão do projeto, **já implementada e testada**, é uma versão da opção B com três níveis. A pessoa informa **só a faixa de idade** ao criar a conta online (autodeclaração; **não** pedimos a data de nascimento e **não** guardamos nada que permita calcular a idade).
+
+| Faixa informada | O que o jogo faz |
+|---|---|
+| **Menos de 12 anos** | **Sem conta online** (o servidor também recusa e **não grava nada**). A carreira solo e o "Relatar problema" seguem livres |
+| **12 a 15 anos** | **Modo protegido**: o **apelido é gerado pelo jogo** ("Técnico 4821"; o servidor ignora o que o aparelho mandar e **não permite trocar**); **só ligas de amigos, entrando por convite** (sem diretório de ligas abertas; o servidor recusa listar, criar e entrar em liga aberta); **nome de liga escolhido de uma lista** de 12 nomes (sem texto livre público). Nuvem, denúncia e "Apagar minha conta" funcionam |
+| **16 anos ou mais** (hoje: 16 a 17 e 18+) | Tudo liberado |
+
+**Como está no código:** `src/online/agePolicy.ts` tem duas constantes, `ONLINE_MIN_AGE = 12` e `FULL_ACCESS_AGE = 16`. **Para passar a liberar tudo só aos 18, basta trocar `FULL_ACCESS_AGE` para 18**: a faixa 16–17 passa a ser protegida sozinha, e a tela de criação de conta, o aviso de privacidade e o servidor acompanham (um teste confere que a idade escolhida é uma fronteira de faixa). A faixa fica numa coluna da tabela `identities` (`age_band`) e vale também no servidor (a trava não depende do aparelho). **Contas anteriores a esta decisão (só de teste) não têm faixa e valem como protegidas.**
+
+**[PERGUNTA EXPLÍCITA AO REVISOR] Posso liberar tudo (apelido livre, ligas abertas, nome de liga livre) a partir de 16 anos, ou o correto é só a partir de 18?** Se a resposta for 18, a mudança é uma linha de configuração. Esta decisão **precisa ser confirmada pelo revisor antes do lançamento público** (durante o teste fechado convidamos só maiores de 18 anos).
+
+**Limites que continuam (para o revisor avaliar):**
+- A faixa é **autodeclarada** e burlável (quem tem 14 anos pode marcar "18 ou mais"). Não há verificação. **[PERGUNTA]** o ECA Digital exige mais para um serviço sem chat, sem compra e sem anúncio?
+- Menos de 12 anos fica de fora do online por **não termos consentimento de responsável** (art. 14, § 1º), não por haver risco específico. A conta não é criada e o servidor não guarda a faixa nem a tentativa. **[PERGUNTA]** confirmar que isso basta.
+- O modo protegido **entra em ligas de amigos que podem ter adultos** (por convite). O adolescente vê apelidos de outros técnicos nessas ligas. **[PERGUNTA]** é aceitável, ou ligas de amigos protegidas devem ser só entre contas protegidas?
+- Os **relatos de problema** (anônimos) continuam abertos a qualquer idade: o texto livre ali é privado e some em 90 dias; a tela já pede para não escrever dados pessoais.
+- A conta protegida pode **mudar de faixa?** Não: a faixa não se altera (se a pessoa crescer, cria outra conta ou o revisor decide como migrar). **[PERGUNTA]** e se o responsável quiser corrigir uma faixa errada? Hoje só apagando a conta e criando outra.
+- O **"aviso para jovens"** hoje é uma seção curta no aviso de privacidade geral ("Crianças e adolescentes"). **[PERGUNTA]** é preciso um texto separado, em linguagem para adolescentes?
+
 **Decisão que preciso do revisor:** (i) qual opção; (ii) idade mínima para cada recurso (12? 13? 16? 18?); (iii) qual nível de verificação de idade basta; (iv) se a data de nascimento pode ficar só no aparelho; (v) texto do aviso para jovens.
 
 ## 10. Inventário de medidas de segurança (resumo)
@@ -162,7 +184,7 @@ O "mundo real" contém **10 mil jogadores reais e 370 clubes** com nome, apelido
 
 1. Quem é o controlador e é preciso encarregado e canal de contato? Qual canal mínimo (e-mail, formulário) para o titular?
 2. Bases legais por finalidade (conta e ligas; nuvem; moderação; relato de problema; dados de jogadores reais).
-3. Menores: opção, idades, verificação (seção 9).
+3. Menores: confirmar o modo protegido de 12 a 15 anos e **a idade de liberação total (16 ou 18?)**, o nível de verificação e o texto para jovens (seções 9.3 e 9.4). **Decisão obrigatória antes do lançamento.**
 4. Transferência internacional (Cloudflare) e o que dizer no aviso.
 5. Retenções: está bem **12 meses sem uso** para apagar contas e saves (hoje desligada)? Prazo para ligas inativas? 90 dias para relatos? Banimentos permanecem?
 6. Completar a **exportação** com ligas e denúncias? É exigido?
@@ -175,7 +197,8 @@ O "mundo real" contém **10 mil jogadores reais e 370 clubes** com nome, apelido
 
 | Assunto | Arquivo |
 |---|---|
-| Tabelas do banco | `server/migrations/0001_identities.sql`, `0002_leagues.sql`, `0003_moderation.sql`, `0004_problems.sql` |
+| Tabelas do banco | `server/migrations/0001_identities.sql`, `0002_leagues.sql`, `0003_moderation.sql`, `0004_problems.sql`, `0005_age_band.sql` |
+| Faixa de idade e modo protegido | `src/online/agePolicy.ts` (as duas idades e a lista de nomes de liga), `identityApi.ts` (cadastro, troca de apelido), `leagueApi.ts` (criar, listar e entrar), `src/ui/screens/online/CreateAccount.tsx`, `tests/onlineAge.test.ts` |
 | Identidade e código de recuperação | `src/online/identity.ts`, `recoveryCode.ts`, `src/store/identityStore.ts` |
 | Saves na nuvem (apagar, exportar) | `src/online/cloudSave.ts`, `cloudSaveApi.ts` |
 | Limites e contadores de IP | `src/online/rateLimit.ts`, `guard.ts`, `server/worker.ts` (classe `Guard`) |

@@ -43,7 +43,7 @@ if (mode === 'cloud') {
   identity = identityFromSeed(fromBase64Url(readFileSync(file, 'utf8').trim())!)
 } else {
   identity = createIdentity(random).identity
-  const text = JSON.stringify({ turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX' })
+  const text = JSON.stringify({ turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX', ageBand: '18+' })
   const parts = { method: 'POST', path: '/api/identity', body: text }
   const res = await fetch(base + parts.path, { method: 'POST', body: text, headers: { Authorization: signRequest(identity, parts, Date.now(), random) } })
   if (res.status !== 201) throw new Error(`Não criou a identidade de teste: ${res.status}`)
