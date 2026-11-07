@@ -34,7 +34,8 @@ function writeNow(): Promise<void> {
   timer = undefined
   const game = getGame()
   const slot = getActiveSlot()
-  if (!game || slot === null || game === lastSaved) return inFlight
+  // O jogo online é o espelho de uma liga do servidor: nunca vai para um espaço de save do aparelho.
+  if (!game || game.online || slot === null || game === lastSaved) return inFlight
   lastSaved = game
   setStatus({ state: 'saving' })
   inFlight = inFlight
@@ -56,7 +57,7 @@ function writeNow(): Promise<void> {
 export function startAutosave(delayMs = 300): () => void {
   const off = subscribeGame(() => {
     const game = getGame()
-    if (!game || getActiveSlot() === null || game === lastSaved) return
+    if (!game || game.online || getActiveSlot() === null || game === lastSaved) return
     if (timer !== undefined) clearTimeout(timer)
     timer = setTimeout(() => void writeNow(), Math.max(delayMs, Math.min(MAX_DELAY_MS, Math.round(lastSaveMs * DUTY))))
   })

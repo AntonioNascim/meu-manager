@@ -11,6 +11,8 @@ import type { TradeReply, TradeOp } from './leagueApi'
 import type { TradeReport } from '../engine/league/trade'
 import type { AiSearchFilters } from '../engine/league/aimarket'
 import type { CupsBody } from '../engine/league/cupsView'
+import type { LeagueCommand } from '../engine/league/command'
+import type { MirrorPayload } from '../engine/league/mirror'
 
 export type LeagueClientDeps = IdentityClientDeps
 
@@ -63,6 +65,12 @@ export const requestLiveTicket = (deps: LeagueClientDeps, identity: Identity, id
 
 /** Endereço do WebSocket da partida: o ticket vai na própria URL (o navegador não manda cabeçalhos no WebSocket). */
 export const liveSocketUrl = (base: string, leagueId: string, ticket: string): string => `${base.replace(/^http/, 'ws')}/api/leagues/${leagueId}/live?ticket=${encodeURIComponent(ticket)}`
+
+/** O espelho do mundo no aparelho (C2): a atualização desde `since` ou a carga completa, página a página. */
+export const mirrorFetch = (deps: LeagueClientDeps, identity: Identity, id: string, since: number | null, page = 0) => ask<{ payload: MirrorPayload }>(deps, identity, 'GET', `/api/leagues/${id}/mirror?${since !== null ? `since=${since}&` : ''}page=${page}`)
+
+/** Um comando do técnico (C2): o servidor valida, aplica e devolve a atualização do espelho. */
+export const sendCommand = (deps: LeagueClientDeps, identity: Identity, id: string, command: LeagueCommand, since: number | null) => ask<{ payload: MirrorPayload }>(deps, identity, 'POST', `/api/leagues/${id}/command`, { since, command })
 
 /** O clube do técnico: meta, contratos que vencem e base (B8.7). */
 export const clubState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ view: ClubView }>(deps, identity, 'GET', `/api/leagues/${id}/club`)

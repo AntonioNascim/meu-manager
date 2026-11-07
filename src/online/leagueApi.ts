@@ -12,6 +12,8 @@ import type { ClubAction, ClubError, ClubView } from '../engine/league/club'
 import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer, TradeReport, TradeResponse } from '../engine/league/trade'
 import type { AiOffersBody, AiSearchFilters, MarketRow } from '../engine/league/aimarket'
 import type { CupsBody } from '../engine/league/cupsView'
+import { parseCommand, type LeagueCommand } from '../engine/league/command'
+import type { MirrorPayload } from '../engine/league/mirror'
 import type { ArrivingRow, BuyerRow, MineBody, PreRow } from '../engine/league/sellmarket'
 import { isProtectedLeagueName } from './agePolicy'
 import { accessOfRecord, authenticate, requireIdentity, type ApiRequest, type ApiDeps, type IdentityStore } from './identityApi'
@@ -100,6 +102,10 @@ export interface RoomPort {
   club(leagueId: string, playerId: string): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure }>
   /** Renovar, promover ou dispensar um jovem; a sala aplica as regras do jogo solo. */
   clubAction(leagueId: string, playerId: string, action: ClubAction): Promise<{ ok: true; view: ClubView } | { ok: false; error: RoomFailure } | { ok: false; refused: ClubError; minimumSalary?: number }>
+  /** O espelho do mundo no aparelho do técnico: a atualização desde `since` ou a carga completa (C2). */
+  mirror(leagueId: string, playerId: string, since: number | null, page: number): Promise<{ ok: true; payload: MirrorPayload } | { ok: false; error: RoomFailure }>
+  /** Um comando do técnico, validado e aplicado pela sala; devolve a atualização do espelho desde `since` (C2). */
+  command(leagueId: string, playerId: string, command: LeagueCommand, since: number | null): Promise<{ ok: true; payload: MirrorPayload } | { ok: false; error: RoomFailure } | { ok: false; refused: string; minimumSalary?: number }>
   /** As copas do mundo da liga e o caminho do clube do técnico nelas (B8.8). */
   cups(leagueId: string, playerId: string): Promise<{ ok: true; cups: CupsBody } | { ok: false; error: RoomFailure }>
   /** Mercado entre técnicos (B8.6): a sala aplica as regras e devolve o que a tela precisa. */
@@ -735,6 +741,39 @@ export async function cupsState(req: ApiRequest, deps: LeagueDeps, id: string): 
   const r = await deps.rooms.cups(id, auth.record.playerId)
   if (!r.ok) return roomFailure(r.error)
   return { status: 200, body: { cups: r.cups } }
+}
+
+/** O tamanho máximo do corpo de um comando (a tática é o maior). */
+const COMMAND_BODY_MAX = 4096
+
+/** O espelho do mundo no aparelho: a atualização desde a revisão `since` (ou a carga completa, em páginas). Só quem tem clube na liga em andamento. */
+export async function mirrorRead(req: ApiRequest, deps: LeagueDeps, id: string, query: { since?: string | null; page?: string | null }): Promise<LeagueResult<{ payload: MirrorPayload }>> {
+  const auth = await requireIdentity(req, 'read', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const since = query.since == null || query.since === '' ? null : /^\d{1,9}$/.test(query.since) ? Number(query.since) : undefined
+  const page = query.page == null || query.page === '' ? 0 : /^\d{1,3}$/.test(query.page) ? Number(query.page) : undefined
+  if (since === undefined || page === undefined) return fail(400, { error: 'bad-body' })
+  const m = await memberOf(deps, id, auth.record.playerId)
+  if (m !== 'ok') return m
+  const r = await deps.rooms.mirror(id, auth.record.playerId, since, page)
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { payload: r.payload } }
+}
+
+/** Um comando do técnico (tática, treino, base, contratos...). Corpo: `{ since, command }`. A sala valida e aplica; a resposta traz a atualização do espelho. */
+export async function leagueCommand(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ payload: MirrorPayload }>> {
+  const auth = await requireIdentity(req, 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  const o = parseJson(req.body, COMMAND_BODY_MAX)
+  const command = o && onlyKeys(o, ['since', 'command']) ? parseCommand(o.command) : undefined
+  const since = o?.since === null || o?.since === undefined ? null : typeof o.since === 'number' && Number.isInteger(o.since) && o.since >= 0 && o.since < 1e9 ? o.since : undefined
+  if (!command || since === undefined) return fail(400, { error: 'bad-body' })
+  const m = await memberOf(deps, id, auth.record.playerId)
+  if (m !== 'ok') return m
+  const r = await deps.rooms.command(id, auth.record.playerId, command, since)
+  if (!r.ok && 'refused' in r) return fail(409, { error: 'club-refused', reason: r.refused as ClubError, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) })
+  if (!r.ok) return roomFailure(r.error)
+  return { status: 200, body: { payload: r.payload } }
 }
 
 /** O clube do técnico (meta, contratos que vencem, base). Só quem tem clube na liga em andamento. */

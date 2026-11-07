@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, cupsState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, leagueCommand, mirrorRead, cupsState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -64,6 +64,18 @@ class FakeRoom implements RoomPort {
     this.clubCalls.push(`${action.type}:${id}:${playerId}:${action.playerId}`)
     if (action.playerId === 'recusa') return { ok: false as const, refused: 'salary' as const, minimumSalary: 5000 }
     return { ok: true as const, view: (await this.club(id, playerId)).view as never }
+  }
+  mirrorCalls: string[] = []
+  async mirror(id: string, playerId: string, since: number | null, page: number) {
+    this.mirrorCalls.push(`mirror:${id}:${playerId}:${since}:${page}`)
+    if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
+    return { ok: true as const, payload: { rev: 3, since, full: since === null, page } }
+  }
+  async command(id: string, playerId: string, command: { type: string }, since: number | null) {
+    this.mirrorCalls.push(`command:${command.type}:${id}:${playerId}:${since}`)
+    if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
+    if (command.type === 'ticket-price') return { ok: false as const, refused: 'invalid', minimumSalary: 1 }
+    return { ok: true as const, payload: { rev: 4, since, full: false } }
   }
   async ticket(id: string, playerId: string) {
     this.calls.push(`ticket:${id}:${playerId}`)
@@ -316,6 +328,30 @@ describe('andamento da liga (B8.4)', () => {
     expect(refused.status).toBe(409)
     expect(refused.body).toEqual({ error: 'club-refused', reason: 'salary', minimumSalary: 5000 })
     expect((await post(dudu, { type: 'promote', playerId: 'player-9' })).status).toBe(404)
+  })
+
+  it('Espelho e comandos (C2): só membro, só em andamento; consulta e corpo conferidos; recusa devolve o motivo', async () => {
+    const { s, ana, bia, dudu, id } = await running()
+    const get = (who: Identity, query: { since?: string | null; page?: string | null } = {}) => mirrorRead(s.req(who, 'GET', `/api/leagues/${id}/mirror`), s.deps, id, query)
+    const cmd = (who: Identity, body: unknown) => leagueCommand(s.req(who, 'POST', `/api/leagues/${id}/command`, body), s.deps, id)
+    expect((await get(bia)).status).toBe(409)
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    expect((await get(bia)).status).toBe(200)
+    expect((await get(dudu)).status).toBe(404)
+    await get(bia, { since: '7', page: '2' })
+    expect(s.room.mirrorCalls).toContain(`mirror:${id}:${bia.playerId}:7:2`)
+    expect(s.room.mirrorCalls).toContain(`mirror:${id}:${bia.playerId}:null:0`)
+    for (const bad of [{ since: '-1' }, { since: 'x' }, { page: '9999' }, { page: 'a' }]) expect((await get(bia, bad)).status).toBe(400)
+    expect((await cmd(bia, { since: 3, command: { type: 'training-plan', plan: { intensity: 'normal', focus: 'balanced' } } })).status).toBe(200)
+    expect(s.room.mirrorCalls).toContain(`command:training-plan:${id}:${bia.playerId}:3`)
+    // corpo ruim: comando desconhecido, campo a mais, valor fora da lista, revisão estranha, campo extra na raiz
+    for (const bad of [{ since: 1, command: { type: 'apagar-tudo' } }, { since: 1, command: { type: 'training-plan', plan: { intensity: 'x', focus: 'balanced' } } }, { since: 1.5, command: { type: 'cancel-individual-training' } }, { since: 1, command: { type: 'cancel-individual-training' }, extra: 1 }, { since: 1 }]) {
+      expect((await cmd(bia, bad)).status).toBe(400)
+    }
+    const refused = await cmd(bia, { since: 1, command: { type: 'ticket-price', price: 50 } })
+    expect(refused.status).toBe(409)
+    expect(refused.body).toEqual({ error: 'club-refused', reason: 'invalid', minimumSalary: 1 })
+    expect((await cmd(dudu, { since: 1, command: { type: 'cancel-individual-training' } })).status).toBe(404)
   })
 
   it('Mercado: só membro e liga em andamento; as denúncias só o ADM vê; corpos conferidos; recusa devolve o motivo', async () => {

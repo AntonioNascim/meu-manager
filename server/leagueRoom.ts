@@ -83,6 +83,7 @@ import {
 } from '../src/engine/league'
 import type { SeasonState } from '../src/engine/season'
 import type { Position } from '../src/engine/types'
+import { applyCommand, buildDelta, buildFull, diffWorlds, mergeChanges, parseCommand, type MirrorChange } from '../src/engine/league'
 import { turnRunner } from '../src/store/game'
 import { createLeagueWorld } from '../src/store/leagueWorld'
 import type { LeagueRecord, TradeOp } from '../src/online/leagueApi'
@@ -160,6 +161,9 @@ export class LeagueRoom {
   private recent = new Map<string, number[]>()
   /** Quando o jogo volta depois do aviso de retomada (só em memória: o aviso dura 10 s). */
   private resumeAt?: number
+  /** Espelho (C2): o mundo na última revisão e a revisão atual; o registro das mudanças fica no `kv` (`ml:<rev>`). */
+  private mirrorBase?: SeasonState
+  private rev = 0
   /** Quantas vezes esta instância foi criada (sobe a cada reinício; serve de prova nos testes). */
   readonly boot: number
 
@@ -204,6 +208,8 @@ export class LeagueRoom {
     const league = this.get('league')
     if (league) this.league = JSON.parse(league) as LeagueState
     this.world = world
+    this.mirrorBase = world
+    this.rev = Number(this.get('mrev') ?? 0)
     this.cursor = JSON.parse(this.get('cursor') ?? '{}') as Cursor
     const liveMeta = this.get('live')
     if (liveMeta && !this.live) this.live = this.loadLive(JSON.parse(liveMeta) as Omit<StoredLiveEvent, 'games'> & { games: { matchId: string; clock: number }[] })
@@ -246,8 +252,64 @@ export class LeagueRoom {
         this.inputSaved.clear()
         this.cmdsSaved.clear()
       }
-      if (opts.world && this.world) this.store.save(this.world)
+      if (opts.world && this.world) {
+        this.store.save(this.world)
+        this.trackWorld()
+      }
     })
+  }
+
+  // ------------------------------------------------------------ espelho do mundo no aparelho (Fase 6C, C2)
+  /** Quantas revisões o registro guarda: quem está mais atrás baixa a carga completa. */
+  static readonly MIRROR_LOG = 64
+  /** Mudança grande demais para valer a pena como diferença (virada de temporada): vira "refazer tudo". */
+  static readonly MIRROR_RESET = 3000
+
+  /** Compara o mundo com o da última revisão e, se algo que o aparelho vê mudou, sobe a revisão e guarda o que mudou. */
+  protected trackWorld(): void {
+    const world = this.world
+    if (!world) return
+    if (!this.mirrorBase) {
+      this.rev = Number(this.get('mrev') ?? 0)
+      this.mirrorBase = world
+      return
+    }
+    if (this.mirrorBase === world) return
+    const change = diffWorlds(this.mirrorBase, world)
+    this.mirrorBase = world
+    const nothing = Object.keys(change.players).length === 0 && change.removedPlayers.length === 0 && change.teams.length === 0 && change.removedTeams.length === 0 && change.matches.length === 0 && change.removedMatches.length === 0 && change.sections.length === 0
+    if (nothing) return
+    this.rev += 1
+    const reset = Object.keys(change.players).length > LeagueRoom.MIRROR_RESET || change.matches.length > LeagueRoom.MIRROR_RESET
+    this.set(`ml:${this.rev}`, JSON.stringify(reset ? { reset: true } : change))
+    this.set('mrev', String(this.rev))
+    this.sql.exec('DELETE FROM kv WHERE k = ?', `ml:${this.rev - LeagueRoom.MIRROR_LOG}`)
+  }
+
+  /** As mudanças juntas das revisões depois de `since`; `undefined` se algum pedaço se perdeu ou foi uma virada (o aparelho baixa tudo). */
+  private changesSince(since: number): MirrorChange | undefined {
+    if (since < this.rev - LeagueRoom.MIRROR_LOG + 1) return undefined
+    const list: MirrorChange[] = []
+    for (let r = since + 1; r <= this.rev; r++) {
+      const raw = this.get(`ml:${r}`)
+      if (!raw) return undefined
+      const parsed = JSON.parse(raw) as MirrorChange & { reset?: boolean }
+      if (parsed.reset) return undefined
+      list.push(parsed)
+    }
+    const merged = mergeChanges(list)
+    return Object.keys(merged.players).length > LeagueRoom.MIRROR_RESET ? undefined : merged
+  }
+
+  /** A carga que o técnico recebe: a atualização desde `since` ou, sem ela (ou antiga demais), a carga completa em páginas. */
+  protected mirrorFor(teamId: string, since: number | null, page: number) {
+    const world = this.world as SeasonState
+    this.trackWorld()
+    if (since !== null && since <= this.rev) {
+      const change = since === this.rev ? diffWorlds(world, world) : this.changesSince(since)
+      if (change) return buildDelta(world, teamId, this.rev, since, change)
+    }
+    return buildFull(world, teamId, this.rev, page)
   }
 
   /** Cria a sala com o mundo e a liga prontos (B8 faz isto pelo fluxo de "Criar liga"). */
@@ -255,6 +317,8 @@ export class LeagueRoom {
     this.meta = meta
     this.league = league
     this.world = world
+    this.mirrorBase = world
+    this.rev = 0
     this.live = undefined
     this.cursor = {}
     this.set('meta', JSON.stringify(meta))
@@ -773,6 +837,25 @@ export class LeagueRoom {
       this.world = result.world
       this.persist({ world: true })
       return Response.json({ ok: true, view: clubView(result.world, seat.teamId) })
+    }
+    if (path === '/internal/mirror') {
+      const seat = this.league?.seats.find((s) => s.playerId === playerId)
+      if (!seat) return no('not-seated')
+      const since = typeof body.since === 'number' && Number.isInteger(body.since) && body.since >= 0 ? body.since : null
+      const page = typeof body.page === 'number' && Number.isInteger(body.page) && body.page >= 0 ? body.page : 0
+      return Response.json({ ok: true, payload: this.mirrorFor(seat.teamId, since, page) })
+    }
+    if (path === '/internal/command') {
+      const seat = this.league?.seats.find((s) => s.playerId === playerId)
+      if (!seat) return no('not-seated')
+      const command = parseCommand(body.command)
+      if (!command) return no('bad-state')
+      const since = typeof body.since === 'number' && Number.isInteger(body.since) && body.since >= 0 ? body.since : null
+      const result = applyCommand(world, seat.teamId, command)
+      if (!result.ok) return Response.json({ ok: false, refused: result.error, ...(result.minimumSalary !== undefined ? { minimumSalary: result.minimumSalary } : {}) })
+      this.world = result.world
+      this.persist({ world: true })
+      return Response.json({ ok: true, payload: this.mirrorFor(seat.teamId, since, 0) })
     }
     if (path === '/internal/ticket') {
       if (!this.league?.seats.some((s) => s.playerId === playerId)) return no('not-seated')

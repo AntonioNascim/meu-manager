@@ -20,6 +20,8 @@ import { LeagueRoom } from './leagueRoom'
 import type { PaceId } from '../src/engine/league/pace'
 import type { LeagueView } from '../src/engine/league/view'
 import type { ClubAction, ClubError, ClubView } from '../src/engine/league/club'
+import type { LeagueCommand } from '../src/engine/league/command'
+import type { MirrorPayload } from '../src/engine/league/mirror'
 import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer } from '../src/engine/league/trade'
 import type { BuyerRow, MineBody, PreRow } from '../src/engine/league/sellmarket'
 import { fileReport, parseReport, type ModerationDeps } from '../src/online/moderation'
@@ -29,7 +31,7 @@ import { D1ProblemStore } from './problemStore'
 import { submitProblem, PROBLEM_LIMITS } from '../src/online/problemApi'
 import type { AiOffersBody, MarketRow } from '../src/engine/league/aimarket'
 import type { CupsBody } from '../src/engine/league/cupsView'
-import { adminAction, changePace, clubDecision, clubState, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
+import { adminAction, changePace, clubDecision, clubState, leagueCommand, mirrorRead, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
@@ -234,6 +236,28 @@ class DoRooms implements RoomPort {
       return { ok: false as const, error: 'unavailable' as const }
     }
   }
+  async mirror(leagueId: string, playerId: string, since: number | null, page: number) {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch('https://room/internal/mirror', { method: 'POST', body: JSON.stringify({ playerId, since, page }) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; payload?: MirrorPayload }
+      return json.ok && json.payload ? { ok: true as const, payload: json.payload } : { ok: false as const, error: json.error ?? ('unavailable' as const) }
+    } catch {
+      return { ok: false as const, error: 'unavailable' as const }
+    }
+  }
+  async command(leagueId: string, playerId: string, command: LeagueCommand, since: number | null) {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch('https://room/internal/command', { method: 'POST', body: JSON.stringify({ playerId, command, since }) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; payload?: MirrorPayload; refused?: string; minimumSalary?: number }
+      if (json.ok && json.payload) return { ok: true as const, payload: json.payload }
+      if (json.refused) return { ok: false as const, refused: json.refused, ...(json.minimumSalary !== undefined ? { minimumSalary: json.minimumSalary } : {}) }
+      return { ok: false as const, error: json.error ?? ('unavailable' as const) }
+    } catch {
+      return { ok: false as const, error: 'unavailable' as const }
+    }
+  }
   async ticket(leagueId: string, playerId: string) {
     try {
       const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
@@ -319,6 +343,8 @@ async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDe
   if (method === 'POST' && second?.startsWith('trade-') && ACTS.includes(second.slice(6))) {
     return respondLeague(await tradeAct(request, deps, first, second.slice(6) as TradeActKind), cors)
   }
+  if (second === 'mirror' && method === 'GET') return respondLeague(await mirrorRead(request, deps, first, { since: url.searchParams.get('since'), page: url.searchParams.get('page') }), cors)
+  if (second === 'command' && method === 'POST') return respondLeague(await leagueCommand(request, deps, first), cors)
   if (second === 'club' && method === 'GET') return respondLeague(await clubState(request, deps, first), cors)
   if (second === 'club' && method === 'POST') return respondLeague(await clubDecision(request, deps, first), cors)
   if (second === 'live-ticket' && method === 'POST') return respondLeague(await liveTicket(request, deps, first), cors)

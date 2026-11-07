@@ -58,6 +58,13 @@ export interface SeasonArchive {
   userMatches: ArchivedMatch[]
 }
 
+/** De onde vem o jogo online: a liga, a revisão do espelho e se o aparelho está conectado. */
+export interface OnlineInfo {
+  leagueId: string
+  rev: number
+  connection: 'online' | 'offline'
+}
+
 export interface Game {
   /** Semente do mundo e da temporada (mesma semente = mesmo jogo). */
   seed: number
@@ -83,6 +90,8 @@ export interface Game {
   savedLineups?: (SavedLineup | null)[]
   /** Reputação do técnico e o dia em que chegou ao clube (sem ele, vale a do clube; saves antigos não têm). */
   coach?: Coach
+  /** Preenchido quando o jogo é o espelho de uma liga online (Fase 6C): não é salvo no aparelho e as ações do técnico vão ao servidor como comandos. */
+  online?: OnlineInfo
   /** Pacote de dados importado que deu origem ao mundo (guardado no navegador, tabela `packages`); sem ele, o mundo fictício padrão. */
   dataPackage?: { id: string; name: string }
 }
