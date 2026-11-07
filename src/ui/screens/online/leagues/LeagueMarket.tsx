@@ -29,9 +29,9 @@ const endAfter = (worldDate: string, years: number): string => `${Number(worldDa
  * Mercado entre técnicos da liga (B8.6): propostas com dinheiro reservado e contrapropostas, elencos dos outros técnicos, jogadores livres e o histórico público
  * (com denúncia). O servidor aplica todas as regras (janela, limite de estrangeiros, faixa de preço, limites por par de técnicos); a tela só mostra e pede.
  */
-export function LeagueMarket({ league, teams, worldDate, onClose }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; worldDate: string; onClose: () => void }) {
+export function LeagueMarket({ league, teams, worldDate, onClose, coachesOnly = false }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; worldDate: string; onClose: () => void; coachesOnly?: boolean }) {
   const id = league.id
-  const [tab, setTab] = useState<Tab>('offers')
+  const [tab, setTab] = useState<Tab>(coachesOnly ? 'coaches' : 'offers')
   const [body, setBody] = useState<TradeBody | null>(null)
   const [ai, setAi] = useState<AiOffersBody | null>(null)
   const [mine, setMine] = useState<MineBody | null>(null)
@@ -87,15 +87,22 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
           <Tabs
             value={tab}
             onChange={setTab}
-            options={[
-              { id: 'offers', label: awaiting > 0 ? `Propostas (${awaiting})` : 'Propostas' },
-              { id: 'search', label: 'Buscar' },
-              { id: 'listings', label: 'Anúncios' },
-              { id: 'mine', label: 'Vender' },
-              { id: 'pre', label: 'Pré-contrato' },
-              { id: 'coaches', label: 'Técnicos' },
-              { id: 'history', label: 'Histórico' },
-            ]}
+            options={(coachesOnly
+              ? [
+                  // Dentro do jogo (Fase 6C) a compra, a venda e o pré-contrato com a IA são as abas do Mercado do jogo solo: aqui só o que é entre técnicos.
+                  { id: 'coaches', label: 'Técnicos' },
+                  { id: 'offers', label: 'Propostas' },
+                  { id: 'history', label: 'Histórico' },
+                ]
+              : [
+                  { id: 'offers', label: awaiting > 0 ? `Propostas (${awaiting})` : 'Propostas' },
+                  { id: 'search', label: 'Buscar' },
+                  { id: 'listings', label: 'Anúncios' },
+                  { id: 'mine', label: 'Vender' },
+                  { id: 'pre', label: 'Pré-contrato' },
+                  { id: 'coaches', label: 'Técnicos' },
+                  { id: 'history', label: 'Histórico' },
+                ]) as { id: Tab; label: string }[]}
           />
           {error && <p className="rounded-xl border border-loss/40 bg-loss/10 p-2 text-sm text-loss" data-testid="market-error">{error}</p>}
         </div>

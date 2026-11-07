@@ -4,7 +4,7 @@
  */
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
-import { replayResult, type CommandOutcome, type LiveEvent, type LiveView, type QueuedCommand, type ReplayRecord } from '../engine/league/live'
+import { LIVE_SPEEDS, replayResult, type CommandOutcome, type LiveEvent, type LiveView, type QueuedCommand, type ReplayRecord } from '../engine/league/live'
 import type { MatchEvent, Mentality, PlayStyle, TeamMatchStats } from '../engine/types'
 import type { MatchSnapshot, PlayTrace, SideSnapshot } from '../engine/match'
 import type { MatchResult } from '../engine/types'
@@ -17,6 +17,10 @@ export type ClientMessage =
   /** Abre ou retoma a conexão. `since` = último minuto que o cliente já viu (0 = tudo). */
   | { t: 'hello'; since: number }
   | { t: 'cmd'; id: string; command: QueuedCommand['command'] }
+  /** A velocidade do jogo deste técnico (1, 2, 4 ou 8; a mesma do jogo solo). */
+  | { t: 'speed'; value: number }
+  /** "Voltar ao jogo" no intervalo. */
+  | { t: 'half' }
   | { t: 'ping' }
 
 export type ParseProblem = 'too-large' | 'not-json' | 'bad-shape' | 'bad-command'
@@ -58,6 +62,8 @@ export function parseClientMessage(text: string): { ok: true; message: ClientMes
   if (!raw || typeof raw !== 'object') return { ok: false, problem: 'bad-shape' }
   const o = raw as Record<string, unknown>
   if (o.t === 'ping') return { ok: true, message: { t: 'ping' } }
+  if (o.t === 'half') return { ok: true, message: { t: 'half' } }
+  if (o.t === 'speed') return typeof o.value === 'number' && (LIVE_SPEEDS as readonly number[]).includes(o.value) ? { ok: true, message: { t: 'speed', value: o.value } } : { ok: false, problem: 'bad-shape' }
   if (o.t === 'hello') return int(o.since ?? 0, 0, 120) ? { ok: true, message: { t: 'hello', since: (o.since as number | undefined) ?? 0 } } : { ok: false, problem: 'bad-shape' }
   if (o.t === 'cmd') {
     if (!isId(o.id)) return { ok: false, problem: 'bad-shape' }
@@ -74,6 +80,11 @@ export interface GameFrame {
   awayGoals: number
   finished: boolean
   controlled: { home: boolean; away: boolean }
+  /** A velocidade que vale para a partida (a mais lenta entre as escolhas dos técnicos conectados) e a escolha de cada técnico. */
+  speed: number
+  speeds: Record<string, number>
+  /** Intervalo em andamento: quanto falta (ms) e quem já tocou em "Voltar ao jogo". */
+  halftime?: { leftMs: number; ready: string[] }
   /** Lesão à espera da escolha do técnico (o jogo dele está parado): quem se machucou e quanto falta para entrar o melhor reserva. */
   injury?: { side: 'home' | 'away'; playerId: string; leftMs: number }
   /** Só o que o cliente ainda não tinha. */
@@ -123,21 +134,28 @@ export type ServerMessage =
   | { t: 'pong' }
 
 /** Quantos eventos e lances de cada partida o cliente já recebeu (para mandar só a diferença). */
-export type Cursor = Record<string, { events: number; trace: number }>
+export type Cursor = Record<string, { events: number; trace: number; minute: number; meta: string }>
 
 /** O que mudou desde o cursor, e o cursor novo. */
-export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cursor): { frame: ServerMessage; cursor: Cursor } {
+export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cursor): { frame: ServerMessage | undefined; cursor: Cursor } {
   const next: Cursor = {}
-  const games = views.map((v): GameFrame => {
-    const seen = cursor[v.matchId] ?? { events: 0, trace: 0 }
-    next[v.matchId] = { events: v.snapshot.events.length, trace: v.snapshot.trace.length }
-    return {
+  const games: GameFrame[] = []
+  for (const v of views) {
+    const seen = cursor[v.matchId] ?? { events: 0, trace: 0, minute: -1, meta: '' }
+    // O que muda sem o jogo andar (velocidade, intervalo, lesão, quem controla, fim) também vale um quadro; o tempo que falta não (a tela conta sozinha).
+    const meta = JSON.stringify([v.controlled, v.speed, v.speeds, v.halftime?.ready ?? null, v.snapshot.injuryPending ?? null, v.snapshot.finished])
+    next[v.matchId] = { events: v.snapshot.events.length, trace: v.snapshot.trace.length, minute: v.snapshot.minute, meta }
+    if (seen.minute === v.snapshot.minute && seen.meta === meta && seen.events === v.snapshot.events.length && seen.trace === v.snapshot.trace.length) continue
+    games.push({
       matchId: v.matchId,
       minute: v.snapshot.minute,
       homeGoals: v.snapshot.homeGoals,
       awayGoals: v.snapshot.awayGoals,
       finished: v.snapshot.finished,
       controlled: v.controlled,
+      speed: v.speed,
+      speeds: v.speeds,
+      ...(v.halftime ? { halftime: v.halftime } : {}),
       ...(v.snapshot.injuryPending ? { injury: { ...v.snapshot.injuryPending, leftMs: v.injuryLeftMs ?? 0 } } : {}),
       events: v.snapshot.events.slice(seen.events),
       trace: v.snapshot.trace.slice(seen.trace),
@@ -148,9 +166,9 @@ export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cur
       ...(v.snapshot.extraTime ? { extraTime: true } : {}),
       ...(v.snapshot.penalties ? { penalties: v.snapshot.penalties } : {}),
       ...(v.snapshot.shootout ? { shootout: v.snapshot.shootout } : {}),
-    }
-  })
-  return { frame: { t: 'frame', minute: e.clock, games }, cursor: next }
+    })
+  }
+  return { frame: games.length > 0 ? { t: 'frame', minute: e.clock, games } : undefined, cursor: next }
 }
 
 /** Texto estável (chaves em ordem) para comparar resultados. */

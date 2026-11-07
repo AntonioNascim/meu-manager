@@ -7,7 +7,12 @@
 import { AcademyError } from '../academy'
 import { cancelIndividualTraining, startIndividualTraining, setTrainingPlan, TrainingError } from '../training'
 import { lineupForeignCount } from '../foreign'
-import { monthlyPayroll, setSalaryBudget, setTicketPrice } from '../finance'
+import { monthlyOperations, monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../finance'
+import { evaluateBoard } from '../board'
+import { computeStandings } from '../season'
+import { makeOffer, respondToOffer } from '../market/offers'
+import { sellPlayer } from '../market/sell'
+import { PRE_CONTRACT_YEARS, offerPreContract } from '../market/precontract'
 import { listUserPlayer, ListingError, unlistUserPlayer } from '../market/listings'
 import { OfferError } from '../market/offers'
 import { releaseUserPlayer } from '../market/sell'
@@ -16,7 +21,7 @@ import type { SeasonState } from '../season'
 import { isGridPoint } from '../grid'
 import { applyClubAction, type ClubAction } from './club'
 import { POSITIONS, TRAINING_FOCUSES, TRAINING_GROUPS, TRAINING_INTENSITIES } from '../types'
-import type { GridPoint, IndividualGoal, Mentality, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan } from '../types'
+import type { GridPoint, IndividualGoal, Mentality, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan } from '../types'
 
 export type LeagueCommand =
   | { type: 'tactic'; tactic: Tactic }
@@ -29,9 +34,27 @@ export type LeagueCommand =
   | { type: 'unlist-player'; playerId: string }
   | { type: 'release-player'; playerId: string }
   | { type: 'club'; action: ClubAction }
+  | { type: 'offer'; kind: OfferKind; playerId: string; fee: number; salary: number; contractEnd: string }
+  | { type: 'respond-offer'; offerId: string; accept: boolean }
+  | { type: 'sell'; playerId: string; buyerId: string; kind: OfferKind; fee: number; contractEnd: string }
+  | { type: 'pre-contract'; playerId: string; salary: number; years: number }
+  | { type: 'request-funds' }
 
 export type CommandError = 'invalid' | 'not-found' | 'busy' | 'squad-full' | 'foreign-limit' | 'refused' | 'salary' | string
-export type CommandResult = { ok: true; world: SeasonState } | { ok: false; error: CommandError; minimumSalary?: number }
+/** O resultado de uma negociação que a tela precisa ler (aceitou? por quê recusou? quanto pagaria?). */
+export type CommandInfo = Record<string, unknown>
+export type CommandResult = { ok: true; world: SeasonState; info?: CommandInfo } | { ok: false; error: CommandError; minimumSalary?: number }
+
+/** O que a liga acrescenta às regras: quais clubes são de técnicos humanos (a IA não negocia por eles pelo mercado da IA). */
+export interface CommandContext {
+  humans?: readonly TeamId[]
+}
+
+/** No máximo isto de propostas abertas por técnico a clubes da IA. */
+export const MAX_OPEN_OFFERS = 5
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+const isDate = (v: unknown): v is string => typeof v === 'string' && DATE.test(v)
+const isKind = (v: unknown): v is OfferKind => v === 'purchase' || v === 'loan'
 
 const STYLES: readonly PlayStyle[] = ['possession', 'counter-attack', 'high-press']
 const MENTALITIES: readonly Mentality[] = [-2, -1, 0, 1, 2]
@@ -108,13 +131,41 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
       const action = only(raw, ['type', 'action']) ? parseClub(raw.action) : undefined
       return action ? { type: 'club', action } : undefined
     }
+    case 'offer':
+      return only(raw, ['type', 'kind', 'playerId', 'fee', 'salary', 'contractEnd']) && isKind(raw.kind) && isId(raw.playerId) && money(raw.fee) && money(raw.salary, 1e9) && isDate(raw.contractEnd) ? { type: 'offer', kind: raw.kind, playerId: raw.playerId, fee: raw.fee, salary: raw.salary, contractEnd: raw.contractEnd } : undefined
+    case 'respond-offer':
+      return only(raw, ['type', 'offerId', 'accept']) && isId(raw.offerId) && typeof raw.accept === 'boolean' ? { type: 'respond-offer', offerId: raw.offerId, accept: raw.accept } : undefined
+    case 'sell':
+      return only(raw, ['type', 'playerId', 'buyerId', 'kind', 'fee', 'contractEnd']) && isId(raw.playerId) && isId(raw.buyerId) && isKind(raw.kind) && money(raw.fee) && isDate(raw.contractEnd) ? { type: 'sell', playerId: raw.playerId, buyerId: raw.buyerId, kind: raw.kind, fee: raw.fee, contractEnd: raw.contractEnd } : undefined
+    case 'pre-contract':
+      return only(raw, ['type', 'playerId', 'salary', 'years']) && isId(raw.playerId) && money(raw.salary, 1e9) && Number.isInteger(raw.years) && (PRE_CONTRACT_YEARS as readonly number[]).includes(raw.years as number) ? { type: 'pre-contract', playerId: raw.playerId, salary: raw.salary, years: raw.years as number } : undefined
+    case 'request-funds':
+      return only(raw, ['type']) ? { type: 'request-funds' } : undefined
     default:
       return undefined
   }
 }
 
+/** A confiança da diretoria no técnico hoje (a mesma conta de `boardOf`, sem a campanha de antes da chegada). */
+export function boardConfidence(world: SeasonState, teamId: TeamId): number {
+  const team = world.teams.find((t) => t.id === teamId)
+  const competition = world.season.competitions.find((c) => c.teamIds.includes(teamId))
+  if (!team || !competition) return 50
+  const table = computeStandings(competition.teamIds, world.matches.filter((m) => m.competitionId === competition.id))
+  const index = table.findIndex((r) => r.teamId === teamId)
+  return evaluateBoard({
+    objective: team.objective,
+    row: table[index],
+    position: index + 1,
+    teamCount: table.length,
+    totalGames: (table.length - 1) * 2,
+    balance: team.finances.balance,
+    monthlyCost: monthlyPayroll(world.players.filter((p) => p.teamId === teamId)) + monthlyOperations(team),
+  }).confidence
+}
+
 /** Aplica o comando ao mundo do clube `teamId`. Nunca lança por regra do jogo: devolve o motivo. */
-export function applyCommand(world: SeasonState, teamId: TeamId, command: LeagueCommand): CommandResult {
+export function applyCommand(world: SeasonState, teamId: TeamId, command: LeagueCommand, ctx: CommandContext = {}): CommandResult {
   const team = world.teams.find((t) => t.id === teamId)
   if (!team) return { ok: false, error: 'not-found' }
   try {
@@ -152,6 +203,36 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
       case 'club': {
         const r = applyClubAction(world, teamId, command.action)
         return r.ok ? r : { ok: false, error: r.error, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) }
+      }
+      case 'offer': {
+        const player = world.players.find((p) => p.id === command.playerId)
+        if (!player) return { ok: false, error: 'not-found' }
+        if (player.teamId !== null && ctx.humans?.includes(player.teamId)) return { ok: false, error: 'human-club' }
+        if (ctx.humans && world.market.offers.filter((o) => o.direction === 'outgoing' && o.status === 'pending' && o.buyerId === teamId).length >= MAX_OPEN_OFFERS) return { ok: false, error: 'too-many-offers' }
+        return { ok: true, world: makeOffer(world, teamId, { kind: command.kind, playerId: command.playerId, fee: Math.round(command.fee), salary: Math.round(command.salary), contractEnd: command.contractEnd }) }
+      }
+      case 'respond-offer': {
+        const offer = world.market.offers.find((o) => o.id === command.offerId)
+        if (!offer || offer.direction !== 'incoming' || offer.status !== 'pending' || offer.sellerId !== teamId) return { ok: false, error: 'not-found' }
+        return { ok: true, world: respondToOffer(world, command.offerId, command.accept) }
+      }
+      case 'sell': {
+        if (ctx.humans?.includes(command.buyerId)) return { ok: false, error: 'human-club' }
+        if (!world.teams.some((t) => t.id === command.buyerId)) return { ok: false, error: 'not-found' }
+        const r = sellPlayer(world, teamId, { playerId: command.playerId, buyerId: command.buyerId, kind: command.kind, fee: Math.round(command.fee), contractEnd: command.contractEnd })
+        return { ok: true, world: r.accepted ? r.state : world, info: { accepted: r.accepted, ...(r.reason ? { reason: r.reason } : {}), ...(r.counter !== undefined ? { counter: r.counter } : {}) } }
+      }
+      case 'pre-contract': {
+        const player = world.players.find((p) => p.id === command.playerId)
+        if (!player) return { ok: false, error: 'not-found' }
+        if (player.teamId !== null && ctx.humans?.includes(player.teamId)) return { ok: false, error: 'human-club' }
+        const r = offerPreContract(world, teamId, command.playerId, { salary: Math.round(command.salary), years: command.years })
+        return { ok: true, world: r.accepted ? r.state : world, info: { accepted: r.accepted, ...(r.reason ? { reason: r.reason } : {}), ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) } }
+      }
+      case 'request-funds': {
+        const r = requestFunds(world, teamId, boardConfidence(world, teamId))
+        const { state: next, ...info } = r
+        return { ok: true, world: r.granted ? next : world, info }
       }
     }
   } catch (e) {

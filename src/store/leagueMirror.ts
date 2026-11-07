@@ -5,17 +5,17 @@
  * Sem conexão o espelho continua legível e os comandos são recusados (`offline`): não há fila de comandos para depois (o relógio da liga andou).
  */
 import { applyCommand, applyPayload, emptyMirror, toSeasonState } from '../engine/league'
-import type { CommandError, LeagueCommand, MirrorPayload, MirrorState } from '../engine/league'
+import type { CommandError, CommandInfo, LeagueCommand, MirrorPayload, MirrorState } from '../engine/league'
 import type { SeasonState } from '../engine/season'
 
 export type TransportFailure = { ok: false; error: string; reason?: string; minimumSalary?: number }
 export interface MirrorTransport {
   fetch(since: number | null, page: number): Promise<{ ok: true; payload: MirrorPayload } | TransportFailure>
-  command(command: LeagueCommand, since: number | null): Promise<{ ok: true; payload: MirrorPayload } | TransportFailure>
+  command(command: LeagueCommand, since: number | null): Promise<{ ok: true; payload: MirrorPayload; info?: CommandInfo } | TransportFailure>
 }
 
 export type Connection = 'online' | 'offline'
-export type Outcome = { ok: true } | { ok: false; error: CommandError | 'offline' | 'no-mirror' | 'server'; minimumSalary?: number }
+export type Outcome = { ok: true; info?: CommandInfo } | { ok: false; error: CommandError | 'offline' | 'no-mirror' | 'server'; minimumSalary?: number }
 
 export class LeagueMirror {
   private state: MirrorState = emptyMirror()
@@ -33,6 +33,9 @@ export class LeagueMirror {
 
   get rev(): number {
     return this.state.rev
+  }
+  get humans(): string[] | undefined {
+    return this.state.own?.humans
   }
   get teamId(): string | undefined {
     return this.state.own?.teamId
@@ -108,7 +111,7 @@ export class LeagueMirror {
       const season = this.season()
       if (!teamId || !season) return { ok: false, error: 'no-mirror' }
       if (this.connection === 'offline') return { ok: false, error: 'offline' }
-      const local = applyCommand(season, teamId, command)
+      const local = applyCommand(season, teamId, command, { humans: this.state.own?.humans ?? [] })
       // Recusado aqui, nem chega ao servidor (a regra é a mesma).
       if (!local.ok) return { ok: false, error: local.error, ...(local.minimumSalary !== undefined ? { minimumSalary: local.minimumSalary } : {}) }
       this.optimistic = local.world
@@ -122,15 +125,16 @@ export class LeagueMirror {
         if (r.reason) return { ok: false, error: r.reason, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) }
         return { ok: false, error: 'server' }
       }
+      const info = r.info ?? local.info
       if (r.payload.full) {
         this.optimistic = undefined
         await this.syncNow()
-        return { ok: true }
+        return { ok: true, ...(info ? { info } : {}) }
       }
       this.state = applyPayload(this.state, r.payload)
       this.optimistic = undefined
       this.onChange()
-      return { ok: true }
+      return { ok: true, ...(info ? { info } : {}) }
     })
   }
 }

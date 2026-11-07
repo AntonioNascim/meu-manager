@@ -11,7 +11,6 @@ import { Sheet } from '../../../theme'
 import { ClubCard } from './ClubCard'
 import { CupsCard } from './CupsCard'
 import { LeagueMarket } from './LeagueMarket'
-import { LiveMatchOnline } from './LiveMatchOnline'
 import { formatMoney } from '../../../format'
 import { Pill } from './parts'
 
@@ -44,7 +43,6 @@ export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { le
   const [busy, setBusy] = useState(false)
   const [confirmAdvance, setConfirmAdvance] = useState(false)
   const [pacing, setPacing] = useState(false)
-  const [watching, setWatching] = useState(false)
   const [market, setMarket] = useState(false)
 
   const load = useCallback(async () => {
@@ -79,7 +77,6 @@ export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { le
   return (
     <>
       {market && <LeagueMarket league={league} teams={teams} worldDate={view.worldDate} onClose={() => setMarket(false)} />}
-      {watching && <LiveMatchOnline leagueId={id} onClose={() => setWatching(false)} />}
       <Status view={view} clubOf={clubOf} />
 
       {me && (
@@ -88,9 +85,9 @@ export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { le
             <>
               <p className="text-sm text-muted">{view.directResult || view.current.playing.includes(me.playerId) ? '' : 'Seu clube não joga nesta rodada. '}A rodada está acontecendo ({view.current.all - view.current.pending} de {view.current.all} partidas dos técnicos terminaram).</p>
               {!view.directResult && view.current.playing.includes(me.playerId) && (
-                <Button className="mt-3 w-full" onClick={() => setWatching(true)} data-testid="live-enter">
-                  Entrar na partida
-                </Button>
+                <p className="mt-2 text-sm font-semibold" data-testid="live-enter-hint">
+                  Seu clube joga agora: abra o jogo do clube e toque em Entrar na partida.
+                </p>
               )}
             </>
           ) : view.paused ? (
@@ -108,7 +105,7 @@ export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { le
         </Card>
       )}
 
-      {me && (
+      {me && !inGame && (
         <Card title="Mercado">
           <p className="text-sm text-muted">Proponha compras e empréstimos aos outros técnicos, contrate jogadores livres e acompanhe as transferências da liga.</p>
           <Button className="mt-3 w-full" onClick={() => setMarket(true)} data-testid="open-market">

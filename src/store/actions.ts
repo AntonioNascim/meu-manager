@@ -19,5 +19,5 @@ export async function perform(command: LeagueCommand): Promise<Outcome> {
   const r = applyCommand(game.season, game.userTeamId, command)
   if (!r.ok) return { ok: false, error: r.error, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) }
   updateGame((g) => ({ ...g, season: r.world }))
-  return { ok: true }
+  return { ok: true, ...(r.info ? { info: r.info } : {}) }
 }

@@ -63,6 +63,8 @@ export interface OnlineInfo {
   leagueId: string
   rev: number
   connection: 'online' | 'offline'
+  /** Clubes de técnicos humanos da liga (a IA não negocia por eles). */
+  humans?: string[]
 }
 
 export interface Game {

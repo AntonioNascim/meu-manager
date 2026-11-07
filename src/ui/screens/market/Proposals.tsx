@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { OfferError, pendingIncoming } from '../../../engine/market'
+import { pendingIncoming } from '../../../engine/market'
 import type { TransferOffer } from '../../../engine/types'
-import { respondToUserOffer } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { formatDate, formatMoney, playerName } from '../../format'
-import { OFFER_KIND_LABELS, OFFER_REASON_LABELS, OFFER_STATUS_LABELS } from '../../labels'
+import { OFFER_KIND_LABELS, OFFER_REASON_LABELS, OFFER_STATUS_LABELS, commandErrorText } from '../../labels'
 import { Panel, TopTabs } from '../../theme'
 import { clubName } from './parts'
 
@@ -50,12 +49,7 @@ export function Proposals({ game, open }: { game: Game; open: boolean }) {
   const sent = game.season.market.offers.filter((o) => o.direction === 'outgoing').slice().reverse()
   const past = game.season.market.offers.filter((o) => o.direction === 'incoming' && o.status !== 'pending').slice().reverse()
   const answer = (id: string, accept: boolean) => {
-    try {
-      updateGame((g) => respondToUserOffer(g, id, accept))
-      setError(null)
-    } catch (e) {
-      setError(e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível responder.')
-    }
+    void perform({ type: 'respond-offer', offerId: id, accept }).then((out) => setError(out.ok ? null : commandErrorText(out.error)))
   }
 
   return (

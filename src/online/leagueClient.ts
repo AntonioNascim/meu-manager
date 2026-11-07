@@ -70,7 +70,7 @@ export const liveSocketUrl = (base: string, leagueId: string, ticket: string): s
 export const mirrorFetch = (deps: LeagueClientDeps, identity: Identity, id: string, since: number | null, page = 0) => ask<{ payload: MirrorPayload }>(deps, identity, 'GET', `/api/leagues/${id}/mirror?${since !== null ? `since=${since}&` : ''}page=${page}`)
 
 /** Um comando do técnico (C2): o servidor valida, aplica e devolve a atualização do espelho. */
-export const sendCommand = (deps: LeagueClientDeps, identity: Identity, id: string, command: LeagueCommand, since: number | null) => ask<{ payload: MirrorPayload }>(deps, identity, 'POST', `/api/leagues/${id}/command`, { since, command })
+export const sendCommand = (deps: LeagueClientDeps, identity: Identity, id: string, command: LeagueCommand, since: number | null) => ask<{ payload: MirrorPayload; info?: Record<string, unknown> }>(deps, identity, 'POST', `/api/leagues/${id}/command`, { since, command })
 
 /** O clube do técnico: meta, contratos que vencem e base (B8.7). */
 export const clubState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ view: ClubView }>(deps, identity, 'GET', `/api/leagues/${id}/club`)

@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { listingOf, listingPrice, marketValue } from '../../../engine/market'
 import { playerOverall } from '../../../engine/overall'
 import type { ListingKind, Player } from '../../../engine/types'
-import { listUserSquadPlayer, squadOf, unlistUserSquadPlayer } from '../../../store/game'
+import { squadOf } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { playerName } from '../../format'
 import { formatMoney } from '../../format'
 import { POSITION_SHORT_LABELS } from '../../labels'
@@ -25,12 +25,7 @@ function ListSheet({ game, player, onClose }: { game: Game; player: Player; onCl
   const [error, setError] = useState<string | null>(null)
 
   const save = () => {
-    try {
-      updateGame((g) => listUserSquadPlayer(g, player.id, kind, price))
-      onClose()
-    } catch {
-      setError('Informe um preço válido.')
-    }
+    void perform({ type: 'list-player', playerId: player.id, kind, price }).then((out) => (out.ok ? onClose() : setError('Informe um preço válido.')))
   }
   return (
     <Sheet
@@ -47,8 +42,7 @@ function ListSheet({ game, player, onClose }: { game: Game; player: Player; onCl
               <button
                 type="button"
                 onClick={() => {
-                  updateGame((g) => unlistUserSquadPlayer(g, player.id))
-                  onClose()
+                  void perform({ type: 'unlist-player', playerId: player.id }).then(() => onClose())
                 }}
                 className="min-h-12 rounded-xl border border-loss/60 px-5 font-bold text-loss active:scale-95"
               >

@@ -64,7 +64,7 @@ describe('lesão na partida ao vivo online: o técnico escolhe quem entra', () =
     expect(mine.injuryLeftMs).toBeLessThanOrEqual(INJURY_WAIT_MS)
     // O quadro que vai para o cliente leva a lesão e o estado do cliente a guarda e a tira quando resolve.
     const { frame } = frameSince(later.event, views, {})
-    expect(frame.t === 'frame' && frame.games.find((x) => x.matchId === f.game.matchId)?.injury).toMatchObject({ side: f.side, playerId: f.game.live.injuryPending!.playerId })
+    expect(frame?.t === 'frame' && frame.games.find((x) => x.matchId === f.game.matchId)?.injury).toMatchObject({ side: f.side, playerId: f.game.live.injuryPending!.playerId })
   })
 
   it('o técnico escolhe o reserva: ele entra, o jogo volta e a partida refeita pelo registro dá o mesmo resultado', () => {
@@ -137,7 +137,7 @@ describe('lesão na partida ao vivo online: o técnico escolhe quem entra', () =
     let state = applyMessage(initialLiveState(), { t: 'full', minute: f.event.clock, paused: false, games: views, roster: { teams: [], players: [] }, me: { teamId: f.seats.find((s) => s.playerId === ownerOf(f))!.teamId } })
     expect(myGame(state)?.injury).toMatchObject({ side: f.side })
     const resolved = stepLiveEvent(enqueueCommand(f.event, f.seats, ownerOf(f), 'x', { type: 'injury' }, f.now).event, f.seats, f.now + MINUTE_MS).event
-    state = applyMessage(state, frameSince(resolved, viewOf(resolved, f.seats), {}).frame)
+    state = applyMessage(state, frameSince(resolved, viewOf(resolved, f.seats), {}).frame!)
     expect(myGame(state)?.injury).toBeUndefined()
     expect(myGame(state)?.snapshot.injuryPending).toBeUndefined()
   })

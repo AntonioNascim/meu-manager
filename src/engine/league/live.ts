@@ -2,7 +2,8 @@
  * Partida ao vivo numa liga online (Fase 6, B7; proposta, seções 2.6, 2.8 e 4.4). Puro: nada aqui lê o relógio da máquina (`now` entra por parâmetro) nem
  * fala com rede. O Durable Object chama `stepLiveEvent` a cada alarme e entrega as mensagens que isto devolve.
  *
- * - O servidor simula (mesmo motor, `startMatch`); o cliente só manda **comandos**, que ficam numa fila e entram no **próximo minuto**.
+ * - O servidor simula (mesmo motor, `startMatch`); o cliente só manda **comandos**, que ficam numa fila e entram no próximo passo do relógio (Fase 6C: cada
+ *   partida tem o seu relógio, a 700 ms por minuto de jogo dividido pela velocidade que o técnico escolheu; dois técnicos no mesmo jogo usam a mais lenta).
  * - Cada partida humana guarda a lista de comandos com o minuto em que valeram (`ReplayRecord`): com a entrada e a semente, qualquer um refaz a partida e
  *   compara o resultado. É também como o objeto se reconstrói depois de uma hibernação ou de um reinício (`rebuildLiveEvent`).
  * - Técnico desconectado = IA completa (`setControlled(false)`); ao voltar, retoma no minuto seguinte. Lesão não para o jogo (o motor troca na hora).
@@ -10,6 +11,7 @@
 import { startMatch, type LiveMatch, type MatchSide, type MatchSnapshot } from '../match'
 import type { MatchInput } from '../match'
 import type { GridPoint, IsoDate, Mentality, Match, MatchResult, PlayStyle, TeamId } from '../types'
+import { BASE_MINUTE_MS, holdFor } from '../match/timing'
 import type { SeasonState } from '../season'
 import { humanMatchInput } from '../season/advance'
 import { applyEventAbsence, type LeagueKind } from './absence'
@@ -23,6 +25,18 @@ export const RESUME_WARNING_MS = 10_000
 export const MAX_MINUTE = 120
 /** Quanto tempo de relógio do evento (sem contar pausas) o jogo de um técnico espera a escolha do reserva depois de uma lesão; passado isso entra o melhor reserva, como a IA faria. */
 export const INJURY_WAIT_MS = 45_000
+
+/** Velocidades que o técnico escolhe (as mesmas do jogo solo). */
+export const LIVE_SPEEDS = [1, 2, 4, 8] as const
+export type LiveSpeed = (typeof LIVE_SPEEDS)[number]
+/** A velocidade de quem ainda não escolheu (a mesma do solo). */
+export const DEFAULT_SPEED: LiveSpeed = 2
+/** Partida sem técnico conectado: ninguém assiste, roda na velocidade máxima e sem câmera lenta. */
+export const UNWATCHED_SPEED: LiveSpeed = 8
+/** O intervalo dura até 1 minuto; termina antes quando todos os técnicos do jogo tocam em "Voltar ao jogo". */
+export const HALFTIME_MS = 60_000
+/** O alarme da sala acorda em segundos cheios: no máximo uma vez por segundo, qualquer que seja o número de partidas. */
+export const GRID_MS = 1_000
 
 export type LiveCommand =
   | { type: 'style'; style: PlayStyle }
@@ -62,6 +76,16 @@ export interface LiveGame {
   commands: CommandRecord[]
   /** Minuto do relógio já jogado. */
   clock: number
+  /** Quando (ms reais) o próximo minuto desta partida fica devido. */
+  nextAt: number
+  /** A velocidade que cada técnico do jogo escolheu (quem não escolheu usa `DEFAULT_SPEED`). Não entra na reprodução: não muda o resultado. */
+  speeds: Record<string, number>
+  /** Intervalo em andamento: até quando e quem já tocou em "Voltar ao jogo". */
+  halftime?: { until: number; ready: string[] }
+  halftimeDone?: boolean
+  /** Só em memória: quanto dos lances e eventos o relógio já viu (a câmera lenta olha só o que veio depois). */
+  seenTrace: number
+  seenEvents: number
   /** Só em memória: reconstruído a partir de `input` e `commands` quando falta. */
   live: LiveMatch
   /** Só em memória: quando (tempo do evento, sem pausas) a lesão pendente foi vista e quanto falta para entrar o melhor reserva. */
@@ -80,12 +104,10 @@ export interface LiveEvent {
   date: IsoDate
   /** Horário real em que o evento começou. */
   startedAt: number
-  /** Tempo real de cada minuto de jogo. */
+  /** Tempo real de cada minuto de jogo na velocidade 1x. */
   minuteMs: number
-  /** Tempo real parado (pausas e avisos) até agora, sem contar uma pausa em curso. */
-  pausedTotal: number
   pausedAt?: number
-  /** Último minuto jogado em todas as partidas. */
+  /** O maior minuto jogado entre as partidas (para a tela e a reconexão). */
   clock: number
   games: LiveGame[]
   queue: QueuedCommand[]
@@ -97,7 +119,7 @@ export interface LiveEvent {
 
 /** O que sobra do evento depois de tirar os objetos do motor: é o que vai para o armazenamento. */
 export interface StoredLiveEvent extends Omit<LiveEvent, 'games'> {
-  games: (ReplayRecord & { clock: number })[]
+  games: (ReplayRecord & Pick<LiveGame, 'clock' | 'nextAt' | 'speeds' | 'halftime' | 'halftimeDone'>)[]
 }
 
 export type RejectReason = 'not-your-team' | 'game-finished' | 'expired' | 'invalid' | 'engine'
@@ -138,8 +160,8 @@ function applyCommand(live: LiveMatch, side: MatchSide, c: LiveCommand): void {
 }
 
 /** Começa uma partida do zero com a entrada dada. */
-export function startGame(matchId: string, input: MatchInput): LiveGame {
-  return { matchId, homeTeamId: input.home.team.id, awayTeamId: input.away.team.id, input, commands: [], clock: 0, live: startMatch(input) }
+export function startGame(matchId: string, input: MatchInput, nextAt = 0): LiveGame {
+  return { matchId, homeTeamId: input.home.team.id, awayTeamId: input.away.team.id, input, commands: [], clock: 0, nextAt, speeds: {}, seenTrace: 0, seenEvents: 0, live: startMatch(input) }
 }
 
 /**
@@ -192,51 +214,83 @@ export function startLiveEvent(
   const games = current.pending.map((id) => {
     const match = world.matches.find((m) => m.id === id) as Match
     // `holdInjurySubs`: a lesão de um time com técnico para o jogo dele até a escolha do reserva (ou até `INJURY_WAIT_MS`).
-    return startGame(id, { ...humanMatchInput(world, match, humans, away), holdInjurySubs: true, ...(injuryRate !== undefined ? { injuryRate } : {}) })
+    return startGame(id, { ...humanMatchInput(world, match, humans, away), holdInjurySubs: true, ...(injuryRate !== undefined ? { injuryRate } : {}) }, now + minuteMs / DEFAULT_SPEED)
   })
   const present = league.seats.filter((s) => here.has(s.playerId)).map((s) => s.playerId)
-  return { date: current.date, startedAt: now, minuteMs, pausedTotal: 0, clock: 0, games, queue: [], connected: [...here], present }
+  return { date: current.date, startedAt: now, minuteMs, clock: 0, games, queue: [], connected: [...here], present }
 }
 
-export const toStored = (e: LiveEvent): StoredLiveEvent => ({ ...e, games: e.games.map((g) => ({ ...replayOf(g), clock: g.clock })) })
+export const toStored = (e: LiveEvent): StoredLiveEvent => ({
+  ...e,
+  games: e.games.map((g) => ({ ...replayOf(g), clock: g.clock, nextAt: g.nextAt, speeds: g.speeds, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}) })),
+})
 
 /** Reconstrói o evento guardado (depois de hibernar ou reiniciar): cada partida volta ao minuto em que estava. */
 export function rebuildLiveEvent(stored: StoredLiveEvent): LiveEvent {
   const games = stored.games.map((r) => {
     const g = rebuildGame(r, r.clock)
     g.clock = r.clock
+    g.nextAt = r.nextAt
+    g.speeds = { ...(r.speeds ?? {}) }
+    if (r.halftime) g.halftime = { until: r.halftime.until, ready: [...r.halftime.ready] }
+    if (r.halftimeDone) g.halftimeDone = true
+    const snap = g.live.snapshot()
+    g.seenTrace = snap.trace.length
+    g.seenEvents = snap.events.length
     return g
   })
   return { ...stored, games }
 }
 
-/** Tempo real descontadas as pausas (e o aviso de retomada). */
-function elapsed(e: LiveEvent, now: number): number {
-  const until = e.pausedAt ?? now
-  return Math.max(0, until - e.startedAt - e.pausedTotal)
-}
-
-/** Minuto de jogo devido em `now`. */
-export const minuteAt = (e: LiveEvent, now: number): number => Math.min(MAX_MINUTE, Math.floor(elapsed(e, now) / e.minuteMs))
-
-/** Quando o próximo minuto fica devido (para o alarme); `undefined` se o evento está pausado ou acabou. */
-export function nextMinuteAt(e: LiveEvent, now: number): number | undefined {
-  if (e.pausedAt !== undefined || isFinished(e)) return undefined
-  const next = Math.max(now, e.startedAt + e.pausedTotal + (e.clock + 1) * e.minuteMs)
-  return next
-}
-
 export const isFinished = (e: LiveEvent): boolean => e.games.every((g) => g.live.finished)
+
+/** Os técnicos ativos e conectados que jogam esta partida (quem a assiste de verdade). */
+function humansOf(e: LiveEvent, seats: readonly Seat[], g: Pick<LiveGame, 'homeTeamId' | 'awayTeamId'>): Seat[] {
+  return seats.filter((s) => (s.teamId === g.homeTeamId || s.teamId === g.awayTeamId) && s.status === 'active' && e.connected.includes(s.playerId))
+}
+
+/**
+ * A velocidade que vale para a partida: a **mais lenta** entre as escolhas dos técnicos conectados nela (o jogo é o mesmo para os dois), a de quem
+ * escolheu ou `DEFAULT_SPEED`; sem técnico conectado ninguém assiste e roda na máxima.
+ */
+export function speedOf(e: LiveEvent, seats: readonly Seat[], g: LiveGame): LiveSpeed {
+  const humans = humansOf(e, seats, g)
+  if (humans.length === 0) return UNWATCHED_SPEED
+  return Math.min(...humans.map((s) => g.speeds[s.playerId] ?? DEFAULT_SPEED)) as LiveSpeed
+}
+
+/**
+ * Quando o relógio deve acordar de novo (para o alarme da sala), arredondado para segundos cheios; `undefined` se o evento está pausado ou acabou.
+ * Uma partida parada por lesão espera o técnico até `INJURY_WAIT_MS`; uma em intervalo, até o fim dele.
+ */
+export function nextWakeAt(e: LiveEvent, now: number): number | undefined {
+  if (e.pausedAt !== undefined || isFinished(e)) return undefined
+  let t = Infinity
+  for (const g of e.games) {
+    if (g.live.finished) continue
+    if (g.halftime) t = Math.min(t, g.halftime.until)
+    else if (g.live.injuryPending) t = Math.min(t, (g.injuryAt ?? now) + INJURY_WAIT_MS)
+    else t = Math.min(t, g.nextAt)
+  }
+  if (!Number.isFinite(t)) return undefined
+  return Math.ceil(Math.max(now, t) / GRID_MS) * GRID_MS
+}
 
 export function pauseLiveEvent(e: LiveEvent, now: number): LiveEvent {
   return e.pausedAt === undefined ? { ...e, pausedAt: now } : e
 }
 
-/** Retoma do minuto em que parou, com 10 s de aviso antes do próximo lance. */
+/** Retoma do minuto em que parou, com 10 s de aviso antes do próximo lance: o relógio de cada partida anda o tempo da pausa. */
 export function resumeLiveEvent(e: LiveEvent, now: number, warningMs = RESUME_WARNING_MS): LiveEvent {
   if (e.pausedAt === undefined) return e
   const { pausedAt: _gone, ...rest } = e
-  return { ...rest, pausedTotal: e.pausedTotal + (now - e.pausedAt) + warningMs }
+  const shift = now - e.pausedAt + warningMs
+  for (const g of e.games) {
+    g.nextAt += shift
+    if (g.halftime) g.halftime = { ...g.halftime, until: g.halftime.until + shift }
+    if (g.injuryAt !== undefined) g.injuryAt += shift
+  }
+  return rest
 }
 
 // ------------------------------------------------------------------ comandos
@@ -251,7 +305,7 @@ export function seatGame(e: LiveEvent, seat: Pick<Seat, 'teamId'>): { game: Live
 }
 
 /**
- * Põe o comando na fila (`ok: false` na hora se o técnico não joga neste evento ou a partida já acabou). Entra no próximo minuto, em `stepLiveEvent`.
+ * Põe o comando na fila (`ok: false` na hora se o técnico não joga neste evento ou a partida já acabou). Entra no próximo passo do relógio, em `stepLiveEvent`.
  * A validação de regras do jogo (trocas, estrangeiros, jogador em campo) é do motor e aparece no resultado do passo.
  */
 export function enqueueCommand(e: LiveEvent, seats: readonly Seat[], playerId: string, id: string, command: QueuedCommand['command'], now: number): { event: LiveEvent; outcome?: CommandOutcome } {
@@ -261,6 +315,36 @@ export function enqueueCommand(e: LiveEvent, seats: readonly Seat[], playerId: s
   if (found.game.live.finished) return { event: e, outcome: { id, playerId, ok: false, reason: 'game-finished' } }
   if (e.queue.some((q) => q.id === id)) return { event: e }
   return { event: { ...e, queue: [...e.queue, { id, playerId, command, receivedAt: now }] } }
+}
+
+/** O técnico escolhe a velocidade do jogo dele (vale do minuto seguinte). `false` se ele não joga neste evento ou a velocidade não existe. */
+export function setSpeed(e: LiveEvent, seats: readonly Seat[], playerId: string, speed: number): boolean {
+  if (!(LIVE_SPEEDS as readonly number[]).includes(speed)) return false
+  const seat = seats.find((s) => s.playerId === playerId)
+  const found = seat ? seatGame(e, seat) : undefined
+  if (!found || found.game.live.finished) return false
+  found.game.speeds = { ...found.game.speeds, [playerId]: speed }
+  return true
+}
+
+/**
+ * "Voltar ao jogo" no intervalo. O jogo volta quando todos os técnicos conectados nele tocaram (ou quando o minuto acaba). Devolve `true` se a
+ * partida voltou agora.
+ */
+export function readyForSecondHalf(e: LiveEvent, seats: readonly Seat[], playerId: string, now: number): boolean {
+  const seat = seats.find((s) => s.playerId === playerId)
+  const found = seat ? seatGame(e, seat) : undefined
+  const g = found?.game
+  if (!g || !g.halftime) return false
+  if (!g.halftime.ready.includes(playerId)) g.halftime = { ...g.halftime, ready: [...g.halftime.ready, playerId] }
+  const needed = humansOf(e, seats, g).map((s) => s.playerId)
+  if (needed.every((p) => g.halftime!.ready.includes(p))) {
+    g.halftime = undefined
+    g.halftimeDone = true
+    g.nextAt = Math.max(g.nextAt, now)
+    return true
+  }
+  return false
 }
 
 /** Técnico conectou ou caiu. Muda o controle do time no próximo minuto e anota a presença. */
@@ -279,6 +363,8 @@ export function setConnected(e: LiveEvent, seats: readonly Seat[], playerId: str
     const controlled = connected && seat.status === 'active'
     found.game.live.setControlled(found.side, controlled)
     found.game.commands.push({ minute: found.game.clock, side: found.side, command: { type: 'control', controlled }, by: 'system' })
+    // Ninguém mais esperando o intervalo: quem caiu não segura o adversário.
+    if (!connected && found.game.halftime) readyForSecondHalf(next, seats, playerId, 0)
   }
   return next
 }
@@ -288,100 +374,105 @@ export function setConnected(e: LiveEvent, seats: readonly Seat[], playerId: str
 export interface LiveStep {
   event: LiveEvent
   outcomes: CommandOutcome[]
-  /** Minuto jogado neste passo (o último). */
+  /** O maior minuto jogado entre as partidas. */
   minute: number
   finished: boolean
 }
 
 /**
- * Leva o evento ao minuto devido em `now`, um minuto de cada vez. Antes de cada minuto, os comandos da fila entram (os que esperaram mais de 2 minutos
- * caem). Pode ser chamado a qualquer momento: se nada é devido, nada muda.
+ * Leva cada partida ao ponto devido em `now`: antes de tudo entram os comandos da fila (os que esperaram mais de 2 minutos caem); depois cada partida joga os
+ * minutos que já venceram no relógio dela (700 ms ÷ velocidade, mais a câmera lenta dos lances quando há técnico assistindo), para no intervalo e na lesão que
+ * espera o técnico. Pode ser chamado a qualquer momento: se nada é devido, nada muda.
  */
 export function stepLiveEvent(from: LiveEvent, seats: readonly Seat[], now: number): LiveStep {
   let e = from
   const outcomes: CommandOutcome[] = []
-  const target = minuteAt(e, now)
-  while (e.clock < target && !isFinished(e)) {
-    const minute = e.clock + 1
-    // 1. comandos que esperavam (os vencidos caem)
-    const queue = e.queue
-    e = { ...e, queue: [] }
-    for (const q of queue) {
-      if (now - q.receivedAt > COMMAND_EXPIRES_MS) {
-        outcomes.push({ id: q.id, playerId: q.playerId, ok: false, reason: 'expired' })
-        continue
-      }
-      const seat = seats.find((s) => s.playerId === q.playerId)
-      const found = seat ? seatGame(e, seat) : undefined
-      if (!found || found.game.live.finished) {
-        outcomes.push({ id: q.id, playerId: q.playerId, ok: false, reason: found ? 'game-finished' : 'not-your-team' })
-        continue
-      }
-      try {
-        applyCommand(found.game.live, found.side, q.command)
-        found.game.commands.push({ minute: found.game.clock, side: found.side, command: q.command, by: q.playerId })
-        outcomes.push({ id: q.id, playerId: q.playerId, ok: true, minute: found.game.clock })
-      } catch (err) {
-        outcomes.push({ id: q.id, playerId: q.playerId, ok: false, reason: 'engine', detail: err instanceof Error ? err.message : String(err) })
-      }
+  if (e.pausedAt !== undefined) return { event: e, outcomes, minute: e.clock, finished: false }
+  // 1. comandos que esperavam (os vencidos caem); valem no ponto em que a partida está, e a reprodução refaz igual
+  const queue = e.queue
+  e = { ...e, queue: [] }
+  for (const q of queue) {
+    if (now - q.receivedAt > COMMAND_EXPIRES_MS) {
+      outcomes.push({ id: q.id, playerId: q.playerId, ok: false, reason: 'expired' })
+      continue
     }
-    // 2. lesões que esperam o técnico: sem ele (caiu ou é a IA) ou depois de `INJURY_WAIT_MS`, entra o melhor reserva
-    settleInjuries(e, seats)
-    // 3. o minuto
-    for (const g of e.games) {
-      if (g.live.finished) continue
+    const seat = seats.find((s) => s.playerId === q.playerId)
+    const found = seat ? seatGame(e, seat) : undefined
+    if (!found || found.game.live.finished) {
+      outcomes.push({ id: q.id, playerId: q.playerId, ok: false, reason: found ? 'game-finished' : 'not-your-team' })
+      continue
+    }
+    try {
+      applyCommand(found.game.live, found.side, q.command)
+      found.game.commands.push({ minute: found.game.clock, side: found.side, command: q.command, by: q.playerId })
+      outcomes.push({ id: q.id, playerId: q.playerId, ok: true, minute: found.game.clock })
+    } catch (err) {
+      outcomes.push({ id: q.id, playerId: q.playerId, ok: false, reason: 'engine', detail: err instanceof Error ? err.message : String(err) })
+    }
+  }
+  // 2. o relógio de cada partida
+  for (const g of e.games) {
+    for (let guard = 0; guard < MAX_MINUTE + 10; guard++) {
+      if (g.live.finished) break
+      if (g.halftime) {
+        if (now < g.halftime.until) break
+        g.halftime = undefined
+        g.halftimeDone = true
+      }
+      settleInjury(e, seats, g, now)
+      if (g.live.injuryPending) break // espera o técnico escolher o reserva (ou `INJURY_WAIT_MS`)
+      if (g.nextAt > now) break
+      const minute = g.clock + 1
       g.live.playUntil(minute)
       g.clock = minute
-    }
-    e = { ...e, clock: minute }
-  }
-  // O relógio parou no teto (120'): lesão que ainda espera não tem mais tempo de esperar, entra o melhor reserva e a partida termina.
-  if (e.clock >= MAX_MINUTE && !isFinished(e)) {
-    settleInjuries(e, seats, true)
-    for (const g of e.games) {
-      if (g.live.finished) continue
-      g.live.playUntil(MAX_MINUTE)
-      g.clock = MAX_MINUTE
+      const snap = g.live.snapshot()
+      const watchers = humansOf(e, seats, g).length
+      const hold = watchers > 0 ? holdFor(snap.trace.slice(g.seenTrace), snap.events.slice(g.seenEvents)) : 0
+      g.seenTrace = snap.trace.length
+      g.seenEvents = snap.events.length
+      g.nextAt += BASE_MINUTE_MS_OF(e) / speedOf(e, seats, g) + hold
+      // O intervalo: quando há técnico assistindo, até 1 minuto (ou até todos tocarem em "Voltar ao jogo").
+      if (minute === 45 && !g.halftimeDone && watchers > 0 && !g.live.finished) g.halftime = { until: g.nextAt + HALFTIME_MS, ready: [] }
     }
   }
-  markInjuries(e)
+  e = { ...e, clock: Math.max(e.clock, ...e.games.map((g) => g.clock)) }
+  // O relógio chegou ao teto (120'): lesão que ainda espera não tem mais tempo, entra o melhor reserva e a partida termina.
+  for (const g of e.games) {
+    if (g.live.finished || g.clock < MAX_MINUTE) continue
+    settleInjury(e, seats, g, now, true)
+    g.live.playUntil(MAX_MINUTE)
+  }
+  markInjuries(e, now)
   return { event: e, outcomes, minute: e.clock, finished: isFinished(e) }
 }
 
-/** O técnico do time está conectado e ativo (é ele quem escolhe, não a IA)? */
-const humanHere = (e: LiveEvent, seats: readonly Seat[], teamId: TeamId): boolean => {
-  const seat = seats.find((s) => s.teamId === teamId)
-  return !!seat && seat.status === 'active' && e.connected.includes(seat.playerId)
-}
+/** O tempo real de um minuto no 1x: o do evento (é o do solo, 700 ms; só os testes locais o encurtam). */
+const BASE_MINUTE_MS_OF = (e: LiveEvent): number => e.minuteMs || BASE_MINUTE_MS
 
-/** Resolve, como a IA, as lesões que esperam um técnico que não está mais ali ou que demorou demais. Anota no registro para a reprodução refazer igual. */
-function settleInjuries(e: LiveEvent, seats: readonly Seat[], force = false): void {
-  const t = e.clock * e.minuteMs // relógio do evento (os minutos já jogados): vale também quando o servidor recupera vários minutos de uma vez
-  for (const g of e.games) {
-    if (g.live.finished) continue
-    const pending = g.live.injuryPending
-    if (!pending) {
-      delete g.injuryAt
-      delete g.injuryLeftMs
-      continue
-    }
-    g.injuryAt ??= t
-    const teamId = pending.side === 'home' ? g.homeTeamId : g.awayTeamId
-    if (!force && humanHere(e, seats, teamId) && t - g.injuryAt < INJURY_WAIT_MS) continue
-    g.live.autoResolveInjury(pending.side)
-    g.commands.push({ minute: g.clock, side: pending.side, command: { type: 'injury-auto' }, by: 'system' })
+/** Resolve, como a IA, a lesão que espera um técnico que não está mais ali ou que demorou demais. Anota no registro para a reprodução refazer igual. */
+function settleInjury(e: LiveEvent, seats: readonly Seat[], g: LiveGame, now: number, force = false): void {
+  const pending = g.live.injuryPending
+  if (!pending) {
     delete g.injuryAt
     delete g.injuryLeftMs
+    return
   }
+  g.injuryAt ??= now
+  const teamId = pending.side === 'home' ? g.homeTeamId : g.awayTeamId
+  const here = seats.some((s) => s.teamId === teamId && s.status === 'active' && e.connected.includes(s.playerId))
+  if (!force && here && now - g.injuryAt < INJURY_WAIT_MS) return
+  g.live.autoResolveInjury(pending.side)
+  g.commands.push({ minute: g.clock, side: pending.side, command: { type: 'injury-auto' }, by: 'system' })
+  delete g.injuryAt
+  delete g.injuryLeftMs
 }
 
 /** Depois do passo: para cada lesão pendente, anota desde quando espera e quanto falta (a tela mostra a contagem). */
-function markInjuries(e: LiveEvent): void {
-  const t = e.clock * e.minuteMs
+function markInjuries(e: LiveEvent, now: number): void {
   for (const g of e.games) {
     if (g.live.finished || !g.live.injuryPending) continue
-    g.injuryAt ??= t
-    g.injuryLeftMs = Math.max(0, INJURY_WAIT_MS - (t - g.injuryAt))
+    g.injuryAt ??= now
+    g.injuryLeftMs = Math.max(0, INJURY_WAIT_MS - (now - g.injuryAt))
   }
 }
 
@@ -392,17 +483,30 @@ export interface LiveView {
   snapshot: MatchSnapshot
   /** Quem controla cada lado agora (`false` = IA). */
   controlled: { home: boolean; away: boolean }
+  /** A velocidade que vale para a partida (a mais lenta entre as escolhas dos técnicos conectados) e a escolha de cada um. */
+  speed: LiveSpeed
+  speeds: Record<string, number>
+  /** Intervalo em andamento: quanto falta e quem já tocou em "Voltar ao jogo". */
+  halftime?: { leftMs: number; ready: string[] }
   /** Lesão à espera da escolha do técnico: quanto tempo real falta para entrar o melhor reserva. */
   injuryLeftMs?: number
 }
 
 /** O estado de todas as partidas, para quem conecta ou reconecta (o servidor manda o que o cliente perdeu: o snapshot traz todos os eventos até agora). */
-export function viewOf(e: LiveEvent, seats: readonly Seat[]): LiveView[] {
+export function viewOf(e: LiveEvent, seats: readonly Seat[], now: number = Date.now()): LiveView[] {
   const humanOf = (teamId: TeamId) => {
     const seat = seats.find((s) => s.teamId === teamId)
     return !!seat && seat.status === 'active' && e.connected.includes(seat.playerId)
   }
-  return e.games.map((g) => ({ matchId: g.matchId, snapshot: g.live.snapshot(), controlled: { home: humanOf(g.homeTeamId), away: humanOf(g.awayTeamId) }, ...(g.injuryLeftMs !== undefined && g.live.injuryPending ? { injuryLeftMs: g.injuryLeftMs } : {}) }))
+  return e.games.map((g) => ({
+    matchId: g.matchId,
+    snapshot: g.live.snapshot(),
+    controlled: { home: humanOf(g.homeTeamId), away: humanOf(g.awayTeamId) },
+    speed: speedOf(e, seats, g),
+    speeds: g.speeds,
+    ...(g.halftime ? { halftime: { leftMs: Math.max(0, g.halftime.until - now), ready: g.halftime.ready } } : {}),
+    ...(g.injuryLeftMs !== undefined && g.live.injuryPending ? { injuryLeftMs: g.injuryLeftMs } : {}),
+  }))
 }
 
 /** Eventos da partida depois do minuto que o cliente já viu (reconexão). */

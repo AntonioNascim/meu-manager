@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { FINANCE } from '../../../engine/config'
 import { budgetTotal, monthlyPayroll, splitLimits } from '../../../engine/finance'
 import type { FundsReason, FundsResult } from '../../../engine/finance'
-import { requestUserFunds, squadOf, userTeam } from '../../../store/game'
+import { squadOf, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { getGame } from '../../../store/gameStore'
 import { perform } from '../../../store/actions'
 import { formatCompactMoney } from '../../format'
 import { Eyebrow, Icon, Panel, Sheet } from '../../theme'
@@ -94,9 +94,11 @@ export function FundsButton({ game }: { game: Game }) {
     queueMicrotask(() => ask())
   }
   const ask = () => {
-    const out = requestUserFunds(game)
-    if (out.game !== game) updateGame(() => out.game)
-    setResult({ result: out.result, purchases: userTeam(out.game).finances.transferBudget })
+    void perform({ type: 'request-funds' }).then((out) => {
+      if (!out.ok || !out.info) return
+      const now = getGame() ?? game
+      setResult({ result: out.info as unknown as FundsResult, purchases: userTeam(now).finances.transferBudget })
+    })
   }
   return (
     <>

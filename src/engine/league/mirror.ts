@@ -191,6 +191,8 @@ export interface OwnPart {
   players: Player[]
   academy: Player[]
   training: TrainingState
+  /** Clubes de técnicos humanos da liga (o mercado da IA não negocia por eles). */
+  humans?: TeamId[]
   /** Propostas e pré-contratos do clube. */
   offers: TransferOffer[]
   preContracts: MarketState['preContracts']
@@ -236,7 +238,7 @@ export interface MirrorPayload {
 /** Jogadores por página da carga completa (~2 MB de texto cada). */
 export const FULL_PAGE_PLAYERS = 2_500
 
-export function ownPart(world: SeasonState, teamId: TeamId): OwnPart {
+export function ownPart(world: SeasonState, teamId: TeamId, humans?: readonly TeamId[]): OwnPart {
   const team = world.teams.find((t) => t.id === teamId) as Team
   const mine = new Set(world.players.filter((p) => p.teamId === teamId).map((p) => p.id))
   const history: TrainingState['history'] = {}
@@ -245,6 +247,7 @@ export function ownPart(world: SeasonState, teamId: TeamId): OwnPart {
   return {
     teamId,
     team,
+    ...(humans ? { humans: [...humans] } : {}),
     players: world.players.filter((p) => p.teamId === teamId).map(ownPlayer),
     academy: world.academy.filter((p) => p.teamId === teamId).map(ownPlayer),
     training: { plans: t.plans[teamId] ? { [teamId]: t.plans[teamId] } : {}, individual: t.individual[teamId] ? { [teamId]: t.individual[teamId] } : {}, finished: t.finished[teamId] ? { [teamId]: t.finished[teamId] } : {}, history },
@@ -287,7 +290,7 @@ function patchOf(p: Player, letters: string): MirrorPlayerPatch {
 }
 
 /** A atualização desde a revisão `since` (as mudanças juntas já em `change`). */
-export function buildDelta(world: SeasonState, teamId: TeamId, rev: number, since: number, change: MirrorChange): MirrorPayload {
+export function buildDelta(world: SeasonState, teamId: TeamId, rev: number, since: number, change: MirrorChange, humans?: readonly TeamId[]): MirrorPayload {
   const byId = new Map(world.players.map((p) => [p.id, p] as const))
   const teams = new Map(world.teams.map((t) => [t.id, t] as const))
   const matches = new Map(world.matches.map((m) => [m.id, m] as const))
@@ -306,12 +309,12 @@ export function buildDelta(world: SeasonState, teamId: TeamId, rev: number, sinc
     matches: change.matches.flatMap((id) => (matches.has(id) ? [matches.get(id) as Match] : [])),
     removedMatches: change.removedMatches,
     // O clube do técnico vai quando algo mudou (o aparelho não sabe o que): quem pergunta na mesma revisão recebe só o aviso de que não há novidade.
-    ...(empty ? {} : { own: ownPart(world, teamId) }),
+    ...(empty ? {} : { own: ownPart(world, teamId, humans) }),
   }
 }
 
 /** A carga completa, página a página: a 0 leva tudo menos os jogadores; as seguintes levam os jogadores. */
-export function buildFull(world: SeasonState, teamId: TeamId, rev: number, page: number): MirrorPayload {
+export function buildFull(world: SeasonState, teamId: TeamId, rev: number, page: number, humans?: readonly TeamId[]): MirrorPayload {
   const pages = 1 + Math.ceil(world.players.length / FULL_PAGE_PLAYERS)
   if (page > 0) {
     const slice = world.players.slice((page - 1) * FULL_PAGE_PLAYERS, page * FULL_PAGE_PLAYERS)
@@ -319,7 +322,7 @@ export function buildFull(world: SeasonState, teamId: TeamId, rev: number, page:
   }
   const sections: Partial<MirrorSections> = {}
   for (const s of SECTIONS) (sections as Record<string, unknown>)[s] = sectionValue(world, s)
-  return { rev, since: null, full: true, page: 0, pages, sections, teams: world.teams.map(publicTeam), matches: world.matches, own: ownPart(world, teamId) }
+  return { rev, since: null, full: true, page: 0, pages, sections, teams: world.teams.map(publicTeam), matches: world.matches, own: ownPart(world, teamId, humans) }
 }
 
 // ---------------------------------------------------------------------------

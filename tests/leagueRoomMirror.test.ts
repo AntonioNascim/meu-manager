@@ -311,3 +311,27 @@ describe('LeagueMirror no aparelho (C2)', () => {
     expect(m.fullLoads).toBe(2)
   })
 })
+
+describe('mercado pelo espelho (C4)', () => {
+  it('a proposta a um clube da IA chega à sala, volta no espelho e a venda devolve o resultado', async () => {
+    const room = new TestRoom()
+    room.setup(base)
+    const m = new LeagueMirror(transportOf(room))
+    await m.sync()
+    const s = m.season()!
+    const buyer = s.teams.find((t) => t.id === MY)!
+    const target = s.players.find((p) => p.teamId !== MY && p.teamId !== null && p.position !== 'GK')!
+    expect(m.humans).toEqual([MY])
+    // O elenco começa cheio (30): libera o mais barato para abrir vaga.
+    const cheap = s.players.filter((p) => p.teamId === MY).sort((a, b) => a.contract.salary - b.contract.salary)[0]!
+    expect((await m.perform({ type: 'release-player', playerId: cheap.id })).ok).toBe(true)
+    const before = m.season()!.market.offers.length
+    const { expectedSalary } = await import('../src/engine/market')
+    const { contractEndIn } = await import('../src/engine/season')
+    const out = await m.perform({ type: 'offer', kind: 'purchase', playerId: target.id, fee: 1_000_000, salary: expectedSalary(target, buyer), contractEnd: contractEndIn(s, MY, 3) })
+    expect(out, JSON.stringify(out)).toMatchObject({ ok: true })
+    expect(m.season()!.market.offers.length).toBe(before + 1)
+    const sold = await m.perform({ type: 'sell', playerId: s.players.find((p) => p.teamId === MY)!.id, buyerId: s.teams.find((t) => t.id !== MY)!.id, kind: 'purchase', fee: 1, contractEnd: contractEndIn(s, MY, 3) })
+    expect(sold.ok && typeof sold.info?.accepted).toBe('boolean')
+  })
+})

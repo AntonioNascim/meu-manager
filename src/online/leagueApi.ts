@@ -105,7 +105,7 @@ export interface RoomPort {
   /** O espelho do mundo no aparelho do técnico: a atualização desde `since` ou a carga completa (C2). */
   mirror(leagueId: string, playerId: string, since: number | null, page: number): Promise<{ ok: true; payload: MirrorPayload } | { ok: false; error: RoomFailure }>
   /** Um comando do técnico, validado e aplicado pela sala; devolve a atualização do espelho desde `since` (C2). */
-  command(leagueId: string, playerId: string, command: LeagueCommand, since: number | null): Promise<{ ok: true; payload: MirrorPayload } | { ok: false; error: RoomFailure } | { ok: false; refused: string; minimumSalary?: number }>
+  command(leagueId: string, playerId: string, command: LeagueCommand, since: number | null): Promise<{ ok: true; payload: MirrorPayload; info?: Record<string, unknown> } | { ok: false; error: RoomFailure } | { ok: false; refused: string; minimumSalary?: number }>
   /** As copas do mundo da liga e o caminho do clube do técnico nelas (B8.8). */
   cups(leagueId: string, playerId: string): Promise<{ ok: true; cups: CupsBody } | { ok: false; error: RoomFailure }>
   /** Mercado entre técnicos (B8.6): a sala aplica as regras e devolve o que a tela precisa. */
@@ -761,7 +761,7 @@ export async function mirrorRead(req: ApiRequest, deps: LeagueDeps, id: string, 
 }
 
 /** Um comando do técnico (tática, treino, base, contratos...). Corpo: `{ since, command }`. A sala valida e aplica; a resposta traz a atualização do espelho. */
-export async function leagueCommand(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ payload: MirrorPayload }>> {
+export async function leagueCommand(req: ApiRequest, deps: LeagueDeps, id: string): Promise<LeagueResult<{ payload: MirrorPayload; info?: Record<string, unknown> }>> {
   const auth = await requireIdentity(req, 'write', deps)
   if (!auth.ok) return auth.result as LeagueResult<never>
   const o = parseJson(req.body, COMMAND_BODY_MAX)
@@ -773,7 +773,7 @@ export async function leagueCommand(req: ApiRequest, deps: LeagueDeps, id: strin
   const r = await deps.rooms.command(id, auth.record.playerId, command, since)
   if (!r.ok && 'refused' in r) return fail(409, { error: 'club-refused', reason: r.refused as ClubError, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) })
   if (!r.ok) return roomFailure(r.error)
-  return { status: 200, body: { payload: r.payload } }
+  return { status: 200, body: { payload: r.payload, ...(r.info ? { info: r.info } : {}) } }
 }
 
 /** O clube do técnico (meta, contratos que vencem, base). Só quem tem clube na liga em andamento. */

@@ -303,3 +303,58 @@
 | Guardar o espelho no aparelho (abrir sem baixar tudo; ler sem internet depois de fechar o app) | C6 |
 | Partida com campo 2D e narração, velocidade e intervalo | C5 |
 | Mercado completo com propostas e técnicos | C4 |
+
+---
+
+## 11. C2 e C3 publicadas (07/11/2026)
+
+Com a autorização dos sócios: `wrangler deploy` do Worker (versão `6c5123cc`, sem migração de banco, sem custo novo; as migrações 0004 e 0005 já estavam aplicadas) e site pelo GitHub Pages (`git push` da `main`, commit `6a9171f`). `/api/leagues/:id/mirror` responde 401 sem assinatura (a rota existe).
+
+## 12. C4 feita (07/11/2026): mercado completo e finanças
+
+**Não publicada** (precisa de `wrangler deploy` do Worker e do site; avisar antes). Testada com o servidor local e o navegador (`tools/online-lab/c4-e2e.mjs`, passa), mais `npm test` (123 arquivos, 1.408 testes, todos passam).
+
+### 12.1 O que o técnico faz agora no Mercado e nas Finanças da liga online
+
+- **Mercado do jogo solo, inteiro:** Buscar (filtros por série, posição, faixas, atalhos "Cabem no bolso", "Barganhas", "Jovens promessas", "Contrato acabando"), Favoritos, Listas, Livres, Pré-contrato, Propostas (recebidas e enviadas), Histórico e Contratos. Tudo roda sobre o espelho (o índice com os atributos de todos).
+- **Comandos novos ao servidor** (resultado na hora no aparelho; o servidor valida com as regras da liga): proposta de compra ou empréstimo a clube da IA (`offer`), resposta a proposta da IA por jogador seu (`respond-offer`), venda ou empréstimo a clube da IA (`sell`), pré-contrato (`pre-contract`), pedido de verba (`request-funds`, com a confiança da diretoria calculada no servidor: `boardConfidence`), renovação (`club` › `renew`), anunciar e tirar anúncio, liberar jogador, ingresso e orçamento. As negociações devolvem o resultado (`info`: aceitou, motivo, salário mínimo, máximo que o clube pagaria) e a tela mostra como no solo.
+- **O que a liga acrescenta às regras:** jogador de clube de outro técnico não é negociado pela IA (`human-club`, com a dica de usar a aba Técnicos), no máximo 5 propostas abertas (`too-many-offers`), clube de outro técnico não aparece como comprador na venda. O espelho leva a lista de clubes humanos (`own.humans`) para o aparelho aplicar a mesma regra na hora.
+- **Aba "Técnicos"** (só na liga online): a negociação entre técnicos humanos (taxa reservada, contraproposta, prazo de 48 h, histórico público, denúncia). O que já existia (`LeagueMarket`) passa a mostrar só o que é entre técnicos (`coachesOnly`); a compra, a venda e o pré-contrato com a IA são as abas do Mercado do jogo. O cartão "Mercado" da sala da liga saiu de dentro do jogo.
+- **Finanças:** extrato, balanço, ingresso, orçamento, pedir verba e alertas, todos com as telas do solo.
+
+### 12.2 Testes
+
+`tests/leagueCommandsMarket.test.ts` (7: corpo conferido, proposta que entra, jogador de técnico recusado, limite de 5, resposta inexistente, venda e pré-contrato com resultado, verba; no solo `perform` dá o mesmo mundo e o mesmo resultado que `requestUserFunds` e `makeUserOffer`), `tests/leagueRoomMirror.test.ts` (+1: proposta e venda pelo espelho ligado à sala), e2e `c4-e2e.mjs` (o servidor recusa com o motivo em português quando o elenco está cheio ou falta orçamento de salários; depois de liberar um jogador a proposta passa e volta no espelho; Propostas > Enviadas; aba Técnicos; pedido de verba). Capturas em `.shots/c4-*.png` e lado a lado `c4-lado-mercado.png` e `c4-lado-financas.png`.
+
+## 13. C5 feita (07/11/2026): partida ao vivo com a tela do jogo solo e velocidade individual
+
+**Não publicada** (precisa de `wrangler deploy` e do site; sem migração de banco). Testada em Node, com a sala de verdade em SQLite e no navegador (`tools/online-lab/c5-e2e.mjs`, passa; captura `.shots/c5-online-*.png` e `c5-lado-partida.png`).
+
+### 13.1 O que mudou
+
+- **Tela de partida = a do solo.** `Match.tsx` (campo 2D, narração, abas Jogos, Dados, Tática e Trocas, câmeras lentas, escudo do adversário) agora roda também sobre a liga online: `store/onlineMatch.ts` faz um `LiveMatch` que espelha os quadros do servidor (`snapshot()` = o último retrato; trocas, mudança tática, posições e escolha do reserva na lesão viram comandos que valem no passo seguinte do relógio, em menos de 1 s; estilo, mentalidade e formação aparecem na hora). Nada é simulado no aparelho. A entrada é o botão **Entrar na partida** do cartão da liga; a tela antiga (`LiveMatchOnline`) foi removida.
+- **Relógio por partida no servidor** (`engine/league/live.ts`): cada partida anda a **700 ms por minuto de jogo ÷ velocidade** (a mesma do solo) **mais a câmera lenta dos lances** (a regra mudou de `pitchModel.ts` para `engine/match/timing.ts`, que a tela e o servidor importam). Velocidades 1x, 2x, 4x e 8x (padrão 2x, como no solo); a velocidade não entra na reprodução (não muda o resultado). **Dois técnicos no mesmo jogo: vale a mais lenta** (se um cai, vale a do outro; sem ninguém conectado a partida roda a 8x e sem câmera lenta).
+- **Intervalo de até 1 minuto** (`HALFTIME_MS`), que acaba antes quando todos os técnicos do jogo tocam em **Voltar ao jogo** (os dois, num jogo entre técnicos); a tela mostra o cronômetro e "Esperando o adversário…". Lesão no seu time para o jogo até você escolher o reserva (ou 45 s), como no solo.
+- **Placar:** o botão de velocidade é o do solo (1x, 2x, 4x, 8x); num jogo entre técnicos aparece "valendo Nx" quando a escolha do outro é mais lenta. No fim, "Voltar ao painel" e o aviso de que a rodada espera as outras partidas; a aba Jogos mostra as outras partidas da rodada ao vivo.
+- **Alarme em grade de 1 s** (`GRID_MS`, `nextWakeAt`): acorda no máximo uma vez por segundo, qualquer que seja o número de partidas. Quadros só das partidas que mudaram (`frameSince` agora devolve `undefined` quando nada mudou). Protocolo novo: `speed` e `half` do cliente; `speed`, `speeds` e `halftime` por partida nos quadros.
+- **Comandos entram já** (a sala chama o relógio assim que um comando chega), não esperam o próximo minuto: a partida pode estar parada na lesão ou no intervalo.
+
+### 13.2 Custo no servidor (`PACOTE_REAL=1 node --expose-gc tools/run.mjs liveCost --humans 10 --speeds mix|1|8`; Node, mundo real de 370 clubes)
+
+O evento do teste teve 5 partidas e 5 técnicos jogando (de 10 na liga).
+
+| Velocidades | Evento no relógio real | Despertares do alarme | Quadros enviados | CPU total |
+|---|---|---|---|---|
+| todos em 1x (o pior caso) | **3,0 min** | 135 | 1.350 KB (mediana 11 KB, p95 19 KB) | 0,1 s (pior passo 16 ms) |
+| mistura de 1x, 2x, 4x e 8x | **2,4 min** | 131 | 1.022 KB | 0,1 s (pior passo 31 ms) |
+| todos em 8x | **2,1 min** | 78 | 671 KB | 0,1 s (pior passo 47 ms) |
+
+Leitura: **o evento dura de 2 a 3 minutos reais em vez de 6 a 20** (inclui 1 minuto de intervalo, que domina o 8x); os despertares do alarme ficam em ~80 a ~135 por evento, no teto de 1 por segundo; a CPU é desprezível (centésimos de segundo por evento). A projeção de custo da seção 32.3 da Fase 6 (sessões de 10 minutos) fica **mais barata**: o objeto da liga fica acordado de 3 a 8 vezes menos durante as partidas. Os quadros somam ~1 MB por evento (a quem está conectado ainda se multiplica pelo número de técnicos conectados).
+
+### 13.3 Testes
+
+`tests/leagueLive.test.ts` (reescrito, 10: 700 ms por minuto e a velocidade divide, dois técnicos usam a mais lenta, quem cai deixa a do outro, sem ninguém roda a 8x, intervalo para até 1 minuto e acaba antes com Voltar ao jogo, comando entra já e a reprodução refaz igual, comando vencido e erro de regra, técnico que cai e volta, hibernação com velocidade e intervalo, pausa e retomada deslocam o relógio, alarme em segundos cheios e fim do evento); `tests/onlineLiveProtocol.test.ts` (velocidades aceitas e recusadas, "half"); `tests/leagueLiveInjury.test.ts` e `onlineLiveSession.test.ts` ajustados; e2e `c5-e2e.mjs` (liga ao vivo, rodada com o clube, entrar, 2x → 4x → 8x, intervalo com cronômetro e Voltar ao jogo, fim e voltar ao painel, partida inteira em 98 s). **Removidos** os scripts `b8-5`, `b8-9` e `b8-10` (testavam a tela antiga).
+
+### 13.4 O que ficou para a C6
+
+Detalhe ao tocar (condição física e moral reais de jogadores de outros clubes), aba Carreira com o histórico do técnico, guardar o espelho ao fechar o app, favoritos e escalações guardadas por conta, demissão e escolha de outro clube livre.

@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { OfferError, PRE_CONTRACT_YEARS, canPreContract, expectedSalary, interestContext, interestIn, preContractsOpen } from '../../../engine/market'
+import { PRE_CONTRACT_YEARS, canPreContract, expectedSalary, interestContext, interestIn, preContractsOpen } from '../../../engine/market'
 import { playerOverall } from '../../../engine/overall'
 import type { Player, PreContract } from '../../../engine/types'
-import { offerUserPreContract, userPreContractsOf } from '../../../store/game'
+import { userPreContractsOf } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { formatDate, formatMoney, playerName } from '../../format'
-import { OFFER_REASON_LABELS } from '../../labels'
+import { OFFER_REASON_LABELS, commandErrorText } from '../../labels'
 import { Flag, Panel, Sheet, ValueBadge } from '../../theme'
 import { Search } from './Search'
 import { InterestText, clubName } from './parts'
@@ -19,18 +19,13 @@ function PreContractSheet({ game, player, onClose }: { game: Game; player: Playe
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
   const submit = () => {
-    try {
-      const { game: next, result } = offerUserPreContract(game, player.id, { salary, years })
-      if (result.accepted) {
-        updateGame(() => next)
-        setMessage({ ok: true, text: `${playerName(player)} aceitou: chega de graça na virada da temporada.` })
-        return
-      }
-      const reason = result.reason ? OFFER_REASON_LABELS[result.reason] : 'Proposta recusada.'
-      setMessage({ ok: false, text: result.minimumSalary !== undefined ? `${reason}. Ele aceitaria a partir de ${formatMoney(result.minimumSalary)}.` : reason })
-    } catch (e) {
-      setMessage({ ok: false, text: e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível propor.' })
-    }
+    void perform({ type: 'pre-contract', playerId: player.id, salary, years }).then((out) => {
+      if (!out.ok) return setMessage({ ok: false, text: commandErrorText(out.error) })
+      const info = (out.info ?? {}) as { accepted?: boolean; reason?: keyof typeof OFFER_REASON_LABELS; minimumSalary?: number }
+      if (info.accepted) return setMessage({ ok: true, text: `${playerName(player)} aceitou: chega de graça na virada da temporada.` })
+      const reason = info.reason ? OFFER_REASON_LABELS[info.reason] : 'Proposta recusada.'
+      setMessage({ ok: false, text: info.minimumSalary !== undefined ? `${reason}. Ele aceitaria a partir de ${formatMoney(info.minimumSalary)}.` : reason })
+    })
   }
 
   const input = 'mt-1 min-h-12 w-full rounded-xl border border-line bg-surface-2 px-3 font-bold'

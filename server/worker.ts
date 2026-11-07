@@ -250,8 +250,8 @@ class DoRooms implements RoomPort {
     try {
       const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
       const res = await stub.fetch('https://room/internal/command', { method: 'POST', body: JSON.stringify({ playerId, command, since }) })
-      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; payload?: MirrorPayload; refused?: string; minimumSalary?: number }
-      if (json.ok && json.payload) return { ok: true as const, payload: json.payload }
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; payload?: MirrorPayload; refused?: string; minimumSalary?: number; info?: Record<string, unknown> }
+      if (json.ok && json.payload) return { ok: true as const, payload: json.payload, ...(json.info ? { info: json.info } : {}) }
       if (json.refused) return { ok: false as const, refused: json.refused, ...(json.minimumSalary !== undefined ? { minimumSalary: json.minimumSalary } : {}) }
       return { ok: false as const, error: json.error ?? ('unavailable' as const) }
     } catch {

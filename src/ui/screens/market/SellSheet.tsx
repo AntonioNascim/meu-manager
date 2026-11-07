@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
-import { OfferError, buyerInterest, isWindowOpen, marketValue, releaseCost } from '../../../engine/market'
+import { buyerInterest, isWindowOpen, marketValue, releaseCost } from '../../../engine/market'
 import { contractEndIn } from '../../../engine/season'
 import type { OfferKind, Player } from '../../../engine/types'
-import { releaseUserSquadPlayer, sellUserPlayer } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { formatMoney, playerName } from '../../format'
-import { OFFER_REASON_LABELS } from '../../labels'
+import { OFFER_REASON_LABELS, commandErrorText } from '../../labels'
 import { Sheet } from '../../theme'
 
 /** Vender, emprestar ou liberar um jogador do seu elenco (aberto pelo detalhe do jogador no Elenco). */
@@ -20,7 +19,7 @@ export function SellSheet({ game, player, onClose, onDone }: { game: Game; playe
   const buyers = useMemo(
     () =>
       state.teams
-        .filter((t) => t.id !== game.userTeamId)
+        .filter((t) => t.id !== game.userTeamId && !(game.online?.humans ?? []).includes(t.id))
         .map((t) => ({ team: t, interest: buyerInterest(state, t.id, player, kind) }))
         .filter((b) => b.interest.maxFee !== null && b.interest.maxFee > 0)
         .sort((a, b) => (b.interest.maxFee ?? 0) - (a.interest.maxFee ?? 0)),
@@ -32,29 +31,19 @@ export function SellSheet({ game, player, onClose, onDone }: { game: Game; playe
 
   const sell = () => {
     if (!chosen) return
-    try {
-      const contractEnd = contractEndIn(state, chosen.team.id, kind === 'loan' ? 0 : 3)
-      const { game: next, result } = sellUserPlayer(game, { playerId: player.id, buyerId: chosen.team.id, kind, fee: value, contractEnd })
-      if (result.accepted) {
-        updateGame(() => next)
-        onDone()
-      } else {
-        const reason = result.reason ? OFFER_REASON_LABELS[result.reason] : 'Proposta recusada.'
-        setMessage(result.counter !== undefined ? `${reason} Máximo: ${formatMoney(result.counter)}.` : reason)
-      }
-    } catch (e) {
-      setMessage(e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível concluir.')
-    }
+    const contractEnd = contractEndIn(state, chosen.team.id, kind === 'loan' ? 0 : 3)
+    void perform({ type: 'sell', playerId: player.id, buyerId: chosen.team.id, kind, fee: value, contractEnd }).then((out) => {
+      if (!out.ok) return setMessage(commandErrorText(out.error))
+      const info = (out.info ?? {}) as { accepted?: boolean; reason?: keyof typeof OFFER_REASON_LABELS; counter?: number }
+      if (info.accepted) return onDone()
+      const reason = info.reason ? OFFER_REASON_LABELS[info.reason] : 'Proposta recusada.'
+      setMessage(info.counter !== undefined ? `${reason} Máximo: ${formatMoney(info.counter)}.` : reason)
+    })
   }
 
   const release = () => {
     if (!window.confirm(`Liberar ${playerName(player)}? Rescisão de ${formatMoney(releaseCost(player, date))}.`)) return
-    try {
-      updateGame((g) => releaseUserSquadPlayer(g, player.id))
-      onDone()
-    } catch (e) {
-      setMessage(e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível liberar.')
-    }
+    void perform({ type: 'release-player', playerId: player.id }).then((out) => (out.ok ? onDone() : setMessage(commandErrorText(out.error))))
   }
 
   const input = 'mt-1 min-h-12 w-full rounded-xl border border-line bg-surface-2 px-3 font-bold'

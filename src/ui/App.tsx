@@ -87,7 +87,7 @@ export function App() {
 
   const team = userTeam(game)
   // A tela da partida só existe enquanto o time do jogador tem um jogo por jogar.
-  const hasMatch = game.pendingUserMatch !== undefined
+  const hasMatch = game.pendingUserMatch !== undefined || game.online !== undefined
   const current: ScreenId = screen === 'match' && !hasMatch ? 'home' : screen
   const tabs: NavItem<NavTab>[] = [
     { id: 'home', label: 'Clube', icon: 'home' },

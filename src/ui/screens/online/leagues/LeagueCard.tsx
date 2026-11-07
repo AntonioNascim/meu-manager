@@ -11,7 +11,7 @@ const POLL_MS = 5000
  * O cartão da liga no Painel (Fase 6C): no lugar do botão "Avançar" do jogo solo. Mostra a próxima rodada no fuso do aparelho, o "Pronto" de
  * quem tem partida nela e leva à sala (ADM: Avançar, Pausar, ritmo). Quem avança o tempo é a liga, não o técnico.
  */
-export function LeagueCard({ leagueId, teamId, onOpen }: { leagueId: string; teamId: string; onOpen: () => void }) {
+export function LeagueCard({ leagueId, teamId, onOpen, onWatch }: { leagueId: string; teamId: string; onOpen: () => void; onWatch: () => void }) {
   const [body, setBody] = useState<LeagueStateBody | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -52,6 +52,11 @@ export function LeagueCard({ leagueId, teamId, onOpen }: { leagueId: string; tea
         <p className="text-sm" data-testid="league-status">
           {status}
         </p>
+        {me && view?.current && !view.directResult && view.current.playing.includes(me.playerId) && (
+          <button type="button" onClick={onWatch} data-testid="league-watch" className="mt-3 flex min-h-14 w-full items-center justify-center rounded-xl bg-accent font-display text-2xl font-extrabold uppercase tracking-wide text-accent-ink transition active:scale-[0.98]">
+            Entrar na partida
+          </button>
+        )}
         {me && view && !view.current && !view.paused && me.required && (
           <button
             type="button"

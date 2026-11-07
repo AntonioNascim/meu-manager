@@ -24,8 +24,9 @@ import {
   enqueueCommand,
   finishLiveEvent,
   isFinished,
-  liveMinuteMs,
-  nextMinuteAt,
+  nextWakeAt,
+  readyForSecondHalf,
+  setSpeed,
   nextWakeup,
   pauseLeague,
   pauseLiveEvent,
@@ -83,6 +84,7 @@ import {
 } from '../src/engine/league'
 import type { SeasonState } from '../src/engine/season'
 import type { Position } from '../src/engine/types'
+import { BASE_MINUTE_MS } from '../src/engine/match/timing'
 import { applyCommand, buildDelta, buildFull, diffWorlds, mergeChanges, parseCommand, type MirrorChange } from '../src/engine/league'
 import { turnRunner } from '../src/store/game'
 import { createLeagueWorld } from '../src/store/leagueWorld'
@@ -216,13 +218,13 @@ export class LeagueRoom {
     return true
   }
 
-  private loadLive(m: Omit<StoredLiveEvent, 'games'> & { games: { matchId: string; clock: number }[] }): LiveEvent {
+  private loadLive(m: Omit<StoredLiveEvent, 'games'> & { games: { matchId: string; clock: number; nextAt?: number; speeds?: Record<string, number>; halftime?: { until: number; ready: string[] }; halftimeDone?: boolean }[] }): LiveEvent {
     const games = m.games.map((g) => {
       const input = JSON.parse(this.get(`in:${g.matchId}`) as string)
       const commands = JSON.parse(this.get(`cmds:${g.matchId}`) ?? '[]')
       this.inputSaved.add(g.matchId)
       this.cmdsSaved.set(g.matchId, commands.length)
-      return { version: 1 as const, matchId: g.matchId, input, commands, clock: g.clock }
+      return { version: 1 as const, matchId: g.matchId, input, commands, clock: g.clock, nextAt: g.nextAt ?? 0, speeds: g.speeds ?? {}, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}) }
     })
     return rebuildLiveEvent({ ...m, games })
   }
@@ -244,7 +246,7 @@ export class LeagueRoom {
             this.cmdsSaved.set(g.matchId, g.commands.length)
           }
         }
-        this.set('live', JSON.stringify({ ...stored, games: stored.games.map((g) => ({ matchId: g.matchId, clock: g.clock })) }))
+        this.set('live', JSON.stringify({ ...stored, games: stored.games.map((g) => ({ matchId: g.matchId, clock: g.clock, nextAt: g.nextAt, speeds: g.speeds, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}) })) }))
       } else {
         this.sql.exec("DELETE FROM kv WHERE k = 'live'")
         this.del('in:')
@@ -304,12 +306,13 @@ export class LeagueRoom {
   /** A carga que o técnico recebe: a atualização desde `since` ou, sem ela (ou antiga demais), a carga completa em páginas. */
   protected mirrorFor(teamId: string, since: number | null, page: number) {
     const world = this.world as SeasonState
+    const humans = this.league?.seats.map((s) => s.teamId)
     this.trackWorld()
     if (since !== null && since <= this.rev) {
       const change = since === this.rev ? diffWorlds(world, world) : this.changesSince(since)
-      if (change) return buildDelta(world, teamId, this.rev, since, change)
+      if (change) return buildDelta(world, teamId, this.rev, since, change, humans)
     }
-    return buildFull(world, teamId, this.rev, page)
+    return buildFull(world, teamId, this.rev, page, humans)
   }
 
   /** Cria a sala com o mundo e a liga prontos (B8 faz isto pelo fluxo de "Criar liga"). */
@@ -377,7 +380,7 @@ export class LeagueRoom {
       const step = stepLiveEvent(live, (this.league as LeagueState).seats, now)
       this.live = step.event
       if (step.outcomes.length > 0) this.sendOutcomes(step.outcomes)
-      if (step.event.clock > live.clock || Object.keys(this.cursor).length === 0) this.sendFrame()
+      this.sendFrame()
       if (!isFinished(step.event)) break
       await this.finishEvent(now)
       worldChanged = true
@@ -387,16 +390,16 @@ export class LeagueRoom {
   }
 
   private minuteMs(): number {
-    const league = this.league as LeagueState
     const test = Number(this.env.LIVE_MINUTE_MS)
-    return this.meta?.minuteMs ?? (test > 0 ? test : liveMinuteMs(league.config.clock.pace))
+    // O 1x online é o 1x do jogo solo (700 ms por minuto de jogo); só o teste local o encurta.
+    return this.meta?.minuteMs ?? (test > 0 ? test : BASE_MINUTE_MS)
   }
 
   private sendFrame(): void {
     if (!this.live || !this.league) return
-    const { frame, cursor } = frameSince(this.live, viewOf(this.live, this.league.seats), this.cursor)
+    const { frame, cursor } = frameSince(this.live, viewOf(this.live, this.league.seats, this.now()), this.cursor)
     this.cursor = cursor
-    this.broadcast(frame)
+    if (frame) this.broadcast(frame)
   }
 
   private sendOutcomes(outcomes: import('../src/engine/league').CommandOutcome[]): void {
@@ -437,7 +440,7 @@ export class LeagueRoom {
   private async schedule(now: number): Promise<void> {
     const league = this.league as LeagueState
     let at: number | undefined
-    if (this.live) at = nextMinuteAt(this.live, now)
+    if (this.live) at = nextWakeAt(this.live, now)
     else at = nextWakeup(league, now)
     // Prazo da proposta aberta mais próxima (o relógio dos prazos congela na pausa)
     const trade = tradeWakeup(league, now)
@@ -520,7 +523,7 @@ export class LeagueRoom {
       const m = world.matches.find((x) => x.id === g.matchId)
       if (m) labels[g.matchId] = { ...matchLabel(world, m), cup: m.cup !== undefined }
     }
-    return { t: 'full', minute: live.clock, paused: live.pausedAt !== undefined, games: viewOf(live, seats), roster: this.rosterOf(live), me: { teamId: seat?.teamId ?? '' }, labels, ...(resumeAt !== undefined ? { resumeAt } : {}) }
+    return { t: 'full', minute: live.clock, paused: live.pausedAt !== undefined, games: viewOf(live, seats, this.now()), roster: this.rosterOf(live), me: { teamId: seat?.teamId ?? '' }, labels, ...(resumeAt !== undefined ? { resumeAt } : {}) }
   }
 
   async webSocketMessage(ws: SocketLike, data: string | ArrayBuffer): Promise<void> {
@@ -541,6 +544,16 @@ export class LeagueRoom {
       } else ws.send(JSON.stringify({ t: 'error', problem: 'not-in-event' } satisfies ServerMessage))
       return
     }
+    if (msg.t === 'speed' || msg.t === 'half') {
+      if (!this.live) return ws.send(JSON.stringify({ t: 'error', problem: 'not-in-event' } satisfies ServerMessage))
+      const seats = (this.league as LeagueState).seats
+      if (msg.t === 'speed') setSpeed(this.live, seats, playerId, msg.value)
+      else readyForSecondHalf(this.live, seats, playerId, now)
+      this.persist()
+      await this.run()
+      this.sendFrame()
+      return
+    }
     // cmd
     const hits = (this.recent.get(playerId) ?? []).filter((t) => now - t < COMMAND_WINDOW_MS)
     if (hits.length >= COMMANDS_PER_WINDOW) return ws.send(JSON.stringify({ t: 'error', problem: 'rate-limited' } satisfies ServerMessage))
@@ -549,7 +562,11 @@ export class LeagueRoom {
     const queued = enqueueCommand(this.live, (this.league as LeagueState).seats, playerId, msg.id, msg.command, now)
     this.live = queued.event
     if (queued.outcome) ws.send(JSON.stringify({ t: 'result', outcomes: [queued.outcome] } satisfies ServerMessage))
-    else this.persist()
+    else {
+      this.persist()
+      // O comando entra já (não espera o próximo minuto: a partida pode estar parada na lesão ou no intervalo).
+      await this.run()
+    }
   }
 
   async webSocketClose(ws: SocketLike, code?: number, reason?: string): Promise<void> {
@@ -851,11 +868,11 @@ export class LeagueRoom {
       const command = parseCommand(body.command)
       if (!command) return no('bad-state')
       const since = typeof body.since === 'number' && Number.isInteger(body.since) && body.since >= 0 ? body.since : null
-      const result = applyCommand(world, seat.teamId, command)
+      const result = applyCommand(world, seat.teamId, command, { humans: this.league?.seats.map((s) => s.teamId) ?? [] })
       if (!result.ok) return Response.json({ ok: false, refused: result.error, ...(result.minimumSalary !== undefined ? { minimumSalary: result.minimumSalary } : {}) })
       this.world = result.world
       this.persist({ world: true })
-      return Response.json({ ok: true, payload: this.mirrorFor(seat.teamId, since, 0) })
+      return Response.json({ ok: true, payload: this.mirrorFor(seat.teamId, since, 0), ...(result.info ? { info: result.info } : {}) })
     }
     if (path === '/internal/ticket') {
       if (!this.league?.seats.some((s) => s.playerId === playerId)) return no('not-seated')

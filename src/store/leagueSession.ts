@@ -9,6 +9,7 @@ import { mirrorFetch, sendCommand } from '../online/leagueClient'
 import { LeagueMirror, type MirrorTransport } from './leagueMirror'
 import { leagueGame } from './leagueGame'
 import { setGame } from './gameStore'
+import { closeOnlineMatch } from './onlineMatch'
 import { getAccount } from './onlineAccount'
 
 const randomBytes = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
@@ -31,7 +32,7 @@ export function transportFor(identity: Identity, id: string, d: IdentityClientDe
     },
     async command(command, since) {
       const r = await sendCommand(d, identity, id, command, since)
-      if (r.ok) return { ok: true, payload: r.payload }
+      if (r.ok) return { ok: true, payload: r.payload, ...(r.info ? { info: r.info as Record<string, unknown> } : {}) }
       const detail = (r.detail ?? {}) as { reason?: unknown; minimumSalary?: unknown }
       return { ok: false, error: r.error, ...(typeof detail.reason === 'string' ? { reason: detail.reason } : {}), ...(typeof detail.minimumSalary === 'number' ? { minimumSalary: detail.minimumSalary } : {}) }
     },
@@ -42,7 +43,7 @@ function publish(): void {
   const season = mirror?.season()
   const teamId = mirror?.teamId
   if (!mirror || !season || !teamId) return
-  setGame(leagueGame(season, teamId, { leagueId, rev: mirror.rev, connection: mirror.connection }))
+  setGame(leagueGame(season, teamId, { leagueId, rev: mirror.rev, connection: mirror.connection, ...(mirror.humans ? { humans: mirror.humans } : {}) }))
 }
 
 /** Abre a liga: baixa o espelho e começa a acompanhá-lo. Devolve `false` se não conseguiu a primeira carga. */
@@ -70,6 +71,7 @@ export async function openLeagueGame(id: string): Promise<'ok' | 'no-account' | 
 }
 
 export function closeLeague(): void {
+  closeOnlineMatch()
   if (timer !== undefined) clearInterval(timer)
   timer = undefined
   if (mirror) setGame(null)

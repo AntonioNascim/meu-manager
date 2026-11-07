@@ -12,8 +12,9 @@ import { PreContractTab } from './market/PreContract'
 import { Proposals } from './market/Proposals'
 import { Search } from './market/Search'
 import { WindowBanner } from './market/parts'
+import { CoachesTab } from './online/leagues/CoachesTab'
 
-export type MarketTab = 'search' | 'favorites' | 'lists' | 'free' | 'precontract' | 'proposals' | 'history' | 'contracts'
+export type MarketTab = 'search' | 'favorites' | 'lists' | 'free' | 'precontract' | 'proposals' | 'history' | 'contracts' | 'coaches'
 
 /** Tela de Mercado: abas com rolagem horizontal e o aviso da janela de transferências no topo de todas. */
 export function Market({ game, initialTab = 'search' }: { game: Game; initialTab?: MarketTab }) {
@@ -38,6 +39,8 @@ export function Market({ game, initialTab = 'search' }: { game: Game; initialTab
           { id: 'proposals', label: 'Propostas', alert: incoming > 0 },
           { id: 'history', label: 'Histórico' },
           { id: 'contracts', label: 'Contratos', alert: lastYearContracts(game).length > 0 },
+          // Só na liga online: negociar com outros técnicos humanos.
+          ...(game.online ? [{ id: 'coaches' as const, label: 'Técnicos' }] : []),
         ]}
       />
       <WindowBanner game={game} />
@@ -49,6 +52,7 @@ export function Market({ game, initialTab = 'search' }: { game: Game; initialTab
       {tab === 'proposals' && <Proposals game={game} open={open} />}
       {tab === 'history' && <History game={game} />}
       {tab === 'contracts' && <Contracts game={game} />}
+      {tab === 'coaches' && game.online && <CoachesTab leagueId={game.online.leagueId} worldDate={game.season.season.currentDate} />}
     </div>
   )
 }

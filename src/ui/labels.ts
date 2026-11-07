@@ -240,6 +240,8 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   'foreign-limit': 'Limite de estrangeiros da liga',
   invalid: 'Escolha inválida: confira a escalação e os valores',
   offline: 'Sem conexão: reconecte para fazer isso',
+  'human-club': 'Jogador de outro técnico da liga: negocie pela aba Técnicos do Mercado',
+  'too-many-offers': 'Você já tem 5 propostas abertas: espere a resposta de alguma',
   'no-mirror': 'A liga ainda não carregou: tente de novo em instantes',
   server: 'O servidor não respondeu: tente de novo',
 }

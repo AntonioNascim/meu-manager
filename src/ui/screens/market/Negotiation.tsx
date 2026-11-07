@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
-import { OfferError, expectedSalary, interestContext, interestIn, listingOf, marketValue, salePrice } from '../../../engine/market'
+import { expectedSalary, interestContext, interestIn, listingOf, marketValue, salePrice } from '../../../engine/market'
 import { playerOverall } from '../../../engine/overall'
 import { contractEndIn } from '../../../engine/season'
 import type { OfferKind, Player } from '../../../engine/types'
-import { makeUserOffer, squadOf } from '../../../store/game'
+import { squadOf } from '../../../store/game'
 import type { Game } from '../../../store/game'
-import { updateGame } from '../../../store/gameStore'
+import { perform } from '../../../store/actions'
 import { formatMoney, playerName } from '../../format'
-import { OFFER_KIND_LABELS, OFFER_REASON_LABELS, POSITION_LABELS } from '../../labels'
+import { OFFER_KIND_LABELS, POSITION_LABELS, commandErrorText } from '../../labels'
 import { Flag, Sheet, ValueBadge } from '../../theme'
 import { FavoriteStar, InterestText, clubName } from './parts'
 
@@ -37,13 +37,8 @@ export function Negotiation({ game, player, open, onClose, extra, initialKind = 
   const amount = fee ?? price
 
   const submit = () => {
-    try {
-      const contractEnd = contractEndIn(state, game.userTeamId, kind === 'loan' ? 0 : years)
-      updateGame((g) => makeUserOffer(g, { kind, playerId: player.id, fee: amount, salary, contractEnd }))
-      onClose()
-    } catch (e) {
-      setError(e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível enviar a proposta.')
-    }
+    const contractEnd = contractEndIn(state, game.userTeamId, kind === 'loan' ? 0 : years)
+    void perform({ type: 'offer', kind, playerId: player.id, fee: amount, salary, contractEnd }).then((out) => (out.ok ? onClose() : setError(commandErrorText(out.error))))
   }
 
   const input = 'mt-1 min-h-12 w-full rounded-xl border border-line bg-surface-2 px-3 font-bold'

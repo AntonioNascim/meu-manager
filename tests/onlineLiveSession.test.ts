@@ -30,7 +30,7 @@ describe('estado do cliente da partida ao vivo', () => {
     game.live.playUntil(55)
     e.clock = 55
     const second = frameSince(e, viewOf(e, []), first.cursor)
-    state = applyMessage(state, second.frame)
+    state = applyMessage(state, second.frame!)
     const snap = game.live.snapshot()
     const mine = state.games[0]!.snapshot
     expect(mine.minute).toBe(55)

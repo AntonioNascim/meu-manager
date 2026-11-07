@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { frameSince, makeStoredReplay, parseClientMessage, replayKey, verifyReplay, type Cursor } from '../src/online/liveProtocol'
-import { LIVE_MATCH_MS, liveMinuteMs } from '../src/engine/league/pace'
+import { BASE_MINUTE_MS } from '../src/engine/match/timing'
 import { replayOf, startGame, viewOf, type LiveEvent } from '../src/engine/league'
 import { humanMatchInput } from '../src/engine/season'
 import { createGame } from '../src/store/game'
@@ -31,9 +31,9 @@ describe('protocolo da partida ao vivo', () => {
     g.live.playUntil(60)
     const second = frameSince(e, viewOf(e, []), first.cursor as Cursor)
     const all = frameSince(e, viewOf(e, []), {})
-    if (first.frame.t === 'frame' && second.frame.t === 'frame' && all.frame.t === 'frame') {
-      expect(first.frame.games[0]!.trace.length + second.frame.games[0]!.trace.length).toBe(all.frame.games[0]!.trace.length)
-      expect(first.frame.games[0]!.events.length + second.frame.games[0]!.events.length).toBe(all.frame.games[0]!.events.length)
+    if (first.frame?.t === 'frame' && second.frame?.t === 'frame' && all.frame?.t === 'frame') {
+      expect(first.frame!.games[0]!.trace.length + second.frame!.games[0]!.trace.length).toBe(all.frame!.games[0]!.trace.length)
+      expect(first.frame!.games[0]!.events.length + second.frame!.games[0]!.events.length).toBe(all.frame!.games[0]!.events.length)
     }
   })
 
@@ -46,9 +46,10 @@ describe('protocolo da partida ao vivo', () => {
     expect(replayKey('liga1', '2026-11-07', match.id)).toBe(`replays/liga1/2026-11-07/${match.id}.json`)
   })
 
-  it('durações por ritmo: Normal = 15 min (10 s por minuto) e quanto mais rápido a liga, mais curta a partida', () => {
-    expect(liveMinuteMs('normal')).toBe(10_000)
-    const order = [LIVE_MATCH_MS.calm, LIVE_MATCH_MS.normal, LIVE_MATCH_MS.fast, LIVE_MATCH_MS['very-fast']]
-    expect(order).toEqual([...order].sort((a, b) => b - a))
+  it('o tempo do 1x online é o do solo (700 ms por minuto) e o protocolo aceita só as velocidades do solo e o Voltar ao jogo', () => {
+    expect(BASE_MINUTE_MS).toBe(700)
+    for (const v of [1, 2, 4, 8]) expect(parseClientMessage(JSON.stringify({ t: 'speed', value: v }))).toEqual({ ok: true, message: { t: 'speed', value: v } })
+    for (const v of [0, 3, 16, -1, '2', null]) expect(parseClientMessage(JSON.stringify({ t: 'speed', value: v })).ok).toBe(false)
+    expect(parseClientMessage('{"t":"half"}')).toEqual({ ok: true, message: { t: 'half' } })
   })
 })

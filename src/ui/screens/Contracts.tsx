@@ -1,15 +1,14 @@
 import { useState } from 'react'
-import { OfferError } from '../../engine/market'
 import { cycleOfTeam } from '../../engine/season'
 import { expiringContracts, renewalDemand } from '../../engine/offseason'
 import { playerOverall } from '../../engine/overall'
 import type { Player } from '../../engine/types'
-import { renewUserPlayer, userTeam } from '../../store/game'
+import { userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
-import { updateGame } from '../../store/gameStore'
+import { perform } from '../../store/actions'
 import { Button, Card } from '../components/ui'
 import { formatDate, formatMoney, playerName } from '../format'
-import { OFFER_REASON_LABELS, POSITION_SHORT_LABELS } from '../labels'
+import { OFFER_REASON_LABELS, POSITION_SHORT_LABELS, commandErrorText } from '../labels'
 
 /** Renovação de contratos: quem vence neste ano e no próximo, com o pedido de cada jogador. */
 export function Contracts({ game }: { game: Game }) {
@@ -52,18 +51,11 @@ function RenewForm({ game, player, onClose }: { game: Game; player: Player; onCl
   const [message, setMessage] = useState<string | null>(null)
 
   const submit = () => {
-    try {
-      const { game: next, result } = renewUserPlayer(game, { playerId: player.id, salary, years })
-      if (result.accepted) {
-        updateGame(() => next)
-        onClose()
-        return
-      }
-      const reason = result.reason ? OFFER_REASON_LABELS[result.reason] : 'Proposta recusada.'
-      setMessage(result.minimumSalary !== undefined ? `${reason} Ele aceitaria a partir de ${formatMoney(result.minimumSalary)}.` : reason)
-    } catch (e) {
-      setMessage(e instanceof OfferError ? OFFER_REASON_LABELS[e.code] : 'Não foi possível renovar.')
-    }
+    void perform({ type: 'club', action: { type: 'renew', playerId: player.id, years, salary } }).then((out) => {
+      if (out.ok) return onClose()
+      const reason = OFFER_REASON_LABELS[out.error as keyof typeof OFFER_REASON_LABELS] ?? commandErrorText(out.error)
+      setMessage(out.minimumSalary !== undefined ? `${reason} Ele aceitaria a partir de ${formatMoney(out.minimumSalary)}.` : reason)
+    })
   }
 
   return (

@@ -7,6 +7,7 @@ import { startMatch } from '../engine/match'
 import type { LiveMatch, MatchSide } from '../engine/match'
 import { userMatchInput } from '../engine/season'
 import type { Game } from './game'
+import type { OnlineMatchHandle } from './onlineMatch'
 
 export interface LiveSession {
   matchId: string
@@ -17,6 +18,8 @@ export interface LiveSession {
   halftimeDone: boolean
   /** A pausa antes da prorrogação já aconteceu (o jogo não para de novo no minuto 90). */
   extraDone?: boolean
+  /** Partida da liga online: quem a joga é o servidor; este objeto só mostra os quadros dele e manda decisões (Fase 6C, C5). */
+  online?: OnlineMatchHandle
 }
 
 let session: LiveSession | null = null
