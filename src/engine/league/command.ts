@@ -19,7 +19,7 @@ import { setTeamTactic } from '../season/advance'
 import type { SeasonState } from '../season'
 import { isGridPoint } from '../grid'
 import { applyClubAction, type ClubAction } from './club'
-import { POSITIONS, TRAINING_FOCUSES, TRAINING_GROUPS, TRAINING_INTENSITIES } from '../types'
+import { PLAY_STYLES, POSITIONS, TRAINING_FOCUSES, TRAINING_GROUPS, TRAINING_INTENSITIES } from '../types'
 import type { GridPoint, IndividualGoal, Mentality, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan } from '../types'
 
 export type LeagueCommand =
@@ -55,7 +55,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
 const isDate = (v: unknown): v is string => typeof v === 'string' && DATE.test(v)
 const isKind = (v: unknown): v is OfferKind => v === 'purchase' || v === 'loan'
 
-const STYLES: readonly PlayStyle[] = ['possession', 'counter-attack', 'high-press']
+const STYLES: readonly PlayStyle[] = PLAY_STYLES
 const MENTALITIES: readonly Mentality[] = [-2, -1, 0, 1, 2]
 const ID = /^[A-Za-z0-9_.:-]{1,64}$/
 const isId = (v: unknown): v is string => typeof v === 'string' && ID.test(v)

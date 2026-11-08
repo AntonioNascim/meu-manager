@@ -11,6 +11,7 @@ import { evaluateBoard } from '../board'
 import { monthlyOperations, monthlyPayroll } from '../finance'
 import { computeStandings } from '../season'
 import type { SeasonState } from '../season'
+import { PLAY_STYLES } from '../types'
 import type { BoardEvaluation, Dismissal, IsoDate, PlayStyle, PlayerCondition, SavedLineup, SeasonRecord, Tactic, TeamId } from '../types'
 import { isGridPoint } from '../grid'
 
@@ -140,7 +141,7 @@ export interface Prefs {
 
 export const EMPTY_PREFS: Prefs = { favorites: [], lineups: [null, null, null] }
 const ID = /^[A-Za-z0-9_.:-]{1,64}$/
-const STYLES: readonly PlayStyle[] = ['possession', 'counter-attack', 'high-press']
+const STYLES: readonly PlayStyle[] = PLAY_STYLES
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /** Confere as preferências (lista fechada de campos, tamanhos limitados). `undefined` = corpo inválido. */

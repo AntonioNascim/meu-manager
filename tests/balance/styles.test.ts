@@ -7,16 +7,17 @@ import { describe, expect, it } from 'vitest'
 import { generateWorld } from '../../src/data/generateWorld'
 import { buildTactic } from '../../src/engine/lineup'
 import { simulateMatch } from '../../src/engine/match'
+import { PLAY_STYLES } from '../../src/engine/types'
 import type { Player, PlayStyle, Team } from '../../src/engine/types'
 
-const STYLES: PlayStyle[] = ['possession', 'counter-attack', 'high-press']
+const STYLES: readonly PlayStyle[] = PLAY_STYLES
 const WORLDS = [101, 102, 103, 104, 105]
 
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 
 describe('estilos de jogo com elencos equivalentes', () => {
-  const points: Record<PlayStyle, number[]> = { possession: [], 'counter-attack': [], 'high-press': [] }
-  const goalDiff: Record<PlayStyle, number[]> = { possession: [], 'counter-attack': [], 'high-press': [] }
+  const points = Object.fromEntries(STYLES.map((s) => [s, [] as number[]])) as Record<PlayStyle, number[]>
+  const goalDiff = Object.fromEntries(STYLES.map((s) => [s, [] as number[]])) as Record<PlayStyle, number[]>
 
   for (const seed of WORLDS) {
     const world = generateWorld({ seed })
@@ -51,7 +52,7 @@ describe('estilos de jogo com elencos equivalentes', () => {
     ['estilo           pts/jogo   saldo/jogo', ...STYLES.map((s) => `${s.padEnd(16)} ${ppg[s].toFixed(3).padStart(7)}   ${gd[s].toFixed(3).padStart(9)}`)].join('\n'),
   )
 
-  it('os três estilos rendem quase o mesmo em pontos por jogo', () => {
+  it('os cinco estilos rendem quase o mesmo em pontos por jogo', () => {
     const values = STYLES.map((s) => ppg[s])
     expect(Math.max(...values) - Math.min(...values)).toBeLessThan(0.06)
   })

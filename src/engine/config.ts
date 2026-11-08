@@ -166,7 +166,7 @@ export const MATCH = {
   fatigue: {
     /** Queda por momento para resistência 50 (escala: (1,5 − resistência/100)). */
     perMoment: 0.3,
-    style: { possession: 0.9, 'counter-attack': 1, 'high-press': 1.2 } satisfies Record<PlayStyle, number>,
+    style: { possession: 0.9, 'counter-attack': 1, 'high-press': 1.2, direct: 0.9, wings: 1 } satisfies Record<PlayStyle, number>,
     /** Cada nível de mentalidade ofensiva cansa um pouco mais. */
     perMentality: 0.05,
     /** Com condição 0, atributos físicos caem até este fator; os demais até `otherFloor`. */
@@ -204,6 +204,36 @@ export const MATCH = {
       spaceBehind: 0.25,
       /** Bola roubada no campo do rival: chance de sair em transição (como no contra-ataque, menos frequente). */
       transitionChance: 0.2,
+    },
+    /**
+     * Lançamento direto (Fase 6D): bola longa para os atacantes, sem passar pelo meio. Cede o meio (`control`), joga mais cruzamento e passe em profundidade
+     * e menos chute de longe; a progressão ganha um bônus que depende do jogo aéreo e físico dos atacantes contra o da zaga rival (`aerial`, no máximo isto
+     * de deslocamento). A pressão alta rival rende menos contra ele (`vsPress`: a bola passa por cima).
+     */
+    direct: {
+      control: -2,
+      playType: { through: 1.3, cross: 1.4, longShot: 0.6 } as Partial<Record<PlayType, number>>,
+      aerial: 0.6,
+      /** Bônus fixo de progressão (a bola longa é uma boa saída de qualquer jeito). */
+      base: 0.16,
+      /** Diferença de jogo aéreo (pontos de atributo) que vale o bônus inteiro. */
+      aerialRange: 25,
+      vsPress: 8,
+    },
+    /**
+     * Jogar pelas pontas (Fase 6D): laterais e pontas puxam o jogo, mais cruzamento e drible, menos passe em profundidade. O bônus de progressão (`wide`) escala
+     * com quantos jogadores de lado a formação tem (de 0 a 4) e com o cruzamento, drible e velocidade deles contra o desarme e a velocidade dos laterais
+     * rivais. Contra uma pressão alta, que deixa o lado exposto, vale um pouco mais (`vsPress`).
+     */
+    wings: {
+      control: 0,
+      playType: { cross: 1.8, dribble: 1.2, through: 0.6 } as Partial<Record<PlayType, number>>,
+      /** Peso a mais para laterais e pontas serem o condutor. */
+      wideCarrier: 1.4,
+      wide: 0.55,
+      base: 0.33,
+      wideRange: 25,
+      vsPress: 0.1,
     },
     /**
      * Mentalidade (−2 a +2): muda a frequência de ataques, o espaço deixado atrás e

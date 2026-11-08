@@ -5,12 +5,13 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
 import { LIVE_SPEEDS, replayResult, type CommandOutcome, type LiveEvent, type LiveView, type QueuedCommand, type ReplayRecord } from '../engine/league/live'
+import { PLAY_STYLES } from '../engine/types'
 import type { MatchEvent, Mentality, PlayStyle, TeamMatchStats } from '../engine/types'
 import type { MatchSnapshot, PlayTrace, SideSnapshot } from '../engine/match'
 import type { MatchResult } from '../engine/types'
 
 export const MAX_MESSAGE_BYTES = 4096
-const STYLES: readonly PlayStyle[] = ['possession', 'counter-attack', 'high-press']
+const STYLES: readonly PlayStyle[] = PLAY_STYLES
 const ID = /^[A-Za-z0-9_.:-]{1,64}$/
 
 export type ClientMessage =

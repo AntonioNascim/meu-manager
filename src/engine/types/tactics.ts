@@ -1,7 +1,12 @@
 import type { PlayerId } from './common'
 import type { Position } from './player'
 
-export type PlayStyle = 'possession' | 'counter-attack' | 'high-press'
+/**
+ * Estilos de jogo. Na tela: `possession` = Toque de bola, `high-press` = Pressão total (só os rótulos mudaram; ids e números são os de sempre),
+ * `counter-attack` = Contra-ataque, `direct` = Lançamento direto e `wings` = Jogar pelas pontas (Fase 6D).
+ */
+export const PLAY_STYLES = ['possession', 'counter-attack', 'high-press', 'direct', 'wings'] as const
+export type PlayStyle = (typeof PLAY_STYLES)[number]
 
 /** De muito defensiva (-2) a muito ofensiva (+2). */
 export type Mentality = -2 | -1 | 0 | 1 | 2

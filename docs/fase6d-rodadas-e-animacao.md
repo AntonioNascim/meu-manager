@@ -279,3 +279,36 @@ Os estilos de hoje e os novos usam o mesmo mecanismo da Parte 2 (forma da equipe
 - **Limite conhecido:** nas rodadas de **copa** (quartas) só joga quem está na copa daquela semana; os outros veem "Seu clube não joga nesta rodada" e não seguram ninguém. Copas diferentes na mesma semana caem na mesma quarta, mas nem toda semana de copa envolve todos os técnicos.
 - **Testes:** `tests/sharedCalendar.test.ts` (8: ano civil único, rodada N no mesmo dia, técnicos de países diferentes juntos nas rodadas, nada depois do fim da temporada, copas em quartas, janelas únicas, funções puras, e a **virada de temporada mantendo o calendário comum**).
 - **Medição de 30 anos no workflow `Medições pesadas`:** ainda **não rodei**. Antes de publicar eu preciso dela com o calendário comum (equilíbrio das ligas da IA: campeões, caixa, força, idades; copas e fim da temporada com as datas novas). Aviso antes.
+
+---
+
+## Parte 3, versão final: 5 estilos (implementada em 08/11/2026)
+
+**Decisões suas:** "Toque de bola" é o novo nome da **Posse** e "Pressão total" o novo nome da **Pressão alta**; entram só **dois estilos novos**, **Lançamento direto** e **Jogar pelas pontas**. Total de 5. Ao vivo o seletor continua como estava, listando os 5. A IA escolhe os estilos a partir da virada de temporada, sem mudar saves antigos no meio. O padrão da liga online fica em 2x.
+
+Isto **substitui** a seção 3 acima (que propunha quatro estilos): os ids `possession` e `high-press` continuam os mesmos, com os mesmos números (só os rótulos mudaram), então os saves, a liga online e as medições de antes seguem valendo. Os estilos são `PLAY_STYLES` (`types/tactics.ts`), a lista única que o comando de tática, a carreira, o protocolo ao vivo e as telas usam.
+
+| Id | Nome na tela | O que faz no motor |
+|---|---|---|
+| `possession` | Toque de bola | como a Posse de sempre (controle do meio +6, menos cara a cara) |
+| `counter-attack` | Contra-ataque | como sempre |
+| `high-press` | Pressão total | como a Pressão alta de sempre (pressão +9, cansa ×1,2, espaço nas costas) |
+| `direct` | Lançamento direto | controle do meio −2; passe em profundidade ×1,3, cruzamento ×1,4, chute de longe ×0,6; cansa ×0,9; **bônus de progressão** de 0,16 fixo + até ±0,6 conforme o jogo aéreo e físico dos atacantes (cabeceio, força, velocidade) contra o da zaga (cabeceio e posicionamento); **a pressão rival rende 8 pontos a menos** contra ele |
+| `wings` | Jogar pelas pontas | controle do meio 0; cruzamento ×1,8, drible ×1,2, passe em profundidade ×0,6; laterais e pontas pesam ×1,4 como condutor; **bônus de progressão** de 0,33 fixo + até ±0,55 conforme **quantos jogadores de lado** a formação tem (0 a 4) e o cruzamento, drible e velocidade deles contra o desarme e a velocidade dos laterais rivais; +0,1 contra pressão alta |
+
+**Pontos fortes e fracos (o que vale como relação entre eles, ver a matriz medida abaixo).** Direto rende com atacantes altos, fortes ou rápidos e passa por cima da pressão, mas cede o meio e some sem esses atacantes. Pontas rende com jogadores de lado bons e uma formação com laterais e pontas, e sofre sem eles. Toque de bola depende de meio-campistas de passe e visão. Pressão total cansa mais. A força do elenco continua mandando.
+
+**Como a IA escolhe (`styleChoice.ts`, `chooseAiStyles`):** na virada, para os clubes sem técnico humano de cada país, cada estilo recebe a nota de ajuste ao elenco (direto: cabeceio, força e velocidade dos atacantes; pontas: cruzamento, drible e velocidade de laterais e pontas; toque: passe, visão e controle do meio; pressão total: fôlego, desarme e juventude; contra-ataque: velocidade dos atacantes e meio menos forte), **medida contra os outros clubes do país** (cada estilo tem escala própria), mais peso pela reputação (os grandes tendem a toque de bola e pressão; os pequenos a contra-ataque e direto), +0,5 para o estilo que o clube já joga e um desvio fixo por clube e temporada (hash). Determinístico. O mundo novo continua nascendo com os três estilos de antes.
+
+**Como aparecem no campo 2D:** direto com defesa e meio atrás da bola e bola longa para o atacante; pontas com o time mais largo, laterais e pontas altos e cruzamento do fundo; os outros três como na Parte 2.
+
+### Calibragem (medida)
+
+Ferramentas novas: `node tools/run.mjs styleMatrix [--mundos N --pares N]` (cada estilo contra cada estilo, mesmos elencos, pontos por jogo, dependência do elenco) e `PACOTE_REAL=1 node tools/run.mjs styleDistribution [--anos N]` (estilos escolhidos pela IA nas viradas).
+
+1. **Os três estilos de antes não mudaram:** `tests/matchGolden.test.ts` passa **sem regravar nada**.
+2. **Equilíbrio** (`tests/balance/styles.test.ts`, agora com os 5 estilos, 5 mundos, 20 times, 38 partidas cada): **passa** (diferença entre os estilos até 0,06 ponto por jogo e até 0,12 de saldo, como antes).
+3. **Matriz** (4 mundos, 40 pares, pontos por jogo do estilo da linha contra o da coluna; média de cada estilo contra todos): toque 1,41, contra-ataque 1,34, pressão total 1,32, direto 1,44 (antes do último ajuste do bônus), pontas 1,35. Maior desvio de um confronto: 0,17 ponto por jogo (1,23 a 1,57). O direto foi baixado depois disso (bônus de 0,24 para 0,16).
+4. **Escolha da IA** (pacote real, 15 ligas de elite): antes 31% toque, 41% contra-ataque, 28% pressão (os novos 0%); depois de 1 virada: **toque 23%, contra-ataque 22%, pressão total 18%, direto 19%, pontas 17%** (nenhum estilo passa de 30%).
+5. **Impressão digital do solo regravada de propósito** (`tests/fixtures/solo-digest.json`): conferi que a **única** causa é a IA escolher os estilos novos na virada (com a escolha desligada a impressão digital antiga volta a passar).
+6. **Falta:** a medição de 30 anos no workflow (calendário comum e estilos novos juntos), que você roda uma vez só. **Ainda não rodou.**

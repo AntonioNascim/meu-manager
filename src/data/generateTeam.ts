@@ -89,12 +89,13 @@ function assignAges(rng: Rng, template: readonly SquadSlot[]): number[] {
 }
 
 export function pickStyle(rng: Rng, reputation: number): PlayStyle {
-  const weights: Record<PlayStyle, number> =
+  // O mundo novo nasce só com os três estilos de sempre (mesmo sorteio de antes); os outros chegam pela IA na virada de temporada (`styleChoice.ts`).
+  const weights: Partial<Record<PlayStyle, number>> & Record<'possession' | 'counter-attack' | 'high-press', number> =
     reputation >= 15
       ? { possession: 55, 'counter-attack': 25, 'high-press': 20 }
       : { possession: 25, 'counter-attack': 45, 'high-press': 30 }
   const styles = Object.keys(weights) as PlayStyle[]
-  return rng.weighted(styles, (s) => weights[s])
+  return rng.weighted(styles, (s) => weights[s] ?? 0)
 }
 
 export function pickMentality(rng: Rng, reputation: number): Mentality {

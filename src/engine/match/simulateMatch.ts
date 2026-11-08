@@ -464,17 +464,20 @@ function controlScore(side: SideState): number {
   const style =
     side.style === 'possession' ? MATCH.tactics.possession.control
     : side.style === 'counter-attack' ? MATCH.tactics.counter.control
+    : side.style === 'direct' ? MATCH.tactics.direct.control
+    : side.style === 'wings' ? MATCH.tactics.wings.control
     : 0
   return base + style + midfieldNumbers(side) + MATCH.tactics.mentality.control * side.mentality
 }
 
 /** Capacidade de tomar a bola: desarme, posicionamento, resistência (+ pressão alta e formação). */
-function pressScore(side: SideState): number {
+function pressScore(side: SideState, opponent?: SideState): number {
   const base = sectorQuality(
     midfielders(side),
     (p) => (attr(p, 'tackling') + attr(p, 'positioning') + attr(p, 'stamina')) / 3,
   )
-  const style = side.style === 'high-press' ? MATCH.tactics.highPress.press : 0
+  // A bola longa do lançamento direto passa por cima da pressão.
+  const style = side.style === 'high-press' ? MATCH.tactics.highPress.press - (opponent?.style === 'direct' ? MATCH.tactics.direct.vsPress : 0) : 0
   return base + style + midfieldNumbers(side)
 }
 
@@ -492,8 +495,39 @@ function progressionOffset(att: SideState, def: SideState, transition: boolean, 
     attackExcess(att) +
     gridGap(def, carrier) +
     MATCH.tactics.mentality.openness * def.mentality +
-    (transition ? MATCH.tactics.counter.transitionProgression : 0)
+    (transition ? MATCH.tactics.counter.transitionProgression : 0) +
+    newStyleBonus(att, def)
   )
+}
+
+const clamp1 = (v: number) => Math.max(-1, Math.min(1, v))
+const WIDE: readonly Position[] = ['RB', 'LB', 'RW', 'LW']
+
+/**
+ * Bônus de progressão dos estilos novos (0 para os três de antes): o lançamento direto depende dos atacantes (cabeceio, força e velocidade) contra a zaga;
+ * jogar pelas pontas, de quantos jogadores de lado há e do que eles fazem (cruzamento, drible e velocidade) contra os laterais rivais.
+ */
+function newStyleBonus(att: SideState, def: SideState): number {
+  if (att.style === 'direct') {
+    const d = MATCH.tactics.direct
+    const forwards = activePlayers(att).filter((p) => p.sector === 'attack' && p.slot !== 'GK')
+    const backs = activePlayers(def).filter((p) => p.sector === 'defense' && p.slot !== 'GK')
+    if (forwards.length === 0) return -d.aerial + d.base
+    const aerialAtt = mean(forwards.map((p) => (attr(p, 'heading') + attr(p, 'strength') + attr(p, 'pace')) / 3))
+    const aerialDef = mean((backs.length > 0 ? backs : activePlayers(def)).map((p) => (attr(p, 'heading') + attr(p, 'positioning')) / 2))
+    return d.base + d.aerial * clamp1((aerialAtt - aerialDef) / d.aerialRange)
+  }
+  if (att.style === 'wings') {
+    const w = MATCH.tactics.wings
+    const wide = activePlayers(att).filter((p) => WIDE.includes(p.slot))
+    const share = Math.min(wide.length, 4) / 4
+    if (share === 0) return -w.wide * 0.5 + w.base
+    const wideQ = mean(wide.map((p) => (attr(p, 'crossing') + attr(p, 'dribbling') + attr(p, 'pace')) / 3))
+    const foes = activePlayers(def).filter((p) => WIDE.includes(p.slot))
+    const foeQ = mean((foes.length > 0 ? foes : activePlayers(def).filter((p) => p.slot !== 'GK')).map((p) => (attr(p, 'tackling') + attr(p, 'pace')) / 2))
+    return w.base + w.wide * share * clamp1((wideQ - foeQ) / w.wideRange) + (def.style === 'high-press' ? w.vsPress : 0)
+  }
+  return 0
 }
 
 /** Quanto o ganho de progressão de uma grade livre passa do teto das formações prontas (negativo: é descontado; 0 nas prontas). */
@@ -598,8 +632,8 @@ function substituteTired(ctx: MatchContext, side: SideState): void {
 }
 
 export function homePossessionChance(home: SideState, away: SideState): number {
-  const homeKeeps = duelChance(controlScore(home), pressScore(away))
-  const awayKeeps = duelChance(controlScore(away), pressScore(home))
+  const homeKeeps = duelChance(controlScore(home), pressScore(away, home))
+  const awayKeeps = duelChance(controlScore(away), pressScore(home, away))
   return 0.5 + (homeKeeps - awayKeeps) / 2
 }
 
@@ -610,6 +644,16 @@ export function homePossessionChance(home: SideState, away: SideState): number {
 /** Anota no rastro do momento em andamento (só leitura; não mexe em nada do jogo). */
 function mark(ctx: MatchContext, patch: Partial<PlayTrace>): void {
   if (ctx.current) Object.assign(ctx.current, patch)
+}
+
+/** Peso de cada posição como condutor para quem joga pelas pontas: laterais e pontas pesam mais. */
+const WINGS_CARRIER: Partial<Record<Position, number>> = Object.fromEntries((Object.entries(MATCH.carrierWeight) as [Position, number][]).map(([slot, w]) => [slot, WIDE.includes(slot) ? w * MATCH.tactics.wings.wideCarrier : w]))
+
+/** Pesos do tipo de jogada por estilo (só os estilos que mudam o tipo de jogada). */
+const STYLE_PLAY_TYPE: Partial<Record<PlayStyle, Partial<Record<PlayType, number>>>> = {
+  possession: MATCH.tactics.possession.playType,
+  direct: MATCH.tactics.direct.playType,
+  wings: MATCH.tactics.wings.playType,
 }
 
 function playMoment(ctx: MatchContext, att: SideState, def: SideState, transition = false): void {
@@ -629,11 +673,11 @@ function playMoment(ctx: MatchContext, att: SideState, def: SideState, transitio
     return
   }
 
-  const carrier = pickByPosition(rng, att, MATCH.carrierWeight)
+  const carrier = pickByPosition(rng, att, att.style === 'wings' ? WINGS_CARRIER : MATCH.carrierWeight)
   if (!carrier) return
   mark(ctx, { carrierId: carrier.player.id })
   const typeWeights = MATCH.playTypeWeight[carrier.slot]
-  const styleWeights: Partial<Record<PlayType, number>> = att.style === 'possession' ? MATCH.tactics.possession.playType : {}
+  const styleWeights: Partial<Record<PlayType, number>> = STYLE_PLAY_TYPE[att.style] ?? {}
   // Em transição não há tempo para chutar de longe ou cruzar: é passe em profundidade ou drible.
   const types = (Object.keys(typeWeights) as PlayType[]).filter((t) => !transition || t === 'through' || t === 'dribble')
   const type = rng.weighted(types, (t) => typeWeights[t] * (styleWeights[t] ?? 1))

@@ -7,6 +7,7 @@ import { ACADEMY, FINANCE, MARKET, OFFSEASON } from '../config'
 import { lineupForeign, squadForeignBlocked } from '../foreign'
 import { defaultTicketPrice, monthlyPayroll, summarizeLedger, sustainablePayroll } from '../finance'
 import { buildTactic, repairTactic } from '../lineup'
+import { chooseAiStyles } from '../styleChoice'
 import { playerOverall } from '../overall'
 import { createRng } from '../rng'
 import type { Rng } from '../rng'
@@ -314,13 +315,20 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
       .sort((a, b) => b.t.reputation - a.t.reputation || a.index - b.index)
       .forEach(({ t }, i) => newRank.set(t.id, i + 1))
   }
+  // Estilo de jogo da IA para a temporada nova (Fase 6D): cada clube sem técnico humano escolhe pelo ajuste do elenco, comparado com os outros do país.
+  const squadsByTeam = new Map<string, Player[]>()
+  for (const p of players) if (p.teamId) squadsByTeam.set(p.teamId, [...(squadsByTeam.get(p.teamId) ?? []), p])
+  const aiStyles = chooseAiStyles(
+    teams.filter((t) => scope.has(t.id) && !isHuman(t.id)).map((t) => ({ team: t, squad: squadsByTeam.get(t.id) ?? [], current: t.tactic.style })),
+    year,
+  )
   teams = teams.map((t) => {
     if (!scope.has(t.id)) return t
     const squad = players.filter((p) => p.teamId === t.id)
     const summary = summarizeLedger(t.finances.ledger)
     const payroll = monthlyPayroll(squad)
     const isUser = isHuman(t.id)
-    const tactic = isUser ? repairTactic(t.tactic, squad, lineupForeign(t)) : buildTactic(squad, { formationId: t.tactic.formationId, style: t.tactic.style, mentality: t.tactic.mentality }, { ...(lineupForeign(t) ? { foreign: lineupForeign(t) } : {}) })
+    const tactic = isUser ? repairTactic(t.tactic, squad, lineupForeign(t)) : buildTactic(squad, { formationId: t.tactic.formationId, style: aiStyles.get(t.id) ?? t.tactic.style, mentality: t.tactic.mentality }, { ...(lineupForeign(t) ? { foreign: lineupForeign(t) } : {}) })
     return {
       ...t,
       squad: squad.map((p) => p.id),

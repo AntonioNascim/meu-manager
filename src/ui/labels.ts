@@ -90,9 +90,11 @@ export const ATTRIBUTE_LABELS: Record<AttributeName, string> = {
 }
 
 export const PLAY_STYLE_LABELS: Record<PlayStyle, string> = {
-  possession: 'Posse de bola',
+  possession: 'Toque de bola',
   'counter-attack': 'Contra-ataque',
-  'high-press': 'Pressão alta',
+  'high-press': 'Pressão total',
+  direct: 'Lançamento direto',
+  wings: 'Jogar pelas pontas',
 }
 
 export const MENTALITY_LABELS: Record<Mentality, string> = {
@@ -180,9 +182,11 @@ export const ATTRIBUTE_GROUP_LABELS: Record<AttributeGroup, string> = {
 
 /** Resumo de cada estilo (o que ganha e o que custa) mostrado na tela de tática. */
 export const PLAY_STYLE_DESCRIPTIONS: Record<PlayStyle, string> = {
-  possession: 'Fica mais com a bola e controla o meio, mas cria menos chances cara a cara.',
+  possession: 'Fica mais com a bola e controla o meio com passes curtos, mas cria menos chances cara a cara. Pede meio-campistas de passe e visão.',
   'counter-attack': 'Cede a bola, mas ataca em transições rápidas de alta qualidade.',
   'high-press': 'Recupera a bola no campo do rival e sai em velocidade, mas cansa mais e deixa espaço nas costas.',
+  direct: 'Bola longa para os atacantes, sem passar pelo meio: cruzamentos e cabeceios. Rende com atacantes altos, fortes ou rápidos e passa por cima da pressão, mas cede o meio.',
+  wings: 'Laterais e pontas puxam o jogo, com cruzamentos e dribles. Rende com jogadores de lado bons de cruzamento, drible e velocidade, mas perde o meio e sofre com zaga forte no jogo aéreo.',
 }
 
 /** Estatísticas da partida (na ordem em que aparecem). */

@@ -179,7 +179,7 @@ describe('tela de tática', () => {
     const html = renderToStaticMarkup(createElement(Tactics, { game }))
     expect(html.match(/aria-label="[^"]*, (GOL|LD|LE|ZAG|VOL|MC|MEI|PD|PE|ATA)"/g)).toHaveLength(11)
     expect(html).toContain('Banco de reservas (7)')
-    expect(html).toContain('Posse de bola')
+    expect(html).toContain('Toque de bola')
     expect(html).toContain('Muito ofensiva')
     for (const id of FORMATION_IDS) expect(html).toContain(id)
   })

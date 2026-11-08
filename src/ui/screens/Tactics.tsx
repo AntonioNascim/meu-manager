@@ -7,6 +7,7 @@ import { buildTactic } from '../../engine/lineup'
 import { overallAt, playerOverall } from '../../engine/overall'
 import { MAX_TAKERS, changeFormation, movePlayerTo, setCaptain, setTaker, swapPlayers } from '../../engine/tacticEdit'
 import type { SetPieceKind } from '../../engine/tacticEdit'
+import { PLAY_STYLES } from '../../engine/types'
 import type { GridPoint, Mentality, Player, PlayStyle, Tactic } from '../../engine/types'
 import { squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
@@ -27,7 +28,7 @@ import {
 } from '../labels'
 import { GridPitch } from '../components/GridPitch'
 
-const STYLES: PlayStyle[] = ['possession', 'counter-attack', 'high-press']
+const STYLES: readonly PlayStyle[] = PLAY_STYLES
 const MENTALITIES: Mentality[] = [-2, -1, 0, 1, 2]
 
 /** Nome curto para caber embaixo da camisa no campo. */

@@ -22,6 +22,7 @@ import { buildTactic } from '../src/engine/lineup'
 import { simulateMatch } from '../src/engine/match'
 import { crowdFill } from '../src/engine/match/state'
 import { createRng } from '../src/engine/rng'
+import { PLAY_STYLES } from '../src/engine/types'
 import type { Player, PlayStyle, Team } from '../src/engine/types'
 import { FULL_WORLD, buildScaleWorld } from '../src/diagnostics/scaleWorld'
 import { formatLeagueSummary, formatLeagueYears, simulateLeagueYears } from './leagueYears'
@@ -99,7 +100,7 @@ function runBands(seasonsCount: number, firstSeed: number) {
   }
 }
 
-const STYLES: PlayStyle[] = ['possession', 'counter-attack', 'high-press']
+const STYLES: readonly PlayStyle[] = PLAY_STYLES
 
 /** Cada time da Série A joga a liga com cada estilo (mesmo elenco, formação e mentalidade). */
 function runStyles(worlds: number, firstSeed: number) {

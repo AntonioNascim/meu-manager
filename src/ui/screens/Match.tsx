@@ -7,6 +7,7 @@ import { shapeOf } from '../../engine/grid'
 import { playerOverall } from '../../engine/overall'
 import type { MatchSnapshot, SideSnapshot } from '../../engine/match'
 import { BASE_MINUTE_MS } from '../../engine/match/timing'
+import { PLAY_STYLES } from '../../engine/types'
 import type { GridPoint, MatchEvent, Mentality, Player, PlayStyle, Position } from '../../engine/types'
 import { finishPendingMatch, teamById } from '../../store/game'
 import type { Game } from '../../store/game'
@@ -40,7 +41,7 @@ import { Jersey } from '../theme'
 const SPEEDS = [1, 2, 4, 8] as const
 /** Duração de um minuto de jogo na velocidade 1x (ms): a do motor (`BASE_MINUTE_MS`), igual no solo e no online. */
 const MINUTE_MS = BASE_MINUTE_MS
-const STYLES: PlayStyle[] = ['possession', 'counter-attack', 'high-press']
+const STYLES: readonly PlayStyle[] = PLAY_STYLES
 const MENTALITIES: Mentality[] = [-2, -1, 0, 1, 2]
 
 const EVENT_ICON: Record<MatchEvent['type'], string> = {
