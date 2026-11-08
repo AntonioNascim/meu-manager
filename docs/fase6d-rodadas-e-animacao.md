@@ -330,3 +330,24 @@ Ferramentas novas: `node tools/run.mjs styleMatrix [--mundos N --pares N]` (cada
 3. **Medição `desempenho-real`** (opcional, tempo e memória do mundo real e do save): pacote = `real`; os outros campos não valem.
 
 O campo "pacote" não muda a `calibracao-liga-online` nem a `calibracao-real` (as duas usam sempre o pacote real), mas deixe em `real`.
+
+---
+
+## Resultado das medições de 30 anos (08/11/2026, branch `fase-6d`)
+
+**Rodadas:** `calibracao-liga-online` (sementes 5, 7, 11, 13, 23) e `calibracao-real` (7, 11, 23), pacote real, 30 temporadas, 370 clubes. **Comparação** com a calibração anterior (`dados-reais/medicoes/recalibracao`, 5 sementes; as 3 sementes iguais separadas para comparar par a par). Ferramenta nova: `node tools/run.mjs medicaoResumo "rotulo=pasta" ...` (junta as sementes de cada grupo e compara). O resumo completo gerado fica em `dados-reais/medicoes/fase-6d/resumo-comparacao.md` (fora do Git).
+
+### Alertas das metas contra a vida real
+- **Liga online (5 sementes): nenhum alerta.** Todas as metas cumpridas em todas as sementes.
+- **Solo novo (3 sementes): 2 alertas, os dois por uma margem pequena:** semente 11, `cont-na-1` com um clube em 8 de 31 títulos (25,8%; limite 25%); semente 23, `mx-1` com um clube (Tigres UANL) em 10 de 30 (33%; limite 30%). Semente 7: nenhum.
+- **Anterior:** 5 sementes com 1 alerta (semente 23, `cont-na-1`, México 68%, quando o piso era 70%; depois baixado para 65%).
+
+### O que mudou entre os grupos (e por quê)
+- **Os estilos não mexem nas partidas simplificadas.** O `simulateQuick` ignora o estilo (`grep style` em `quick.ts` não acha nada). Na medição do **solo** só a pirâmide do foco (Brasil) é jogada lance a lance; na da **liga online** nenhuma é. Por isso o efeito direto dos estilos novos é só nas ligas brasileiras do solo; o resto das diferenças vem do calendário comum (liga online) e da trajetória diferente de cada sorteio (a mudança no Brasil muda o mercado e as lesões, e o mundo inteiro diverge a partir daí).
+- **Liga online tem os campeões mais espalhados que antes**: campeões diferentes em 30 anos (liga online contra anterior, 5 sementes) fr-1 11,6 contra 9,4; pt-1 10,0 contra 7,8; nl-1 10,6 contra 8,4; mx-1 12,8 contra 10,4; maior fatia média de um clube em mx-1 19% contra 23%, em de-1 23% contra 29%. Explicação provável: a liga online não tem as copas mundiais (a Intercontinental e o Mundial de Clubes davam dinheiro extra aos gigantes) e as estrelas levadas pelo freio contra dinastias caem de 145 para 128 por semente em 30 anos.
+- **Copas continentais**, maior fatia de um clube (média / pior semente): `cont-eu-1` liga online 15% / 20%, solo novo 19% / 27% (Barcelona 8 de 30 na semente 11), anterior 13% / 17%; `cont-sa-1` 14% / 17%, 12% / 13%, 15% / 20%; `cont-na-1` 16% / 20%, 19% / 26%, 15% / 23%. México na `cont-na-1`: 79% (liga online), 82% (solo novo), 76% (anterior), dentro da meta de 65% a 95%.
+- **Reputação dos 6 maiores** (queda média do começo ao fim): todas as ligas abaixo de 2,2 pontos nos três grupos (meta: não cair mais de 3). Liga online: br-1 2,1 (2 de 5 sementes acima de 2) e ar-1 1,6; as europeias 0,8 a 1,1. Igual à anterior (br-1 1,8).
+- **Gigantes** (títulos nacionais em 30 anos, média; vida real entre parênteses): o quadro é o mesmo da calibração anterior, com as pendências já conhecidas (Bayern 6,4 a 7,7 contra 22; Juventus 5,2 a 6,3 contra 14; Milan 6,3 a 7,8 contra 4; Liverpool 4,2 a 6,3 contra 2). Flamengo e Palmeiras ficam em 2,0 a 2,6 nos dois grupos novos contra 3,6 e 3,0 antes: no solo novo o Brasil continua lance a lance, na liga online ele é simplificado como os outros países; a diferença é pequena (1 a 2 títulos em 30 anos) e não passa de nenhuma meta.
+
+### Conclusão
+**Nenhum ajuste é necessário antes de publicar.** O calendário comum e os estilos novos não deslocaram a calibragem; a liga online passa em todas as metas nas 5 sementes. Os dois alertas do solo são marginais (1 ou 2 títulos acima do limite), dependem de um clube só em copa ou liga fora do foco, não têm relação com estilo (as partidas desses campeonatos são simplificadas) e têm o mesmo perfil dos alertas já vistos nas rodadas anteriores. **Opcional, para tirar a dúvida:** rodar `calibracao-real` com as sementes `5,13` (fecha 5 sementes iguais às da calibração anterior) na mesma branch.
