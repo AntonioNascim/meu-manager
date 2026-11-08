@@ -312,3 +312,21 @@ Ferramentas novas: `node tools/run.mjs styleMatrix [--mundos N --pares N]` (cada
 4. **Escolha da IA** (pacote real, 15 ligas de elite): antes 31% toque, 41% contra-ataque, 28% pressão (os novos 0%); depois de 1 virada: **toque 23%, contra-ataque 22%, pressão total 18%, direto 19%, pontas 17%** (nenhum estilo passa de 30%).
 5. **Impressão digital do solo regravada de propósito** (`tests/fixtures/solo-digest.json`): conferi que a **única** causa é a IA escolher os estilos novos na virada (com a escolha desligada a impressão digital antiga volta a passar).
 6. **Falta:** a medição de 30 anos no workflow (calendário comum e estilos novos juntos), que você roda uma vez só. **Ainda não rodou.**
+
+---
+
+## Medições antes de publicar (08/11/2026)
+
+**Feitas no PC (sem servidor aberto):**
+- `test:balance` completo, **um arquivo de cada vez**: os 16 arquivos passaram (`attributes` 6, `cups` 6, `formations` 2, `fullSeason` 17, `gridTactics` 4, `leagues` 7, `longRun` 10, `packageLeagues` 2, `quick` 6, `saveParts` 1, `saveSize` 4, `season` 14, `shortHanded` 3, `styles` 2, `tactics` 14, `trainingIntensity` 4). `npm test` (unidade) também passou: 129 arquivos, 1.453 testes.
+- **Matriz de estilos com o valor final** (Lançamento direto com bônus 0,16; 4 mundos, 40 pares; pontos por jogo contra todos os estilos): toque 1,41; contra-ataque 1,34; pressão total 1,32; direto 1,41; pontas 1,35. Maior desvio de um confronto: 0,15. O teste de equilíbrio `tests/balance/styles.test.ts` (protocolo antigo: o time joga com cada estilo contra adversários que mantêm o estilo deles) passa com os cinco.
+- **`calibracao-real` não cobre o calendário comum:** ela roda `loadWorld` + `createSeason` com os calendários de cada país (Brasil de janeiro a dezembro, Europa de agosto a maio, pausas, copas mundiais) e **uma pirâmide de foco** jogada lance a lance. Por isso criei a opção abaixo.
+- **Modo novo `realRun --online`** (`tools/realRun.ts`, `tools/leagueYears.ts`): o mundo de uma liga online (calendário comum, sem técnico humano, todas as partidas simplificadas). Teste de fumaça local: 3 temporadas do pacote real em 140 s, 26 ligas e copas, sem erro (as metas contra a vida real só valem com 20 temporadas ou mais).
+
+**O que rodar no workflow `Medições pesadas`** (aba Actions › Run workflow, **"Use workflow from": `fase-6d`**; o site e a `main` do GitHub **não** são tocados):
+
+1. **Medição `calibracao-liga-online`**: pacote = `real` · sementes = `7,11,23,5,13` · anos = `30` · foco = qualquer (é ignorado). Cobre o calendário comum, os estilos novos escolhidos pela IA e o mundo de liga online, ao mesmo tempo. Termina com erro se uma meta de `tools/realTargets.ts` falhar. Roda 5 execuções em paralelo (~25 a 30 min cada).
+2. **Medição `calibracao-real`** (opcional, para comparar com o jogo solo, que agora também tem os estilos novos): pacote = `real` · sementes = `7,11,23` · anos = `30` · foco = `Brazil`.
+3. **Medição `desempenho-real`** (opcional, tempo e memória do mundo real e do save): pacote = `real`; os outros campos não valem.
+
+O campo "pacote" não muda a `calibracao-liga-online` nem a `calibracao-real` (as duas usam sempre o pacote real), mas deixe em `real`.

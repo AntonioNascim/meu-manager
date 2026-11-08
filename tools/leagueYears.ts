@@ -24,6 +24,8 @@ export interface LeagueInit {
   competitions?: CompetitionSetup[]
   focus?: string
   cupSpecs?: CupSpec[]
+  /** Mundo de liga online (Fase 6D): sem técnico humano e sem pirâmide de foco, todas as partidas usam o resultado simplificado, como numa liga em andamento. */
+  online?: boolean
 }
 
 export interface LeagueYear {
@@ -197,7 +199,7 @@ export function simulateLeagueYears(init: LeagueInit, years: number, observe?: {
   }
   // Até o fim de julho do ano seguinte ao último: todos os países já viraram `years` vezes (os da Europa viram em 30/6, ou poucos dias depois quando uma final continental atrasa).
   const split = state.season.competitions.some((c) => c.split)
-  advanceUntil(state, split ? `${init.year + years}-07-31` : `${init.year + years - 1}-12-31`, { market: true, turn })
+  advanceUntil(state, split ? `${init.year + years}-07-31` : `${init.year + years - 1}-12-31`, { market: true, turn, ...(init.online ? { humanTeamIds: [] } : {}) })
   // Mantém a ordem das ligas do mundo em cada ano.
   const order = new Map(state.season.competitions.map((c, i) => [c.id, i]))
   for (const run of runs) run.leagues.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))

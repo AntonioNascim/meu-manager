@@ -16,6 +16,7 @@ on:
           - ligas
           - mundo-ampliado
           - calibracao-real
+          - calibracao-liga-online
           - desempenho-real
           - personalizada
       pacote:
@@ -27,15 +28,15 @@ on:
           - ficticio
           - real
       sementes:
-        description: "continentais e calibracao-real: sementes separadas por vírgula (uma execução em paralelo para cada; para a calibração use 5 sementes, por exemplo 7,11,23,5,13)"
+        description: "continentais, calibracao-real e calibracao-liga-online: sementes separadas por vírgula (uma execução em paralelo para cada; para a calibração use 5 sementes, por exemplo 7,11,23,5,13)"
         type: string
         default: "23"
       anos:
-        description: "continentais, calibracao-real e ligas: temporadas simuladas (calibracao-real: 30)"
+        description: "continentais, calibracao-real, calibracao-liga-online e ligas: temporadas simuladas (calibracao: 30)"
         type: string
         default: "30"
       foco:
-        description: "continentais e calibracao-real: país jogado lance a lance (nome em inglês)"
+        description: "continentais e calibracao-real: país jogado lance a lance (nome em inglês); a calibracao-liga-online ignora (liga online não tem técnico jogando lance a lance)"
         type: string
         default: Brazil
       ferramenta:
@@ -72,7 +73,7 @@ jobs:
             [[ "$FERRAMENTA" =~ ^[A-Za-z0-9]+$ ]] || { echo "ferramenta inválida: $FERRAMENTA"; exit 1; }
             [[ "$ARGUMENTOS" =~ ^[A-Za-z0-9\ ._,=:-]*$ ]] || { echo "argumentos inválidos: $ARGUMENTOS"; exit 1; }
           fi
-          if [ "$MEDICAO" = "continentais" ] || [ "$MEDICAO" = "calibracao-real" ]; then
+          if [ "$MEDICAO" = "continentais" ] || [ "$MEDICAO" = "calibracao-real" ] || [ "$MEDICAO" = "calibracao-liga-online" ]; then
             [[ "$SEMENTES" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "sementes inválidas: $SEMENTES"; exit 1; }
             echo "matrix={\"semente\":[\"${SEMENTES//,/\",\"}\"]}" >> "$GITHUB_OUTPUT"
           else
@@ -137,6 +138,12 @@ jobs:
               export PACOTE_REAL=1
               echo "Calibração com o pacote real: semente $SEMENTE, $ANOS anos, foco $FOCO" | tee -a resultado/cabecalho.txt
               node --expose-gc tools/run.mjs realRun --years "$ANOS" --seed "$SEMENTE" --focus "$FOCO" | tee "resultado/calibracao-real-semente-$SEMENTE.txt"
+              ;;
+            calibracao-liga-online)
+              # Fase 6D: o mesmo que a calibracao-real, mas com o mundo de uma LIGA ONLINE: calendário comum (temporada única, rodada N no mesmo dia, copas em quartas, sem as copas mundiais), sem técnico humano e com todas as partidas simplificadas, como numa liga em andamento. Sempre com o pacote real. Termina com erro se uma meta de tools/realTargets.ts falhar.
+              export PACOTE_REAL=1
+              echo "Calibração com o pacote real como liga online: semente $SEMENTE, $ANOS anos" | tee -a resultado/cabecalho.txt
+              node --expose-gc tools/run.mjs realRun --online --years "$ANOS" --seed "$SEMENTE" | tee "resultado/calibracao-liga-online-semente-$SEMENTE.txt"
               ;;
             desempenho-real)
               # Fase 5D: tempo, memória e save do mundo real (370 clubes, mais de 10 mil jogadores), calendário das ligas e copas e o mesmo relatório do ?diagnostico=1.

@@ -4,14 +4,15 @@
  * mundial, campeões por clube e por país; e, por país, a trajetória de reputação e de força dos gigantes (os 6 clubes de maior reputação
  * no início), para ver se continuam grandes por décadas sem dominar tudo.
  *
- * Uso: PACOTE_REAL=1 node --expose-gc tools/run.mjs realRun [--years 30] [--seed 7] [--focus Brazil] [--ids en-1,es-1]
+ * Uso: PACOTE_REAL=1 node --expose-gc tools/run.mjs realRun [--years 30] [--seed 7] [--focus Brazil] [--ids en-1,es-1] [--online]
+ * `--online`: o mundo de uma liga online (Fase 6D): calendário comum, sem técnico humano, todas as partidas simplificadas (`--focus` não vale).
  * Termina com erro se alguma meta de `tools/realTargets.ts` for violada (só com 20 temporadas ou mais): o workflow usa isso como aviso.
  */
 import { loadWorld } from '../src/data/package/defaultPackage'
 import { validatePackage } from '../src/data/package/validate'
 import type { World } from '../src/data/generateWorld'
 import { playerOverall } from '../src/engine/overall'
-import { computeStandings, pyramidOf } from '../src/engine/season'
+import { computeStandings, pyramidOf, sharedCupSpecs, sharedSetups } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
 import { continentalObserver } from './continentalRun'
 import type { ContinentalRun } from './continentalRun'
@@ -43,7 +44,7 @@ export interface RealSimulation {
 }
 
 /** Joga `years` temporadas do pacote de medição (o real com `PACOTE_REAL=1`) com o relógio único do mundo. */
-export function simulateReal(years: number, seed: number, focus = 'Brazil'): RealSimulation {
+export function simulateReal(years: number, seed: number, focus = 'Brazil', online = false): RealSimulation {
   const { pkg } = validatePackage(measurementPackage(seed))
   if (!pkg) throw new Error('pacote inválido')
   const world = loadWorld(seed, pkg)
@@ -83,7 +84,10 @@ export function simulateReal(years: number, seed: number, focus = 'Brazil'): Rea
   }
   const t0 = Date.now()
   const runs = simulateLeagueYears(
-    { year: world.startYear, seed: `real-${seed}`, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus, ...(world.cups ? { cupSpecs: world.cups } : {}) },
+    online
+      ? // Mundo de liga online: calendário comum (temporada única, rodada N no mesmo dia, copas em quartas, sem as mundiais), sem técnico humano e sem foco.
+        { year: world.startYear, seed: `real-${seed}`, teams: world.teams, players: world.players, academy: world.academy, competitions: sharedSetups(world.competitions!), online: true, ...(world.cups ? { cupSpecs: sharedCupSpecs(world.cups, world.competitions!) } : {}) }
+      : { year: world.startYear, seed: `real-${seed}`, teams: world.teams, players: world.players, academy: world.academy, competitions: world.competitions!, focus, ...(world.cups ? { cupSpecs: world.cups } : {}) },
     years,
     observer,
   )
@@ -124,9 +128,10 @@ if (process.argv[1]?.includes('realRun')) {
   const years = Number(opt('years', '30'))
   const seed = Number(opt('seed', '7'))
   const only = opt('ids', '').split(',').filter(Boolean)
-  const sim = simulateReal(years, seed, opt('focus', 'Brazil'))
+  const online = args.includes('--online')
+  const sim = simulateReal(years, seed, opt('focus', 'Brazil'), online)
   const { world, nameOf } = sim
-  console.log(`# Mundo real: ${world.teams.length} clubes, ${years} temporadas, semente ${seed} (${sim.seconds} s)\n`)
+  console.log(`# Mundo real${online ? ' como LIGA ONLINE (calendário comum, sem técnico humano, todas as partidas simplificadas)' : ''}: ${world.teams.length} clubes, ${years} temporadas, semente ${seed} (${sim.seconds} s)\n`)
 
   const results = summarizeReal(sim, only)
   console.log('## Campeões das ligas')
