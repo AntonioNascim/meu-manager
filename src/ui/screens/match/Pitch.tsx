@@ -3,11 +3,12 @@ import { slotAt } from '../../../engine/grid'
 import type { MatchSnapshot } from '../../../engine/match'
 import type { Player } from '../../../engine/types'
 import { playerName } from '../../format'
-import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor, HOLD_MS, devFlag, devParam } from './pitchModel'
+import { BASE_MINUTE_MS, MIN_BEAT_MS } from '../../../engine/match/timing'
+import { assignNumber, beatsFor, fitBeats, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor, HOLD_MS, devFlag, devParam } from './pitchModel'
 import type { Beat, Layout, MarkKind, Placed, Pt, Side } from './pitchModel'
 
 /** Tempo de um minuto de jogo em 1x (ms), o mesmo da tela de partida. */
-const MINUTE_MS = 700
+const MINUTE_MS = BASE_MINUTE_MS
 
 const MARK_ICON: Record<MarkKind, { icon: string; cls: string; label: string }> = {
   goal: { icon: '⚽', cls: 'bg-accent text-accent-ink', label: 'Gol' },
@@ -119,7 +120,7 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
     timers.current = []
     const last = pickTrace(fresh)
     if (!last) return
-    const beats = beatsFor(last, new Map([...latest.current.known, ...latest.current.layout]), snap.events)
+    const beats = beatsFor(last, new Map([...latest.current.known, ...latest.current.layout]), snap.events, new Set(latest.current.layout.keys()))
     if (beats.length === 0) return
     // Finalizações e gols passam em câmera lenta em qualquer velocidade (o relógio da partida espera: ver `holdFor`).
     // Em desenvolvimento, &anim=1 mostra a sequência completa mesmo ao abrir a partida no meio (para conferir as setas).
@@ -127,17 +128,23 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
     const slow = fresh.length <= 2 || forceFull ? slowFor(last) : 0
     const tick = slow || MINUTE_MS / speed
     const simplified = !forceFull && !slow && (speed >= 4 || fresh.length > 2)
-    const played = playbackFor(beats, slow ? 1 : speed, simplified)
+    // Até 2x (ou em câmera lenta) o lance toca inteiro dentro do tempo do minuto; passos que não cabem (cada um precisa de MIN_BEAT_MS) são omitidos.
+    const played = simplified || (!slow && speed >= 4) ? playbackFor(beats, slow ? 1 : speed, simplified) : { beats: fitBeats(beats, tick, MIN_BEAT_MS), arrows: true }
     const { arrows } = played
     // Em desenvolvimento, &passo=N mostra só a batida N da sequência (para conferir a cena parada).
     const only = devParam('passo')
     const seq = only !== null && played.beats[Number(only)] ? [played.beats[Number(only)] as Beat] : played.beats
-    const slot = tick / Math.max(1, seq.length)
-    const glide = !arrows ? Math.min(160, tick) : Math.max(90, Math.min(480, slot * 0.9))
+    // O tempo de cada passo é proporcional ao peso dele (passe curto menos, bola longa e cruzamento mais; o chute fica mais tempo na tela).
+    const weights = seq.map((b) => b.weight ?? 1)
+    const total = weights.reduce((a, b) => a + b, 0) || 1
+    const minSlot = (tick * Math.min(...weights)) / total
+    const glide = !arrows ? Math.min(160, tick) : Math.max(90, Math.min(520, minSlot * 0.95))
+    let at = 0
     seq.forEach((beat, i) => {
       const show = () => setView({ beat: { ...beat, arrow: arrows ? beat.arrow : undefined } as Beat, glide })
       if (i === 0) show()
-      else timers.current.push(window.setTimeout(show, slot * i))
+      else timers.current.push(window.setTimeout(show, at))
+      at += (tick * (weights[i] as number)) / total
     })
   }, [snap.trace.length, snap.minute]) // eslint-disable-line react-hooks/exhaustive-deps
   // Ao sair (ou no remonte do modo estrito de desenvolvimento) os temporizadores caem e o campo volta a desenhar o último lance.

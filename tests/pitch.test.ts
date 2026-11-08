@@ -200,7 +200,8 @@ describe('bola, setas e marcações de cada lance', () => {
     const through = snap.trace.find((t) => t.play === 'through' && t.outcome === 'won' && t.receiverId)!
     const cross = snap.trace.find((t) => t.play === 'cross' && t.outcome === 'won' && t.receiverId)!
     const shotTrace = snap.trace.find((t) => t.shot?.result === 'saved')!
-    const arrowOf = (t: typeof through, phase: string) => beatsFor(t, everyone, snap.events).find((x) => x.arrow && (x.arrow.solid ? phase === 'solid' : phase === 'dashed'))?.arrow
+    // O passe em profundidade e o cruzamento são a seta do passo "chance" (antes dele podem vir passes curtos e a bola longa da saída).
+    const arrowOf = (t: typeof through, phase: string) => beatsFor(t, everyone, snap.events).find((x) => x.arrow && (x.arrow.solid ? phase === 'solid' : x.phase === 'chance'))?.arrow
     expect(arrowOf(through, 'dashed')).toBeDefined()
     expect(arrowOf(through, 'dashed')?.curve).toBe(false)
     expect(arrowOf(cross, 'dashed')?.curve).toBe(true)

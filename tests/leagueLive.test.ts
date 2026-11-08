@@ -82,8 +82,8 @@ const gameOf = (e: LiveEvent, teamId: string) => e.games.find((g) => g.homeTeamI
 const sameResults = (a: LiveEvent) => a.games.map((g) => JSON.stringify(g.live.result())) as string[]
 
 describe('partida ao vivo na liga online: um relógio por partida (C5)', () => {
-  it('a 1x o minuto de jogo dura 700 ms (o do jogo solo) e a velocidade escolhida o divide', () => {
-    expect(BASE_MINUTE_MS).toBe(700)
+  it('a 1x o minuto de jogo dura 1.600 ms (o do jogo solo) e a velocidade escolhida o divide', () => {
+    expect(BASE_MINUTE_MS).toBe(1600)
     expect(DEFAULT_SPEED).toBe(2)
     const { stepped, event, now } = atFirstEvent()
     const seats = stepped.league.seats

@@ -519,7 +519,7 @@ export class LeagueRoom {
 
   private minuteMs(): number {
     const test = Number(this.env.LIVE_MINUTE_MS)
-    // O 1x online é o 1x do jogo solo (700 ms por minuto de jogo); só o teste local o encurta.
+    // O 1x online é o 1x do jogo solo (1.600 ms por minuto de jogo); só o teste local o encurta.
     return this.meta?.minuteMs ?? (test > 0 ? test : BASE_MINUTE_MS)
   }
 

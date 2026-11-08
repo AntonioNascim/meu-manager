@@ -6,7 +6,8 @@
  * O mandante ataca para a direita.
  */
 import type { MatchSnapshot, PlayTrace } from '../../../engine/match'
-import type { GridPoint, MatchEvent, Position } from '../../../engine/types'
+import type { GridPoint, MatchEvent, PlayStyle, Position } from '../../../engine/types'
+import { depthShift, shapeOf, type StyleShape } from './pitchStyle'
 
 export type Side = 'home' | 'away'
 export interface Pt {
@@ -54,16 +55,22 @@ export interface Placed {
   slot: Position
   /** Posição de base (sem o deslocamento da fase da jogada). */
   base: Pt
+  /** Estilo do time: a forma e o avanço de fase seguem o estilo (sem ele vale o avanço neutro de antes). */
+  style?: PlayStyle
 }
 
 /** Base de um time: cada vaga na profundidade da posição e espalhada na largura quando há mais de um na mesma posição. */
-export function basePositions(side: Side, onPitch: readonly OnPitch[], wingersAttack: boolean): Placed[] {
+export function basePositions(side: Side, onPitch: readonly OnPitch[], wingersAttack: boolean, shape?: StyleShape, style?: PlayStyle): Placed[] {
+  // A forma do estilo sobe ou recua as linhas e aperta ou abre o time; sem ela, a posição é a da formação.
+  const deepen = (slot: Position, depth: number) => (shape ? clamp(depth + depthShift(slot, shape), 0.03, 0.92) : depth)
+  const squeeze = (y: number) => (shape ? clamp(0.5 + (y - 0.5) * shape.compact, 0.04, 0.96) : y)
+  const tag = style ? { style } : {}
   if (onPitch.length > 0 && onPitch.every((p) => p.point)) {
     return onPitch.map((p) => {
       const { row, lane } = p.point as GridPoint
-      const depth = ROW_DEPTH[row] ?? 0.5
-      const y = LANE_Y[lane] ?? 0.5
-      return { playerId: p.playerId, side, slot: p.slot, base: { x: side === 'home' ? depth : 1 - depth, y: side === 'home' ? y : 1 - y } }
+      const depth = deepen(p.slot, ROW_DEPTH[row] ?? 0.5)
+      const y = squeeze(LANE_Y[lane] ?? 0.5)
+      return { playerId: p.playerId, side, slot: p.slot, base: { x: side === 'home' ? depth : 1 - depth, y: side === 'home' ? y : 1 - y }, ...tag }
     })
   }
   const groups = new Map<Position, OnPitch[]>()
@@ -78,10 +85,11 @@ export function basePositions(side: Side, onPitch: readonly OnPitch[], wingersAt
       const lane = n === 1 ? LANE[slot] : clamp(LANE[slot] + (i - (n - 1) / 2) * 2 * spread, 0.06, 0.94)
       let depth = DEPTH[slot]
       if ((slot === 'RW' || slot === 'LW') && !wingersAttack) depth = 0.52
+      depth = deepen(slot, depth)
       const x = side === 'home' ? depth : 1 - depth
       // O time visto de cima atacando para a direita tem o lado direito embaixo; o visitante é o espelho.
-      const y = side === 'home' ? lane : 1 - lane
-      placed.push({ playerId: p.playerId, side, slot, base: { x, y } })
+      const y = squeeze(side === 'home' ? lane : 1 - lane)
+      placed.push({ playerId: p.playerId, side, slot, base: { x, y }, ...tag })
     })
   }
   return placed
@@ -161,8 +169,10 @@ const ROLE_PUSH: Record<Position, number> = { GK: 0.05, CB: 0.45, RB: 0.7, LB: 0
 export function shifted(p: Placed, attSide: Side, phase: Phase, focusY: number): Pt {
   const dir = attSide === 'home' ? 1 : -1
   const mine = p.side === attSide
-  const push = PHASE_PUSH[phase] * ROLE_PUSH[p.slot]
-  const dx = mine ? dir * push : dir * push * 0.55 * (p.slot === 'GK' ? 0 : 1)
+  const shape = p.style ? shapeOf(p.style) : undefined
+  const push = PHASE_PUSH[phase] * ROLE_PUSH[p.slot] * (mine ? (shape?.attackPush ?? 1) : 1)
+  // Sem a bola o time recua (posse e pressão alta pouco; contra-ataque, que espera atrás, bastante).
+  const dx = mine ? dir * push : dir * push * (shape?.defendPush ?? 0.55) * (p.slot === 'GK' ? 0 : 1)
   const closeness = 1 - Math.abs(p.base.y - focusY)
   const dy = (focusY - p.base.y) * (phase === 'midfield' ? 0.08 : 0.28) * closeness
   return { x: clamp(p.base.x + dx, 0.02, 0.98), y: clamp(p.base.y + dy, 0.05, 0.95) }
@@ -200,6 +210,8 @@ export interface Beat {
   attSide: Side
   focusY: number
   marks: Mark[]
+  /** Peso do tempo do passo na animação do lance (padrão 1): passe curto menos, cruzamento e bola longa mais. */
+  weight?: number
 }
 
 export type Layout = Map<string, Placed>
@@ -210,11 +222,76 @@ const goalX = (side: Side) => (side === 'home' ? 1 : 0)
 const markFor = (e: MatchEvent): MarkKind | null =>
   e.type === 'goal' ? 'goal' : e.type === 'own-goal' ? 'own-goal' : e.type === 'corner' ? 'corner' : e.type === 'foul' ? 'foul' : e.type === 'yellow-card' ? 'yellow' : e.type === 'red-card' ? 'red' : null
 
+/** Alcance de um passe curto (≈ 19 m) e distância mínima de um marcador para o companheiro contar como livre. */
+const SHORT_PASS = 0.19
+const FREE_OF_MARKER = 0.05
+/** Acima disto o passe é uma bola longa (≈ 35 m). */
+const LONG_PASS = 0.3
+
+const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y)
+
+/**
+ * Passes curtos de `from` até `to`: cada passe vai para um companheiro perto (até `SHORT_PASS`) e livre (sem marcador a menos de
+ * `FREE_OF_MARKER`), nunca para quem já tocou na bola neste lance. Posse e toque de bola trocam o jogo de lado e para trás; os outros
+ * estilos procuram o que aproxima do destino. O último passe vai a `to`. Sem `to` (a bola só foi mantida) a troca termina onde parar.
+ */
+function passChain(placed: readonly Placed[], active: ReadonlySet<string> | undefined, att: Side, def: Side, from: Placed, to: Placed | undefined, legs: [number, number], minute: number, focusY: number, tempo: number): Beat[] {
+  const dir = att === 'home' ? 1 : -1
+  const where = (p: Placed) => shifted(p, att, 'midfield', focusY)
+  const mates = placed.filter((p) => p.side === att && p.slot !== 'GK' && p.playerId !== to?.playerId && (!active || active.has(p.playerId)))
+  const foes = placed.filter((p) => p.side === def && p.slot !== 'GK' && (!active || active.has(p.playerId))).map(where)
+  const wanted = Math.round(legs[0] + hash(`${minute}:${att}:legs`) * (legs[1] - legs[0]))
+  const out: Beat[] = []
+  const used = new Set<string>([from.playerId])
+  let holder = from
+  const pass = (target: Placed, curve = false, weight = 0.7): void => {
+    const a = where(holder)
+    const b = where(target)
+    out.push({ phase: 'midfield', holder: target.playerId, ball: nudge(b, dir), arrow: { from: a, to: b, curve }, moves: {}, attSide: att, focusY, marks: [], weight: weight * tempo })
+    used.add(target.playerId)
+    holder = target
+  }
+  // Faz os passes combinados e, se o destino ainda está longe, segue passando (até 7) em vez de um passe comprido no fim.
+  for (let leg = 0; leg < 7; leg++) {
+    const hp = where(holder)
+    const toward = to ? where(to) : undefined
+    if (leg >= wanted && (!toward || dist(hp, toward) <= SHORT_PASS)) break
+    const near = mates.filter((p) => !used.has(p.playerId)).map((p) => ({ p, at: where(p) }))
+    // Prefere quem está livre; sem ninguém livre perto, aceita um companheiro marcado (ou um pouco mais longe) em vez de um passe comprido.
+    let options = near.filter(({ at }) => dist(hp, at) <= SHORT_PASS && foes.every((f) => dist(f, at) >= FREE_OF_MARKER))
+    if (options.length === 0) options = near.filter(({ at }) => dist(hp, at) <= SHORT_PASS * 1.3)
+    if (options.length === 0) options = near.filter(({ at }) => dist(hp, at) <= SHORT_PASS * 1.8)
+    if (options.length === 0) break
+    const scored = options
+      .map(({ p, at }) => ({ p, at, progress: toward ? dist(hp, toward) - dist(at, toward) : (at.x - hp.x) * dir }))
+      // Longe do destino só vale o que aproxima dele; perto dele, nos passes combinados, vale trocar de lado ou voltar.
+      .filter(({ progress }) => progress > 0.01 || (leg < wanted && (!toward || dist(hp, toward) <= SHORT_PASS)))
+      .map(({ p, progress }) => {
+      const noise = hash(`${minute}:${p.playerId}:${leg}`)
+      return { p, score: progress * (legs[1] > 2 ? 0.6 : 2) + noise * (legs[1] > 2 ? 0.1 : 0.05) }
+    })
+    if (scored.length === 0) break
+    scored.sort((x, y) => y.score - x.score)
+    pass((scored[0] as { p: Placed }).p)
+  }
+  if (to && holder.playerId !== to.playerId) pass(to)
+  return out
+}
+
+/** Bola longa (contra-ataque e passes em profundidade de quem joga em bola longa): um passe só, em curva, do que recuperou até quem corre. */
+function longBall(att: Side, from: Placed, to: Placed, focusY: number, tempo: number): Beat[] {
+  const dir = att === 'home' ? 1 : -1
+  const a = shifted(from, att, 'midfield', focusY)
+  const b = shifted(to, att, 'progress', focusY)
+  return [{ phase: 'midfield', holder: to.playerId, ball: nudge(b, dir), arrow: { from: a, to: b, curve: true }, moves: { [to.playerId]: b }, attSide: att, focusY, marks: [], weight: 1.3 * tempo }]
+}
+
 /**
  * As batidas de um momento de posse. Não sorteia nada: onde há escolha (o meio-campista que "ganhou o meio", o
- * lado do escanteio) usa um hash do minuto e dos ids, o mesmo em qualquer máquina.
+ * lado do escanteio, o passe curto) usa um hash do minuto e dos ids, o mesmo em qualquer máquina. `active` são os jogadores
+ * em campo agora (quem saiu por troca nunca recebe a bola).
  */
-export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly MatchEvent[]): Beat[] {
+export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly MatchEvent[], active?: ReadonlySet<string>): Beat[] {
   if (trace.shot && (trace.shot.type === 'penalty' || trace.shot.type === 'freeKick')) {
     const scene = setPieceBeats(trace, layout, events)
     if (scene.length > 0) return scene
@@ -222,15 +299,23 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
   const att = trace.side
   const def: Side = att === 'home' ? 'away' : 'home'
   const dir = att === 'home' ? 1 : -1
+  const gx = goalX(att)
   const placed = [...layout.values()]
   const get = (id?: string) => (id ? layout.get(id) : undefined)
   const posAt = (id: string | undefined, phase: Phase, focusY: number): Pt | undefined => {
     const p = get(id)
     return p ? shifted(p, att, phase, focusY) : undefined
   }
+  const attShape = shapeOf(placed.find((p) => p.side === att)?.style)
   const carrier = get(trace.carrierId)
-  const mids = placed.filter((p) => p.side === att && (p.slot === 'DM' || p.slot === 'CM' || p.slot === 'AM'))
-  const pool = mids.length > 0 ? mids : placed.filter((p) => p.side === att && p.slot !== 'GK')
+  const onPitch = (p: Placed) => !active || active.has(p.playerId)
+  // Contra-ataque: quem recupera a bola está atrás (defesa ou volante); nos outros lances, é um meio-campista.
+  const mids = placed.filter((p) => p.side === att && onPitch(p) && (p.slot === 'DM' || p.slot === 'CM' || p.slot === 'AM'))
+  const backs = placed.filter((p) => p.side === att && onPitch(p) && (p.slot === 'CB' || p.slot === 'RB' || p.slot === 'LB' || p.slot === 'DM'))
+  // Quem joga na posse constrói de trás (zagueiros e volante), então a bola passa por mais gente até o condutor.
+  const fromBack = trace.transition || attShape.passes[0] >= 3
+  const preferred = fromBack && backs.length > 0 ? backs : mids
+  const pool = preferred.length > 0 ? preferred : placed.filter((p) => p.side === att && p.slot !== 'GK')
   const winner = pool.length > 0 ? pool[Math.floor(hash(`${trace.minute}:${att}:${trace.carrierId ?? ''}`) * pool.length)] : undefined
   const wide = carrier && (carrier.slot === 'RB' || carrier.slot === 'LB' || carrier.slot === 'RW' || carrier.slot === 'LW')
   const focusY = carrier && (wide || trace.play === 'cross') ? carrier.base.y : 0.5
@@ -254,23 +339,35 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
   }
 
   const beats: Beat[] = []
-  // 1) Disputa do meio: o time com a bola sobe um pouco; a bola vai para um meio-campista.
+  // 1) Disputa do meio: o time com a bola sobe um pouco; a bola vai para quem recuperou ou ganhou o meio.
   const winnerPos = winner ? shifted(winner, att, 'midfield', focusMid) : { x: 0.5, y: 0.5 }
-  beats.push({ phase: 'midfield', ...(winner ? { holder: winner.playerId } : {}), ball: nudge(winnerPos, dir), moves: {}, attSide: att, focusY: focusMid, marks: [] })
+  beats.push({ phase: 'midfield', ...(winner ? { holder: winner.playerId } : {}), ball: nudge(winnerPos, dir), moves: {}, attSide: att, focusY: focusMid, marks: [], weight: 0.9 })
   if (trace.play === 'held' || !carrier) {
-    // Só manteve a bola: eventos paralelos (falta no meio) aparecem aqui.
+    // Só manteve a bola: troca de passes (mais longa em quem joga na posse) e eventos paralelos (falta no meio).
+    if (winner) beats.push(...passChain(placed, active, att, def, winner, undefined, attShape.passes, trace.minute, focusMid, attShape.tempo))
     const marks = marksFromEvents((e) => (isFoulOrCard(e) ? positionOf(layout, e.playerId, att, 'midfield', focusMid) : undefined))
     const last = beats[beats.length - 1] as Beat
     last.marks = marks
     return beats
   }
 
+  // 1b) Construção: passes curtos para quem está perto e livre até o condutor; na saída do contra-ataque, uma bola longa.
+  if (winner && winner.playerId !== carrier.playerId) {
+    const farAway = dist(shifted(winner, att, 'midfield', focusMid), shifted(carrier, att, 'progress', focusY)) > LONG_PASS
+    if (attShape.longBalls && (trace.transition || trace.play === 'through') && farAway) beats.push(...longBall(att, winner, carrier, focusY, attShape.tempo))
+    else beats.push(...passChain(placed, active, att, def, winner, carrier, trace.transition ? [0, 0] : attShape.passes, trace.minute, focusMid, attShape.tempo))
+  }
+
   const carrierPos = posAt(trace.carrierId, 'progress', focusY) as Pt
   const marker = get(trace.markerId)
   const moves: Record<string, Pt> = {}
   let carrierEnd = carrierPos
+  // O cruzamento sai do fundo: o condutor vai pela faixa do lado dele até o terço final e à linha de fundo, e só então cruza.
+  const lane = carrier.base.y < 0.5 ? 0.1 : 0.9
+  const channel: Pt = { x: gx - dir * 0.22, y: lane }
+  const byline: Pt = { x: gx - dir * 0.07, y: lane }
   if (trace.play === 'dribble') carrierEnd = { x: clamp(carrierPos.x + dir * 0.07, 0.05, 0.95), y: carrierPos.y }
-  if (trace.play === 'cross') carrierEnd = { x: goalX(att) === 1 ? 0.86 : 0.14, y: carrierPos.y < 0.5 ? 0.07 : 0.93 }
+  if (trace.play === 'cross') carrierEnd = channel
   if (marker && trace.play !== 'through') moves[marker.playerId] = { x: clamp(carrierEnd.x - dir * 0.04, 0.03, 0.97), y: clamp(carrierEnd.y + (marker.base.y < carrierEnd.y ? 0.03 : -0.03), 0.04, 0.96) }
   moves[carrier.playerId] = carrierEnd
 
@@ -284,43 +381,69 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
     attSide: att,
     focusY,
     marks: marksFromEvents((e) => (isFoulOrCard(e) ? (moves[e.playerId] ?? positionOf(layout, e.playerId, att, 'progress', focusY)) : undefined)),
+    weight: 1.1 * attShape.tempo,
   })
   if (trace.outcome === 'foul') return beats
   if (lostDribble) return beats
+  if (trace.play === 'cross') {
+    carrierEnd = byline
+    moves[carrier.playerId] = byline
+    if (marker) moves[marker.playerId] = { x: clamp(byline.x - dir * 0.03, 0.03, 0.97), y: clamp(byline.y + (lane < 0.5 ? 0.04 : -0.04), 0.04, 0.96) }
+    beats.push({ phase: 'progress', holder: carrier.playerId, ball: nudge(byline, dir), moves: { ...moves }, attSide: att, focusY, marks: [], weight: 0.9 * attShape.tempo })
+  }
 
-  // 3) Passe em profundidade ou cruzamento: seta tracejada até o alvo.
+  // 3) Passe em profundidade ou cruzamento: seta tracejada até o alvo (o cruzamento sai do fundo para dentro da área).
   const receiver = get(trace.receiverId)
   if ((trace.play === 'through' || trace.play === 'cross') && receiver) {
     const target: Pt =
       trace.play === 'cross'
-        ? { x: clamp(goalX(att) === 1 ? 0.88 : 0.12, 0.05, 0.95), y: clamp(0.5 + (hash(`${trace.minute}:${receiver.playerId}`) - 0.5) * 0.28, 0.3, 0.7) }
-        : { x: clamp(goalX(att) === 1 ? 0.82 : 0.18, 0.05, 0.95), y: clamp(receiver.base.y * 0.5 + 0.25, 0.25, 0.75) }
+        ? { x: gx - dir * (0.07 + 0.06 * hash(`${trace.minute}:${receiver.playerId}:cx`)), y: clamp(0.5 + (hash(`${trace.minute}:${receiver.playerId}`) - 0.5) * 0.28, 0.36, 0.64) }
+        : { x: clamp(gx === 1 ? 0.82 : 0.18, 0.05, 0.95), y: clamp(receiver.base.y * 0.5 + 0.25, 0.25, 0.75) }
     if (trace.outcome === 'intercepted' && marker) {
       const m = shifted(marker, att, 'progress', focusY)
-      beats.push({ phase: 'progress', holder: marker.playerId, ball: nudge(m, -dir), arrow: { from: carrierEnd, to: m, curve: false }, moves: { ...moves, [marker.playerId]: m }, attSide: att, focusY, marks: [] })
+      beats.push({ phase: 'progress', holder: marker.playerId, ball: nudge(m, -dir), arrow: { from: carrierEnd, to: m, curve: false }, moves: { ...moves, [marker.playerId]: m }, attSide: att, focusY, marks: [], weight: 0.8 })
       return beats
     }
     if (trace.play === 'cross' && trace.outcome === 'lost' && marker) {
       const m = { x: target.x - dir * 0.03, y: target.y }
-      beats.push({ phase: 'chance', holder: marker.playerId, ball: m, arrow: { from: carrierEnd, to: m, curve: true }, moves: { ...moves, [marker.playerId]: m }, attSide: att, focusY, marks: marksFromEvents((e) => (e.type === 'corner' ? cornerPoint(att, carrierEnd.y) : undefined)) })
+      beats.push({ phase: 'chance', holder: marker.playerId, ball: m, arrow: { from: carrierEnd, to: m, curve: true }, moves: { ...moves, [marker.playerId]: m }, attSide: att, focusY, marks: marksFromEvents((e) => (e.type === 'corner' ? cornerPoint(att, carrierEnd.y) : undefined)), weight: 1.4 })
       return beats
     }
-    beats.push({ phase: 'chance', holder: receiver.playerId, ball: nudge(target, dir), arrow: { from: carrierEnd, to: target, curve: trace.play === 'cross' }, moves: { ...moves, [receiver.playerId]: target }, attSide: att, focusY, marks: [] })
+    // Quem fica na área esperando a bola: até dois companheiros de ataque entram nela.
+    const inBox: Record<string, Pt> = {}
+    if (trace.play === 'cross') {
+      const others = placed.filter((p) => p.side === att && onPitch(p) && p.playerId !== receiver.playerId && p.playerId !== carrier.playerId && (p.slot === 'ST' || p.slot === 'AM' || p.slot === 'RW' || p.slot === 'LW')).sort((a, b) => hash(`${trace.minute}:${a.playerId}`) - hash(`${trace.minute}:${b.playerId}`))
+      others.slice(0, 2).forEach((p, i) => {
+        inBox[p.playerId] = { x: gx - dir * (0.1 + 0.05 * i), y: clamp(i === 0 ? target.y - 0.14 : target.y + 0.14, 0.3, 0.7) }
+      })
+    }
+    beats.push({ phase: 'chance', holder: receiver.playerId, ball: nudge(target, dir), arrow: { from: carrierEnd, to: target, curve: trace.play === 'cross' }, moves: { ...moves, ...inBox, [receiver.playerId]: target }, attSide: att, focusY, marks: [], weight: trace.play === 'cross' ? 1.4 : 1.2 })
     moves[receiver.playerId] = target
+    Object.assign(moves, inBox)
   }
 
   const shot = trace.shot
   if (!shot) return beats
 
-  // 4) Finalização: chute ao gol; goleiro, bloqueio, para fora ou gol.
+  // 4) Finalização: o chutador chega perto da área (chute de longe a ~26 m, os outros dentro ou na beira da área) e chuta ao gol.
   const shooter = get(shot.shooterId)
-  const from: Pt = (shooter && (moves[shooter.playerId] ?? shifted(shooter, att, 'chance', focusY))) || carrierEnd
+  let from: Pt = (shooter && (moves[shooter.playerId] ?? shifted(shooter, att, 'chance', focusY))) || carrierEnd
+  if (shooter) {
+    const limit = shot.type === 'longShot' ? 0.31 : 0.22
+    if (Math.abs(gx - from.x) > limit) {
+      const goalDist = shot.type === 'longShot' ? 0.25 + 0.04 * hash(`${trace.minute}:${shot.shooterId}:ls`) : 0.12 + 0.06 * hash(`${trace.minute}:${shot.shooterId}:bx`)
+      const spot: Pt = { x: gx - dir * goalDist, y: clamp(from.y + (0.5 - from.y) * 0.55, 0.24, 0.76) }
+      beats.push({ phase: 'chance', holder: shooter.playerId, ball: nudge(spot, dir), moves: { ...moves, [shooter.playerId]: spot }, attSide: att, focusY, marks: [], weight: 1.3 })
+      moves[shooter.playerId] = spot
+      from = spot
+    }
+  }
   const keeper = get(shot.keeperId)
-  const mouth: Pt = { x: goalX(att), y: 0.5 + (hash(`${trace.minute}:${shot.shooterId}:y`) - 0.5) * 0.18 }
-  const keeperPos = keeper ? shifted(keeper, att, 'shot', 0.5) : { x: goalX(att), y: 0.5 }
+  const mouth: Pt = { x: gx, y: 0.5 + (hash(`${trace.minute}:${shot.shooterId}:y`) - 0.5) * 0.18 }
+  const keeperPos = keeper ? shifted(keeper, att, 'shot', 0.5) : { x: gx, y: 0.5 }
   let end: Pt = mouth
   let holder: string | undefined = shot.shooterId
-  if (shot.result === 'off-target') end = { x: goalX(att) === 1 ? 1.03 : -0.03, y: clamp(0.5 + (hash(`${trace.minute}:${shot.shooterId}:o`) < 0.5 ? -1 : 1) * 0.2, 0.15, 0.85) }
+  if (shot.result === 'off-target') end = { x: gx === 1 ? 1.03 : -0.03, y: clamp(0.5 + (hash(`${trace.minute}:${shot.shooterId}:o`) < 0.5 ? -1 : 1) * 0.2, 0.15, 0.85) }
   if (shot.result === 'saved') {
     end = { x: keeperPos.x, y: keeperPos.y }
     holder = keeper?.playerId
@@ -347,8 +470,23 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
     attSide: att,
     focusY,
     marks,
+    weight: 1.6,
   })
   return beats
+}
+
+/**
+ * Quantos passos cabem no tempo do lance: cada um precisa de `minBeatMs` para ser visto. Se não cabem todos, ficam o primeiro, o último
+ * (o desfecho) e os do meio mais espaçados. Em velocidades altas o lance se resume ao desfecho.
+ */
+export function fitBeats(beats: readonly Beat[], tickMs: number, minBeatMs: number): Beat[] {
+  const room = Math.max(1, Math.floor(tickMs / minBeatMs))
+  if (beats.length <= room) return [...beats]
+  if (room === 1) return [beats[beats.length - 1] as Beat]
+  const picked = new Set<number>([0, beats.length - 1])
+  for (let i = 1; picked.size < room && i < room - 1; i++) picked.add(Math.round((i * (beats.length - 1)) / (room - 1)))
+  for (let i = 1; picked.size < room && i < beats.length - 1; i++) picked.add(i)
+  return [...picked].sort((a, b) => a - b).map((i) => beats[i] as Beat)
 }
 
 /** Pênalti: a área (16,5 m de fundo, 40,3 m de largura em 105 × 68) e a marca (11 m). */
@@ -497,8 +635,10 @@ export function pickTrace(fresh: readonly PlayTrace[]): PlayTrace | undefined {
 /** Monta o mapa de jogadores em campo dos dois times a partir do snapshot da partida. */
 export function layoutFrom(snap: MatchSnapshot, wingers: { home: boolean; away: boolean }): Layout {
   const out: Layout = new Map()
-  for (const p of basePositions('home', snap.home.onPitch, wingers.home)) out.set(p.playerId, p)
-  for (const p of basePositions('away', snap.away.onPitch, wingers.away)) out.set(p.playerId, p)
+  const homeShape = shapeOf(snap.home.style, snap.home.activeMentality)
+  const awayShape = shapeOf(snap.away.style, snap.away.activeMentality)
+  for (const p of basePositions('home', snap.home.onPitch, wingers.home, homeShape, snap.home.style)) out.set(p.playerId, p)
+  for (const p of basePositions('away', snap.away.onPitch, wingers.away, awayShape, snap.away.style)) out.set(p.playerId, p)
   return out
 }
 

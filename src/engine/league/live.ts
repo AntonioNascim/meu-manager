@@ -3,7 +3,7 @@
  * fala com rede. O Durable Object chama `stepLiveEvent` a cada alarme e entrega as mensagens que isto devolve.
  *
  * - O servidor simula (mesmo motor, `startMatch`); o cliente só manda **comandos**, que ficam numa fila e entram no próximo passo do relógio (Fase 6C: cada
- *   partida tem o seu relógio, a 700 ms por minuto de jogo dividido pela velocidade que o técnico escolheu; dois técnicos no mesmo jogo usam a mais lenta).
+ *   partida tem o seu relógio, a 1.600 ms por minuto de jogo dividido pela velocidade que o técnico escolheu; dois técnicos no mesmo jogo usam a mais lenta).
  * - Cada partida humana guarda a lista de comandos com o minuto em que valeram (`ReplayRecord`): com a entrada e a semente, qualquer um refaz a partida e
  *   compara o resultado. É também como o objeto se reconstrói depois de uma hibernação ou de um reinício (`rebuildLiveEvent`).
  * - Técnico desconectado = IA completa (`setControlled(false)`); ao voltar, retoma no minuto seguinte. Lesão não para o jogo (o motor troca na hora).
@@ -392,7 +392,7 @@ export interface LiveStep {
 
 /**
  * Leva cada partida ao ponto devido em `now`: antes de tudo entram os comandos da fila (os que esperaram mais de 2 minutos caem); depois cada partida joga os
- * minutos que já venceram no relógio dela (700 ms ÷ velocidade, mais a câmera lenta dos lances quando há técnico assistindo), para no intervalo e na lesão que
+ * minutos que já venceram no relógio dela (1.600 ms ÷ velocidade, mais a câmera lenta dos lances quando há técnico assistindo), para no intervalo e na lesão que
  * espera o técnico. Pode ser chamado a qualquer momento: se nada é devido, nada muda.
  */
 export function stepLiveEvent(from: LiveEvent, seats: readonly Seat[], now: number): LiveStep {
@@ -457,7 +457,7 @@ export function stepLiveEvent(from: LiveEvent, seats: readonly Seat[], now: numb
   return { event: e, outcomes, minute: e.clock, finished: isFinished(e) }
 }
 
-/** O tempo real de um minuto no 1x: o do evento (é o do solo, 700 ms; só os testes locais o encurtam). */
+/** O tempo real de um minuto no 1x: o do evento (é o do solo, 1.600 ms; só os testes locais o encurtam). */
 const BASE_MINUTE_MS_OF = (e: LiveEvent): number => e.minuteMs || BASE_MINUTE_MS
 
 /** Resolve, como a IA, a lesão que espera um técnico que não está mais ali ou que demorou demais. Anota no registro para a reprodução refazer igual. */
