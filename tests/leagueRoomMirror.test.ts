@@ -23,7 +23,7 @@ class TestRoom extends LeagueRoom {
         return { toArray: () => rows }
       },
     }
-    const ctx = { storage: { sql, transactionSync: <T>(fn: () => T) => fn() }, getWebSockets: () => [] }
+    const ctx = { storage: { sql, transactionSync: <T>(fn: () => T) => fn(), setAlarm: async () => undefined, deleteAlarm: async () => undefined }, getWebSockets: () => [] }
     super(ctx as never, {})
   }
   setup(world: SeasonState): void {
@@ -40,7 +40,12 @@ class TestRoom extends LeagueRoom {
   }
   async post(path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
     const res = await this.fetch(new Request(`https://room/internal/${path}`, { method: 'POST', body: JSON.stringify(body) }))
-    return (await res.json()) as Record<string, unknown>
+    const text = await res.text()
+    try {
+      return JSON.parse(text) as Record<string, unknown>
+    } catch {
+      throw new Error(text.slice(0, 600))
+    }
   }
   async mirror(since: number | null, page = 0, playerId = 'ana'): Promise<MirrorPayload> {
     return ((await this.post('mirror', { playerId, since, page })) as { payload: MirrorPayload }).payload
@@ -333,5 +338,46 @@ describe('mercado pelo espelho (C4)', () => {
     expect(m.season()!.market.offers.length).toBe(before + 1)
     const sold = await m.perform({ type: 'sell', playerId: s.players.find((p) => p.teamId === MY)!.id, buyerId: s.teams.find((t) => t.id !== MY)!.id, kind: 'purchase', fee: 1, contractEnd: contractEndIn(s, MY, 3) })
     expect(sold.ok && typeof sold.info?.accepted).toBe('boolean')
+  })
+})
+
+describe('sala: Pronto antes da partida e códigos de vaga', () => {
+  type Reply = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+
+  it('Avançar só abre a sala: a partida espera o Pronto e começa quando todos dão Pronto', async () => {
+    const room = new TestRoom()
+    room.setup(base)
+    expect(await room.post('advance', { by: 'ana' })).toMatchObject({ ok: true })
+    const waiting = (await room.post('state', { playerId: 'ana' })) as Reply
+    expect(waiting.view.next.waiting.deadlineAt).toBeGreaterThan(waiting.view.now)
+    expect(waiting.view.current).toBeUndefined()
+    expect(waiting.view.seats[0].lastActiveAt).toBeGreaterThan(0)
+    expect(waiting.view.progress.played).toBe(0)
+    // Avançar de novo com a sala esperando é recusado.
+    expect(await room.post('advance', { by: 'ana' })).toMatchObject({ ok: false, error: 'bad-state' })
+    // O Pronto de quem joga começa a partida (resultado direto: o evento termina na hora).
+    expect(await room.post('ready', { playerId: 'ana', ready: true })).toMatchObject({ ok: true })
+    const after = (await room.post('state', { playerId: 'ana' })) as Reply
+    expect(after.view.log.some((l: { type: string }) => l.type === 'event-started')).toBe(true)
+    expect(after.view.next?.waiting).toBeUndefined()
+  }, 120_000)
+
+  it('código de vaga: reserva o clube, barra quem não tem o código e é gasto ao entrar', async () => {
+    const room = new TestRoom()
+    room.setup(base)
+    const club = comp.teamIds[5]!
+    const made = (await room.post('query', { playerId: 'ana', op: 'vacancy-create', args: { teamId: club } })) as Reply
+    const v = made.body.vacancies[0]
+    expect(v.code).toHaveLength(4)
+    expect(v.teamId).toBe(club)
+    expect(v.expiresAt).toBeGreaterThan(Date.now() + 71 * 3_600_000)
+    expect(await room.post('query', { playerId: 'ana', op: 'vacancy-create', args: { teamId: MY } })).toMatchObject({ ok: false, error: 'team-taken' })
+    expect(await room.post('seat/add', { playerId: 'bia', teamId: club })).toMatchObject({ ok: false, error: 'team-reserved' })
+    expect(await room.post('seat/add', { playerId: 'bia', teamId: club, vacancy: 'ZZZZ' })).toMatchObject({ ok: false, error: 'team-reserved' })
+    expect(await room.post('seat/add', { playerId: 'bia', teamId: comp.teamIds[6]!, vacancy: v.code })).toMatchObject({ ok: false, error: 'bad-vacancy' })
+    expect(await room.post('query', { playerId: 'bia', op: 'vacancy-check', args: { code: v.code } })).toMatchObject({ ok: true, body: { teamId: club } })
+    expect(await room.post('seat/add', { playerId: 'bia', teamId: club, vacancy: v.code })).toMatchObject({ ok: true })
+    expect(await room.post('query', { playerId: 'ana', op: 'vacancy-list', args: {} })).toMatchObject({ ok: true, body: { vacancies: [] } })
+    expect(await room.post('query', { playerId: 'bia', op: 'vacancy-check', args: { code: v.code } })).toMatchObject({ ok: false })
   })
 })

@@ -37,6 +37,8 @@ export const UNWATCHED_SPEED: LiveSpeed = 8
 export const HALFTIME_MS = 60_000
 /** O alarme da sala acorda em segundos cheios: no máximo uma vez por segundo, qualquer que seja o número de partidas. */
 export const GRID_MS = 1_000
+/** Quem deu Pronto mas ainda não abriu a partida tem este tempo antes de o jogo começar a andar (o técnico é levado para a tela sozinho). */
+export const START_GRACE_MS = 30_000
 
 export type LiveCommand =
   | { type: 'style'; style: PlayStyle }
@@ -115,6 +117,8 @@ export interface LiveEvent {
   connected: string[]
   /** Técnicos que estiveram conectados em algum momento do evento (conta como presença). */
   present: string[]
+  /** Não deram Pronto antes do começo: a IA joga por eles e eles não assumem o time no meio da partida. */
+  locked?: string[]
 }
 
 /** O que sobra do evento depois de tirar os objetos do motor: é o que vai para o armazenamento. */
@@ -209,15 +213,17 @@ export function startLiveEvent(
   const current = league.current
   if (!current) throw new Error('Não há evento em andamento')
   const humans = new Set(league.seats.map((s) => s.teamId))
-  const here = new Set(connected)
+  const locked = new Set(current.locked ?? [])
+  const here = new Set(connected.filter((p) => !locked.has(p)))
   const away = new Set(league.seats.filter((s) => s.status !== 'active' || !here.has(s.playerId)).map((s) => s.teamId))
   const games = current.pending.map((id) => {
     const match = world.matches.find((m) => m.id === id) as Match
     // `holdInjurySubs`: a lesão de um time com técnico para o jogo dele até a escolha do reserva (ou até `INJURY_WAIT_MS`).
-    return startGame(id, { ...humanMatchInput(world, match, humans, away), holdInjurySubs: true, ...(injuryRate !== undefined ? { injuryRate } : {}) }, now + minuteMs / DEFAULT_SPEED)
+    const waitFor = league.seats.some((s) => s.status === 'active' && !locked.has(s.playerId) && !here.has(s.playerId) && (s.teamId === match.homeTeamId || s.teamId === match.awayTeamId))
+    return startGame(id, { ...humanMatchInput(world, match, humans, away), holdInjurySubs: true, ...(injuryRate !== undefined ? { injuryRate } : {}) }, now + (waitFor ? START_GRACE_MS : minuteMs / DEFAULT_SPEED))
   })
   const present = league.seats.filter((s) => here.has(s.playerId)).map((s) => s.playerId)
-  return { date: current.date, startedAt: now, minuteMs, clock: 0, games, queue: [], connected: [...here], present }
+  return { date: current.date, startedAt: now, minuteMs, clock: 0, games, queue: [], connected: [...here], present, ...(locked.size > 0 ? { locked: [...locked] } : {}) }
 }
 
 export const toStored = (e: LiveEvent): StoredLiveEvent => ({
@@ -310,7 +316,7 @@ export function seatGame(e: LiveEvent, seat: Pick<Seat, 'teamId'>): { game: Live
  */
 export function enqueueCommand(e: LiveEvent, seats: readonly Seat[], playerId: string, id: string, command: QueuedCommand['command'], now: number): { event: LiveEvent; outcome?: CommandOutcome } {
   const seat = seats.find((s) => s.playerId === playerId)
-  const found = seat ? seatGame(e, seat) : undefined
+  const found = seat && !e.locked?.includes(playerId) ? seatGame(e, seat) : undefined
   if (!found) return { event: e, outcome: { id, playerId, ok: false, reason: 'not-your-team' } }
   if (found.game.live.finished) return { event: e, outcome: { id, playerId, ok: false, reason: 'game-finished' } }
   if (e.queue.some((q) => q.id === id)) return { event: e }
@@ -321,7 +327,7 @@ export function enqueueCommand(e: LiveEvent, seats: readonly Seat[], playerId: s
 export function setSpeed(e: LiveEvent, seats: readonly Seat[], playerId: string, speed: number): boolean {
   if (!(LIVE_SPEEDS as readonly number[]).includes(speed)) return false
   const seat = seats.find((s) => s.playerId === playerId)
-  const found = seat ? seatGame(e, seat) : undefined
+  const found = seat && !e.locked?.includes(playerId) ? seatGame(e, seat) : undefined
   if (!found || found.game.live.finished) return false
   found.game.speeds = { ...found.game.speeds, [playerId]: speed }
   return true
@@ -348,10 +354,10 @@ export function readyForSecondHalf(e: LiveEvent, seats: readonly Seat[], playerI
 }
 
 /** Técnico conectou ou caiu. Muda o controle do time no próximo minuto e anota a presença. */
-export function setConnected(e: LiveEvent, seats: readonly Seat[], playerId: string, connected: boolean): LiveEvent {
+export function setConnected(e: LiveEvent, seats: readonly Seat[], playerId: string, connected: boolean, now?: number): LiveEvent {
   const seat = seats.find((s) => s.playerId === playerId)
   const has = e.connected.includes(playerId)
-  if (!seat || has === connected) return e
+  if (!seat || has === connected || e.locked?.includes(playerId)) return e
   const next: LiveEvent = {
     ...e,
     connected: connected ? [...e.connected, playerId] : e.connected.filter((p) => p !== playerId),
@@ -363,6 +369,11 @@ export function setConnected(e: LiveEvent, seats: readonly Seat[], playerId: str
     const controlled = connected && seat.status === 'active'
     found.game.live.setControlled(found.side, controlled)
     found.game.commands.push({ minute: found.game.clock, side: found.side, command: { type: 'control', controlled }, by: 'system' })
+    // Todos os técnicos que deram Pronto chegaram: não precisa esperar o fim da tolerância do começo.
+    if (connected && now !== undefined && found.game.clock === 0) {
+      const waiting = seats.some((s) => (s.teamId === found.game.homeTeamId || s.teamId === found.game.awayTeamId) && s.status === 'active' && !next.locked?.includes(s.playerId) && !next.connected.includes(s.playerId))
+      if (!waiting) found.game.nextAt = Math.min(found.game.nextAt, now + next.minuteMs / DEFAULT_SPEED)
+    }
     // Ninguém mais esperando o intervalo: quem caiu não segura o adversário.
     if (!connected && found.game.halftime) readyForSecondHalf(next, seats, playerId, 0)
   }

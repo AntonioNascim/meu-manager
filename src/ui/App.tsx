@@ -8,6 +8,7 @@ import { clearLive } from '../store/liveMatch'
 import { closeLeague, clearDismissed, useDismissed } from '../store/leagueSession'
 import { LeagueDismissed } from './screens/online/leagues/LeagueDismissed'
 import { LeagueScreen } from './screens/online/leagues/LeagueScreen'
+import { AdminPanel } from './screens/online/leagues/AdminPanel'
 import { BusyOverlay } from './components/BusyOverlay'
 import { TeamBadge } from './components/ui'
 import { formatDate } from './format'
@@ -160,6 +161,7 @@ export function App() {
       <main className="flex-1 px-4 pb-28 pt-4">
         {current === 'home' && <Dashboard game={game} onNavigate={navigate} />}
         {current === 'league' && game.online && <LeagueScreen leagueId={game.online.leagueId} />}
+        {current === 'admin' && game.online && <AdminPanel leagueId={game.online.leagueId} />}
         {current === 'career' && <Career game={game} onTaken={() => navigate('home')} />}
         {current === 'match' && <MatchScreen game={game} onNavigate={navigate} />}
         {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab(hint)} />}

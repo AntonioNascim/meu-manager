@@ -32,7 +32,18 @@ export const LEAGUE_LIMITS = {
   directoryPage: 20,
 } as const
 
-export type RoomQueryOp = 'detail' | 'career' | 'dismissal' | 'rechoose' | 'prefs-get' | 'prefs-set'
+export type RoomQueryOp = 'detail' | 'career' | 'dismissal' | 'rechoose' | 'prefs-get' | 'prefs-set' | 'vacancy-create' | 'vacancy-list' | 'vacancy-cancel' | 'vacancy-check'
+
+/** O código de vaga é o código de convite da liga + 4 símbolos; o clube fica reservado por 72 horas. */
+export const VACANCY_LENGTH = 4
+export const VACANCY_TTL_MS = 72 * 3_600_000
+export const VACANCY_MAX = 10
+export interface VacancyRow {
+  /** O código completo (convite da liga + vaga), como a pessoa digita ao entrar. */
+  code: string
+  teamId: string
+  expiresAt: number
+}
 
 export type WorldRef = { source: 'ficticio' } | { source: 'real'; version: string }
 export type LeagueKind = 'open' | 'friends'
@@ -86,12 +97,12 @@ export interface LeagueStore {
   countMemberships(playerId: string): Promise<number>
 }
 
-export type RoomFailure = SeatError | 'not-found' | 'bad-world' | 'bad-state' | 'unavailable'
+export type RoomFailure = SeatError | 'team-reserved' | 'bad-vacancy' | 'not-found' | 'bad-world' | 'bad-state' | 'unavailable'
 
 /** A sala da liga (Durable Object): dona das vagas e do mundo. */
 export interface RoomPort {
   init(league: LeagueRecord): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
-  addSeat(leagueId: string, playerId: string, teamId: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
+  addSeat(leagueId: string, playerId: string, teamId: string, vacancy?: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   removeSeat(leagueId: string, playerId: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   start(leagueId: string): Promise<{ ok: true } | { ok: false; error: RoomFailure }>
   destroy(leagueId: string): Promise<void>
@@ -189,6 +200,10 @@ export type LeagueError =
   | { error: 'wrong-code' }
   | { error: 'already-member' }
   | { error: 'team-taken' }
+  /** O clube está reservado pelo ADM (código de vaga) para outra pessoa. */
+  | { error: 'team-reserved' }
+  /** O código de vaga não vale (outro clube, já usado ou vencido). */
+  | { error: 'bad-vacancy' }
   | { error: 'unknown-team' }
   | { error: 'room-failed'; detail: string }
   | { error: 'bad-state' }
@@ -234,6 +249,8 @@ export interface LeagueDetail extends LeagueSummary {
   code?: string
   isAdmin: boolean
   myTeamId?: string
+  /** Entrou com um código de vaga: o clube que o ADM reservou. */
+  reservedTeamId?: string
 }
 
 async function nicknameOf(deps: LeagueDeps, playerId: string): Promise<string | undefined> {
@@ -361,7 +378,7 @@ function parseCreate(body: ApiRequest['body']): CreateBody | undefined {
 // ---------------------------------------------------------------- operações
 
 const roomFailure = <T>(error: RoomFailure): LeagueResult<T> =>
-  error === 'bad-state' ? fail(409, { error: 'bad-state' }) : error === 'not-seated' ? fail(409, { error: 'not-seated' }) : error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
+  error === 'bad-state' ? fail(409, { error: 'bad-state' }) : error === 'not-seated' ? fail(409, { error: 'not-seated' }) : error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'team-reserved' ? fail(409, { error: 'team-reserved' }) : error === 'bad-vacancy' ? fail(409, { error: 'bad-vacancy' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
 
 /** Cria a liga. Ligas abertas só usam o ritmo Normal; quem cria é o ADM e já pode escolher o clube. */
 export async function createLeague(req: ApiRequest, deps: LeagueDeps): Promise<LeagueResult<LeagueDetail>> {
@@ -451,19 +468,26 @@ export async function resolveCode(req: ApiRequest, deps: LeagueDeps, code: strin
   const auth = await requireIdentity(req, 'joinByCode', deps, 'joinByCodeIp')
   if (!auth.ok) return auth.result as LeagueResult<never>
   const normalized = normalizeCode(code)
-  if (normalized.length !== CODE_LENGTH || [...normalized].some((c) => !CODE_ALPHABET.includes(c))) return fail(404, { error: 'wrong-code' })
-  const league = await deps.leagues.findByCode(normalized)
+  const withVacancy = normalized.length === CODE_LENGTH + VACANCY_LENGTH
+  if ((normalized.length !== CODE_LENGTH && !withVacancy) || [...normalized].some((c) => !CODE_ALPHABET.includes(c))) return fail(404, { error: 'wrong-code' })
+  const league = await deps.leagues.findByCode(normalized.slice(0, CODE_LENGTH))
   if (!league || league.status === 'closed') return fail(404, { error: 'wrong-code' })
-  return { status: 200, body: { ...(await detailOf(deps, league, auth.record.playerId)), code: undefined } }
+  let reservedTeamId: string | undefined
+  if (withVacancy) {
+    const r = await deps.rooms.query(league.id, auth.record.playerId, 'vacancy-check', { code: normalized.slice(CODE_LENGTH) })
+    reservedTeamId = r.ok ? (r.body as { teamId?: string } | undefined)?.teamId : undefined
+    if (!reservedTeamId) return fail(404, { error: 'wrong-code' })
+  }
+  return { status: 200, body: { ...(await detailOf(deps, league, auth.record.playerId)), code: undefined, ...(reservedTeamId ? { reservedTeamId } : {}) } }
 }
 
-async function joinChecked(deps: LeagueDeps, league: LeagueRecord, playerId: string, teamId: string): Promise<{ ok: true } | { ok: false; result: LeagueResult<never> }> {
+async function joinChecked(deps: LeagueDeps, league: LeagueRecord, playerId: string, teamId: string, vacancy?: string): Promise<{ ok: true } | { ok: false; result: LeagueResult<never> }> {
   const members = await deps.leagues.members(league.id)
   if (members.some((m) => m.playerId === playerId)) return { ok: false, result: fail(409, { error: 'already-member' }) }
   if (members.length >= league.maxHumans) return { ok: false, result: fail(409, { error: 'league-full' }) }
   if ((await deps.leagues.countMemberships(playerId)) >= LEAGUE_LIMITS.participating) return { ok: false, result: fail(409, { error: 'too-many-joined', limit: LEAGUE_LIMITS.participating }) }
   if (members.some((m) => m.teamId === teamId)) return { ok: false, result: fail(409, { error: 'team-taken' }) }
-  const seat = await deps.rooms.addSeat(league.id, playerId, teamId)
+  const seat = await deps.rooms.addSeat(league.id, playerId, teamId, vacancy)
   if (!seat.ok) return { ok: false, result: roomFailure(seat.error) }
   const added = await deps.leagues.addMember({ leagueId: league.id, playerId, teamId, joinedAt: deps.now() })
   if (!added) {
@@ -483,16 +507,45 @@ export async function joinLeague(req: ApiRequest, deps: LeagueDeps, id: string):
   const league = await deps.leagues.get(id)
   if (!league || league.status === 'closed' || league.hidden) return fail(404, { error: 'not-found' })
   if (league.kind === 'open' && accessOfRecord(auth.record) !== 'full') return fail(403, { error: 'protected-account' })
-  // Liga de amigos: o código vale; o ADM entra sem ele (a liga é dele).
-  if (league.kind === 'friends' && league.adminId !== auth.record.playerId && !(typeof o.code === 'string' && league.code && sameText(normalizeCode(o.code), league.code))) {
+  // Liga de amigos: o código vale (de convite, ou de vaga = convite + 4 símbolos); o ADM entra sem ele (a liga é dele).
+  const given = typeof o.code === 'string' ? normalizeCode(o.code) : ''
+  const vacancy = given.length === CODE_LENGTH + VACANCY_LENGTH ? given.slice(CODE_LENGTH) : undefined
+  const codeOk = !!league.code && (given.length === CODE_LENGTH || vacancy !== undefined) && sameText(given.slice(0, CODE_LENGTH), league.code)
+  if (league.kind === 'friends' && league.adminId !== auth.record.playerId && !codeOk) {
     const hit = await deps.limiter.hit('joinByCode', `id:${auth.record.playerId}`, deps.now())
     if (!hit.allowed) return fail(429, { error: 'rate-limited', retryAfterMs: hit.retryAfterMs })
     return fail(403, { error: 'wrong-code' })
   }
-  if (league.entryClosed) return fail(403, { error: 'entry-closed' })
-  const joined = await joinChecked(deps, league, auth.record.playerId, o.teamId)
+  // A entrada fechada vale para a porta aberta; o código de vaga é um convite feito à mão pelo ADM e passa.
+  if (league.entryClosed && vacancy === undefined) return fail(403, { error: 'entry-closed' })
+  const joined = await joinChecked(deps, league, auth.record.playerId, o.teamId, vacancy)
   if (!joined.ok) return joined.result as LeagueResult<never>
   return { status: 200, body: await detailOf(deps, league, auth.record.playerId) }
+}
+
+/**
+ * Códigos de vaga (só o ADM, liga de amigos em andamento): reserva um clube sem técnico humano por 72 horas e devolve o código para quem for entrar.
+ * Quem entra com o código cria o técnico direto nesse clube; sem ele, o clube reservado não pode ser escolhido por outra pessoa.
+ */
+export async function vacancyAct(req: ApiRequest, deps: LeagueDeps, id: string, op: 'create' | 'list' | 'cancel'): Promise<LeagueResult<{ vacancies: VacancyRow[] }>> {
+  const auth = await requireIdentity(req, op === 'list' ? 'read' : 'write', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  let args: Record<string, unknown> = {}
+  if (op !== 'list') {
+    const o = parseJson(req.body)
+    const key = op === 'create' ? 'teamId' : 'code'
+    if (!o || !onlyKeys(o, [key]) || typeof o[key] !== 'string' || (op === 'create' ? !TEAM_ID.test(o[key] as string) : (o[key] as string).length > 16)) return fail(400, { error: 'bad-body' })
+    args = { [key]: o[key] }
+  }
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  if (league.adminId !== auth.record.playerId) return fail(403, { error: 'forbidden' })
+  if (league.kind !== 'friends' || !league.code || league.status !== 'running') return fail(409, { error: 'bad-state' })
+  const r = await deps.rooms.query(id, auth.record.playerId, `vacancy-${op}` as RoomQueryOp, args)
+  if (!r.ok && 'refused' in r) return fail(409, { error: 'club-refused', reason: r.refused as ClubError })
+  if (!r.ok) return roomFailure(r.error)
+  const rows = ((r.body as { vacancies?: { code: string; teamId: string; expiresAt: number }[] }).vacancies ?? []).map((v) => ({ ...v, code: `${league.code}${v.code}` }))
+  return { status: 200, body: { vacancies: rows } }
 }
 
 /** Passa o cargo de ADM ao humano mais antigo que sobrou (ou fecha a liga se não sobrou ninguém). */

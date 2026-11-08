@@ -10,7 +10,7 @@ import { bookOf, type TradeRecord, type TradeReport } from './trade'
 import { LEAGUE_TRADE } from '../config'
 import { fixturesOn, type LeagueFixture } from './cupsView'
 import { MAX_PAUSE_MS, ROOM_OPENS_BEFORE_MS, type PaceId } from './pace'
-import { notReady, requiredSeats, upcoming, type LeagueState, type LogType, type SeatStatus } from './runner'
+import { notReady, requiredSeats, upcoming, waitingDeadlineAt, type LeagueState, type LogType, type SeatStatus } from './runner'
 
 export interface ViewEvent {
   date: IsoDate
@@ -29,6 +29,8 @@ export interface ViewSeat {
   required: boolean
   missed: number
   leaving: boolean
+  /** Última vez que o técnico apareceu (jogou, deu Pronto ou abriu o jogo); sem registro, a entrada na liga. */
+  lastActiveAt: number
 }
 
 export interface ViewLog {
@@ -41,6 +43,10 @@ export interface ViewLog {
 export interface LeagueView {
   now: number
   worldDate: IsoDate
+  /** Ano da temporada do técnico da liga (do mundo). */
+  season: number
+  /** Jogos do clube de quem consulta na temporada (todas as competições): `played` de `total`. */
+  progress?: { played: number; total: number }
   pace: PaceId
   band: string
   tzOffsetMin: number
@@ -50,11 +56,11 @@ export interface LeagueView {
   /** Quando a pausa acaba sozinha (limite de 30 dias). */
   autoResumeAt?: number
   /** O próximo evento de partidas (as âncoras não aparecem). */
-  next?: ViewEvent & { roomOpensAt: number; required: string[]; notReady: string[] }
+  next?: ViewEvent & { roomOpensAt: number; required: string[]; notReady: string[]; /** O jogo já chegou na hora e a partida espera o Pronto; `deadlineAt` é quando começa sozinha. */ waiting?: { openedAt: number; deadlineAt?: number } }
   /** Calendário das próximas semanas (só eventos com partidas). */
   events: ViewEvent[]
   /** `playing`: técnicos cujo clube tem partida neste evento (quem não joga não tem o que ver ao vivo). */
-  current?: { date: IsoDate; startedAt: number; pending: number; all: number; playing: string[]; fixtures: LeagueFixture[] }
+  current?: { date: IsoDate; startedAt: number; pending: number; all: number; playing: string[]; /** Técnicos que não deram Pronto: a IA joga por eles e eles não entram no meio da partida. */ locked: string[]; fixtures: LeagueFixture[] }
   seats: ViewSeat[]
   log: ViewLog[]
   /** Só para o ADM (a API tira dos outros): quem passaria do limite de ausência. */
@@ -65,6 +71,18 @@ export interface LeagueView {
   reports: TradeReport[]
 }
 
+/** Jogos feitos e a fazer do clube na temporada (liga e copas). */
+function progressOf(world: SeasonState, teamId: string): { played: number; total: number } {
+  let played = 0
+  let total = 0
+  for (const m of world.matches) {
+    if (m.homeTeamId !== teamId && m.awayTeamId !== teamId) continue
+    total++
+    if (m.status === 'finished') played++
+  }
+  return { played, total }
+}
+
 /** Técnicos cujo clube joga no evento em andamento. */
 function playingIn(league: LeagueState, world: SeasonState): string[] {
   const ids = new Set(league.current?.all ?? [])
@@ -73,7 +91,7 @@ function playingIn(league: LeagueState, world: SeasonState): string[] {
   return league.seats.filter((s) => teams.has(s.teamId)).map((s) => s.playerId)
 }
 
-export function leagueView(league: LeagueState, world: SeasonState, now: number, joinedAt: (playerId: string) => number): LeagueView {
+export function leagueView(league: LeagueState, world: SeasonState, now: number, joinedAt: (playerId: string) => number, viewerTeamId?: string): LeagueView {
   const required = new Set(requiredSeats(league, world).map((s) => s.playerId))
   const matchEvents = upcoming(league, now).filter((e) => e.kind === 'match')
   const firstMatch = league.clock.events.find((e) => e.kind === 'match')
@@ -88,6 +106,8 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
   return {
     now,
     worldDate: world.season.currentDate,
+    season: world.season.year,
+    ...(viewerTeamId ? { progress: progressOf(world, viewerTeamId) } : {}),
     pace: league.config.clock.pace,
     band: league.config.clock.band.id,
     tzOffsetMin: league.config.clock.tzOffsetMin,
@@ -95,11 +115,11 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
     paused,
     ...(paused ? { pausedAt: league.clock.pausedAt as number, autoResumeAt: (league.clock.pausedAt as number) + MAX_PAUSE_MS } : {}),
     ...(firstMatch
-      ? { next: { date: dateOfDay(firstMatch.day), startAt: firstMatch.startAt, kind: 'match' as const, fixtures: fixtures.get(dateOfDay(firstMatch.day)) ?? [], roomOpensAt: firstMatch.startAt - ROOM_OPENS_BEFORE_MS, required: [...required], notReady: notReady(league, world).map((s) => s.playerId) } }
+      ? { next: { date: dateOfDay(firstMatch.day), startAt: firstMatch.startAt, kind: 'match' as const, fixtures: fixtures.get(dateOfDay(firstMatch.day)) ?? [], roomOpensAt: firstMatch.startAt - ROOM_OPENS_BEFORE_MS, required: [...required], notReady: notReady(league, world).map((s) => s.playerId), ...(league.waiting ? { waiting: { openedAt: league.waiting.openedAt, ...(waitingDeadlineAt(league) !== undefined ? { deadlineAt: waitingDeadlineAt(league) as number } : {}) } } : {}) } }
       : {}),
     events: shown.map((e) => ({ ...e, fixtures: fixtures.get(e.date) ?? [] })),
-    ...(league.current ? { current: { date: league.current.date, startedAt: league.current.startedAt, pending: league.current.pending.length, all: league.current.all.length, playing: playingIn(league, world), fixtures: fixtures.get(league.current.date) ?? [] } } : {}),
-    seats: league.seats.map((s) => ({ playerId: s.playerId, teamId: s.teamId, status: s.status, ready: s.ready, required: required.has(s.playerId), missed: s.missed ?? 0, leaving: s.leaving === true })),
+    ...(league.current ? { current: { date: league.current.date, startedAt: league.current.startedAt, pending: league.current.pending.length, all: league.current.all.length, playing: playingIn(league, world), locked: league.current.locked ?? [], fixtures: fixtures.get(league.current.date) ?? [] } } : {}),
+    seats: league.seats.map((s) => ({ playerId: s.playerId, teamId: s.teamId, status: s.status, ready: s.ready, required: required.has(s.playerId), missed: s.missed ?? 0, leaving: s.leaving === true, lastActiveAt: s.lastActiveAt ?? joinedAt(s.playerId) })),
     log: league.log.filter((l) => l.type !== 'tick').slice(-15).map((l) => ({ at: l.at, type: l.type, ...(l.by ? { by: l.by } : {}), ...(l.date ? { date: l.date } : {}) })),
     suggestions: suggestionsFor(league.seats, now, joinedAt),
     transfers: [...bookOf(league).history].reverse().slice(0, LEAGUE_TRADE.historyShown),

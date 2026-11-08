@@ -31,7 +31,7 @@ import { D1ProblemStore } from './problemStore'
 import { submitProblem, PROBLEM_LIMITS } from '../src/online/problemApi'
 import type { AiOffersBody, MarketRow } from '../src/engine/league/aimarket'
 import type { CupsBody } from '../src/engine/league/cupsView'
-import { adminAction, changePace, clubDecision, clubState, leagueCommand, mirrorRead, roomQuery, type RoomQueryOp, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
+import { vacancyAct, adminAction, changePace, clubDecision, clubState, leagueCommand, mirrorRead, roomQuery, type RoomQueryOp, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
@@ -164,8 +164,8 @@ class DoRooms implements RoomPort {
   init(league: LeagueRecord) {
     return this.call(league.id, '/internal/init', league)
   }
-  addSeat(leagueId: string, playerId: string, teamId: string) {
-    return this.call(leagueId, '/internal/seat/add', { playerId, teamId })
+  addSeat(leagueId: string, playerId: string, teamId: string, vacancy?: string) {
+    return this.call(leagueId, '/internal/seat/add', { playerId, teamId, ...(vacancy ? { vacancy } : {}) })
   }
   removeSeat(leagueId: string, playerId: string) {
     return this.call(leagueId, '/internal/seat/remove', { playerId })
@@ -367,6 +367,9 @@ async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDe
   if (second === 'club' && method === 'POST') return respondLeague(await clubDecision(request, deps, first), cors)
   if (second === 'live-ticket' && method === 'POST') return respondLeague(await liveTicket(request, deps, first), cors)
   if (second === 'pace' && method === 'POST') return respondLeague(await changePace(request, deps, first), cors)
+  if (second === 'vacancies' && method === 'GET') return respondLeague(await vacancyAct(request, deps, first, 'list'), cors)
+  if (second === 'vacancy' && method === 'POST') return respondLeague(await vacancyAct(request, deps, first, 'create'), cors)
+  if (second === 'vacancy-cancel' && method === 'POST') return respondLeague(await vacancyAct(request, deps, first, 'cancel'), cors)
   if (second === 'join' && method === 'POST') return respondLeague(await joinLeague(request, deps, first), cors)
   if (second === 'leave' && method === 'POST') return respondLeague(await leaveLeague(request, deps, first), cors)
   if (second && ADMIN_ACTIONS.includes(second) && method === 'POST') return respondLeague(await adminAction(request, deps, first, second as AdminAction), cors)

@@ -24,6 +24,7 @@ import {
 } from '../../store/game'
 import type { Game } from '../../store/game'
 import { runHeavy } from '../../store/heavy'
+import { AdminShortcut } from './online/leagues/AdminShortcut'
 import { LeagueCard } from './online/leagues/LeagueCard'
 import { Card } from '../components/ui'
 import { ReportProblem } from '../components/ReportProblem'
@@ -305,6 +306,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
         <ShortcutTile icon="finance" label="Finanças" tone="teal" alert={financeAlert} onClick={() => onNavigate('finance')} />
         <ShortcutTile icon="table" label="Tabela" tone="violet" onClick={() => onNavigate('standings')} />
         <ShortcutTile icon="history" label="Histórico" tone="slate" onClick={() => onNavigate('standings', 'history')} />
+        {game.online && <AdminShortcut leagueId={game.online.leagueId} onClick={() => onNavigate('admin')} />}
       </div>
 
       <MiniTable game={game} competition={competition} onOpen={() => onNavigate('standings')} />

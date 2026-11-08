@@ -5,6 +5,7 @@ import {
   DEFAULT_SPEED,
   GRID_MS,
   HALFTIME_MS,
+  START_GRACE_MS,
   UNWATCHED_SPEED,
   createLeague,
   defaultLeagueConfig,
@@ -52,7 +53,8 @@ function atFirstEvent(seats = SEATS): { stepped: Stepped; event: LiveEvent; now:
   let now = T0
   for (let i = 0; i < 24 * 40 && !stepped.league.current; i++) {
     now = T0 + i * 30 * MS_MINUTE
-    stepped = processLeague(JSON.parse(JSON.stringify(stepped.league)) as LeagueState, stepped.world, now, { turn: turnRunner })
+    const l = JSON.parse(JSON.stringify(stepped.league)) as LeagueState
+    stepped = processLeague({ ...l, seats: l.seats.map((s) => ({ ...s, ready: true })) }, stepped.world, now, { turn: turnRunner })
   }
   expect(stepped.league.current).toBeDefined()
   return { stepped, event: startLiveEvent(stepped.league, stepped.world, now, BASE_MINUTE_MS, seats.map((s) => s.playerId)), now }
@@ -261,5 +263,32 @@ describe('partida ao vivo na liga online: um relógio por partida (C5)', () => {
     }
     expect(seat1?.missed ?? 0).toBe(0)
     expect(end.stepped.world.matches.filter((m) => done.games.some((g) => g.matchId === m.id)).every((m) => m.status === 'finished')).toBe(true)
+  })
+})
+
+describe('quem não deu Pronto não entra no meio da partida', () => {
+  it('trancado: a IA joga pelo time, ele não assume ao conectar, não manda comando nem velocidade; quem deu Pronto tem 30 s antes de o jogo andar', () => {
+    const { stepped, now } = atFirstEvent(DUEL)
+    const seats = stepped.league.seats
+    const cur = { ...stepped.league.current!, locked: ['jogador-2'] }
+    const league = { ...stepped.league, current: cur }
+    // jogador-1 (pronto) ainda não conectou: o jogo espera a tolerância; jogador-2 está trancado.
+    const e = startLiveEvent(league, stepped.world, now, BASE_MINUTE_MS, [])
+    expect(e.locked).toEqual(['jogador-2'])
+    expect(e.games[0]!.nextAt).toBe(now + START_GRACE_MS)
+    // Conectar sendo trancado não muda nada e não conta como presença.
+    const after = setConnected(e, seats, 'jogador-2', true)
+    expect(after).toBe(e)
+    expect(e.present).not.toContain('jogador-2')
+    expect(enqueueCommand(e, seats, 'jogador-2', 'c1', { type: 'style', style: 'possession' } as never, now).outcome).toMatchObject({ ok: false, reason: 'not-your-team' })
+    expect(setSpeed(e, seats, 'jogador-2', 1)).toBe(false)
+    // Quem deu Pronto conecta e assume normalmente.
+    const ready = setConnected(e, seats, 'jogador-1', true)
+    expect(ready.connected).toContain('jogador-1')
+    expect(speedOf(ready, seats, ready.games[0]!)).toBe(DEFAULT_SPEED)
+    // Sem trancados, sem ninguém esperando: o primeiro minuto vem no ritmo normal.
+    const free = startLiveEvent({ ...stepped.league, current: { ...cur, locked: undefined } }, stepped.world, now, BASE_MINUTE_MS, ['jogador-1', 'jogador-2'])
+    expect(free.locked).toBeUndefined()
+    expect(free.games[0]!.nextAt).toBe(now + BASE_MINUTE_MS / DEFAULT_SPEED)
   })
 })

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CODE_LENGTH, normalizeCode } from '../../../../online/leagueApi'
+import { CODE_LENGTH, VACANCY_LENGTH, normalizeCode } from '../../../../online/leagueApi'
 import { leagueApi } from '../../../../store/leagues'
 import { Button } from '../../../components/ui'
 import { LEAGUE_ERROR_LABELS } from '../../../labels'
@@ -23,11 +23,11 @@ export function JoinByCode({ initialCode = '', onBack, onFound }: { initialCode?
 
   return (
     <Frame eyebrow="Ligas online" title="Entrar com um código" onBack={onBack}>
-      <p className="text-sm text-muted">Digite o código de {CODE_LENGTH} letras e números que o ADM da liga mandou.</p>
+      <p className="text-sm text-muted">Digite o código de {CODE_LENGTH} letras e números que o ADM da liga mandou. Se ele reservou um clube para você, o código tem mais {VACANCY_LENGTH} símbolos.</p>
       <input
         className={`min-h-14 rounded-xl bg-surface-2 px-4 text-center text-2xl font-bold uppercase tracking-[0.3em] ring-1 ${error ? 'ring-loss' : 'ring-line'}`}
         value={code}
-        maxLength={CODE_LENGTH + 2}
+        maxLength={CODE_LENGTH + VACANCY_LENGTH + 3}
         autoCapitalize="characters"
         autoComplete="off"
         autoCorrect="off"
@@ -43,7 +43,7 @@ export function JoinByCode({ initialCode = '', onBack, onFound }: { initialCode?
           {error}
         </p>
       )}
-      <Button disabled={clean.length !== CODE_LENGTH || busy} onClick={() => void search()}>
+      <Button disabled={(clean.length !== CODE_LENGTH && clean.length !== CODE_LENGTH + VACANCY_LENGTH) || busy} onClick={() => void search()}>
         {busy ? 'Procurando…' : 'Procurar a liga'}
       </Button>
     </Frame>

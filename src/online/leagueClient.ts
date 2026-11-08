@@ -7,7 +7,7 @@ import { signedCall, type IdentityClientDeps } from './identityClient'
 import type { LeagueDetail, LeagueSummary, LeagueError, AdminAction, WorldRef, LeagueStateBody, ControlAction } from './leagueApi'
 import type { PaceId } from '../engine/league/pace'
 import type { ClubAction, ClubView } from '../engine/league/club'
-import type { TradeReply, TradeOp } from './leagueApi'
+import type { TradeReply, TradeOp, VacancyRow } from './leagueApi'
 import type { TradeReport } from '../engine/league/trade'
 import type { AiSearchFilters } from '../engine/league/aimarket'
 import type { CupsBody } from '../engine/league/cupsView'
@@ -86,6 +86,11 @@ export const leagueRechoose = (deps: LeagueClientDeps, identity: Identity, id: s
 /** Favoritos e escalações guardadas, por conta (C6). */
 export const leaguePrefsGet = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<Prefs>(deps, identity, 'GET', `/api/leagues/${id}/prefs`)
 export const leaguePrefsSet = (deps: LeagueClientDeps, identity: Identity, id: string, prefs: Prefs) => ask<Prefs>(deps, identity, 'PUT', `/api/leagues/${id}/prefs`, prefs)
+
+/** Códigos de vaga do ADM: reservar um clube por 72 horas, listar e cancelar. */
+export const vacancyList = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ vacancies: VacancyRow[] }>(deps, identity, 'GET', `/api/leagues/${id}/vacancies`)
+export const vacancyCreate = (deps: LeagueClientDeps, identity: Identity, id: string, teamId: string) => ask<{ vacancies: VacancyRow[] }>(deps, identity, 'POST', `/api/leagues/${id}/vacancy`, { teamId })
+export const vacancyCancel = (deps: LeagueClientDeps, identity: Identity, id: string, code: string) => ask<{ vacancies: VacancyRow[] }>(deps, identity, 'POST', `/api/leagues/${id}/vacancy-cancel`, { code })
 
 /** O clube do técnico: meta, contratos que vencem e base (B8.7). */
 export const clubState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ view: ClubView }>(deps, identity, 'GET', `/api/leagues/${id}/club`)

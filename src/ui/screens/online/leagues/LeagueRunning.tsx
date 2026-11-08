@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PaceId } from '../../../../engine/league/pace'
 import type { LeagueView, ViewSeat } from '../../../../engine/league/view'
 import type { LeagueFixture } from '../../../../engine/league/cupsView'
-import type { ControlAction, LeagueDetail, LeagueStateBody } from '../../../../online/leagueApi'
+import type { LeagueDetail, LeagueStateBody } from '../../../../online/leagueApi'
 import type { Answer } from '../../../../online/leagueClient'
 import { leagueApi, type LeagueTeam } from '../../../../store/leagues'
 import { Button, Card } from '../../../components/ui'
 import { LEAGUE_ERROR_LABELS, LEAGUE_LOG_LABELS, PACE_LABELS, SEAT_STATUS_LABELS } from '../../../labels'
-import { Sheet } from '../../../theme'
 import { formatMoney } from '../../../format'
 import { Pill } from './parts'
 
 const POLL_MS = 5000
-const PACE_ORDER: PaceId[] = ['calm', 'normal', 'fast', 'very-fast']
 
 /** Dia da semana, data e hora no fuso do aparelho (o servidor só guarda milissegundos). */
 export const whenLabel = (ms: number): string => new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(ms))
@@ -38,8 +35,6 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
   const [body, setBody] = useState<LeagueStateBody | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [confirmAdvance, setConfirmAdvance] = useState(false)
-  const [pacing, setPacing] = useState(false)
 
   const load = useCallback(async () => {
     const r = await leagueApi.state(id)
@@ -68,7 +63,6 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
   const view = body.view
   const me = view.seats.find((s) => s.teamId === league.myTeamId)
   const myTurn = me?.required === true
-  const control = (action: ControlAction) => run(() => leagueApi.control(id, action))
 
   return (
     <>
@@ -79,7 +73,12 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
           {view.current ? (
             <>
               <p className="text-sm text-muted">{view.directResult || view.current.playing.includes(me.playerId) ? '' : 'Seu clube não joga nesta rodada. '}A rodada está acontecendo ({view.current.all - view.current.pending} de {view.current.all} partidas dos técnicos terminaram).</p>
-              {!view.directResult && view.current.playing.includes(me.playerId) && (
+              {!view.directResult && view.current.locked.includes(me.playerId) && (
+                <p className="mt-2 text-sm font-semibold text-yellow-300" data-testid="locked-hint">
+                  A partida começou sem o seu Pronto: a IA joga pelo seu time e você não entra no meio do jogo.
+                </p>
+              )}
+              {!view.directResult && view.current.playing.includes(me.playerId) && !view.current.locked.includes(me.playerId) && (
                 <p className="mt-2 text-sm font-semibold" data-testid="live-enter-hint">
                   Seu clube joga agora: abra o jogo do clube e toque em Entrar na partida.
                 </p>
@@ -89,7 +88,7 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
             <p className="text-sm text-muted">A liga está pausada. O Pronto volta a valer quando o ADM retomar.</p>
           ) : myTurn ? (
             <>
-              <p className="text-sm text-muted">Seu clube joga na próxima rodada. Quando todos os técnicos dão Pronto, com a sala aberta, a rodada começa antes do horário.</p>
+              <p className="text-sm text-muted">Seu clube joga na próxima rodada. A partida só começa quando todos os técnicos que jogam derem Pronto{view.next?.waiting?.deadlineAt ? ` (ou sozinha às ${hourLabel(view.next.waiting.deadlineAt)}, com a IA no lugar de quem faltar)` : ''}.</p>
               <Button className="mt-3 w-full" disabled={busy} onClick={() => void run(() => leagueApi.ready(id, !me.ready))} data-testid="ready-button">
                 {me.ready ? 'Pronto! Toque para desfazer' : 'Estou pronto'}
               </Button>
@@ -140,50 +139,6 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
         )}
       </Card>
 
-      {body.isAdmin && (
-        <Card title="Controles do ADM">
-          <div className="flex flex-col gap-2">
-            {view.paused ? (
-              <Button disabled={busy} onClick={() => void control('resume')} data-testid="resume-league">
-                Retomar a liga
-              </Button>
-            ) : (
-              <>
-                <Button disabled={busy || !!view.current || !view.next} onClick={() => setConfirmAdvance(true)} data-testid="advance-league">
-                  Avançar para a próxima rodada
-                </Button>
-                <Button variant="secondary" disabled={busy} onClick={() => void control('pause')} data-testid="pause-league">
-                  Pausar a liga
-                </Button>
-              </>
-            )}
-            {league.kind === 'friends' && (
-              <Button variant="secondary" disabled={busy || !!view.current} onClick={() => setPacing(true)} data-testid="change-pace">
-                Ritmo: {PACE_LABELS[view.pace]}
-              </Button>
-            )}
-          </div>
-          {view.suggestions.length > 0 && (
-            <div className="mt-4 rounded-xl border border-yellow-500/50 bg-yellow-500/10 p-3" data-testid="absence-suggestions">
-              <p className="text-sm font-bold text-yellow-300">Técnicos sumidos</p>
-              <p className="mt-1 text-xs text-muted">Estes técnicos perderam várias rodadas seguidas. A IA joga por eles. Se quiser abrir a vaga, remova o técnico: o clube volta para a IA.</p>
-              <ul className="mt-2 flex flex-col gap-2">
-                {view.suggestions.map((s) => (
-                  <li key={s.playerId} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0 truncate">
-                      <b>{nick(s.playerId)}</b> · {clubOf(s.teamId)} · {s.missed} rodadas perdidas, {s.idleDays} dias sem aparecer
-                    </span>
-                    <button type="button" className="min-h-12 flex-none rounded-lg px-2 text-xs text-loss hover:bg-surface" disabled={busy} onClick={() => void run(() => leagueApi.admin(id, 'kick', s.playerId))}>
-                      Remover
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Card>
-      )}
-
       {view.transfers.length > 0 && (
         <Card title="Últimas transferências">
           <ul className="flex flex-col gap-2 text-sm" data-testid="room-transfers">
@@ -219,66 +174,15 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
         </p>
       )}
 
-      {confirmAdvance && (
-        <Sheet
-          title="Avançar para a próxima rodada?"
-          onClose={() => setConfirmAdvance(false)}
-          footer={
-            <div className="flex flex-col gap-3">
-              <Button
-                disabled={busy}
-                onClick={() => {
-                  setConfirmAdvance(false)
-                  void control('advance')
-                }}
-                data-testid="confirm-advance"
-              >
-                Avançar agora
-              </Button>
-              <Button variant="secondary" onClick={() => setConfirmAdvance(false)}>
-                Esperar
-              </Button>
-            </div>
-          }
-        >
-          <p className="text-sm text-muted">
-            A rodada de {view.next ? dateLabel(view.next.date) : '—'} começa agora, sem esperar o horário ({view.next ? whenLabel(view.next.startAt) : ''}). Os horários das rodadas seguintes não mudam.
-          </p>
-          {view.next && view.next.notReady.length > 0 ? (
-            <div className="mt-3 rounded-xl border border-yellow-500/50 bg-yellow-500/10 p-3" data-testid="advance-not-ready">
-              <p className="text-sm font-bold text-yellow-300">Ainda não deram Pronto:</p>
-              <p className="mt-1 text-sm">{view.next.notReady.map(nick).join(', ')}</p>
-              <p className="mt-1 text-xs text-muted">Quem não estiver presente joga com a IA no lugar.</p>
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-win">Todos os técnicos com partida já deram Pronto.</p>
-          )}
-        </Sheet>
-      )}
-
-      {pacing && (
-        <Sheet title="Ritmo da liga" onClose={() => setPacing(false)}>
-          <p className="mb-3 text-sm text-muted">Muda a velocidade das próximas rodadas. O que já aconteceu não muda e os horários futuros são refeitos agora.</p>
-          <div className="flex flex-col gap-2">
-            {PACE_ORDER.map((p) => (
-              <Button
-                key={p}
-                variant={p === view.pace ? 'primary' : 'secondary'}
-                disabled={busy}
-                onClick={() => {
-                  setPacing(false)
-                  if (p !== view.pace) void run(() => leagueApi.pace(id, p))
-                }}
-                data-testid={`pace-${p}`}
-              >
-                {PACE_LABELS[p]}
-              </Button>
-            ))}
-          </div>
-        </Sheet>
-      )}
     </>
   )
+}
+
+/** Quantos dos técnicos que jogam no próximo evento já deram Pronto (ausentes e em piloto automático não contam). */
+export function readyCount(view: LeagueView): { done: number; total: number } {
+  const required = new Set(view.next?.required ?? [])
+  const seats = view.seats.filter((s) => required.has(s.playerId) && s.status === 'active')
+  return { done: seats.filter((s) => s.ready).length, total: seats.length }
 }
 
 function SeatPill({ seat }: { seat: ViewSeat }) {
@@ -333,6 +237,22 @@ function Status({ view, clubOf }: { view: LeagueView; clubOf: (teamId: string) =
       </div>
     )
   }
+  if (view.next?.waiting) {
+    const { done, total } = readyCount(view)
+    return (
+      <div className="rounded-2xl border border-accent/60 bg-accent/10 p-4" data-testid="status-waiting">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Próxima rodada</p>
+        <p className="mt-1 text-xl font-bold text-accent">Jogo pronto · Agora</p>
+        <p className="mt-1 text-sm" data-testid="ready-counter">
+          Pronto {done}/{total}
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          A partida começa para todos ao mesmo tempo, no minuto 0, quando todos derem Pronto{view.next.waiting.deadlineAt ? `. Se faltar alguém, começa sozinha às ${hourLabel(view.next.waiting.deadlineAt)}, com a IA jogando por quem não deu Pronto` : ''}.
+        </p>
+        <Fixtures fixtures={view.next.fixtures} clubOf={clubOf} />
+      </div>
+    )
+  }
   if (view.next) {
     const open = view.now >= view.next.roomOpensAt
     return (
@@ -343,7 +263,7 @@ function Status({ view, clubOf }: { view: LeagueView; clubOf: (teamId: string) =
           Jogos de {dateLabel(view.next.date)} · {inLabel(view.next.startAt - view.now)}
         </p>
         <Fixtures fixtures={view.next.fixtures} clubOf={clubOf} />
-        <p className="mt-2 text-xs text-muted">{open ? 'A sala está aberta: quando todos derem Pronto, a rodada começa.' : `A sala abre às ${hourLabel(view.next.roomOpensAt)}.`}</p>
+        <p className="mt-2 text-xs text-muted">{open ? 'A sala está aberta: quando todos derem Pronto, a partida começa.' : `A sala abre às ${hourLabel(view.next.roomOpensAt)}.`}</p>
       </div>
     )
   }

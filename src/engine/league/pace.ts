@@ -31,6 +31,16 @@ export const MAX_DELAY_MS = 36 * MS_HOUR
 export const SLOT_OPTIONS = 3
 /** A sala abre este tempo antes do horário do evento. */
 export const ROOM_OPENS_BEFORE_MS = 5 * MS_MINUTE
+/**
+ * Quanto a sala espera os técnicos darem Pronto depois que o horário do jogo chega (ou que o ADM avança). Passado o prazo a partida começa sozinha e a
+ * IA joga por quem não deu Pronto. Quanto mais rápida a liga, menos se espera: no Calmo há poucos jogos por dia e dá para esperar mais.
+ */
+export const READY_WAIT_MS: Record<PaceId, number> = {
+  calm: 30 * MS_MINUTE,
+  normal: 20 * MS_MINUTE,
+  fast: 15 * MS_MINUTE,
+  'very-fast': 10 * MS_MINUTE,
+}
 /** A pausa do ADM dura no máximo isto (depois a liga volta sozinha e avisa). */
 export const MAX_PAUSE_MS = 30 * MS_DAY
 /** Quanto do calendário futuro fica agendado e visível. */

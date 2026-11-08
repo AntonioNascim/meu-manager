@@ -45,6 +45,9 @@ export const leagueApi = {
   tradeRespond: (leagueId: string, offerId: string, type: 'accept' | 'decline' | 'counter', fee?: number) => withIdentity((id) => client.tradeRespond(deps(), id, leagueId, offerId, type, fee)),
   tradeWithdraw: (leagueId: string, offerId: string) => withIdentity((id) => client.tradeWithdraw(deps(), id, leagueId, offerId)),
   tradeReport: (leagueId: string, recordId: string, reason: Parameters<typeof client.tradeReport>[4]) => withIdentity((id) => client.tradeReport(deps(), id, leagueId, recordId, reason)),
+  vacancies: (leagueId: string) => withIdentity((id) => client.vacancyList(deps(), id, leagueId)),
+  vacancyCreate: (leagueId: string, teamId: string) => withIdentity((id) => client.vacancyCreate(deps(), id, leagueId, teamId)),
+  vacancyCancel: (leagueId: string, code: string) => withIdentity((id) => client.vacancyCancel(deps(), id, leagueId, code)),
   liveTicket: (leagueId: string) => withIdentity((id) => client.requestLiveTicket(deps(), id, leagueId)),
 }
 

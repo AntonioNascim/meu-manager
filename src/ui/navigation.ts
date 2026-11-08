@@ -1,4 +1,4 @@
-export type ScreenId = 'home' | 'squad' | 'tactics' | 'match' | 'standings' | 'finance' | 'market' | 'contracts' | 'academy' | 'training' | 'career' | 'league'
+export type ScreenId = 'home' | 'squad' | 'tactics' | 'match' | 'standings' | 'finance' | 'market' | 'contracts' | 'academy' | 'training' | 'career' | 'league' | 'admin'
 
 export const SCREEN_LABELS: Record<ScreenId, string> = {
   home: 'Clube',
@@ -13,6 +13,7 @@ export const SCREEN_LABELS: Record<ScreenId, string> = {
   training: 'Treino',
   career: 'Carreira',
   league: 'Liga',
+  admin: 'ADM',
 }
 
 /** Abas da barra de baixo. */
@@ -30,6 +31,7 @@ export const NAV_TAB_OF: Record<ScreenId, NavTab> = {
   training: 'squad',
   career: 'home',
   league: 'home',
+  admin: 'home',
   standings: 'standings',
   finance: 'finance',
 }

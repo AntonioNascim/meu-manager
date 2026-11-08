@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, createLeague, defaultLeagueConfig, leagueView, pauseLeague, replanForPace, resumeLeague, setPlayerReady, processLeague, shouldStart } from '../src/engine/league'
-import { MS_DAY, MS_MINUTE, ROOM_OPENS_BEFORE_MS } from '../src/engine/league/pace'
+import { advanceLeague } from '../src/engine/league'
+import { MS_DAY, MS_MINUTE, ROOM_OPENS_BEFORE_MS, READY_WAIT_MS } from '../src/engine/league/pace'
 import { createLeagueWorld } from '../src/store/leagueWorld'
 import { turnRunner } from '../src/store/game'
 
@@ -51,6 +52,21 @@ describe('visão da liga (B8.4)', () => {
     const need = leagueView(l, world, t, joined).next?.required ?? []
     for (const id of need) l = setPlayerReady(l, id, true, t)
     if (need.length > 0) expect(shouldStart(l, world, t)).toBe('all-ready')
+  })
+
+
+  it('depois do Avançar a visão mostra o jogo pronto com o prazo; o progresso e a última vez do técnico vêm do estado', () => {
+    const l0 = make()
+    const adv = advanceLeague(l0, world, T0 + MS_MINUTE, { turn: turnRunner }, 'ana')
+    const v = leagueView(adv.league, adv.world, T0 + 2 * MS_MINUTE, joined, comp.teamIds[0])
+    expect(v.next?.waiting).toEqual({ openedAt: T0 + MS_MINUTE, deadlineAt: T0 + MS_MINUTE + READY_WAIT_MS.normal })
+    expect(v.next?.startAt).toBe(T0 + MS_MINUTE)
+    expect(v.current).toBeUndefined()
+    expect(v.progress).toMatchObject({ played: 0 })
+    expect(v.progress!.total).toBeGreaterThan(30)
+    expect(v.season).toBe(world.season.year)
+    expect(v.seats.every((s) => s.lastActiveAt === T0)).toBe(true)
+    expect(leagueView(adv.league, adv.world, T0, joined).progress).toBeUndefined()
   })
 
   it('pausa aparece na visão com o limite de 30 dias; retomar tira', () => {

@@ -32,7 +32,8 @@ function withInjury(): Found {
     let now = T0
     for (let i = 0; i < 24 * 40 && !stepped.league.current; i++) {
       now = T0 + i * 30 * MS_MINUTE
-      stepped = processLeague(JSON.parse(JSON.stringify(stepped.league)) as LeagueState, stepped.world, now, { turn: turnRunner })
+      const l = JSON.parse(JSON.stringify(stepped.league)) as LeagueState
+      stepped = processLeague({ ...l, seats: l.seats.map((s) => ({ ...s, ready: true })) }, stepped.world, now, { turn: turnRunner })
     }
     if (!stepped.league.current) continue
     let event = startLiveEvent(stepped.league, stepped.world, now, MINUTE_MS, ['jogador-1', 'jogador-2'])

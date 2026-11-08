@@ -9,6 +9,7 @@ import { Button, Card, TeamBadge } from '../../../components/ui'
 import { BAND_LABELS, LEAGUE_ERROR_LABELS, LEAGUE_KIND_LABELS, LEAGUE_STATUS_LABELS, PACE_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
 import { ClubPicker } from './ClubPicker'
+import { AdminPanel } from './AdminPanel'
 import { LeagueRunning } from './LeagueRunning'
 import { Frame, Pill } from './parts'
 
@@ -107,7 +108,8 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
   const member = league.myTeamId !== undefined
   if (picking && !member) return <ClubPicker league={league} busy={busy} error={pickError} onBack={() => setPicking(false)} onPick={(t) => void pick(t)} />
   const inviteCode = league.code
-  const canJoin = !member && !league.entryClosed && league.humans < league.maxHumans
+  const reserved = !member ? league.reservedTeamId : undefined
+  const canJoin = !member && (reserved !== undefined || (!league.entryClosed && league.humans < league.maxHumans))
   const myClub = member ? teams?.byId.get(league.myTeamId as string) : undefined
 
   return (
@@ -193,6 +195,20 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
         <p className="text-sm">
           Seu clube: <b>{myClub?.team.name ?? league.myTeamId}</b>
         </p>
+      ) : reserved ? (
+        <Card title="Clube reservado para você">
+          <p className="text-sm" data-testid="reserved-club">
+            O ADM reservou o {teams?.byId.get(reserved)?.team.name ?? reserved} para quem usar este código. Ao assumir, você cria o técnico direto nesse clube.
+          </p>
+          {pickError && (
+            <p role="alert" className="mt-2 text-sm text-loss">
+              {pickError}
+            </p>
+          )}
+          <Button className="mt-3 w-full" disabled={busy} onClick={() => void pick(reserved)} data-testid="take-reserved">
+            {busy ? 'Entrando…' : 'Assumir o clube'}
+          </Button>
+        </Card>
       ) : canJoin ? (
         <Button onClick={() => setPicking(true)} data-testid="pick-club">
           Escolher meu clube
@@ -201,7 +217,9 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
         <p className="text-sm text-muted">{league.entryClosed ? 'A entrada está fechada.' : 'A liga está cheia.'}</p>
       )}
 
-      {league.isAdmin && (
+      {league.isAdmin && league.status === 'running' && member && <AdminPanel leagueId={league.id} />}
+
+      {league.isAdmin && !(league.status === 'running' && member) && (
         <Card title={league.status === 'running' ? 'Entrada e convite' : 'Controles do ADM'}>
           <div className="flex flex-col gap-2">
             {league.status === 'lobby' && (

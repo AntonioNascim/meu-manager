@@ -396,3 +396,18 @@ Com a autorização dos sócios: `wrangler deploy` (versão `a6f8752d`, sem migr
 **Limpeza das telas online simplificadas.** Removidas por já serem cobertas pelo jogo do clube: `ClubCard` (Meu clube), `CupsCard`, o cartão e a tela "Mercado" da sala com as abas Buscar, Anúncios, Vender e Pré-contrato (`LeagueMarketAi.tsx`, `LeagueMarketSell.tsx`) e as propostas da IA dentro dela; o `LeagueMarket` ficou só com o que é entre técnicos (Técnicos, Propostas e Histórico, usado pela aba Técnicos do Mercado do jogo). Na sala da liga fora do jogo ficam: técnicos e clubes, convite, Pronto, Avançar, Pausa, ritmo, calendário, sugestões de ausência e o botão **Abrir o jogo do clube**. Removidos também os fios do cliente que só essas telas usavam (`leagueApi.club`, `cups`, `tradeSearch` e semelhantes em `store/leagues.ts`) e os testes de ponta a ponta das telas antigas (`b8-6`, `b8-6b`, `b8-7`, `b8-8`). **Ficam** (sem tela que os use, mas testadas): as rotas do servidor `club`, `cups`, `trade-search|listings|ai*|mine|buyers|pre`, `list`, `unlist`, `sell` e `pre-offer` e os módulos de `engine/league` por trás delas, porque a aba Técnicos e os comandos ainda usam parte das regras e tirar rota publicada exige outra publicação com cuidado; podem sair numa limpeza futura.
 
 **Testes:** `npm test` 126 arquivos, 1.423 testes, todos passam depois da limpeza. Guia de teste do online novo em `docs/teste-fechado.md` seções 2 e 2.1; **demissão com troca de clube anotada como item a observar** na seção 2.2 e no `CLAUDE.md`.
+
+## 17. Pronto antes da partida e Painel do ADM (08/11/2026)
+
+**Defeito corrigido.** O Avançar do ADM e o horário do jogo começavam a partida na hora; quem não estava com a tela aberta perdia os primeiros minutos (a partida sem ninguém roda a 8x) e encontrava o jogo no minuto 70 ou 80.
+
+**Como é agora.**
+- O horário do jogo, ou o Avançar, só **abre a sala**: o cartão mostra "Jogo pronto · Agora", o contador "Pronto X/N" e "Sozinho às HH:MM". Avançar com a sala já aberta não faz nada.
+- A partida **começa no minuto 0, para todos ao mesmo tempo**, quando todos os técnicos ativos que jogam derem Pronto. Técnicos ausentes ou em piloto automático não precisam dar Pronto.
+- **Prazo (proposta por ritmo):** Calmo 30 min, Normal 20 min, Rápido 15 min, Muito rápido 10 min (`READY_WAIT_MS`). Passado o prazo a partida começa sozinha e a IA joga por quem não deu Pronto. Esse técnico fica **trancado**: não assume o time no meio, não manda comando nem velocidade, e vê o aviso.
+- Quem deu Pronto e ainda não abriu a tela tem 30 s antes de o jogo andar, e o aplicativo abre a tela da partida sozinho.
+- Pausar congela o prazo; ao retomar a sala continua esperando.
+
+**Painel do ADM** (botão "ADM" nos atalhos, só para o ADM): código de convite, ritmo, temporada, "jogo N/M" do clube; Avançar até o próximo jogo e Pausar/Retomar; **código de vaga** (o ADM escolhe um clube sem técnico humano; o código é o convite da liga + 4 símbolos; quem entra com ele vira técnico direto nesse clube; o clube fica reservado 72 h, ninguém mais o pega; vale mesmo com a entrada fechada; só liga de amigos em andamento, até 10 reservas); abrir/fechar a entrada; lista de técnicos com a última vez que apareceu (abrir o jogo conta), remover e passar o cargo. Os controles de Avançar, Pausar, ritmo e sugestões de ausência saíram da sala da liga.
+
+**Sem migração de banco e sem custo novo** (as reservas ficam no armazenamento da sala). Testes: `leagueRunner`, `leagueView`, `leagueLive` (trancado), `leagueRoomMirror` (sala), `onlineLeagueApi` (código de vaga) e `tools/online-lab/c7-e2e.mjs` (painel, código de vaga, entrada fechada); `c5`/`c6` ajustados ao novo fluxo.

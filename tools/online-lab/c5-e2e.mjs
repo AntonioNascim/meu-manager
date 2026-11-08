@@ -55,21 +55,24 @@ await page.getByTestId('league-card').waitFor({ timeout: 90000 })
 // ------------------------------------------------------------------ o ADM avança até uma rodada em que o clube joga
 let watching = false
 for (let tries = 0; tries < 8 && !watching; tries++) {
-  await page.getByTestId('league-open-room').click()
-  await page.getByTestId('league-screen').waitFor()
+  await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
+  await page.getByRole('button', { name: /^ADM/ }).click()
   await page.getByTestId('advance-league').click()
-  await page.getByTestId('confirm-advance').click()
-  await page.getByTestId('status-event').waitFor({ timeout: 30000 })
-  await page.getByRole('button', { name: 'Clube', exact: true }).click()
-  watching = await page.getByTestId('league-watch').waitFor({ timeout: 8000 }).then(() => true, () => false)
-  if (!watching) {
+  await page.getByTestId('confirm-action').click()
+  await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
+  // Avançar só abre a sala ("Jogo pronto · Agora"): a partida espera o Pronto e abre sozinha na tela depois dele.
+  const ready = await page.getByTestId('league-ready').waitFor({ timeout: 10000 }).then(() => true, () => false)
+  if (ready) {
+    await page.getByTestId('league-ready-counter').waitFor({ timeout: 20000 })
+    check('o cartão mostra "Jogo pronto · Agora" e o contador antes de a partida começar', (await page.getByTestId('league-status').innerText()).includes('Jogo pronto') && (await page.getByTestId('league-ready-counter').innerText()).includes('Pronto 0/'))
+    await page.getByTestId('league-ready').click()
+    watching = await page.getByTestId('speed').waitFor({ timeout: 40000 }).then(() => true, () => false)
+  } else {
     await page.getByTestId('league-open-room').click()
     await page.getByTestId('status-next').waitFor({ timeout: 180000 })
-    await page.getByRole('button', { name: 'Clube', exact: true }).click()
   }
 }
-check('com a rodada em andamento o cartão da liga oferece "Entrar na partida"', watching)
-await page.getByTestId('league-watch').click()
+check('depois do Pronto a partida abre sozinha na tela', watching)
 
 // ------------------------------------------------------------------ a tela de partida é a do jogo solo, movida pelo servidor
 await page.getByTestId('speed').waitFor({ timeout: 40000 })
@@ -114,10 +117,10 @@ const after45 = await page.locator('main').innerText()
 check('depois de Voltar ao jogo a partida segue (sai do intervalo antes de 1 minuto)', !/Intervalo · \d+ s/.test(after45) && before45 !== after45)
 
 // ------------------------------------------------------------------ fim de jogo: vê o resultado e espera a rodada
-await page.getByRole('button', { name: 'Voltar ao painel' }).waitFor({ timeout: 120000 })
+await page.getByRole('button', { name: 'Voltar ao painel' }).waitFor({ timeout: 240000 })
 check('no fim aparece o resultado e o aviso de que a rodada espera as outras partidas', (await page.locator('main').innerText()).includes('Fim de jogo'))
 const total = Math.round((Date.now() - t0) / 1000)
-check('a partida inteira durou poucos minutos reais (700 ms por minuto, até 8x)', total < 150, `${total} s desde a entrada`)
+check('a partida inteira durou poucos minutos reais (700 ms por minuto, até 8x)', total < 330, `${total} s desde a entrada`)
 await shoot(page, 'online-fim')
 await page.getByRole('button', { name: 'Voltar ao painel' }).click()
 await page.getByTestId('league-card').waitFor()

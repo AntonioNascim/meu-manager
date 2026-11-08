@@ -32,7 +32,7 @@ import {
   type ClockState,
   type ScheduledEvent,
 } from './clock'
-import { DEFAULT_TICK_HOUR, MAX_PAUSE_MS, ROOM_OPENS_BEFORE_MS, SCHEDULE_HORIZON_MS, type PaceId } from './pace'
+import { DEFAULT_TICK_HOUR, MAX_PAUSE_MS, READY_WAIT_MS, ROOM_OPENS_BEFORE_MS, SCHEDULE_HORIZON_MS, type PaceId } from './pace'
 
 export type SeatStatus = 'active' | 'absent' | 'autopilot'
 
@@ -77,6 +77,15 @@ export interface CurrentEvent {
   pending: string[]
   all: string[]
   reason: 'time' | 'all-ready' | 'advance' | 'anchor'
+  /** Técnicos que não deram Pronto até o começo: a IA joga por eles e eles não entram no meio da partida. */
+  locked?: string[]
+}
+
+/** O jogo chegou na hora (ou o ADM avançou) e a partida espera os técnicos darem Pronto. `deadline` está no relógio dos prazos (congela na pausa). */
+export interface Waiting {
+  day: number
+  openedAt: number
+  deadline: number
 }
 
 export interface LeagueState {
@@ -84,6 +93,8 @@ export interface LeagueState {
   clock: ClockState
   seats: Seat[]
   current?: CurrentEvent
+  /** A sala do próximo jogo está esperando o Pronto (a partida ainda não começou). */
+  waiting?: Waiting
   /** Próxima passagem diária. */
   nextTick: number
   log: LogEntry[]
@@ -167,10 +178,28 @@ export function roomOpen(league: LeagueState, now: number): boolean {
 export function shouldStart(league: LeagueState, world: SeasonState, now: number): 'time' | 'all-ready' | false {
   const ev = nextEvent(league.clock)
   if (!ev || league.clock.pausedAt !== undefined || league.current) return false
-  if (now >= ev.startAt) return 'time'
-  if (ev.kind === 'match' && roomOpen(league, now) && requiredSeats(league, world).length > 0 && notReady(league, world).length === 0) return 'all-ready'
+  if (ev.kind === 'anchor') return now >= ev.startAt ? 'time' : false
+  // Jogo com técnicos: o horário só abre a sala (`openWaiting`); a partida começa quando todos dão Pronto ou quando o prazo acaba.
+  if (league.waiting) {
+    if (notReady(league, world).length === 0) return 'all-ready'
+    return deadlineExpired(league, now, league.waiting.deadline) ? 'time' : false
+  }
+  if (now >= ev.startAt) return false
+  if (roomOpen(league, now) && requiredSeats(league, world).length > 0 && notReady(league, world).length === 0) return 'all-ready'
   return false
 }
+
+/** O horário do jogo chegou (ou o ADM avançou): a sala abre e espera o Pronto até o prazo do ritmo. O relógio do mundo já vale a data do jogo. */
+export function openWaiting(league: LeagueState, now: number): LeagueState {
+  const ev = nextEvent(league.clock)
+  if (!ev || ev.kind !== 'match' || league.waiting || league.current) return league
+  const [, ...rest] = league.clock.events
+  const clock = ev.startAt > now ? { ...league.clock, events: [{ ...ev, startAt: now }, ...rest] } : league.clock
+  return { ...league, clock, waiting: { day: ev.day, openedAt: now, deadline: deadlineIn(league, now, READY_WAIT_MS[league.config.clock.pace]) } }
+}
+
+/** O instante real em que a partida começa sozinha (só com a sala esperando e a liga andando). */
+export const waitingDeadlineAt = (league: LeagueState): number | undefined => (league.waiting && league.clock.pausedAt === undefined ? league.waiting.deadline + league.clock.pausedTotalMs : undefined)
 
 /** A data do mundo que a liga deveria ter alcançado em `now` (os dias completos de `D`). */
 export const worldDateAt = (league: LeagueState, now: number): IsoDate => gameDate(league.clock, now, league.config.clock)
@@ -180,6 +209,7 @@ export function nextWakeup(league: LeagueState, now: number): number | undefined
   const c = league.clock
   if (c.pausedAt !== undefined) return c.pausedAt + MAX_PAUSE_MS
   if (league.current) return undefined // espera os resultados (B7); a conexão acorda a liga
+  if (league.waiting) return waitingDeadlineAt(league)
   const ev = nextEvent(c)
   const times = [league.nextTick, ev ? ev.startAt : undefined, ev?.kind === 'match' ? ev.startAt - ROOM_OPENS_BEFORE_MS : undefined].filter((t): t is number => t !== undefined && t > now - 1)
   return times.length > 0 ? Math.min(...times) : undefined
@@ -225,8 +255,10 @@ export function pauseLeague(league: LeagueState, now: number, by?: string): Step
 export function resumeLeague(league: LeagueState, world: SeasonState, now: number, by?: string, auto = false): LeagueState {
   if (league.clock.pausedAt === undefined) return league
   const day = gameDay(league.clock, now, league.config.clock)
+  const waitingEvent = league.waiting ? league.clock.events.find((e) => e.day === league.waiting!.day) : undefined
   const days = eventDaysOf(world, league.seats).filter((e) => e.day > day)
-  const clock = resumeClock(league.clock, now, league.config.clock, days)
+  const resumed = resumeClock(league.clock, now, league.config.clock, days)
+  const clock = waitingEvent ? { ...resumed, events: [{ ...waitingEvent, startAt: Math.min(waitingEvent.startAt, now) }, ...resumed.events] } : resumed
   return log({ ...league, clock, nextTick: nextTickAt(now, league.config.clock, league.config.tickHour) }, { at: now, type: auto ? 'auto-resume' : 'resume', by })
 }
 
@@ -242,14 +274,15 @@ function beginEvent(league: LeagueState, world: SeasonState, now: number, deps: 
   const step = date > world.season.currentDate ? advanceUntil(world, date, optionsOf(league, deps)) : undefined
   if (step) current = step.state
   const pending = (step?.pendingHumanMatches ?? []).map((m) => m.id)
+  const locked = ev.kind === 'match' ? notReady(league, world).map((s) => s.playerId) : []
   const seats = league.seats.map((s) => ({ ...s, ready: false }))
-  let next: LeagueState = { ...league, clock: started.clock, seats }
+  let next: LeagueState = { ...league, clock: started.clock, seats, waiting: undefined }
   next = log(next, { at: now, type: reason === 'advance' ? 'advance' : 'event-started', date, detail: reason, ...(by !== undefined ? { by } : {}) })
   if (pending.length === 0) {
     actions.push({ type: 'event-ended', date })
     return { league: refreshEvents(log(next, { at: now, type: 'event-ended', date }), current), world: current, actions }
   }
-  next = { ...next, current: { date, startedAt: now, pending, all: pending, reason: ev.kind === 'anchor' ? 'anchor' : reason } }
+  next = { ...next, current: { date, startedAt: now, pending, all: pending, reason: ev.kind === 'anchor' ? 'anchor' : reason, ...(locked.length > 0 ? { locked } : {}) } }
   actions.push({ type: 'event-started', date, matchIds: pending, reason })
   return { league: next, world: current, actions }
 }
@@ -286,11 +319,25 @@ export function submitResult(from: Stepped, matchId: string, result: MatchResult
   return { league: refreshEvents(ended, moved), world: moved, actions: [...from.actions, { type: 'event-ended', date: cur.date }] }
 }
 
-/** O ADM mandou Avançar: o próximo evento começa na hora, mesmo que falte gente pronta. Os horários dos eventos seguintes não mudam. */
+/**
+ * O ADM mandou Avançar: pula a espera até o horário do próximo jogo. A sala abre ("Jogo pronto · Agora") e a partida só começa quando todos os técnicos
+ * que jogam derem Pronto ou quando o prazo acabar. Âncoras (virada de um país) no caminho passam direto. Os horários dos eventos seguintes não mudam.
+ */
 export function advanceLeague(league: LeagueState, world: SeasonState, now: number, deps: LeagueDeps, by?: string): Stepped {
-  if (league.clock.pausedAt !== undefined || league.current || !nextEvent(league.clock)) return { league, world, actions: [] }
-  const started = beginEvent(league, world, now, deps, 'advance', by)
-  return league.config.directResult && started.league.current ? finishDirect(started, now) : started
+  let state: Stepped = { league, world, actions: [] }
+  for (let guard = 0; guard < 20; guard++) {
+    const l = state.league
+    const ev = nextEvent(l.clock)
+    if (l.clock.pausedAt !== undefined || l.current || l.waiting || !ev) break
+    if (ev.kind === 'anchor') {
+      const started = beginEvent(l, state.world, now, deps, 'advance', by)
+      state = { league: started.league, world: started.world, actions: [...state.actions, ...started.actions] }
+      continue
+    }
+    state = { ...state, league: log(openWaiting(l, now), { at: now, type: 'advance', date: dateOfDay(ev.day), ...(by !== undefined ? { by } : {}) }) }
+    break
+  }
+  return state
 }
 
 function finishDirect(from: Stepped, now: number): Stepped {
@@ -328,6 +375,11 @@ export function processLeague(league: LeagueState, world: SeasonState, now: numb
       continue
     }
     if (l.current) break
+    const ev = nextEvent(l.clock)
+    if (ev?.kind === 'match' && !l.waiting && now >= ev.startAt) {
+      state = { ...state, league: openWaiting(l, now) }
+      continue
+    }
     const why = shouldStart(l, state.world, now)
     if (why) {
       const started = beginEvent(l, state.world, now, deps, why)
@@ -350,7 +402,7 @@ export function processLeague(league: LeagueState, world: SeasonState, now: numb
  * Só vale com nenhum evento em andamento; em pausa, os horários se refazem na retomada.
  */
 export function replanForPace(league: LeagueState, world: SeasonState, pace: PaceId): LeagueState {
-  if (league.config.clock.pace === pace || league.current) return league
+  if (league.config.clock.pace === pace || league.current || league.waiting) return league
   const config: LeagueConfig = { ...league.config, clock: { ...league.config.clock, pace } }
   const days = eventDaysOf(world, league.seats)
   const base: LeagueState = { ...league, config }

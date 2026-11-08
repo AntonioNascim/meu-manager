@@ -23,7 +23,7 @@ import {
   worldDateAt,
 } from '../src/engine/league'
 import type { LeagueState, Stepped } from '../src/engine/league'
-import { MAX_PAUSE_MS, MS_DAY, MS_HOUR, MS_MINUTE, ROOM_OPENS_BEFORE_MS } from '../src/engine/league/pace'
+import { MAX_PAUSE_MS, MS_DAY, MS_HOUR, MS_MINUTE, READY_WAIT_MS, ROOM_OPENS_BEFORE_MS } from '../src/engine/league/pace'
 import { humanMatchInput } from '../src/engine/season'
 import type { SeasonState } from '../src/engine/season'
 import { createGame, turnRunner } from '../src/store/game'
@@ -144,7 +144,14 @@ describe('Pronto', () => {
       const partial = setReady(league, need[0]!.playerId)
       const wait = processLeague(partial, world, ev.startAt - ROOM_OPENS_BEFORE_MS + MS_MINUTE, deps)
       expect(wait.league.log.some((e) => e.type === 'event-started')).toBe(false)
-      expect(processLeague(partial, world, ev.startAt, deps).league.log.some((e) => e.type === 'event-started' && e.detail === 'time')).toBe(true)
+      // No horário a sala abre e espera; a partida só começa sozinha quando o prazo do ritmo acaba, e quem faltou fica trancado (a IA joga por ele).
+      const atTime = processLeague(partial, world, ev.startAt, deps)
+      expect(atTime.league.current).toBeUndefined()
+      expect(atTime.league.waiting).toBeDefined()
+      expect(nextWakeup(atTime.league, ev.startAt)).toBe(ev.startAt + READY_WAIT_MS.normal)
+      const late = processLeague(atTime.league, atTime.world, ev.startAt + READY_WAIT_MS.normal, deps)
+      expect(late.league.log.some((e) => e.type === 'event-started' && e.detail === 'time')).toBe(true)
+      expect(late.league.waiting).toBeUndefined()
     }
   }, 120_000)
 
@@ -160,7 +167,7 @@ describe('Pronto', () => {
 })
 
 describe('Avançar (ADM)', () => {
-  it('começa o próximo evento agora, mesmo sem todos prontos; D salta e os horários seguintes ficam como estavam', () => {
+  it('só pula a espera até o horário: a sala abre e a partida espera o Pronto; D salta e os horários seguintes ficam como estavam', () => {
     const { league, world } = make()
     const preview = previewAdvance(league, world)!
     expect(preview.date).toBe(dateOfDay(league.clock.events[0]!.day))
@@ -169,9 +176,28 @@ describe('Avançar (ADM)', () => {
     const now = T0 + MS_HOUR
     const stepped = advanceLeague(league, world, now, deps, 'adm')
     expect(stepped.league.log.find((e) => e.type === 'advance')?.by).toBe('adm')
-    expect(stepped.world.season.currentDate >= preview.date).toBe(true)
+    // A partida não começou: a sala espera o Pronto até o prazo do ritmo.
+    expect(stepped.league.current).toBeUndefined()
+    expect(stepped.league.waiting).toEqual({ day: league.clock.events[0]!.day, openedAt: now, deadline: expect.any(Number) })
+    expect(stepped.league.clock.events[0]!.startAt).toBe(now)
+    // Avançar de novo com a sala esperando não faz nada.
+    expect(advanceLeague(stepped.league, stepped.world, now + MS_MINUTE, deps, 'adm').league).toBe(stepped.league)
     // Os horários dos eventos seguintes não mudaram.
-    expect(stepped.league.clock.events.slice(0, after.length).map((e) => e.startAt)).toEqual(after.slice(0, stepped.league.clock.events.length))
+    expect(stepped.league.clock.events.slice(1, 1 + after.length).map((e) => e.startAt)).toEqual(after.slice(0, stepped.league.clock.events.length - 1))
+    // Sem Pronto de ninguém, nada anda até o prazo; todos prontos começam juntos (nenhum trancado).
+    expect(processLeague(stepped.league, stepped.world, now + READY_WAIT_MS.normal - MS_MINUTE, deps).league.current).toBeUndefined()
+    const all = requiredSeats(stepped.league, stepped.world).reduce((l, s) => setReady(l, s.playerId), stepped.league)
+    const go = processLeague(all, stepped.world, now + MS_MINUTE, deps)
+    expect(go.league.log.some((e) => e.type === 'event-started' && e.detail === 'all-ready')).toBe(true)
+    expect(go.world.season.currentDate >= preview.date).toBe(true)
+    expect(go.league.current?.locked).toBeUndefined()
+    // Pausada, a espera congela e volta de onde parou.
+    const p = pauseLeague(stepped.league, now + 5 * MS_MINUTE)
+    expect(nextWakeup(p, now + 6 * MS_MINUTE)).toBe(now + 5 * MS_MINUTE + MAX_PAUSE_MS)
+    const r = resumeLeague(p, stepped.world, now + 2 * MS_HOUR)
+    expect(r.waiting).toBeDefined()
+    expect(r.clock.events[0]!.day).toBe(league.clock.events[0]!.day)
+    expect(nextWakeup(r, now + 2 * MS_HOUR)).toBe(now + 2 * MS_HOUR + READY_WAIT_MS.normal - 5 * MS_MINUTE)
   }, 120_000)
 })
 
@@ -218,7 +244,9 @@ describe('modo ao vivo (a B7 entrega os resultados)', () => {
   it('o evento fica aberto até todas as partidas humanas terem resultado; a liga não anda sozinha enquanto isso', () => {
     const { league, world } = make(false)
     const ev = league.clock.events[0]!
-    let s = processLeague(league, world, ev.startAt, deps)
+    const open = processLeague(league, world, ev.startAt, deps)
+    expect(open.league.current).toBeUndefined()
+    let s = processLeague({ ...open.league, seats: open.league.seats.map((x) => ({ ...x, ready: true })) }, open.world, ev.startAt, deps)
     expect(s.league.current).toBeDefined()
     const pending = [...s.league.current!.pending]
     expect(pending.length).toBeGreaterThan(0)

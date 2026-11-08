@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, roomQuery, leagueCommand, mirrorRead, cupsState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, vacancyAct, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, roomQuery, leagueCommand, mirrorRead, cupsState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -25,9 +25,14 @@ class FakeRoom implements RoomPort {
     this.seats.set(league.id, new Map())
     return { ok: true as const }
   }
-  async addSeat(id: string, playerId: string, teamId: string) {
+  vacancyList: { code: string; teamId: string; expiresAt: number }[] = []
+  async addSeat(id: string, playerId: string, teamId: string, vacancy?: string) {
     const room = this.seats.get(id)
     if (!room) return { ok: false as const, error: 'not-found' as const }
+    const reserved = this.vacancyList.find((v) => v.teamId === teamId)
+    if (reserved && reserved.code !== vacancy) return { ok: false as const, error: 'team-reserved' as const }
+    if (!reserved && vacancy) return { ok: false as const, error: 'bad-vacancy' as const }
+    if (reserved) this.vacancyList = this.vacancyList.filter((v) => v !== reserved)
     if (!teamId.startsWith('team-')) return { ok: false as const, error: 'unknown-team' as const }
     if ([...room.values()].includes(teamId)) return { ok: false as const, error: 'team-taken' as const }
     room.set(playerId, teamId)
@@ -69,6 +74,10 @@ class FakeRoom implements RoomPort {
   async query(id: string, playerId: string, op: string, args: Record<string, unknown>) {
     this.queries.push(`${op}:${id}:${playerId}:${JSON.stringify(args)}`)
     if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
+    if (op === 'vacancy-create') this.vacancyList = [...this.vacancyList.filter((v) => v.teamId !== args.teamId), { code: 'ABCD', teamId: String(args.teamId), expiresAt: T0 + 72 * 3_600_000 }]
+    if (op === 'vacancy-cancel') this.vacancyList = this.vacancyList.filter((v) => v.code !== args.code)
+    if (op === 'vacancy-check') return this.vacancyList.find((v) => v.code === args.code) ? { ok: true as const, body: { teamId: this.vacancyList.find((v) => v.code === args.code)!.teamId } } : { ok: false as const, error: 'bad-vacancy' as const }
+    if (op.startsWith('vacancy-')) return { ok: true as const, body: { vacancies: this.vacancyList } }
     if (op === 'rechoose' && args.teamId === 'team-recusa') return { ok: false as const, refused: 'not-eligible' }
     return { ok: true as const, body: op === 'rechoose' ? { teamId: args.teamId } : { op } }
   }
@@ -549,5 +558,55 @@ describe('ADM, sair e conta apagada', () => {
     expect(await s.deps.leagues.mine(ana.playerId)).toEqual([])
     expect((await s.deps.leagues.get(a.body.id))?.adminId).toBe(bia.playerId)
     expect(s.room.seats.get(a.body.id)?.has(ana.playerId)).toBe(false)
+  })
+})
+
+describe('código de vaga (painel do ADM)', () => {
+  async function started() {
+    const s = setup()
+    const ana = await s.person('Ana')
+    const bia = await s.person('Bia')
+    const made = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, teamId: 'team-1' }), s.deps)
+    if (made.status !== 201) throw new Error('x')
+    const id = made.body.id
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    return { s, ana, bia, id, code: made.body.code as string }
+  }
+
+  it('só o ADM reserva; o código é o convite + 4 símbolos; quem entra com ele assume o clube mesmo com a entrada fechada', async () => {
+    const { s, ana, bia, id, code } = await started()
+    const no = await vacancyAct(s.req(bia, 'POST', `/api/leagues/${id}/vacancy`, { teamId: 'team-5' }), s.deps, id, 'create')
+    expect(no.status).toBe(403)
+    const made = await vacancyAct(s.req(ana, 'POST', `/api/leagues/${id}/vacancy`, { teamId: 'team-5' }), s.deps, id, 'create')
+    expect(made.status).toBe(200)
+    if (made.status !== 200) return
+    expect(made.body.vacancies[0]).toMatchObject({ code: `${code}ABCD`, teamId: 'team-5' })
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/close-entry`, {}), s.deps, id, 'close-entry')
+    // O código resolve e diz qual clube está reservado.
+    const found = await resolveCode(s.req(bia, 'POST', '/api/leagues/code', {}), s.deps, `${code}ABCD`)
+    expect(found.status === 200 && found.body.reservedTeamId).toBe('team-5')
+    // Sem o código a entrada fechada barra; com um código errado, o clube reservado não sai.
+    expect((await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-9', code }), s.deps, id)).body).toMatchObject({ error: 'entry-closed' })
+    expect((await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-5', code }), s.deps, id)).status).toBe(403)
+    expect((await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-9', code: `${code}ABCD` }), s.deps, id)).body).toMatchObject({ error: 'bad-vacancy' })
+    const ok = await joinLeague(s.req(bia, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-5', code: `${code}ABCD` }), s.deps, id)
+    expect(ok.status).toBe(200)
+    expect(s.room.seats.get(id)?.get(bia.playerId)).toBe('team-5')
+    // O código já foi usado.
+    expect((await resolveCode(s.req(bia, 'POST', '/api/leagues/code', {}), s.deps, `${code}ABCD`)).status).toBe(404)
+  })
+
+  it('o clube reservado fica barrado para quem entra pela porta aberta; cancelar libera; liga aberta não tem código de vaga', async () => {
+    const { s, ana, id, code } = await started()
+    const cara = await s.person('Cara')
+    await vacancyAct(s.req(ana, 'POST', `/api/leagues/${id}/vacancy`, { teamId: 'team-6' }), s.deps, id, 'create')
+    expect((await joinLeague(s.req(cara, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-6', code }), s.deps, id)).body).toMatchObject({ error: 'team-reserved' })
+    const cancelled = await vacancyAct(s.req(ana, 'POST', `/api/leagues/${id}/vacancy-cancel`, { code: 'ABCD' }), s.deps, id, 'cancel')
+    expect(cancelled.status === 200 && cancelled.body.vacancies).toHaveLength(0)
+    expect((await joinLeague(s.req(cara, 'POST', `/api/leagues/${id}/join`, { teamId: 'team-6', code }), s.deps, id)).status).toBe(200)
+    const open = await createLeague(s.req(ana, 'POST', '/api/leagues', { ...create, kind: 'open', teamId: 'team-2' }), s.deps)
+    if (open.status !== 201) throw new Error('x')
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${open.body.id}/start`, {}), s.deps, open.body.id, 'start')
+    expect((await vacancyAct(s.req(ana, 'POST', `/api/leagues/${open.body.id}/vacancy`, { teamId: 'team-7' }), s.deps, open.body.id, 'create')).status).toBe(409)
   })
 })

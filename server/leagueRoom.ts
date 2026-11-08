@@ -90,7 +90,7 @@ import type { Dismissal } from '../src/engine/types'
 import { applyCommand, buildDelta, buildFull, diffWorlds, mergeChanges, parseCommand, type MirrorChange } from '../src/engine/league'
 import { turnRunner } from '../src/store/game'
 import { createLeagueWorld } from '../src/store/leagueWorld'
-import type { LeagueRecord, TradeOp } from '../src/online/leagueApi'
+import { CODE_ALPHABET, VACANCY_LENGTH, VACANCY_MAX, VACANCY_TTL_MS, type LeagueRecord, type TradeOp } from '../src/online/leagueApi'
 import type { DataPackage } from '../src/data/package/types'
 import { SqliteWorldStore, type WorldSql } from '../src/store/worldStore'
 import { frameSince, makeStoredReplay, parseClientMessage, replayKey, type Cursor, type Roster, type ServerMessage } from '../src/online/liveProtocol'
@@ -458,7 +458,7 @@ export class LeagueRoom {
     if (op === 'career') return Response.json({ ok: true, body: { rows: careerView(world, this.careers()[playerId] ?? []) } })
     if (op === 'dismissal' || op === 'rechoose') {
       const record = this.dismissals()[playerId]
-      const humans = new Set((this.league?.seats ?? []).map((s) => s.teamId))
+      const humans = new Set([...(this.league?.seats ?? []).map((s) => s.teamId), ...this.vacancies().map((v) => v.teamId)])
       if (op === 'dismissal') return Response.json({ ok: true, body: record ? { dismissal: record, options: freeClubsFor(world, humans, record.teamId) } : {} })
       if (!record || seat) return no('bad-state')
       const teamId = String(args.teamId ?? '')
@@ -474,6 +474,29 @@ export class LeagueRoom {
       await this.schedule(this.now())
       return Response.json({ ok: true, body: { teamId } })
     }
+    if (op === 'vacancy-check') {
+      const found = this.vacancies().find((v) => v.code === String(args.code ?? ''))
+      return found ? Response.json({ ok: true, body: { teamId: found.teamId } }) : no('bad-vacancy')
+    }
+    if (op === 'vacancy-list') return Response.json({ ok: true, body: { vacancies: this.vacancies() } })
+    if (op === 'vacancy-cancel') {
+      this.setVacancies(this.vacancies().filter((v) => v.code !== String(args.code ?? '')))
+      return Response.json({ ok: true, body: { vacancies: this.vacancies() } })
+    }
+    if (op === 'vacancy-create') {
+      const teamId = String(args.teamId ?? '')
+      if (!world.teams.some((t) => t.id === teamId)) return no('unknown-team')
+      if (this.league?.seats.some((s) => s.teamId === teamId)) return no('team-taken')
+      const open = this.vacancies().filter((v) => v.teamId !== teamId)
+      if (open.length >= VACANCY_MAX) return Response.json({ ok: false, refused: 'too-many-vacancies' })
+      const bytes = crypto.getRandomValues(new Uint8Array(VACANCY_LENGTH * 4))
+      const limit = 256 - (256 % CODE_ALPHABET.length)
+      let code = ''
+      for (const b of bytes) if (code.length < VACANCY_LENGTH && b < limit) code += CODE_ALPHABET[b % CODE_ALPHABET.length]
+      while (code.length < VACANCY_LENGTH) code += CODE_ALPHABET[0]
+      this.setVacancies([...open, { code, teamId, expiresAt: this.now() + VACANCY_TTL_MS }])
+      return Response.json({ ok: true, body: { vacancies: this.vacancies() } })
+    }
     if (op === 'prefs-get') return Response.json({ ok: true, body: this.prefsOf(playerId) })
     if (op === 'prefs-set') {
       const prefs = parsePrefs(args.prefs)
@@ -482,6 +505,16 @@ export class LeagueRoom {
       return Response.json({ ok: true, body: prefs })
     }
     return no('not-found')
+  }
+
+  /** Clubes reservados pelo ADM com um código de vaga (72 h); os vencidos saem na leitura. */
+  private vacancies(): { code: string; teamId: string; expiresAt: number }[] {
+    const all = JSON.parse(this.get('vacancies') ?? '[]') as { code: string; teamId: string; expiresAt: number }[]
+    const now = this.now()
+    return all.filter((v) => v.expiresAt > now)
+  }
+  private setVacancies(list: { code: string; teamId: string; expiresAt: number }[]): void {
+    this.set('vacancies', JSON.stringify(list))
   }
 
   private minuteMs(): number {
@@ -633,8 +666,9 @@ export class LeagueRoom {
     if (msg.t === 'hello') {
       // Chegou ou voltou: avisa o motor (retoma no minuto seguinte) e manda tudo o que ele pode ter perdido.
       if (this.live) {
-        this.live = setConnected(this.live, (this.league as LeagueState).seats, playerId, true)
+        this.live = setConnected(this.live, (this.league as LeagueState).seats, playerId, true, this.now())
         this.persist()
+        void this.schedule(now)
         ws.send(JSON.stringify(this.fullFor(playerId)))
       } else ws.send(JSON.stringify({ t: 'error', problem: 'not-in-event' } satisfies ServerMessage))
       return
@@ -867,9 +901,14 @@ export class LeagueRoom {
     if (path === '/internal/seat/add') {
       const teamId = String(body.teamId ?? '')
       if (this.league) {
+        const reserved = this.vacancies().find((v) => v.teamId === teamId)
+        const given = String(body.vacancy ?? '')
+        if (reserved && reserved.code !== given) return no('team-reserved')
+        if (!reserved && given) return no('bad-vacancy')
         const res = addSeat(this.league, world, playerId, teamId, now)
         if (!res.ok) return no(res.error)
         this.league = res.league
+        if (reserved) this.setVacancies(this.vacancies().filter((v) => v.code !== reserved.code))
         this.stintStart(playerId, teamId)
         this.persist()
         await this.schedule(now)
@@ -898,7 +937,7 @@ export class LeagueRoom {
     if (path === '/internal/state') {
       if (!this.league) return Response.json({ ok: true, phase: 'lobby' })
       const awaiting = playerId ? awaitingFor(this.league, now, playerId) + aiAwaiting(this.league, world, playerId) : 0
-      return Response.json({ ok: true, phase: 'running', view: leagueView(this.league, world, now, () => meta.createdAt), ...(awaiting > 0 ? { awaiting } : {}) })
+      return Response.json({ ok: true, phase: 'running', view: leagueView(this.league, world, now, () => meta.createdAt, this.league.seats.find((s) => s.playerId === playerId)?.teamId), ...(awaiting > 0 ? { awaiting } : {}) })
     }
     if (path === '/internal/trade') return await this.trade(playerId, body.op as TradeOp, now)
     if (path === '/internal/cups') {
@@ -918,7 +957,7 @@ export class LeagueRoom {
       const l = this.league
       if (!l) return no('bad-state')
       const paused = l.clock.pausedAt !== undefined
-      if (path === '/internal/advance' && (paused || l.current || l.clock.events.length === 0)) return no('bad-state')
+      if (path === '/internal/advance' && (paused || l.current || l.waiting || l.clock.events.length === 0)) return no('bad-state')
       if (path === '/internal/pause' && paused) return no('bad-state')
       if (path === '/internal/resume' && !paused) return no('bad-state')
       await this.admin(path.replace('/internal', '/admin'), { by: String(body.by ?? 'adm') })
@@ -927,7 +966,7 @@ export class LeagueRoom {
     if (path === '/internal/pace') {
       const l = this.league
       const pace = String(body.pace ?? '') as PaceId
-      if (!l || !(pace in PACES) || l.current) return no('bad-state')
+      if (!l || !(pace in PACES) || l.current || l.waiting) return no('bad-state')
       this.league = replanForPace(l, world, pace)
       if (meta.record) {
         this.meta = { ...meta, record: { ...meta.record, pace } }
@@ -954,6 +993,11 @@ export class LeagueRoom {
     if (path === '/internal/mirror') {
       const seat = this.league?.seats.find((s) => s.playerId === playerId)
       if (!seat) return no('not-seated')
+      // Abrir o jogo conta como aparecer (a lista do ADM mostra a última vez); grava no máximo a cada 10 minutos.
+      if (this.league && now - (seat.lastActiveAt ?? 0) > 10 * 60_000) {
+        this.league = { ...this.league, seats: this.league.seats.map((s) => (s.playerId === playerId ? { ...s, lastActiveAt: now } : s)) }
+        this.persist()
+      }
       const since = typeof body.since === 'number' && Number.isInteger(body.since) && body.since >= 0 ? body.since : null
       const page = typeof body.page === 'number' && Number.isInteger(body.page) && body.page >= 0 ? body.page : 0
       return Response.json({ ok: true, payload: this.mirrorFor(seat.teamId, since, page) })

@@ -129,20 +129,23 @@ check('a estrela marcou um favorito', favs === 1, `${favs}`)
 let watching = false
 for (let tries = 0; tries < 8 && !watching; tries++) {
   await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
-  await page.getByTestId('league-open-room').click()
-  await page.getByTestId('league-screen').waitFor()
+  await page.getByRole('button', { name: /^ADM/ }).click()
   await page.getByTestId('advance-league').click()
-  await page.getByTestId('confirm-advance').click()
-  await page.getByTestId('status-event').waitFor({ timeout: 30000 })
+  await page.getByTestId('confirm-action').click()
   await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
-  watching = await page.getByTestId('league-watch').waitFor({ timeout: 8000 }).then(() => true, () => false)
-  if (!watching) {
+  // Avançar só abre a sala ("Jogo pronto · Agora"): a partida espera o Pronto e abre sozinha na tela depois dele.
+  const ready = await page.getByTestId('league-ready').waitFor({ timeout: 10000 }).then(() => true, () => false)
+  if (ready) {
+    await page.getByTestId('league-ready-counter').waitFor({ timeout: 20000 })
+    check('o cartão mostra "Jogo pronto · Agora" e o contador antes de a partida começar', (await page.getByTestId('league-status').innerText()).includes('Jogo pronto') && (await page.getByTestId('league-ready-counter').innerText()).includes('Pronto 0/'))
+    await page.getByTestId('league-ready').click()
+    watching = await page.getByTestId('speed').waitFor({ timeout: 40000 }).then(() => true, () => false)
+  } else {
     await page.getByTestId('league-open-room').click()
     await page.getByTestId('status-next').waitFor({ timeout: 180000 })
   }
 }
-check('a rodada ao vivo oferece "Entrar na partida"', watching)
-await page.getByTestId('league-watch').click()
+check('depois do Pronto a partida abre sozinha na tela', watching)
 await page.getByTestId('speed').waitFor({ timeout: 40000 })
 await page.getByTestId('speed').click()
 await page.getByTestId('speed').click()
