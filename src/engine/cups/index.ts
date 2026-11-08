@@ -11,7 +11,7 @@ import { createRng, hashSeed } from '../rng'
 import type { SeasonState } from '../season/calendar'
 import { cycleOfPyramid, focusPyramid, phaseOfPyramid } from '../season/cycles'
 import { pyramidOf } from '../season/fidelity'
-import { WEDNESDAY, addDays, makeDate, onOrAfterWeekday, weekday as dayOfWeek } from '../season/dates'
+import { WEDNESDAY, addDays, daysBetween, makeDate, onOrAfterWeekday, weekday as dayOfWeek } from '../season/dates'
 import type { Competition, Cup, CupSpec, CupStageSpec, IsoDate, Match, MatchCupInfo, StandingRow, Team, TeamId } from '../types'
 import { drawGroups, drawKnockout, drawLeaguePhase, groupRounds } from './draw'
 import { resolveEntrants } from './entrants'
@@ -46,8 +46,9 @@ function busyDays(matches: readonly Match[], teamIds: ReadonlySet<TeamId>): Map<
  * Primeiro dia de jogo da copa: a quarta-feira a partir de `notBefore` em que nenhum dos clubes joga (nem na véspera nem no dia
  * seguinte), então os jogos da copa nunca batem com a liga.
  */
-export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: ReadonlyMap<TeamId, ReadonlySet<IsoDate>>, weekday: number = WEDNESDAY, tolerant = false): IsoDate {
+export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: ReadonlyMap<TeamId, ReadonlySet<IsoDate>>, weekday: number = WEDNESDAY, tolerant = false, grid?: IsoDate): IsoDate {
   const ids = [...teamIds]
+  if (grid !== undefined) return pickSharedCupDay(notBefore, ids, busy, grid)
   let day = onOrAfterWeekday(notBefore, weekday)
   if (tolerant) {
     // Primeiro procura, por até 10 semanas, um dia de terça a quinta em que nenhum clube joga nem na véspera nem no dia seguinte (copas com
@@ -97,6 +98,28 @@ export function pickCupDay(notBefore: IsoDate, teamIds: Iterable<TeamId>, busy: 
     })
     if (free) return day
   }
+  return day
+}
+
+/** Passo da grade comum de copas (dias): toda quarta-feira livre. Uma grade mais espaçada (14 dias) alinhava mais as copas, mas empurrava as fases finais para depois do fim da temporada. */
+export const CUP_GRID_DAYS = 7
+
+/** Quartas-feiras da grade comum da liga online, a partir da primeira quarta de `grid`: copas com datas de referência na mesma semana caem na mesma quarta. */
+export function snapToCupGrid(date: IsoDate, grid: IsoDate): IsoDate {
+  const origin = onOrAfterWeekday(grid, WEDNESDAY)
+  let day = onOrAfterWeekday(date < origin ? origin : date, WEDNESDAY)
+  while (daysBetween(origin, day) % CUP_GRID_DAYS !== 0) day = addDays(day, 7)
+  return day
+}
+
+/** Calendário comum: a primeira quarta da grade (a partir de `notBefore`) em que nenhum dos clubes joga, nem na véspera nem no dia seguinte; sem achar, a primeira quarta livre mais adiante. */
+function pickSharedCupDay(notBefore: IsoDate, ids: readonly TeamId[], busy: ReadonlyMap<TeamId, ReadonlySet<IsoDate>>, grid: IsoDate): IsoDate {
+  const free = (day: IsoDate) => ids.every((id) => {
+    const days = busy.get(id)
+    return !days || (!days.has(day) && !days.has(addDays(day, -1)) && !days.has(addDays(day, 1)))
+  })
+  let day = snapToCupGrid(notBefore, grid)
+  for (let i = 0; i < 80; i++, day = addDays(day, CUP_GRID_DAYS)) if (free(day)) return day
   return day
 }
 
@@ -179,9 +202,13 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
   const { cup, state } = ctx
   const spec = cup.spec
   // Copa de um país segue a temporada dele; a continental, a do continente (a europeia atravessa o ano).
-  const split = cup.pyramid !== undefined ? state.cycles[cup.pyramid]?.split === true : spec.region !== undefined && SPLIT_REGIONS.includes(spec.region)
+  // Calendário comum da liga online: todas as copas dentro do ano civil virtual (as datas de referência já foram deslocadas por `sharedCupSpecs`).
+  const sharedCalendar = state.season.competitions.some((c) => c.shared)
+  const split = !sharedCalendar && (cup.pyramid !== undefined ? state.cycles[cup.pyramid]?.split === true : spec.region !== undefined && SPLIT_REGIONS.includes(spec.region))
   const weekday = spec.weekday ?? WEDNESDAY
-  const tolerant = isContinental(spec) || isWorld(spec)
+  // Calendário comum da liga online: todas as copas nas mesmas quartas-feiras (grade de 14 dias a partir da 1ª quarta do ano da edição).
+  const grid = sharedCalendar ? makeDate(cup.year, 1, 1) : undefined
+  const tolerant = grid === undefined && (isContinental(spec) || isWorld(spec))
   const descriptor = stageList(spec)[stage] as ReturnType<typeof stageList>[number]
   const participants = participantsOf(ctx, stage)
   const rng = createRng(`${state.market.seed}:${cup.year}:${cup.id}:draw:${stage}`)
@@ -198,8 +225,8 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
   if (descriptor.kind === 'knockout') {
     const stageSpec = descriptor.stage as CupStageSpec
     const draw = drawKnockout(participants, seeded, strength, rng)
-    const first = pickCupDay(maxDate(stageAnchor(cup, split, stageSpec.date), notBefore), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant)
-    const second = stageSpec.legs === 2 ? pickCupDay(addDays(first, stageSpec.legGap ?? CUP.legGapDays), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant) : undefined
+    const first = pickCupDay(maxDate(stageAnchor(cup, split, stageSpec.date), notBefore), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant, grid)
+    const second = stageSpec.legs === 2 ? pickCupDay(addDays(first, stageSpec.legGap ?? CUP.legGapDays), draw.ties.flatMap((t) => t.teams), busy, weekday, tolerant, grid) : undefined
     draw.ties.forEach((tie, i) => {
       let [x, y] = tie.teams
       if (stageSpec.legs === 1) {
@@ -227,7 +254,7 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
     const days = Math.max(...perGroup.map((r) => r.length))
     let notYet = maxDate(stageAnchor(cup, split, g.date), notBefore)
     for (let d = 0; d < days; d++) {
-      const day = pickCupDay(notYet, participants, busy, weekday, tolerant)
+      const day = pickCupDay(notYet, participants, busy, weekday, tolerant, grid)
       notYet = addDays(day, gap)
       perGroup.forEach((rounds, gi) => (rounds[d] ?? []).forEach((f, i) => created.push(mkMatch(ctx, `s${stage}-g${gi + 1}-r${d + 1}-${i + 1}`, f.homeTeamId, f.awayTeamId, day, round + d, { stage, kind: 'group', group: gi + 1 }))))
     }
@@ -239,7 +266,7 @@ function generateStage(ctx: Ctx, stage: number, notBefore: IsoDate): Match[] {
     const gap = lp.gapDays ?? CUP.groupGapDays
     let notYet = maxDate(stageAnchor(cup, split, lp.date), notBefore)
     draw.matchdays.forEach((fixtures, d) => {
-      const day = pickCupDay(notYet, participants, busy, weekday, tolerant)
+      const day = pickCupDay(notYet, participants, busy, weekday, tolerant, grid)
       notYet = addDays(day, gap)
       fixtures.forEach((f, i) => created.push(mkMatch(ctx, `s${stage}-r${d + 1}-${i + 1}`, f.homeTeamId, f.awayTeamId, day, round + d, { stage, kind: 'league' })))
     })

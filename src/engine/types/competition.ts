@@ -45,6 +45,8 @@ export interface Competition {
   foreignLimit?: ForeignLimit
   /** Reputação média dos clubes da divisão (para onde a reputação volta); ausente = `OFFSEASON.reputation.tierMean` da série. */
   reputationMean?: number
+  /** Calendário comum da liga online (Fase 6D): todas as ligas e copas do mundo seguem as mesmas datas virtuais e as mesmas janelas de transferência. Ausente = calendário de cada país. */
+  shared?: true
 }
 
 /** Linha da classificação, sempre derivada das partidas finalizadas (nunca guardada). */

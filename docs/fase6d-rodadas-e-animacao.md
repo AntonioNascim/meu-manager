@@ -257,3 +257,25 @@ Os estilos de hoje e os novos usam o mesmo mecanismo da Parte 2 (forma da equipe
 2. Ao vivo, o seletor de estilo lista os **sete** estilos (como hoje, com mais opções) ou os novos só valem escolhidos antes da partida?
 3. A ideia de cada estilo e as relações da seção 3.2 estão de acordo como ponto de partida? A calibragem ajusta os números.
 4. Aprova que a IA escolha estilos novos **só a partir da virada de temporada**, sem mudar saves antigos no meio?
+
+---
+
+## Feito: Parte 2 (campo 2D) e Parte 1 (calendário comum) (08/11/2026)
+
+**Nada publicado.** As duas partes estão na main, testadas. Os estilos novos (Parte 3) **esperam a sua resposta**.
+
+### Parte 2: campo 2D (só a tela, o motor não foi tocado)
+
+- **Ritmo:** `BASE_MINUTE_MS` passou de 700 para **1.600 ms** (1x); 2x = 800, 4x = 400, 8x = 200. Vale no solo e no online. **Atenção ao padrão online:** na proposta eu escrevi que manter o 2x deixava a duração das rodadas "como hoje". Estava errado: o 2x de hoje durava 350 ms por minuto, o novo 2x dura 800 ms. Uma partida online no padrão passa de ~1 min 15 s para ~2 min 50 s (mais as câmeras lentas). Para ficar como hoje basta o padrão online ser **4x** (400 ms): é uma constante (`DEFAULT_SPEED` em `engine/league/live.ts`). Deixei em 2x, como você respondeu; **me diga se prefere 4x**. O tempo do lance agora é por passo (`Beat.weight`: passe curto menos, bola longa, cruzamento e chute mais) e o que não cabe em 260 ms por passo é omitido (`fitBeats`).
+- **Forma por estilo** (`pitchStyle.ts`, `basePositions` com `shape`): posse com linhas altas e compactas, contra-ataque com bloco recuado (defesa em ~0,18 do campo), pressão alta com as linhas adiantadas; a mentalidade move as linhas em ±0,03 por nível; sem a bola o contra-ataque recua mais e a pressão alta quase não recua.
+- **Lances que fazem sentido** (`beatsFor`): passes curtos (≤ ~19 m) para companheiros perto e livres de marcador, só para quem está em campo; a posse constrói de trás com mais passes e o contra-ataque sai em **bola longa**; o chute de longe sai de ~26 m do gol (o condutor avança antes), os outros chutes de dentro ou da beira da área; o cruzamento sai do fundo, pela faixa do lado do condutor, para dentro da área, com dois atacantes esperando.
+- **Testes:** `tests/pitchPlays.test.ts` (chute, cruzamento, passes, estilos, tempo) e os do campo antigo ajustados; **`matchGolden` e `soloUnchanged` passam sem regravar nada**. Capturas de 380 px: `.shots/d1-campo-{posse,contra-ataque,pressao-alta}.png` (`tools/online-lab/d1-campo-shots.mjs`).
+
+### Parte 1: calendário comum da liga online (só ligas novas)
+
+- **Como funciona:** `createLeagueWorld(..., { shared: true })` (a sala da liga passa a usar para ligas novas) monta **uma temporada só** (ano civil virtual), com `Competition.shared = true`: todas as ligas começam em 24/1, a **rodada N cai no mesmo sábado em qualquer país** (a rodada inteira num dia só; a de meio de semana, a cada 5, é a mesma quarta, inclusive a última de uma liga curta), sem pausas de calendário; ligas curtas terminam antes (opção A); **uma janela de transferências só** para todos (`windowRegionOf`, `regionOfTeam`); **todas as copas em quartas-feiras** da mesma grade (`pickCupDay` com `grid`), com as datas de referência das copas europeias deslocadas seis meses para caber no ano civil (`sharedCupSpecs`); **Mundial de Clubes e Intercontinental ficam de fora**.
+- **O jogo solo e as ligas já criadas não mudam** (`soloUnchanged` passa).
+- **Medido** (`PACOTE_REAL=1 node tools/run.mjs onlineCalendar`, 6 técnicos em Brasil, Inglaterra, Argentina, Espanha, Itália e Japão, pacote real): **calendário de cada país: 132 datas com jogo, rodadas de liga com todos juntos em 4%; calendário comum: 50 datas e 100% das rodadas de liga (38 de 38) com todos os técnicos de liga ainda ativa jogando juntos**, nenhuma partida da primeira temporada depois de 31/12 e a virada de temporada de todos os países no mesmo dia (31/12).
+- **Limite conhecido:** nas rodadas de **copa** (quartas) só joga quem está na copa daquela semana; os outros veem "Seu clube não joga nesta rodada" e não seguram ninguém. Copas diferentes na mesma semana caem na mesma quarta, mas nem toda semana de copa envolve todos os técnicos.
+- **Testes:** `tests/sharedCalendar.test.ts` (8: ano civil único, rodada N no mesmo dia, técnicos de países diferentes juntos nas rodadas, nada depois do fim da temporada, copas em quartas, janelas únicas, funções puras, e a **virada de temporada mantendo o calendário comum**).
+- **Medição de 30 anos no workflow `Medições pesadas`:** ainda **não rodei**. Antes de publicar eu preciso dela com o calendário comum (equilíbrio das ligas da IA: campeões, caixa, força, idades; copas e fim da temporada com as datas novas). Aviso antes.

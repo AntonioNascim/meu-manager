@@ -67,21 +67,23 @@ export function leaguePauses(specs: readonly Pick<CupSpec, 'world'>[] | undefine
 }
 
 /** Datas de cada rodada. Rodadas de meio de semana não avançam o fim de semana seguinte. `start` = mês e dia a partir do qual vale o primeiro sábado (padrão: o do calendário brasileiro). `pauses`: períodos sem rodadas (o fim de semana seguinte vale). */
-export function roundSlots(year: number, roundCount: number, start: readonly [number, number] = [SEASON.startMonth, SEASON.startDay], gapEvery?: number, pauses: readonly [IsoDate, IsoDate][] = []): RoundSlot[] {
+export function roundSlots(year: number, roundCount: number, start: readonly [number, number] = [SEASON.startMonth, SEASON.startDay], gapEvery?: number, pauses: readonly [IsoDate, IsoDate][] = [], singleDay = false): RoundSlot[] {
   const paused = (d: IsoDate) => pauses.some(([a, b]) => d >= a && d <= b)
   let saturday = onOrAfterWeekday(makeDate(year, start[0], start[1]), SATURDAY)
   let lastSaturday = saturday
   let weekends = 0
   const slots: RoundSlot[] = []
   for (let round = 1; round <= roundCount; round++) {
-    if (isMidweekRound(round) && round < roundCount && !paused(addDays(lastSaturday, 4))) {
+    // No calendário comum a rodada N é a mesma em toda liga, mesmo a última de uma liga curta: a de meio de semana também vale nela.
+    if (isMidweekRound(round) && (singleDay || round < roundCount) && !paused(addDays(lastSaturday, 4))) {
       // Quarta-feira depois do último fim de semana jogado.
       slots.push({ round, kind: 'midweek', days: [addDays(lastSaturday, 4)] })
       continue
     }
     while (paused(saturday) || paused(addDays(saturday, 1))) saturday = addDays(saturday, 7)
     const sunday = addDays(saturday, 1)
-    const days = SEASON.finalRoundSameDay && round === roundCount ? [sunday] : [saturday, sunday]
+    // Calendário comum da liga online: a rodada inteira no sábado (todos os técnicos jogam no mesmo dia).
+    const days = singleDay ? [saturday] : SEASON.finalRoundSameDay && round === roundCount ? [sunday] : [saturday, sunday]
     slots.push({ round, kind: 'weekend', days })
     lastSaturday = saturday
     // Pausa de calendário: uma semana sem rodada a cada `gapEvery` rodadas de fim de semana.
@@ -102,6 +104,8 @@ export interface CompetitionSetup {
   /** Temporada que atravessa o ano (a pirâmide inteira segue a da primeira divisão) e pausas de calendário. */
   split?: boolean
   gapEvery?: number
+  /** Calendário comum da liga online (`sharedSetups`). */
+  shared?: boolean
   /** Pirâmide do país (divisões ligadas por acesso e rebaixamento). */
   pyramid?: string
   /** Economia da liga (a do Brasil quando falta) e reputação média da divisão. */
@@ -183,7 +187,7 @@ export function buildPyramid(args: { seed: number | string; cycle: Cycle; setups
     const rounds = buildLeagueRounds(setup.teams.map((t) => t.id), rng.fork(setup.id), setup.rounds ?? 2)
     const start = setup.start ?? (cycle.split ? [SEASON.split.startMonth, SEASON.split.startDay] : undefined)
     const gapEvery = (setup.gapEvery ?? SEASON.gapEvery) || undefined
-    const slots = roundSlots(cycle.year, rounds.length, start, gapEvery, pauses)
+    const slots = roundSlots(cycle.year, rounds.length, start, gapEvery, pauses, setup.shared === true)
     rounds.forEach((fixtures, roundIndex) => {
       const slot = slots[roundIndex] as RoundSlot
       fixtures.forEach((fixture, i) => {
@@ -214,7 +218,8 @@ export function buildPyramid(args: { seed: number | string; cycle: Cycle; setups
       ...(setup.start ? { start: setup.start } : {}),
       ...(setup.rounds ? { rounds: setup.rounds } : {}),
       ...(cycle.split ? { split: true } : {}),
-      ...(setup.gapEvery ? { gapEvery: setup.gapEvery } : {}),
+      ...(setup.gapEvery !== undefined ? { gapEvery: setup.gapEvery } : {}),
+      ...(setup.shared ? { shared: true as const } : {}),
       ...(setup.pyramid ? { pyramid: setup.pyramid } : {}),
       ...(setup.economy ? { economy: setup.economy } : {}),
       ...(setup.country ? { country: setup.country } : {}),

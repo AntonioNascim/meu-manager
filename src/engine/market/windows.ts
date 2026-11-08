@@ -8,9 +8,12 @@ import type { SeasonState } from '../season/calendar'
 import { focusPyramid, regionOfTeam } from '../season/cycles'
 import { pyramidOf } from '../season/fidelity'
 import { addDays, makeDate } from '../season/dates'
-import type { IsoDate, Match, Region, Season, TeamId, TransferWindow } from '../types'
+import type { Competition, IsoDate, Match, Region, Season, TeamId, TransferWindow } from '../types'
 
 type Windowed = Pick<SeasonState, 'matches' | 'season' | 'focus' | 'cycles'>
+
+/** A região de janelas de uma liga: as de calendário comum (liga online) usam todas a mesma. */
+export const windowRegionOf = (c: Pick<Competition, 'region' | 'shared'>): Region => (c.shared ? 'BR' : (c.region ?? 'BR'))
 
 /** Janelas de uma região num ano civil: o fim "até a véspera da primeira rodada" usa a primeira rodada de liga do ano. */
 function yearWindows(year: number, firstMatch: IsoDate | undefined, region: Region): TransferWindow[] {
@@ -43,7 +46,7 @@ function firstLeagueDate(state: Windowed, region: Region, year: number): IsoDate
   const key = `${region}:${year}`
   const known = cache.get(key)
   if (known !== undefined) return known ?? undefined
-  const ids = new Set(state.season.competitions.filter((c) => (c.region ?? 'BR') === region).map((c) => c.id))
+  const ids = new Set(state.season.competitions.filter((c) => windowRegionOf(c) === region).map((c) => c.id))
   const prefix = `${year}-`
   let first: IsoDate | null = null
   for (const m of state.matches) if (m.cup === undefined && ids.has(m.competitionId) && m.date.startsWith(prefix) && (first === null || m.date < first)) first = m.date
@@ -70,12 +73,13 @@ export function windowOfTeam(state: Windowed, date: IsoDate, teamId: TeamId): Tr
 /** A região da pirâmide do foco (a do técnico). */
 export function focusRegion(state: Pick<SeasonState, 'season' | 'focus'>): Region {
   const pyramid = focusPyramid(state)
-  return state.season.competitions.find((c) => pyramidOf(c) === pyramid)?.region ?? 'BR'
+  const c = state.season.competitions.find((x) => pyramidOf(x) === pyramid)
+  return c ? windowRegionOf(c) : 'BR'
 }
 
 /** As regiões que têm liga no mundo. */
 export function regionsOf(state: Pick<SeasonState, 'season'>): Region[] {
-  return [...new Set(state.season.competitions.map((c) => c.region ?? 'BR'))]
+  return [...new Set(state.season.competitions.map(windowRegionOf))]
 }
 
 /** Dias de negociação da IA dentro de uma janela: um a cada `tickDays`, depois da abertura. */

@@ -782,11 +782,12 @@ export class LeagueRoom {
 
   /** Monta o mundo da liga: o fictício nasce da semente; o real é lido do bucket dos pacotes (versão fixada na criação da liga). */
   protected async buildWorld(record: LeagueRecord): Promise<SeasonState | 'bad-world'> {
-    if (record.world.source === 'ficticio') return createLeagueWorld(record.seed)
+    // Ligas novas: calendário comum (Fase 6D), todas as partidas dos técnicos nos mesmos eventos. As ligas criadas antes já têm o mundo guardado.
+    if (record.world.source === 'ficticio') return createLeagueWorld(record.seed, undefined, { shared: true })
     const object = await this.env.PACKAGES?.get(`mundo-real/${record.world.version}/pacote.json.gz`)
     if (!object) return 'bad-world'
     const text = await new Response(object.body.pipeThrough(new DecompressionStream('gzip'))).text()
-    return createLeagueWorld(record.seed, JSON.parse(text) as DataPackage)
+    return createLeagueWorld(record.seed, JSON.parse(text) as DataPackage, { shared: true })
   }
 
   /** Mercado entre técnicos (B8.6). Propostas e contratações só valem fora de uma rodada em andamento (o mundo não muda no meio das partidas). */

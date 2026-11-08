@@ -5,18 +5,22 @@
  */
 import type { DataPackage } from '../data/package/types'
 import { loadWorld } from '../data/package/defaultPackage'
-import { createSeason, makeCycle } from '../engine/season'
+import { createSeason, makeCycle, sharedCupSpecs, sharedSetups } from '../engine/season'
 import type { SeasonState } from '../engine/season'
 import { emptyTraining } from '../engine/types'
 
 export interface LeagueWorldOptions {
   /** `false`: só ligas, sem copas (testes e mundos pequenos). */
   cups?: boolean
+  /** Calendário comum (Fase 6D): temporada única, as mesmas rodadas e copas nas mesmas datas para todos os países. As ligas novas usam; as antigas seguem o calendário de cada país. */
+  shared?: boolean
 }
 
 export function createLeagueWorld(seed: number, pkg?: DataPackage, options: LeagueWorldOptions = {}): SeasonState {
   const world = loadWorld(seed, pkg)
-  const starts = (world.competitions ?? []).map((c) => makeCycle(world.startYear, c.split === true).start)
+  const competitions = options.shared && world.competitions ? sharedSetups(world.competitions) : world.competitions
+  const cups = options.shared && world.cups ? sharedCupSpecs(world.cups, world.competitions ?? []) : world.cups
+  const starts = (competitions ?? []).map((c) => makeCycle(world.startYear, c.split === true).start)
   const startDate = starts.length > 0 ? [...starts].sort()[0]! : makeCycle(world.startYear, false).start
   return createSeason({
     year: world.startYear,
@@ -26,8 +30,8 @@ export function createLeagueWorld(seed: number, pkg?: DataPackage, options: Leag
     players: world.players,
     academy: world.academy,
     training: emptyTraining(),
-    ...(world.competitions ? { competitions: world.competitions } : {}),
-    ...(options.cups === false ? { cupSpecs: [] } : world.cups && world.cups.length > 0 ? { cupSpecs: world.cups } : {}),
+    ...(competitions ? { competitions } : {}),
+    ...(options.cups === false ? { cupSpecs: [] } : cups && cups.length > 0 ? { cupSpecs: cups } : {}),
   })
 }
 

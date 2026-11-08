@@ -72,7 +72,9 @@ export function pyramidOfTeamId(state: Pick<SeasonState, 'season'>, teamId: Team
 
 /** A região do clube (as janelas de transferência seguem a liga dele); padrão: Brasil. */
 export function regionOfTeam(state: Pick<SeasonState, 'season'>, teamId: TeamId): Region {
-  return competitionOfTeamId(state, teamId)?.region ?? 'BR'
+  const competition = competitionOfTeamId(state, teamId)
+  // No calendário comum da liga online todos os clubes seguem as mesmas janelas de transferência (as do Brasil).
+  return competition?.shared ? 'BR' : (competition?.region ?? 'BR')
 }
 
 /** A temporada do clube (a do país dele); clube sem competição usa a do foco. */
