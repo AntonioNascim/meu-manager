@@ -282,7 +282,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
         {game.online ? (
           // Na liga online quem avança o tempo é a liga: no lugar do botão Avançar entra o cartão da liga (Pronto e sala).
-          <LeagueCard leagueId={game.online.leagueId} teamId={game.userTeamId} onOpen={() => onNavigate('league')} onWatch={() => onNavigate('match')} />
+          <LeagueCard leagueId={game.online.leagueId} teamId={game.userTeamId} onOpen={() => onNavigate('league')} onWatch={() => onNavigate('match')} onCareer={() => onNavigate('career')} />
         ) : (
           <button
             type="button"

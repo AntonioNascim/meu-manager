@@ -11,7 +11,7 @@ const POLL_MS = 5000
  * O cartão da liga no Painel (Fase 6C): no lugar do botão "Avançar" do jogo solo. Mostra a próxima rodada no fuso do aparelho, o "Pronto" de
  * quem tem partida nela e leva à sala (ADM: Avançar, Pausar, ritmo). Quem avança o tempo é a liga, não o técnico.
  */
-export function LeagueCard({ leagueId, teamId, onOpen, onWatch }: { leagueId: string; teamId: string; onOpen: () => void; onWatch: () => void }) {
+export function LeagueCard({ leagueId, teamId, onOpen, onWatch, onCareer }: { leagueId: string; teamId: string; onOpen: () => void; onWatch: () => void; onCareer: () => void }) {
   const [body, setBody] = useState<LeagueStateBody | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -69,6 +69,9 @@ export function LeagueCard({ leagueId, teamId, onOpen, onWatch }: { leagueId: st
           </button>
         )}
         {me && view && !view.current && !view.paused && !me.required && view.next && <p className="mt-2 text-xs text-muted">Seu clube não joga na próxima rodada. Não precisa dar Pronto.</p>}
+        <button type="button" onClick={onCareer} data-testid="league-career" className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-line text-sm font-bold">
+          Minha carreira
+        </button>
         <button type="button" onClick={onOpen} data-testid="league-open-room" className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-line text-sm font-bold">
           {body?.isAdmin ? 'Sala da liga (Avançar, Pausar, ritmo)' : 'Sala da liga'}
         </button>

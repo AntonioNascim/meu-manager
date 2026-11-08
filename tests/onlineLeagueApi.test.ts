@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryIdentityStore, type ApiRequest } from '../src/online/identityApi'
-import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, leagueCommand, mirrorRead, cupsState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
+import { CODE_ALPHABET, LEAGUE_LIMITS, adminAction, changePace, controlLeague, createLeague, getLeague, clubDecision, clubState, roomQuery, leagueCommand, mirrorRead, cupsState, parseSearchFilters, tradeAct, tradeRead, leagueState, liveTicket, setReady, joinLeague, leaveAllLeagues, leaveLeague, listOpenLeagues, myLeagues, normalizeCode, resolveCode, type LeagueDeps, type RoomPort } from '../src/online/leagueApi'
 import { MemoryLeagueStore } from '../src/online/leagueMemory'
 import { createIdentity, type Identity } from '../src/online/identity'
 import { RateLimiter } from '../src/online/rateLimit'
@@ -64,6 +64,13 @@ class FakeRoom implements RoomPort {
     this.clubCalls.push(`${action.type}:${id}:${playerId}:${action.playerId}`)
     if (action.playerId === 'recusa') return { ok: false as const, refused: 'salary' as const, minimumSalary: 5000 }
     return { ok: true as const, view: (await this.club(id, playerId)).view as never }
+  }
+  queries: string[] = []
+  async query(id: string, playerId: string, op: string, args: Record<string, unknown>) {
+    this.queries.push(`${op}:${id}:${playerId}:${JSON.stringify(args)}`)
+    if (!this.started.has(id)) return { ok: false as const, error: 'bad-state' as const }
+    if (op === 'rechoose' && args.teamId === 'team-recusa') return { ok: false as const, refused: 'not-eligible' }
+    return { ok: true as const, body: op === 'rechoose' ? { teamId: args.teamId } : { op } }
   }
   mirrorCalls: string[] = []
   async mirror(id: string, playerId: string, since: number | null, page: number) {
@@ -352,6 +359,33 @@ describe('andamento da liga (B8.4)', () => {
     expect(refused.status).toBe(409)
     expect(refused.body).toEqual({ error: 'club-refused', reason: 'invalid', minimumSalary: 1 })
     expect((await cmd(dudu, { since: 1, command: { type: 'cancel-individual-training' } })).status).toBe(404)
+  })
+
+  it('Detalhe, carreira, demissão, escolha de outro clube e preferências (C6): só membro, corpo conferido, o clube novo vai ao índice da liga', async () => {
+    const { s, ana, bia, dudu, id } = await running()
+    const call = (who: Identity, op: Parameters<typeof roomQuery>[3], body?: unknown, team?: string | null) => roomQuery(s.req(who, op === 'rechoose' || op === 'prefs-set' ? (op === 'prefs-set' ? 'PUT' : 'POST') : 'GET', `/api/leagues/${id}/x`, body), s.deps, id, op, { team })
+    expect((await call(bia, 'career')).status).toBe(409) // liga ainda no saguão
+    await adminAction(s.req(ana, 'POST', `/api/leagues/${id}/start`, {}), s.deps, id, 'start')
+    expect((await call(bia, 'career')).status).toBe(200)
+    expect((await call(dudu, 'career')).status).toBe(404)
+    expect((await call(bia, 'detail', undefined, 'team-2')).status).toBe(200)
+    expect((await call(bia, 'detail', undefined, 'time errado!')).status).toBe(400)
+    expect((await call(bia, 'detail', undefined, null)).status).toBe(400)
+    const xi = Array.from({ length: 11 }, (_, i) => `p${i}`)
+    const prefs = { favorites: ['p1'], lineups: [{ name: 'A', formationId: '4-4-2', style: 'possession', startingXI: xi }, null, null] }
+    expect((await call(bia, 'prefs-set', prefs)).status).toBe(200)
+    expect((await call(bia, 'prefs-set', { favorites: 'x', lineups: [] })).status).toBe(400)
+    expect((await call(bia, 'prefs-set', { ...prefs, extra: 1 })).status).toBe(400)
+    expect((await call(bia, 'prefs-get')).status).toBe(200)
+    expect((await call(bia, 'dismissal')).status).toBe(200)
+    const refused = await call(bia, 'rechoose', { teamId: 'team-recusa' })
+    expect(refused.status).toBe(409)
+    expect(refused.body).toMatchObject({ error: 'club-refused', reason: 'not-eligible' })
+    expect((await call(bia, 'rechoose', { teamId: 'a b' })).status).toBe(400)
+    const ok = await call(bia, 'rechoose', { teamId: 'team-9' })
+    expect(ok.status).toBe(200)
+    // O clube novo vale no índice da liga.
+    expect((await s.deps.leagues.members(id)).find((m) => m.playerId === bia.playerId)?.teamId).toBe('team-9')
   })
 
   it('Mercado: só membro e liga em andamento; as denúncias só o ADM vê; corpos conferidos; recusa devolve o motivo', async () => {

@@ -61,9 +61,12 @@ export function playerFromGroups(g: PlayerGroups): Player {
 /** Jogador do clube do técnico: completo (condição, moral, notas), só com o `hidden` embaçado. */
 export const ownPlayer = (p: Player): Player => ({ ...p, hidden: publicHidden(p) })
 
-/** Time de outro clube: sem finanças (a tela só mostra as do técnico). */
-const EMPTY_FINANCES: Finances = { balance: 0, salaryBudget: 0, transferBudget: 0, ledger: [], pastSeasons: [], budgetShift: 0, purchaseBonus: 0, fundsRequests: [] }
-export const publicTeam = (t: Team): Team => ({ ...t, finances: EMPTY_FINANCES })
+/**
+ * Time de outro clube: só o que a lista de compradores e a busca precisam (caixa e orçamentos, que decidem quanto o clube pagaria); o extrato, o histórico de
+ * temporadas e os pedidos de verba são só do técnico.
+ */
+const publicFinances = (f: Finances): Finances => ({ balance: f.balance, salaryBudget: f.salaryBudget, transferBudget: f.transferBudget, ledger: [], pastSeasons: [], budgetShift: f.budgetShift, purchaseBonus: f.purchaseBonus, fundsRequests: [] })
+export const publicTeam = (t: Team): Team => ({ ...t, finances: publicFinances(t.finances) })
 
 // ---------------------------------------------------------------------------
 // O que mudou entre dois mundos

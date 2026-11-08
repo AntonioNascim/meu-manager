@@ -13,8 +13,12 @@ import type { AiSearchFilters } from '../engine/league/aimarket'
 import type { CupsBody } from '../engine/league/cupsView'
 import type { LeagueCommand } from '../engine/league/command'
 import type { MirrorPayload } from '../engine/league/mirror'
+import type { CareerRow, FreeClubRow, Prefs, TeamDetail } from '../engine/league/career'
+import type { Dismissal } from '../engine/types'
 
 export type LeagueClientDeps = IdentityClientDeps
+
+export type DismissalRow = Dismissal & { teamId: string }
 
 export type Answer<T> = ({ ok: true } & T) | { ok: false; error: LeagueError['error'] | 'offline' | 'server'; detail?: unknown; retryAfterMs?: number }
 
@@ -71,6 +75,17 @@ export const mirrorFetch = (deps: LeagueClientDeps, identity: Identity, id: stri
 
 /** Um comando do técnico (C2): o servidor valida, aplica e devolve a atualização do espelho. */
 export const sendCommand = (deps: LeagueClientDeps, identity: Identity, id: string, command: LeagueCommand, since: number | null) => ask<{ payload: MirrorPayload; info?: Record<string, unknown> }>(deps, identity, 'POST', `/api/leagues/${id}/command`, { since, command })
+
+/** Detalhe ao tocar (C6): a condição física e a moral reais do elenco de um clube e a tática salva dele. */
+export const leagueDetail = (deps: LeagueClientDeps, identity: Identity, id: string, teamId: string) => ask<TeamDetail>(deps, identity, 'GET', `/api/leagues/${id}/detail?team=${encodeURIComponent(teamId)}`)
+/** A carreira do técnico na liga (C6): cada passagem por um clube. */
+export const leagueCareer = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ rows: CareerRow[] }>(deps, identity, 'GET', `/api/leagues/${id}/career`)
+/** Demissão (C6): o registro (se foi demitido) e os clubes livres que ele pode assumir. */
+export const leagueDismissal = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ dismissal?: DismissalRow; options?: FreeClubRow[] }>(deps, identity, 'GET', `/api/leagues/${id}/dismissal`)
+export const leagueRechoose = (deps: LeagueClientDeps, identity: Identity, id: string, teamId: string) => ask<{ teamId: string }>(deps, identity, 'POST', `/api/leagues/${id}/rechoose`, { teamId })
+/** Favoritos e escalações guardadas, por conta (C6). */
+export const leaguePrefsGet = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<Prefs>(deps, identity, 'GET', `/api/leagues/${id}/prefs`)
+export const leaguePrefsSet = (deps: LeagueClientDeps, identity: Identity, id: string, prefs: Prefs) => ask<Prefs>(deps, identity, 'PUT', `/api/leagues/${id}/prefs`, prefs)
 
 /** O clube do técnico: meta, contratos que vencem e base (B8.7). */
 export const clubState = (deps: LeagueClientDeps, identity: Identity, id: string) => ask<{ view: ClubView }>(deps, identity, 'GET', `/api/leagues/${id}/club`)

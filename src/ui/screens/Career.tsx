@@ -2,9 +2,12 @@ import { coachOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { Card } from '../components/ui'
 import { JobList } from './career/JobList'
+import { OnlineCareer } from './online/OnlineCareer'
 
 /** Carreira do técnico: reputação e propostas de outros clubes (de qualquer liga). */
 export function Career({ game, onTaken }: { game: Game; onTaken: () => void }) {
+  // Na liga online só há o histórico: o jeito de mudar de clube é pela demissão ou pela sala da liga.
+  if (game.online) return <OnlineCareer leagueId={game.online.leagueId} />
   const team = userTeam(game)
   const coach = coachOf(game)
   return (

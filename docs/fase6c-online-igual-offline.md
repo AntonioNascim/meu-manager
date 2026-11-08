@@ -358,3 +358,33 @@ Leitura: **o evento dura de 2 a 3 minutos reais em vez de 6 a 20** (inclui 1 min
 ### 13.4 O que ficou para a C6
 
 Detalhe ao tocar (condição física e moral reais de jogadores de outros clubes), aba Carreira com o histórico do técnico, guardar o espelho ao fechar o app, favoritos e escalações guardadas por conta, demissão e escolha de outro clube livre.
+
+---
+
+## 14. C4 e C5 publicadas (07/11/2026)
+
+Com a autorização dos sócios: `wrangler deploy` (versão `a6f8752d`, sem migração de banco, sem custo novo) e site pelo GitHub Pages (`git push`, commit `b810cb9`).
+
+## 15. C6 feita (07/11/2026): detalhe ao tocar, carreira, espelho guardado, preferências por conta e demissão
+
+**Não publicada** (precisa de `wrangler deploy` e do site; sem migração de banco, sem custo novo; avisar antes). Testada em Node (sala com SQLite de verdade, API com sala falsa), com o navegador contra o servidor local (`tools/online-lab/c6-e2e.mjs`, passa) e `npm test` (126 arquivos, 1.423 testes, todos passam).
+
+### 15.1 O que mudou
+
+- **Detalhe ao tocar.** O espelho continua levando a condição física e a moral dos outros clubes como neutras (100 e 70; é o que mantém o tráfego baixo). Ao abrir a página de um time ou a ficha de um jogador de outro clube, o aparelho baixa a condição real do elenco e a tática salva dele (`GET /api/leagues/:id/detail?team=`, uma vez por revisão; `useOnlineDetail`, `LeagueMirror.loadDetail`). Verificado no navegador: depois de uma rodada a página do adversário traz jogadores com condição abaixo de 100.
+- **Aba Carreira = histórico.** `Carreira` na liga online mostra só o histórico: cada passagem por um clube (da mais recente), as temporadas fechadas enquanto o técnico estava lá (posição e título) e a campanha de hoje (`GET .../career`, botão "Minha carreira" no cartão da liga). A sala guarda as passagens por técnico (`careers`); as propostas de emprego do solo não existem no online.
+- **Espelho guardado no aparelho.** `src/store/mirrorCache.ts` (IndexedDB próprio `meu-manager-espelho`, gzip, 3 ligas no máximo, formato versionado): abrir a liga mostra já o espelho guardado e baixa só a atualização; **sem internet abre só com o guardado, em leitura, com o aviso de sem conexão**; sem guardado e sem internet não abre. Grava a cada atualização (com espera de 4 s) e ao fechar.
+- **Favoritos e escalações guardadas por conta.** `GET/PUT /api/leagues/:id/prefs` (corpo conferido: lista fechada de campos, até 300 favoritos, 3 espaços de escalação, 16 KB). O aparelho carrega ao abrir a liga e manda (1,5 s depois da mudança) quando o técnico muda; trocar de aparelho traz tudo.
+- **Demissão e escolha de outro clube.** Depois de cada rodada a diretoria avalia os técnicos pelas regras do solo (`evaluateBoard`: finanças e resultados). Demitido, o clube **volta à IA e a vaga continua do técnico**, que vê a tela "Você foi demitido" com os **clubes livres da mesma liga de reputação igual ou menor**, os maiores primeiro, e escolhe um (`GET .../dismissal`, `POST .../rechoose`; a sala valida e o índice da liga passa a ter o clube novo). A passagem anterior fica na carreira como "Demitido".
+- **Correção importante (aparecia na C4 publicada).** O espelho levava as finanças de **todos os outros clubes zeradas**, então a lista de compradores da venda ("Clube interessado") ficava vazia online. Agora o caixa e os orçamentos dos outros clubes vão no espelho (o extrato, o histórico de temporadas e os pedidos de verba continuam só do técnico). Achado pelo teste de ponta a ponta de vendas; **a versão publicada da C4 tem esse defeito até a C6 ser publicada**.
+- **Removido:** nada novo. O `c5-lado-partida.png` foi regerado (solo à esquerda, online à direita, ambos na tela de partida).
+
+### 15.2 Testes novos
+
+`tests/leagueCareer.test.ts` (7: demissão por finanças, clubes livres de reputação igual ou menor, carreira, detalhe, preferências conferidas; sala: demitido perde a vaga, lista de clubes, clube maior é recusado, escolha, carreira com "Demitido", detalhe só para quem tem clube, preferências por conta), `tests/leagueSessionC6.test.ts` (4: espelho guardado e devolvido idêntico, só 3 ligas e só regrava quando a revisão muda, detalhe sobre o neutro uma vez por revisão, abre sem internet só com o guardado), `tests/leagueDismissedScreen.test.ts` (3), `tests/onlineLeagueApi.test.ts` (+1: as rotas novas) e ajustes em `leagueMirror.test.ts`.
+
+**Ponta a ponta no navegador (`c6-e2e.mjs`, passa)** cobre o que os testes antigos (`b8-9`, `b8-10`, `b8-5`) cobriam e o `c5-e2e` não:
+- **Compradores em sequência:** dois jogadores vendidos um depois do outro a clubes da IA **diferentes** (a IA recusa, por exemplo, quem ficaria sem reposição na posição: o teste tenta outro, como o técnico faria).
+- **Lesão repetida:** com o servidor local provocando lesões, o técnico escolhe quem entra mais de uma vez (jogadores diferentes) na mesma partida e a partida termina.
+- **Queda de conexão com ticket novo:** a conexão do WebSocket é derrubada no meio da partida e volta sozinha com ticket novo; todos os tickets são diferentes (cada um só vale uma vez).
+- **Mais:** favorito que volta da conta, carreira, condição real do adversário, espelho guardado no aparelho.

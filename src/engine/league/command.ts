@@ -7,9 +7,8 @@
 import { AcademyError } from '../academy'
 import { cancelIndividualTraining, startIndividualTraining, setTrainingPlan, TrainingError } from '../training'
 import { lineupForeignCount } from '../foreign'
-import { monthlyOperations, monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../finance'
-import { evaluateBoard } from '../board'
-import { computeStandings } from '../season'
+import { monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../finance'
+import { boardEvaluation } from './career'
 import { makeOffer, respondToOffer } from '../market/offers'
 import { sellPlayer } from '../market/sell'
 import { PRE_CONTRACT_YEARS, offerPreContract } from '../market/precontract'
@@ -147,22 +146,7 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
 }
 
 /** A confiança da diretoria no técnico hoje (a mesma conta de `boardOf`, sem a campanha de antes da chegada). */
-export function boardConfidence(world: SeasonState, teamId: TeamId): number {
-  const team = world.teams.find((t) => t.id === teamId)
-  const competition = world.season.competitions.find((c) => c.teamIds.includes(teamId))
-  if (!team || !competition) return 50
-  const table = computeStandings(competition.teamIds, world.matches.filter((m) => m.competitionId === competition.id))
-  const index = table.findIndex((r) => r.teamId === teamId)
-  return evaluateBoard({
-    objective: team.objective,
-    row: table[index],
-    position: index + 1,
-    teamCount: table.length,
-    totalGames: (table.length - 1) * 2,
-    balance: team.finances.balance,
-    monthlyCost: monthlyPayroll(world.players.filter((p) => p.teamId === teamId)) + monthlyOperations(team),
-  }).confidence
-}
+export const boardConfidence = (world: SeasonState, teamId: TeamId): number => boardEvaluation(world, teamId)?.confidence ?? 50
 
 /** Aplica o comando ao mundo do clube `teamId`. Nunca lança por regra do jogo: devolve o motivo. */
 export function applyCommand(world: SeasonState, teamId: TeamId, command: LeagueCommand, ctx: CommandContext = {}): CommandResult {

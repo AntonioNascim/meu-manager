@@ -5,7 +5,8 @@ import { flushAutosave, useSaveStatus } from '../store/autosave'
 import { setGame, useGame } from '../store/gameStore'
 import { useBusy } from '../store/heavy'
 import { clearLive } from '../store/liveMatch'
-import { closeLeague } from '../store/leagueSession'
+import { closeLeague, clearDismissed, useDismissed } from '../store/leagueSession'
+import { LeagueDismissed } from './screens/online/leagues/LeagueDismissed'
 import { LeagueScreen } from './screens/online/leagues/LeagueScreen'
 import { BusyOverlay } from './components/BusyOverlay'
 import { TeamBadge } from './components/ui'
@@ -53,6 +54,7 @@ function initialStandingsSection(hint?: string): 'table' | 'rounds' | 'goals' | 
 
 export function App() {
   const game = useGame()
+  const dismissedLeague = useDismissed()
   const busy = useBusy()
   const saveStatus = useSaveStatus()
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
@@ -77,6 +79,7 @@ export function App() {
     setHint(tab)
     setScreen(to)
   }
+  if (!game && dismissedLeague) return <LeagueDismissed state={dismissedLeague} onLeave={clearDismissed} />
   if (!game) {
     return (
       <Start />

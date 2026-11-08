@@ -13,6 +13,7 @@ import type { FreeAgentRow, SquadRow, TradeBody, TradeOffer, TradeReport, TradeR
 import type { AiOffersBody, AiSearchFilters, MarketRow } from '../engine/league/aimarket'
 import type { CupsBody } from '../engine/league/cupsView'
 import { parseCommand, type LeagueCommand } from '../engine/league/command'
+import { parsePrefs } from '../engine/league/career'
 import type { MirrorPayload } from '../engine/league/mirror'
 import type { ArrivingRow, BuyerRow, MineBody, PreRow } from '../engine/league/sellmarket'
 import { isProtectedLeagueName } from './agePolicy'
@@ -30,6 +31,8 @@ export const LEAGUE_LIMITS = {
   nameMax: 30,
   directoryPage: 20,
 } as const
+
+export type RoomQueryOp = 'detail' | 'career' | 'dismissal' | 'rechoose' | 'prefs-get' | 'prefs-set'
 
 export type WorldRef = { source: 'ficticio' } | { source: 'real'; version: string }
 export type LeagueKind = 'open' | 'friends'
@@ -106,6 +109,8 @@ export interface RoomPort {
   mirror(leagueId: string, playerId: string, since: number | null, page: number): Promise<{ ok: true; payload: MirrorPayload } | { ok: false; error: RoomFailure }>
   /** Um comando do técnico, validado e aplicado pela sala; devolve a atualização do espelho desde `since` (C2). */
   command(leagueId: string, playerId: string, command: LeagueCommand, since: number | null): Promise<{ ok: true; payload: MirrorPayload; info?: Record<string, unknown> } | { ok: false; error: RoomFailure } | { ok: false; refused: string; minimumSalary?: number }>
+  /** Consultas e ações do técnico que não mexem no mundo: detalhe de clube, carreira, demissão, escolha de outro clube e preferências (C6). */
+  query(leagueId: string, playerId: string, op: RoomQueryOp, args: Record<string, unknown>): Promise<{ ok: true; body: unknown } | { ok: false; error: RoomFailure } | { ok: false; refused: string }>
   /** As copas do mundo da liga e o caminho do clube do técnico nelas (B8.8). */
   cups(leagueId: string, playerId: string): Promise<{ ok: true; cups: CupsBody } | { ok: false; error: RoomFailure }>
   /** Mercado entre técnicos (B8.6): a sala aplica as regras e devolve o que a tela precisa. */
@@ -170,6 +175,8 @@ export type LeagueError =
   | { error: 'turnstile-failed' }
   | { error: 'bad-name'; issue: NameIssue }
   | { error: 'not-found' }
+  /** O técnico não tem clube na liga (foi demitido): a tela leva à escolha de outro clube. */
+  | { error: 'not-seated' }
   | { error: 'forbidden' }
   /** Modo protegido (menor de idade): só ligas de amigos, por convite. */
   | { error: 'protected-account' }
@@ -354,7 +361,7 @@ function parseCreate(body: ApiRequest['body']): CreateBody | undefined {
 // ---------------------------------------------------------------- operações
 
 const roomFailure = <T>(error: RoomFailure): LeagueResult<T> =>
-  error === 'bad-state' ? fail(409, { error: 'bad-state' }) : error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
+  error === 'bad-state' ? fail(409, { error: 'bad-state' }) : error === 'not-seated' ? fail(409, { error: 'not-seated' }) : error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
 
 /** Cria a liga. Ligas abertas só usam o ritmo Normal; quem cria é o ADM e já pode escolher o clube. */
 export async function createLeague(req: ApiRequest, deps: LeagueDeps): Promise<LeagueResult<LeagueDetail>> {
@@ -741,6 +748,44 @@ export async function cupsState(req: ApiRequest, deps: LeagueDeps, id: string): 
   const r = await deps.rooms.cups(id, auth.record.playerId)
   if (!r.ok) return roomFailure(r.error)
   return { status: 200, body: { cups: r.cups } }
+}
+
+/**
+ * Detalhe de clube, carreira, demissão, escolha de outro clube e preferências (C6). `GET detail?team=`, `GET career`, `GET dismissal`, `POST rechoose { teamId }`,
+ * `GET prefs` e `PUT prefs { favorites, lineups }`. Só membro da liga em andamento (quem foi demitido continua membro, sem clube).
+ */
+export async function roomQuery(req: ApiRequest, deps: LeagueDeps, id: string, op: RoomQueryOp, input: { team?: string | null } = {}): Promise<LeagueResult<Record<string, unknown>>> {
+  const auth = await requireIdentity(req, op === 'rechoose' || op === 'prefs-set' ? 'write' : 'read', deps)
+  if (!auth.ok) return auth.result as LeagueResult<never>
+  let args: Record<string, unknown> = {}
+  if (op === 'detail') {
+    if (!input.team || !TEAM_ID.test(input.team)) return fail(400, { error: 'bad-body' })
+    args = { teamId: input.team }
+  } else if (op === 'rechoose') {
+    const o = parseJson(req.body)
+    if (!o || !onlyKeys(o, ['teamId']) || typeof o.teamId !== 'string' || !TEAM_ID.test(o.teamId)) return fail(400, { error: 'bad-body' })
+    args = { teamId: o.teamId }
+  } else if (op === 'prefs-set') {
+    const o = parseJson(req.body, 16_384)
+    const prefs = o ? parsePrefs(o) : undefined
+    if (!prefs) return fail(400, { error: 'bad-body' })
+    args = { prefs }
+  }
+  const league = await deps.leagues.get(id)
+  if (!league || league.status === 'closed') return fail(404, { error: 'not-found' })
+  const members = await deps.leagues.members(id)
+  if (!members.some((m) => m.playerId === auth.record.playerId)) return fail(404, { error: 'not-found' })
+  if (league.status !== 'running') return fail(409, { error: 'bad-state' })
+  const r = await deps.rooms.query(id, auth.record.playerId, op, args)
+  if (!r.ok && 'refused' in r) return fail(409, { error: 'club-refused', reason: r.refused as ClubError })
+  if (!r.ok) return roomFailure(r.error)
+  if (op === 'rechoose') {
+    // O clube novo vale também no índice da liga (a vaga continua a mesma pessoa).
+    const teamId = (r.body as { teamId: string }).teamId
+    await deps.leagues.removeMember(id, auth.record.playerId)
+    await deps.leagues.addMember({ leagueId: id, playerId: auth.record.playerId, teamId, joinedAt: deps.now() })
+  }
+  return { status: 200, body: (r.body ?? {}) as Record<string, unknown> }
 }
 
 /** O tamanho máximo do corpo de um comando (a tática é o maior). */

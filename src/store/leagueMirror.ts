@@ -7,11 +7,14 @@
 import { applyCommand, applyPayload, emptyMirror, toSeasonState } from '../engine/league'
 import type { CommandError, CommandInfo, LeagueCommand, MirrorPayload, MirrorState } from '../engine/league'
 import type { SeasonState } from '../engine/season'
+import type { TeamDetail } from '../engine/league/career'
 
 export type TransportFailure = { ok: false; error: string; reason?: string; minimumSalary?: number }
 export interface MirrorTransport {
   fetch(since: number | null, page: number): Promise<{ ok: true; payload: MirrorPayload } | TransportFailure>
   command(command: LeagueCommand, since: number | null): Promise<{ ok: true; payload: MirrorPayload; info?: CommandInfo } | TransportFailure>
+  /** Detalhe ao tocar: a condição real do elenco de um clube e a tática dele. */
+  detail?(teamId: string): Promise<{ ok: true; detail: TeamDetail } | TransportFailure>
 }
 
 export type Connection = 'online' | 'offline'
@@ -25,6 +28,14 @@ export class LeagueMirror {
   connection: Connection = 'online'
   /** Quantas cargas completas já foram baixadas (serve de prova nos testes). */
   fullLoads = 0
+  /** O motivo da última falha de sincronização (por exemplo `not-seated`: o técnico perdeu o clube). */
+  lastError?: string
+  /** Condição real e tática de clubes que o técnico abriu (detalhe ao tocar), com a revisão em que vieram. */
+  private details = new Map<string, TeamDetail & { rev: number }>()
+  private detailVersion = 0
+  private overlaid?: { base: SeasonState; version: number; season: SeasonState }
+  /** Guarda o espelho no aparelho (a sessão liga isto ao IndexedDB). */
+  persist?: (state: MirrorState) => void
 
   constructor(
     private readonly transport: MirrorTransport,
@@ -45,7 +56,42 @@ export class LeagueMirror {
   season(): SeasonState | undefined {
     if (this.optimistic) return this.optimistic
     if (this.built?.source !== this.state) this.built = { source: this.state, season: toSeasonState(this.state) }
-    return this.built.season
+    const base = this.built.season
+    if (!base || this.details.size === 0) return base
+    if (this.overlaid?.base !== base || this.overlaid.version !== this.detailVersion) this.overlaid = { base, version: this.detailVersion, season: this.withDetails(base) }
+    return this.overlaid.season
+  }
+
+  /** Põe a condição real (e a tática) dos clubes abertos por cima do que o espelho tem de neutro. */
+  private withDetails(base: SeasonState): SeasonState {
+    const conditions = new Map<string, TeamDetail['conditions'][string]>()
+    for (const d of this.details.values()) for (const [id, c] of Object.entries(d.conditions)) conditions.set(id, c)
+    return {
+      ...base,
+      players: base.players.map((p) => (conditions.has(p.id) ? { ...p, condition: conditions.get(p.id) as typeof p.condition } : p)),
+      teams: base.teams.map((t) => (this.details.has(t.id) && t.id !== this.teamId ? { ...t, tactic: (this.details.get(t.id) as TeamDetail).tactic } : t)),
+    }
+  }
+
+  /** Detalhe ao tocar: baixa a condição e a tática reais de um clube (uma vez por revisão do espelho). Devolve se algo mudou. */
+  async loadDetail(teamId: string): Promise<boolean> {
+    if (!this.transport.detail || teamId === this.teamId) return false
+    if (this.details.get(teamId)?.rev === this.state.rev) return false
+    const r = await this.transport.detail(teamId)
+    if (!r.ok) return false
+    this.details.set(teamId, { ...r.detail, rev: this.state.rev })
+    this.detailVersion++
+    this.onChange()
+    return true
+  }
+
+  /** O espelho guardado no aparelho (para abrir a liga sem baixar tudo e para ler sem internet). */
+  snapshotState(): MirrorState {
+    return this.state
+  }
+  restore(state: MirrorState): void {
+    this.state = state
+    this.onChange()
   }
 
   private serial<T>(job: () => Promise<T>): Promise<T> {
@@ -70,15 +116,18 @@ export class LeagueMirror {
       const since = this.state.rev >= 0 ? this.state.rev : null
       const first = await this.transport.fetch(since, 0)
       if (!first.ok) {
+        this.lastError = first.error
         this.setConnection(first.error === 'offline' ? 'offline' : this.connection)
         return false
       }
+      this.lastError = undefined
       this.setConnection('online')
       const p = first.payload
       if (!p.full) {
         this.state = applyPayload(this.state, p)
         this.optimistic = undefined
         this.onChange()
+        this.persist?.(this.state)
         return true
       }
       // Carga completa: monta num espelho à parte e troca só no fim (as telas nunca veem o mundo pela metade).
@@ -99,6 +148,7 @@ export class LeagueMirror {
       const again = await this.transport.fetch(this.state.rev, 0)
       if (again.ok && !again.payload.full) this.state = applyPayload(this.state, again.payload)
       this.onChange()
+      this.persist?.(this.state)
       return true
     }
     return false

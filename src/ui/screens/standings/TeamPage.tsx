@@ -8,10 +8,12 @@ import { playerOverall } from '../../../engine/overall'
 import { shortName } from './parts'
 import { Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
 import { TacticSection } from './TacticSection'
+import { useOnlineDetail } from '../../useOnlineDetail'
 import type { LiveTactic } from './TacticSection'
 
 /** Página simples de um time para estudar o adversário: posição, força, últimos resultados e elenco. */
 export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; teamId: string; onBack: () => void; onTeam: (id: string) => void; live?: LiveTactic | undefined }) {
+  useOnlineDetail(teamId)
   const team = teamById(game, teamId)
   const competition = game.season.season.competitions.find((c) => c.teamIds.includes(teamId))
   const rows: StandingRow[] = competition ? standingsOf(game, competition) : []

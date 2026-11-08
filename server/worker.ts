@@ -31,7 +31,7 @@ import { D1ProblemStore } from './problemStore'
 import { submitProblem, PROBLEM_LIMITS } from '../src/online/problemApi'
 import type { AiOffersBody, MarketRow } from '../src/engine/league/aimarket'
 import type { CupsBody } from '../src/engine/league/cupsView'
-import { adminAction, changePace, clubDecision, clubState, leagueCommand, mirrorRead, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
+import { adminAction, changePace, clubDecision, clubState, leagueCommand, mirrorRead, roomQuery, type RoomQueryOp, cupsState, parseSearchFilters, tradeAct, tradeRead, type TradeOp, type TradeActKind, type SaleOutcome, controlLeague, createLeague, getLeague, joinLeague, leagueState, leaveAllLeagues, leaveLeague, listOpenLeagues, liveTicket, myLeagues, resolveCode, setReady, type ControlAction, type AdminAction, type LeagueDeps, type LeagueRecord, type LeagueResult, type RoomFailure, type RoomPort } from '../src/online/leagueApi'
 
 /** Pedaços do ambiente do Cloudflare que usamos. */
 interface DurableObjectStubLike {
@@ -258,6 +258,18 @@ class DoRooms implements RoomPort {
       return { ok: false as const, error: 'unavailable' as const }
     }
   }
+  async query(leagueId: string, playerId: string, op: RoomQueryOp, args: Record<string, unknown>) {
+    try {
+      const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
+      const res = await stub.fetch('https://room/internal/query', { method: 'POST', body: JSON.stringify({ playerId, op, args }) })
+      const json = (await res.json()) as { ok: boolean; error?: RoomFailure; body?: unknown; refused?: string }
+      if (json.ok) return { ok: true as const, body: json.body }
+      if (json.refused) return { ok: false as const, refused: json.refused }
+      return { ok: false as const, error: json.error ?? ('unavailable' as const) }
+    } catch {
+      return { ok: false as const, error: 'unavailable' as const }
+    }
+  }
   async ticket(leagueId: string, playerId: string) {
     try {
       const stub = this.env.LEAGUES.get(this.env.LEAGUES.idFromName(leagueId))
@@ -343,6 +355,12 @@ async function serveLeagues(request: ApiRequest, url: URL, env: Env, base: ApiDe
   if (method === 'POST' && second?.startsWith('trade-') && ACTS.includes(second.slice(6))) {
     return respondLeague(await tradeAct(request, deps, first, second.slice(6) as TradeActKind), cors)
   }
+  if (method === 'GET' && second === 'detail') return respondLeague(await roomQuery(request, deps, first, 'detail', { team: url.searchParams.get('team') }), cors)
+  if (method === 'GET' && second === 'career') return respondLeague(await roomQuery(request, deps, first, 'career'), cors)
+  if (method === 'GET' && second === 'dismissal') return respondLeague(await roomQuery(request, deps, first, 'dismissal'), cors)
+  if (method === 'POST' && second === 'rechoose') return respondLeague(await roomQuery(request, deps, first, 'rechoose'), cors)
+  if (method === 'GET' && second === 'prefs') return respondLeague(await roomQuery(request, deps, first, 'prefs-get'), cors)
+  if (method === 'PUT' && second === 'prefs') return respondLeague(await roomQuery(request, deps, first, 'prefs-set'), cors)
   if (second === 'mirror' && method === 'GET') return respondLeague(await mirrorRead(request, deps, first, { since: url.searchParams.get('since'), page: url.searchParams.get('page') }), cors)
   if (second === 'command' && method === 'POST') return respondLeague(await leagueCommand(request, deps, first), cors)
   if (second === 'club' && method === 'GET') return respondLeague(await clubState(request, deps, first), cors)

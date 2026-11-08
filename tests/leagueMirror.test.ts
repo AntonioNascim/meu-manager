@@ -72,14 +72,14 @@ describe('espelho do mundo da liga (C2)', () => {
     const text = JSON.stringify(payloads)
     const leaks = base.players.filter((p) => p.hidden.consistency !== 50 && text.includes(`"consistency":${p.hidden.consistency},"injuryProneness":${p.hidden.injuryProneness},"professionalism":${p.hidden.professionalism}`))
     expect(leaks).toHaveLength(0)
-    expect(text).not.toContain('"finances":{"balance":' + (base.teams[1]!.finances.balance as number))
   })
 
   it('outros clubes chegam sem finanças; o clube do técnico chega com elas', () => {
     const seen = toSeasonState(syncFull(base, MY, 1))!
     const other = seen.teams.find((t) => t.id !== MY)!
     expect(other.finances.ledger).toEqual([])
-    expect(other.finances.balance).toBe(0)
+    // O caixa e os orçamentos vêm (decidem quanto um clube da IA pagaria); o extrato não.
+    expect(other.finances.balance).toBe(base.teams.find((t) => t.id === other.id)!.finances.balance)
     expect(seen.teams.find((t) => t.id === MY)!.finances.balance).toBe(base.teams.find((t) => t.id === MY)!.finances.balance)
   })
 

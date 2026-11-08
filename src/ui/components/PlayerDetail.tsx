@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useFreshPlayer } from '../useOnlineDetail'
 import { CONDITION } from '../../engine/config'
 import { overallAt, playerOverall } from '../../engine/overall'
 import { GOALKEEPER_ATTRIBUTES, MENTAL_ATTRIBUTES, PHYSICAL_ATTRIBUTES, TECHNICAL_ATTRIBUTES } from '../../engine/types'
@@ -96,7 +97,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * Detalhe do jogador. Na base (`academy`), mostra a estimativa de potencial em estrelas (`stars`) no lugar de estado,
  * temporada e contrato, e o `footer` traz os botões de promover e dispensar.
  */
-export function PlayerDetail({ player, onClose, academy = false, stars, footer, history, currentDate }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode; history?: readonly StrengthSnapshot[]; currentDate?: IsoDate }) {
+export function PlayerDetail({ player: shown, onClose, academy = false, stars, footer, history, currentDate }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode; history?: readonly StrengthSnapshot[]; currentDate?: IsoDate }) {
+  const player = useFreshPlayer(shown)
   const c = player.condition
   const overall = playerOverall(player)
   const isKeeper = player.position === 'GK'

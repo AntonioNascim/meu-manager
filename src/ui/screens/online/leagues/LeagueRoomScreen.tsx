@@ -34,7 +34,8 @@ export function LeagueRoomScreen({ id, code, onBack }: { id: string; code?: stri
     setError(null)
     const r = await openLeagueGame(id)
     setOpening(false)
-    if (r !== 'ok') setError(r === 'no-account' ? 'Crie ou recupere a conta online para abrir o jogo.' : 'Não consegui carregar o jogo da liga. Confira a conexão e tente de novo.')
+    if (r === 'no-account') setError('Crie ou recupere a conta online para abrir o jogo.')
+    else if (r === 'failed') setError('Não consegui carregar o jogo da liga. Confira a conexão e tente de novo.')
   }
 
   const load = useCallback(async () => {

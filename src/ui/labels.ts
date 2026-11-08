@@ -606,6 +606,7 @@ export const LEAGUE_ERROR_LABELS: Record<import('../online/leagueApi').LeagueErr
   'turnstile-failed': 'A verificação de que você é uma pessoa não passou. Tente de novo.',
   'bad-name': 'Esse nome não serve.',
   'not-found': 'Não encontramos essa liga.',
+  'not-seated': 'Você não tem clube nesta liga agora.',
   forbidden: 'Só o ADM da liga pode fazer isso.',
   'protected-account': 'No modo protegido só vale liga de amigos, entrando por convite.',
   'protected-name': 'No modo protegido o nome da liga é escolhido da lista.',

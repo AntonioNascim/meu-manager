@@ -85,6 +85,8 @@ import {
 import type { SeasonState } from '../src/engine/season'
 import type { Position } from '../src/engine/types'
 import { BASE_MINUTE_MS } from '../src/engine/match/timing'
+import { careerView, dismissalCheck, freeClubsFor, parsePrefs, teamDetail, EMPTY_PREFS, type Prefs, type Stint } from '../src/engine/league/career'
+import type { Dismissal } from '../src/engine/types'
 import { applyCommand, buildDelta, buildFull, diffWorlds, mergeChanges, parseCommand, type MirrorChange } from '../src/engine/league'
 import { turnRunner } from '../src/store/game'
 import { createLeagueWorld } from '../src/store/leagueWorld'
@@ -385,8 +387,101 @@ export class LeagueRoom {
       await this.finishEvent(now)
       worldChanged = true
     }
+    if (worldChanged) this.checkDismissals()
     this.persist({ world: worldChanged || this.league !== league0 })
     await this.schedule(now)
+  }
+
+  // ------------------------------------------------------------ carreira, demissão e preferências por conta (Fase 6C, C6)
+  private careers(): Record<string, Stint[]> {
+    return JSON.parse(this.get('careers') ?? '{}') as Record<string, Stint[]>
+  }
+  private stintStart(playerId: string, teamId: string): void {
+    const all = this.careers()
+    const since = (this.world as SeasonState).season.currentDate
+    all[playerId] = [...(all[playerId] ?? []).filter((s) => s.until !== undefined || s.teamId !== teamId), { teamId, since }]
+    this.set('careers', JSON.stringify(all))
+  }
+  private stintEnd(playerId: string, ended: 'dismissed' | 'moved'): void {
+    const all = this.careers()
+    const list = all[playerId] ?? []
+    const open = list.at(-1)
+    if (!open || open.until !== undefined) return
+    list[list.length - 1] = { ...open, until: (this.world as SeasonState).season.currentDate, ended }
+    all[playerId] = list
+    this.set('careers', JSON.stringify(all))
+  }
+  private dismissals(): Record<string, Dismissal & { teamId: string }> {
+    return JSON.parse(this.get('dismissals') ?? '{}') as Record<string, Dismissal & { teamId: string }>
+  }
+
+  /** A diretoria avalia cada técnico: quem foi demitido perde o clube (volta à IA) e a vaga fica com ele para escolher outro. */
+  private checkDismissals(): void {
+    const league = this.league
+    const world = this.world
+    if (!league || !world) return
+    let next = league
+    const records = this.dismissals()
+    let changed = false
+    for (const seat of league.seats) {
+      if (seat.leaving || records[seat.playerId]) continue
+      const d = dismissalCheck(world, seat.teamId)
+      if (!d) continue
+      const res = removeSeat(next, world, seat.playerId)
+      if (!res.ok) continue
+      next = res.league
+      records[seat.playerId] = { ...d, teamId: seat.teamId }
+      this.stintEnd(seat.playerId, 'dismissed')
+      changed = true
+    }
+    if (changed) {
+      this.league = next
+      this.set('dismissals', JSON.stringify(records))
+    }
+  }
+
+  private prefsOf(playerId: string): Prefs {
+    const raw = this.get(`prefs:${playerId}`)
+    return raw ? (JSON.parse(raw) as Prefs) : EMPTY_PREFS
+  }
+
+  /** Consultas e ações do técnico que não mexem no mundo: detalhe de clube, carreira, demissão, escolha de outro clube e preferências. */
+  protected async query(playerId: string, op: string, args: Record<string, unknown>): Promise<Response> {
+    const world = this.world as SeasonState
+    const no = (error: string) => Response.json({ ok: false, error })
+    const seat = this.league?.seats.find((s) => s.playerId === playerId)
+    if (op === 'detail') {
+      if (!seat) return no('not-seated')
+      const d = teamDetail(world, String(args.teamId ?? ''))
+      return d ? Response.json({ ok: true, body: d }) : no('not-found')
+    }
+    if (op === 'career') return Response.json({ ok: true, body: { rows: careerView(world, this.careers()[playerId] ?? []) } })
+    if (op === 'dismissal' || op === 'rechoose') {
+      const record = this.dismissals()[playerId]
+      const humans = new Set((this.league?.seats ?? []).map((s) => s.teamId))
+      if (op === 'dismissal') return Response.json({ ok: true, body: record ? { dismissal: record, options: freeClubsFor(world, humans, record.teamId) } : {} })
+      if (!record || seat) return no('bad-state')
+      const teamId = String(args.teamId ?? '')
+      if (!freeClubsFor(world, humans, record.teamId, 10_000).some((c) => c.teamId === teamId)) return Response.json({ ok: false, refused: 'not-eligible' })
+      const res = addSeat(this.league as LeagueState, world, playerId, teamId, this.now())
+      if (!res.ok) return no(res.error)
+      this.league = res.league
+      const records = this.dismissals()
+      delete records[playerId]
+      this.set('dismissals', JSON.stringify(records))
+      this.stintStart(playerId, teamId)
+      this.persist()
+      await this.schedule(this.now())
+      return Response.json({ ok: true, body: { teamId } })
+    }
+    if (op === 'prefs-get') return Response.json({ ok: true, body: this.prefsOf(playerId) })
+    if (op === 'prefs-set') {
+      const prefs = parsePrefs(args.prefs)
+      if (!prefs) return no('bad-body')
+      this.set(`prefs:${playerId}`, JSON.stringify(prefs))
+      return Response.json({ ok: true, body: prefs })
+    }
+    return no('not-found')
   }
 
   private minuteMs(): number {
@@ -775,6 +870,7 @@ export class LeagueRoom {
         const res = addSeat(this.league, world, playerId, teamId, now)
         if (!res.ok) return no(res.error)
         this.league = res.league
+        this.stintStart(playerId, teamId)
         this.persist()
         await this.schedule(now)
         return ok()
@@ -878,10 +974,12 @@ export class LeagueRoom {
       if (!this.league?.seats.some((s) => s.playerId === playerId)) return no('not-seated')
       return Response.json({ ok: true, ticket: this.issueTicket(playerId, now), expiresInMs: TICKET_TTL_MS, live: this.live !== undefined })
     }
+    if (path === '/internal/query') return await this.query(playerId, String(body.op ?? ''), (body.args ?? {}) as Record<string, unknown>)
     if (path === '/internal/start') {
       if (this.league || !meta.record) return no('bad-state')
       const r = meta.record
       this.league = startLeague(defaultLeagueConfig({ ...DEFAULT_CONFIG(r.id), pace: r.pace, band: bandOf(r.band), tzOffsetMin: r.tzOffsetMin }, r.directResult), world, this.lobby(), now)
+      for (const m of this.lobby()) this.stintStart(m.playerId, m.teamId)
       this.persist({ world: true })
       await this.run()
       return ok()
