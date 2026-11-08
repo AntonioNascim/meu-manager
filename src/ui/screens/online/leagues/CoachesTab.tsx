@@ -25,7 +25,7 @@ export function CoachesTab({ leagueId, worldDate }: { leagueId: string; worldDat
       <button type="button" disabled={!league} onClick={() => setOpen(true)} data-testid="open-coaches-market" className="min-h-12 w-full rounded-xl bg-accent font-bold text-accent-ink active:scale-95 disabled:opacity-40">
         Abrir o mercado entre técnicos
       </button>
-      {open && league && <LeagueMarket league={league} teams={teams ?? undefined} worldDate={worldDate} onClose={() => setOpen(false)} coachesOnly />}
+      {open && league && <LeagueMarket league={league} teams={teams ?? undefined} worldDate={worldDate} onClose={() => setOpen(false)} />}
     </Panel>
   )
 }

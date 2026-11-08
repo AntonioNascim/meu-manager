@@ -8,8 +8,6 @@ import * as client from '../online/leagueClient'
 import type { Answer, CreateLeagueInput } from '../online/leagueClient'
 import type { AdminAction, ControlAction, LeagueDetail, LeagueSummary } from '../online/leagueApi'
 import type { PaceId } from '../engine/league/pace'
-import type { ClubAction } from '../engine/league/club'
-import type { AiSearchFilters } from '../engine/league/aimarket'
 import { loadWorld } from '../data/package/defaultPackage'
 import type { CompetitionSetup } from '../engine/season/calendar'
 import type { Team } from '../engine/types'
@@ -40,31 +38,13 @@ export const leagueApi = {
   ready: (leagueId: string, ready: boolean) => withIdentity((id) => client.sendReady(deps(), id, leagueId, ready)),
   control: (leagueId: string, action: ControlAction) => withIdentity((id) => client.controlLeague(deps(), id, leagueId, action)),
   pace: (leagueId: string, pace: PaceId) => withIdentity((id) => client.changePace(deps(), id, leagueId, pace)),
-  cups: (leagueId: string) => withIdentity((id) => client.cupsState(deps(), id, leagueId)),
-  tradeSearch: (leagueId: string, f: AiSearchFilters) => withIdentity((id) => client.tradeSearch(deps(), id, leagueId, f)),
-  tradeListings: (leagueId: string) => withIdentity((id) => client.tradeListings(deps(), id, leagueId)),
-  tradeAi: (leagueId: string) => withIdentity((id) => client.tradeAi(deps(), id, leagueId)),
-  tradeAiOffer: (leagueId: string, o: Parameters<typeof client.tradeAiOffer>[3]) => withIdentity((id) => client.tradeAiOffer(deps(), id, leagueId, o)),
-  tradeAiRespond: (leagueId: string, offerId: string, accept: boolean) => withIdentity((id) => client.tradeAiRespond(deps(), id, leagueId, offerId, accept)),
-  tradeAiWithdraw: (leagueId: string, offerId: string) => withIdentity((id) => client.tradeAiWithdraw(deps(), id, leagueId, offerId)),
   report: (body: Parameters<typeof client.sendReport>[2]) => withIdentity((id) => client.sendReport(deps(), id, body)),
-  tradeMine: (leagueId: string) => withIdentity((id) => client.tradeMine(deps(), id, leagueId)),
-  tradeBuyers: (leagueId: string, playerId: string, kind: 'purchase' | 'loan') => withIdentity((id) => client.tradeBuyers(deps(), id, leagueId, playerId, kind)),
-  tradePre: (leagueId: string, f: { query?: string; position?: string }) => withIdentity((id) => client.tradePre(deps(), id, leagueId, f)),
-  tradeList: (leagueId: string, o: Parameters<typeof client.tradeList>[3]) => withIdentity((id) => client.tradeList(deps(), id, leagueId, o)),
-  tradeUnlist: (leagueId: string, playerId: string) => withIdentity((id) => client.tradeUnlist(deps(), id, leagueId, playerId)),
-  tradeSell: (leagueId: string, o: Parameters<typeof client.tradeSell>[3]) => withIdentity((id) => client.tradeSell(deps(), id, leagueId, o)),
-  tradePreOffer: (leagueId: string, o: Parameters<typeof client.tradePreOffer>[3]) => withIdentity((id) => client.tradePreOffer(deps(), id, leagueId, o)),
   tradeBody: (leagueId: string) => withIdentity((id) => client.tradeBody(deps(), id, leagueId)),
   tradeSquad: (leagueId: string, teamId: string) => withIdentity((id) => client.tradeSquad(deps(), id, leagueId, teamId)),
-  tradeFree: (leagueId: string, position?: string) => withIdentity((id) => client.tradeFree(deps(), id, leagueId, position)),
   tradeOffer: (leagueId: string, o: Parameters<typeof client.tradeOffer>[3]) => withIdentity((id) => client.tradeOffer(deps(), id, leagueId, o)),
   tradeRespond: (leagueId: string, offerId: string, type: 'accept' | 'decline' | 'counter', fee?: number) => withIdentity((id) => client.tradeRespond(deps(), id, leagueId, offerId, type, fee)),
   tradeWithdraw: (leagueId: string, offerId: string) => withIdentity((id) => client.tradeWithdraw(deps(), id, leagueId, offerId)),
-  tradeSign: (leagueId: string, o: Parameters<typeof client.tradeSign>[3]) => withIdentity((id) => client.tradeSign(deps(), id, leagueId, o)),
   tradeReport: (leagueId: string, recordId: string, reason: Parameters<typeof client.tradeReport>[4]) => withIdentity((id) => client.tradeReport(deps(), id, leagueId, recordId, reason)),
-  club: (leagueId: string) => withIdentity((id) => client.clubState(deps(), id, leagueId)),
-  clubAction: (leagueId: string, action: ClubAction) => withIdentity((id) => client.clubDecision(deps(), id, leagueId, action)),
   liveTicket: (leagueId: string) => withIdentity((id) => client.requestLiveTicket(deps(), id, leagueId)),
 }
 

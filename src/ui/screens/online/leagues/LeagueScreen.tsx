@@ -24,7 +24,7 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
         <div className="title text-2xl">{league.name}</div>
         <div className="text-xs text-muted">Sala da liga</div>
       </div>
-      <LeagueRunning league={league} teams={teams ?? undefined} onRefresh={() => void load()} inGame />
+      <LeagueRunning league={league} teams={teams ?? undefined} onRefresh={() => void load()} />
     </div>
   )
 }

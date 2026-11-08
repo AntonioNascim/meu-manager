@@ -388,3 +388,11 @@ Com a autorização dos sócios: `wrangler deploy` (versão `a6f8752d`, sem migr
 - **Lesão repetida:** com o servidor local provocando lesões, o técnico escolhe quem entra mais de uma vez (jogadores diferentes) na mesma partida e a partida termina.
 - **Queda de conexão com ticket novo:** a conexão do WebSocket é derrubada no meio da partida e volta sozinha com ticket novo; todos os tickets são diferentes (cada um só vale uma vez).
 - **Mais:** favorito que volta da conta, carreira, condição real do adversário, espelho guardado no aparelho.
+
+## 16. C6 publicada e fechamento da Fase 6C (07/11/2026)
+
+**C6 publicada** com a autorização dos sócios: `wrangler deploy` (versão `4ea6003c`, sem migração de banco, sem custo novo) e site (commit `a6816b6`).
+
+**Limpeza das telas online simplificadas.** Removidas por já serem cobertas pelo jogo do clube: `ClubCard` (Meu clube), `CupsCard`, o cartão e a tela "Mercado" da sala com as abas Buscar, Anúncios, Vender e Pré-contrato (`LeagueMarketAi.tsx`, `LeagueMarketSell.tsx`) e as propostas da IA dentro dela; o `LeagueMarket` ficou só com o que é entre técnicos (Técnicos, Propostas e Histórico, usado pela aba Técnicos do Mercado do jogo). Na sala da liga fora do jogo ficam: técnicos e clubes, convite, Pronto, Avançar, Pausa, ritmo, calendário, sugestões de ausência e o botão **Abrir o jogo do clube**. Removidos também os fios do cliente que só essas telas usavam (`leagueApi.club`, `cups`, `tradeSearch` e semelhantes em `store/leagues.ts`) e os testes de ponta a ponta das telas antigas (`b8-6`, `b8-6b`, `b8-7`, `b8-8`). **Ficam** (sem tela que os use, mas testadas): as rotas do servidor `club`, `cups`, `trade-search|listings|ai*|mine|buyers|pre`, `list`, `unlist`, `sell` e `pre-offer` e os módulos de `engine/league` por trás delas, porque a aba Técnicos e os comandos ainda usam parte das regras e tirar rota publicada exige outra publicação com cuidado; podem sair numa limpeza futura.
+
+**Testes:** `npm test` 126 arquivos, 1.423 testes, todos passam depois da limpeza. Guia de teste do online novo em `docs/teste-fechado.md` seções 2 e 2.1; **demissão com troca de clube anotada como item a observar** na seção 2.2 e no `CLAUDE.md`.

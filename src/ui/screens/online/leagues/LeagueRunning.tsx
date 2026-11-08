@@ -8,9 +8,6 @@ import { leagueApi, type LeagueTeam } from '../../../../store/leagues'
 import { Button, Card } from '../../../components/ui'
 import { LEAGUE_ERROR_LABELS, LEAGUE_LOG_LABELS, PACE_LABELS, SEAT_STATUS_LABELS } from '../../../labels'
 import { Sheet } from '../../../theme'
-import { ClubCard } from './ClubCard'
-import { CupsCard } from './CupsCard'
-import { LeagueMarket } from './LeagueMarket'
 import { formatMoney } from '../../../format'
 import { Pill } from './parts'
 
@@ -36,14 +33,13 @@ export function inLabel(ms: number): string {
  * Liga em andamento (B8.4): calendário no fuso do aparelho, "Pronto" de quem tem partida no próximo evento e, para o ADM, Avançar (com
  * confirmação), Pausar/Retomar, ritmo e sugestões de ausência. Consulta a sala a cada poucos segundos.
  */
-export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; onRefresh: () => void; inGame?: boolean }) {
+export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; onRefresh: () => void }) {
   const id = league.id
   const [body, setBody] = useState<LeagueStateBody | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirmAdvance, setConfirmAdvance] = useState(false)
   const [pacing, setPacing] = useState(false)
-  const [market, setMarket] = useState(false)
 
   const load = useCallback(async () => {
     const r = await leagueApi.state(id)
@@ -76,7 +72,6 @@ export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { le
 
   return (
     <>
-      {market && <LeagueMarket league={league} teams={teams} worldDate={view.worldDate} onClose={() => setMarket(false)} />}
       <Status view={view} clubOf={clubOf} />
 
       {me && (
@@ -104,18 +99,6 @@ export function LeagueRunning({ league, teams, onRefresh, inGame = false }: { le
           )}
         </Card>
       )}
-
-      {me && !inGame && (
-        <Card title="Mercado">
-          <p className="text-sm text-muted">Proponha compras e empréstimos aos outros técnicos, contrate jogadores livres e acompanhe as transferências da liga.</p>
-          <Button className="mt-3 w-full" onClick={() => setMarket(true)} data-testid="open-market">
-            {body.awaiting ? `Abrir o mercado (${body.awaiting} proposta${body.awaiting > 1 ? 's' : ''} esperando você)` : 'Abrir o mercado'}
-          </Button>
-        </Card>
-      )}
-      {/* Dentro do jogo (Fase 6C) o clube, as copas e o resto são as telas do jogo solo; estes cartões simples só existem fora dele. */}
-      {me && !inGame && <ClubCard leagueId={id} />}
-      {me && !inGame && <CupsCard leagueId={id} clubOf={clubOf} />}
 
       <Card title="Quem está pronto">
         <ul className="flex flex-col gap-2" data-testid="ready-list">

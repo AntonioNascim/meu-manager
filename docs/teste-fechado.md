@@ -37,7 +37,8 @@ O `?online=1` é o que mostra o cartão "Online" no menu; ele fica lembrado no a
 > 1. No menu, **Online › Criar minha conta online**. Marque a faixa de idade (**18 anos ou mais**) e escolha um apelido. (O código de recuperação aparece depois; **guarde-o**.)
 > 2. **Ligas online › Criar uma liga**. Escolha **Resultado direto** (mais rápido) ou **Assistir ao vivo**, e convide os amigos pelo **link ou código** de convite.
 > 3. Cada um escolhe um clube. Quem criou toca em **Iniciar a liga**.
-> 4. Toquem em **Pronto** e o criador em **Avançar**. Experimentem propostas entre vocês no **Mercado**, vender e anunciar jogadores e, numa partida ao vivo, **arrastar jogadores no campo**.
+> 4. Cada um toca em **Abrir o jogo do clube**: é o mesmo jogo da carreira solo (Painel, Elenco, Tática, Treino, Base, Mercado, Tabela, Finanças), mas a liga é de todos. No lugar do botão Avançar há o **cartão da liga**: toquem em **Pronto** e o criador em **Avançar** (pela **Sala da liga**).
+> 5. Experimentem comprar e vender jogadores de clubes da IA no **Mercado** e propostas entre vocês na aba **Técnicos**. Na rodada ao vivo, toquem em **Entrar na partida**: mudem a **velocidade** (1x a 8x), a tática e as trocas, e no intervalo toquem em **Voltar ao jogo**.
 >
 > **Se o celular travar, o jogo der erro ou algo parecer injusto ou estranho:** toque em **Relatar problema**, descreva o que você fez e, se puder, anexe um print da tela.
 
@@ -46,10 +47,28 @@ O `?online=1` é o que mostra o cartão "Online" no menu; ele fica lembrado no a
 1. **Instalar e abrir** em celulares simples (Android antigo, iPhone com Safari) e offline depois da primeira visita.
 2. **Uma temporada inteira** da carreira solo (tempo, travamentos, salvar e carregar).
 3. **Liga online de 4 a 20 pessoas**: criar, entrar por convite, Pronto/Avançar, partida ao vivo, lesão (o jogo para até escolher o reserva), mercado entre técnicos.
+3b. **O jogo do clube na liga online (Fase 6C)**, roteiro abaixo (seção 2.1).
 4. **Virada de temporada** numa liga online.
 5. **Trocar de aparelho** com o código de recuperação.
 6. **Denúncias** (apelido e liga) e o **painel** (nós).
 7. **Custo**: a conta do Cloudflare durante o teste (seção 4).
+
+### 2.1 Roteiro do jogo do clube na liga online (Fase 6C)
+
+Para quem conduz o teste (nós), em duas pessoas ou mais, ligas de **Assistir ao vivo**:
+
+1. **Abrir o jogo:** na sala da liga, **Abrir o jogo do clube**. Confira Painel, Elenco, Tática, Treino, Base, Mercado, Tabela e Finanças com as mesmas telas do solo. O Painel mostra o **cartão da liga** (próxima rodada no seu fuso, Pronto) e "Minha carreira".
+2. **Ações do técnico:** mudar tática e escalação, treino coletivo e individual, promover jovem, ingresso e orçamento. Fechar e abrir o jogo de novo: tudo tem de continuar (o servidor guarda).
+3. **Mercado:** buscar e propor a clube da IA, anunciar, vender a dois clubes diferentes em seguida, pedir verba, renovar contrato; na aba **Técnicos**, proposta entre técnicos, contraproposta e recusa. Jogador de clube de outro técnico não aceita proposta pela IA (mensagem diz para usar a aba Técnicos).
+4. **Rodada ao vivo:** Pronto de todos, o criador avança; **Entrar na partida**. Testar: velocidade (1x, 2x, 4x, 8x), lesão (escolher o reserva; o jogo espera até 45 s), troca, mudança de tática, arrastar jogador, **intervalo** (cronômetro de 1 minuto, **Voltar ao jogo**). **Dois técnicos no mesmo jogo:** vale a velocidade mais lenta dos dois (aparece "valendo Nx") e o intervalo só termina quando os dois tocam ou o minuto acaba.
+5. **Conexão:** durante a partida, desligar o Wi-Fi por alguns segundos e religar: a partida volta sozinha. Com o aparelho em modo avião ao abrir o jogo: abre com o último estado guardado, só para ler, com o aviso de sem conexão.
+6. **Outro aparelho:** entrar com o código de recuperação e abrir o jogo: favoritos e escalações guardadas vêm da conta.
+7. **Detalhe:** abrir a página do adversário e a ficha de um jogador de outro clube depois de uma rodada: a condição física tem de aparecer cansada (não 100%).
+8. **Carreira:** "Minha carreira" mostra o clube atual, as temporadas e a campanha de hoje.
+
+### 2.2 Item a observar: demissão com troca de clube
+
+**Ainda não foi visto numa liga de verdade.** A diretoria demite o técnico (finanças muito negativas ou resultados muito abaixo da meta) depois de uma rodada: o clube volta para a IA, a vaga continua do técnico e aparece a tela **Você foi demitido** com os clubes livres da liga de reputação igual ou menor. O que observar: (a) se a demissão aparece na hora certa e não cedo demais (ajustar `BOARD` se necessário); (b) a tela aparece também para quem estava com o jogo aberto; (c) a lista de clubes livres faz sentido e **Assumir** abre o jogo do clube novo; (d) a carreira mostra "Demitido"; (e) o clube que ele perdeu segue bem com a IA; (f) ninguém fica preso sem clube se a lista vier vazia (hoje só dá para voltar ao menu e esperar). Está coberto por testes automáticos, mas não por um teste de ponta a ponta no navegador (não dá para forçar a demissão no servidor local).
 
 ---
 

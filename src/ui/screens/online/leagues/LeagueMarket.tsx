@@ -9,13 +9,9 @@ import { LEAGUE_ERROR_LABELS, OFFER_REASON_LABELS, POSITION_SHORT_LABELS, TRADE_
 import { Sheet } from '../../../theme'
 import type { Position } from '../../../../engine/types'
 import { inLabel } from './LeagueRunning'
-import { AiOffers, ListingsTab, SearchTab } from './LeagueMarketAi'
-import type { AiOffersBody } from '../../../../engine/league/aimarket'
 import { Pill } from './parts'
-import { MineTab, PreTab } from './LeagueMarketSell'
-import type { MineBody } from '../../../../engine/league/sellmarket'
 
-type Tab = 'offers' | 'search' | 'listings' | 'mine' | 'pre' | 'coaches' | 'history'
+type Tab = 'offers' | 'coaches' | 'history'
 type Body = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
 const POLL_MS = 8000
 const pos = (p: string): string => POSITION_SHORT_LABELS[p as Position] ?? p
@@ -29,12 +25,10 @@ const endAfter = (worldDate: string, years: number): string => `${Number(worldDa
  * Mercado entre técnicos da liga (B8.6): propostas com dinheiro reservado e contrapropostas, elencos dos outros técnicos, jogadores livres e o histórico público
  * (com denúncia). O servidor aplica todas as regras (janela, limite de estrangeiros, faixa de preço, limites por par de técnicos); a tela só mostra e pede.
  */
-export function LeagueMarket({ league, teams, worldDate, onClose, coachesOnly = false }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; worldDate: string; onClose: () => void; coachesOnly?: boolean }) {
+export function LeagueMarket({ league, teams, worldDate, onClose }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; worldDate: string; onClose: () => void }) {
   const id = league.id
-  const [tab, setTab] = useState<Tab>(coachesOnly ? 'coaches' : 'offers')
+  const [tab, setTab] = useState<Tab>('coaches')
   const [body, setBody] = useState<TradeBody | null>(null)
-  const [ai, setAi] = useState<AiOffersBody | null>(null)
-  const [mine, setMine] = useState<MineBody | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const clubOf = (teamId: string | null): string => (teamId === null ? 'Livre' : (teams?.byId.get(teamId)?.team.shortName ?? teams?.byId.get(teamId)?.team.name ?? teamId))
@@ -44,10 +38,6 @@ export function LeagueMarket({ league, teams, worldDate, onClose, coachesOnly = 
     const r = await leagueApi.tradeBody(id)
     if (r.ok && r.body) setBody(r.body)
     else if (!r.ok) setError(LEAGUE_ERROR_LABELS[r.error])
-    const a = await leagueApi.tradeAi(id)
-    if (a.ok && a.ai) setAi(a.ai)
-    const m = await leagueApi.tradeMine(id)
-    if (m.ok && m.mine) setMine(m.mine)
   }, [id])
   useEffect(() => {
     void load()
@@ -63,8 +53,6 @@ export function LeagueMarket({ league, teams, worldDate, onClose, coachesOnly = 
     setBusy(false)
     if (r.ok) {
       if (r.body) setBody(r.body)
-      if (r.ai) setAi(r.ai)
-      if (r.mine) setMine(r.mine)
       onReply?.(r)
       return true
     }
@@ -74,7 +62,6 @@ export function LeagueMarket({ league, teams, worldDate, onClose, coachesOnly = 
     return false
   }
 
-  const awaiting = (body?.offers.filter((o) => o.mine).length ?? 0) + (ai?.incoming.length ?? 0)
   return (
     <div className="fixed inset-0 z-30 overflow-y-auto bg-bg" data-testid="league-market">
       <div className="mx-auto max-w-md space-y-3 px-3 pb-10">
@@ -87,36 +74,21 @@ export function LeagueMarket({ league, teams, worldDate, onClose, coachesOnly = 
           <Tabs
             value={tab}
             onChange={setTab}
-            options={(coachesOnly
-              ? [
-                  // Dentro do jogo (Fase 6C) a compra, a venda e o pré-contrato com a IA são as abas do Mercado do jogo solo: aqui só o que é entre técnicos.
-                  { id: 'coaches', label: 'Técnicos' },
-                  { id: 'offers', label: 'Propostas' },
-                  { id: 'history', label: 'Histórico' },
-                ]
-              : [
-                  { id: 'offers', label: awaiting > 0 ? `Propostas (${awaiting})` : 'Propostas' },
-                  { id: 'search', label: 'Buscar' },
-                  { id: 'listings', label: 'Anúncios' },
-                  { id: 'mine', label: 'Vender' },
-                  { id: 'pre', label: 'Pré-contrato' },
-                  { id: 'coaches', label: 'Técnicos' },
-                  { id: 'history', label: 'Histórico' },
-                ]) as { id: Tab; label: string }[]}
+            options={[
+              // A compra, a venda e o pré-contrato com a IA são as abas do Mercado do jogo do clube; aqui só o que é entre técnicos da liga.
+              { id: 'coaches', label: 'Técnicos' },
+              { id: 'offers', label: 'Propostas' },
+              { id: 'history', label: 'Histórico' },
+            ]}
           />
           {error && <p className="rounded-xl border border-loss/40 bg-loss/10 p-2 text-sm text-loss" data-testid="market-error">{error}</p>}
         </div>
         {!body ? <p className="text-sm text-muted">Carregando o mercado…</p> : null}
         {body && tab === 'offers' && (
           <>
-            <AiOffers ai={ai} teams={teams} busy={busy} act={act} id={id} />
             <Offers body={body} busy={busy} nick={nick} clubOf={clubOf} act={act} id={id} myTeamId={league.myTeamId} />
           </>
         )}
-        {body && tab === 'search' && <SearchTab league={league} teams={teams} worldDate={worldDate} busy={busy} act={act} windowOpen={body.windowOpen} />}
-        {body && tab === 'listings' && <ListingsTab league={league} teams={teams} worldDate={worldDate} busy={busy} act={act} windowOpen={body.windowOpen} />}
-        {body && tab === 'mine' && <MineTab league={league} mine={mine} teams={teams} busy={busy} act={act} id={id} />}
-        {body && tab === 'pre' && <PreTab mine={mine} teams={teams} busy={busy} act={act} id={id} />}
         {body && tab === 'coaches' && <Coaches league={league} clubOf={clubOf} worldDate={worldDate} busy={busy} act={act} id={id} windowOpen={body.windowOpen} />}
         {body && tab === 'history' && <History body={body} clubOf={clubOf} act={act} id={id} isAdmin={league.isAdmin} />}
       </div>
