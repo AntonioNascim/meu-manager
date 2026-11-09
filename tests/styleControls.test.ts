@@ -2,11 +2,11 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLAY_STYLES } from '../src/engine/types'
-import { createGame, userTeam } from '../src/store/game'
+import { createGame, nextUserMatch, teamById, userTeam } from '../src/store/game'
 import { getGame, setGame } from '../src/store/gameStore'
 import { perform } from '../src/store/actions'
 import { leagueGame } from '../src/store/leagueGame'
-import { PLAY_STYLE_DESCRIPTIONS, PLAY_STYLE_LABELS } from '../src/ui/labels'
+import { MENTALITY_LABELS, PLAY_STYLE_DESCRIPTIONS, PLAY_STYLE_LABELS, formationLabel } from '../src/ui/labels'
 import { Squad } from '../src/ui/screens/Squad'
 import { Tactics } from '../src/ui/screens/Tactics'
 
@@ -58,5 +58,32 @@ describe('estilo e mentalidade na Escalação (mesma escolha da Tática e da par
     await perform({ type: 'tactic', tactic: { ...base, style: 'direct' } })
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({ type: 'tactic', tactic: { style: 'direct' } })
+  })
+})
+
+describe('próximo adversário na Escalação', () => {
+  beforeEach(() => setGame(null))
+
+  it('mostra o adversário com a formação, o estilo e a mentalidade dele (os mesmos do time dele), antes das formações do técnico', () => {
+    const g = solo()
+    const next = nextUserMatch(g)!
+    const opponent = teamById(g, next.homeTeamId === g.userTeamId ? next.awayTeamId : next.homeTeamId)
+    const html = lineup(g)
+    expect(html).toContain('data-testid="next-opponent"')
+    expect(html).toContain('Próximo adversário')
+    expect(html).toContain(opponent.name)
+    const tactic = html.slice(html.indexOf('data-testid="next-opponent-tactic"'))
+    expect(tactic).toContain(PLAY_STYLE_LABELS[opponent.tactic.style])
+    expect(tactic).toContain(formationLabel(opponent.tactic.formationId))
+    expect(tactic).toContain(MENTALITY_LABELS[opponent.tactic.mentality])
+    expect(html.indexOf('Próximo adversário')).toBeLessThan(html.indexOf('Formações'))
+  })
+
+  it('o estilo do adversário muda no cartão quando a tática dele muda (no online chega pelo detalhe do clube)', () => {
+    const g = solo()
+    const next = nextUserMatch(g)!
+    const oppId = next.homeTeamId === g.userTeamId ? next.awayTeamId : next.homeTeamId
+    const changed = { ...g, season: { ...g.season, teams: g.season.teams.map((t) => (t.id === oppId ? { ...t, tactic: { ...t.tactic, style: 'direct' as const } } : t)) } }
+    expect(lineup(changed)).toContain(PLAY_STYLE_DESCRIPTIONS.direct)
   })
 })

@@ -18,6 +18,7 @@ import { perform } from '../../../store/actions'
 import { getLive } from '../../../store/liveMatch'
 import { StatusTags } from '../../components/PlayerDetail'
 import { StyleControls } from '../../components/StyleControls'
+import { NextOpponent } from './NextOpponent'
 import { playerName } from '../../format'
 import { GridPitch } from '../../components/GridPitch'
 import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, commandErrorText, formationLabel } from '../../labels'
@@ -223,6 +224,9 @@ export function Lineup({ game }: { game: Game }) {
   return (
     <div className="space-y-3">
       <SavedLineups game={game} />
+
+      {/* Para decidir a formação e o estilo conforme o rival: o mesmo que aparece ao tocar no escudo do adversário. */}
+      <NextOpponent game={game} />
 
       <div>
         <div className="mb-2">
