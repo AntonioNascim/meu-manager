@@ -7,8 +7,7 @@ import { buildTactic } from '../../engine/lineup'
 import { overallAt, playerOverall } from '../../engine/overall'
 import { MAX_TAKERS, changeFormation, movePlayerTo, setCaptain, setTaker, swapPlayers } from '../../engine/tacticEdit'
 import type { SetPieceKind } from '../../engine/tacticEdit'
-import { PLAY_STYLES } from '../../engine/types'
-import type { GridPoint, Mentality, Player, PlayStyle, Tactic } from '../../engine/types'
+import type { GridPoint, Player, Tactic } from '../../engine/types'
 import { squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { getGame } from '../../store/gameStore'
@@ -16,20 +15,16 @@ import { perform } from '../../store/actions'
 import { bandFor, conditionBand } from '../colors'
 import { getLive } from '../../store/liveMatch'
 import { StatusTags } from '../components/PlayerDetail'
-import { Button, Card, Segmented } from '../components/ui'
+import { StyleControls } from '../components/StyleControls'
+import { Button, Card } from '../components/ui'
 import { playerName } from '../format'
 import {
-  MENTALITY_LABELS,
-  PLAY_STYLE_DESCRIPTIONS,
-  PLAY_STYLE_LABELS,
   POSITION_SHORT_LABELS,
   SET_PIECE_LABELS,
   commandErrorText,
 } from '../labels'
 import { GridPitch } from '../components/GridPitch'
 
-const STYLES: readonly PlayStyle[] = PLAY_STYLES
-const MENTALITIES: Mentality[] = [-2, -1, 0, 1, 2]
 
 /** Nome curto para caber embaixo da camisa no campo. */
 function shortName(p: Player): string {
@@ -220,18 +215,7 @@ export function Tactics({ game }: { game: Game }) {
       <ForeignNote team={team} tactic={tactic} squad={squad} />
       {error && <p className="rounded-lg bg-rose-900/60 p-2 text-sm text-rose-100">{error}</p>}
 
-      <Card title="Estilo de jogo">
-        <Segmented
-          value={tactic.style}
-          options={STYLES.map((s) => ({ id: s, label: PLAY_STYLE_LABELS[s] }))}
-          onChange={(style) => apply((t) => ({ ...t, style }))}
-        />
-        <p className="mt-2 text-xs text-slate-400">{PLAY_STYLE_DESCRIPTIONS[tactic.style]}</p>
-      </Card>
-
-      <Card title="Mentalidade">
-        <Segmented value={tactic.mentality} options={MENTALITIES.map((m) => ({ id: m, label: MENTALITY_LABELS[m] }))} onChange={(mentality) => apply((t) => ({ ...t, mentality }))} />
-      </Card>
+      <StyleControls style={tactic.style} mentality={tactic.mentality} onStyle={(style) => apply((t) => ({ ...t, style }))} onMentality={(mentality) => apply((t) => ({ ...t, mentality }))} />
 
       <Card title="Capitão e cobradores">
         <PlayerSelect label="Capitão" value={tactic.captainId} xi={xi} onChange={(id) => apply((t) => setCaptain(t, id))} />

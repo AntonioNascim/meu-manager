@@ -17,6 +17,7 @@ import { getGame, updateGame } from '../../../store/gameStore'
 import { perform } from '../../../store/actions'
 import { getLive } from '../../../store/liveMatch'
 import { StatusTags } from '../../components/PlayerDetail'
+import { StyleControls } from '../../components/StyleControls'
 import { playerName } from '../../format'
 import { GridPitch } from '../../components/GridPitch'
 import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, commandErrorText, formationLabel } from '../../labels'
@@ -246,6 +247,9 @@ export function Lineup({ game }: { game: Game }) {
           )}
         </div>
       </div>
+
+      {/* O estilo e a mentalidade do time: os mesmos da Tática e da partida, para decidir antes do jogo conforme o adversário. */}
+      <StyleControls style={tactic.style} mentality={tactic.mentality} onStyle={(style) => apply((t) => ({ ...t, style }))} onMentality={(mentality) => apply((t) => ({ ...t, mentality }))} />
 
       <p className="min-h-5 text-xs text-muted">
         {selected ? (

@@ -63,15 +63,16 @@ export function Tabs<T extends string>({ value, options, onChange }: { value: T;
   )
 }
 
-export function Segmented<T extends string | number>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (id: T) => void }) {
+/** Botões de escolha única. `columns`: em grade com esse número de colunas (opções com nome comprido, como os estilos de jogo), em vez de uma linha só. */
+export function Segmented<T extends string | number>({ value, options, onChange, columns }: { value: T; options: { id: T; label: string }[]; onChange: (id: T) => void; columns?: number }) {
   return (
-    <div className="flex gap-1">
+    <div className={columns ? 'grid gap-1' : 'flex gap-1'} style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}>
       {options.map((o) => (
         <button
           key={String(o.id)}
           type="button"
           onClick={() => onChange(o.id)}
-          className={`min-h-11 flex-1 rounded-lg px-1 text-xs font-semibold leading-tight ${value === o.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-200'}`}
+          className={`min-h-11 min-w-0 flex-1 rounded-lg px-1 font-semibold leading-tight ${options.length >= 5 && !columns ? 'text-[11px]' : 'text-xs'} ${value === o.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-200'}`}
         >
           {o.label}
         </button>

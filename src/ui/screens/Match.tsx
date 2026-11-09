@@ -7,25 +7,23 @@ import { shapeOf } from '../../engine/grid'
 import { playerOverall } from '../../engine/overall'
 import type { MatchSnapshot, SideSnapshot } from '../../engine/match'
 import { BASE_MINUTE_MS } from '../../engine/match/timing'
-import { PLAY_STYLES } from '../../engine/types'
-import type { GridPoint, MatchEvent, Mentality, Player, PlayStyle, Position } from '../../engine/types'
-import { finishPendingMatch, teamById } from '../../store/game'
+import type { GridPoint, MatchEvent, Player, Position, Tactic } from '../../engine/types'
+import { finishPendingMatch, teamById, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
-import { updateGame } from '../../store/gameStore'
+import { perform } from '../../store/actions'
+import { getGame, updateGame } from '../../store/gameStore'
 import { beginLive, clearLive, getLive } from '../../store/liveMatch'
 import type { LiveSession } from '../../store/liveMatch'
 import { bandFor, conditionBand } from '../colors'
 import { FieldLineup } from '../components/FieldLineup'
 import type { Kit } from '../components/FieldLineup'
 import { OpponentOverlay } from '../components/OpponentOverlay'
-import { Button, Card, Segmented, Tabs, TeamBadge } from '../components/ui'
+import { StyleControls } from '../components/StyleControls'
+import { Button, Card, Tabs, TeamBadge } from '../components/ui'
 import { formatDate, playerName } from '../format'
 import {
   MATCH_EVENT_LABELS,
   MATCH_STAT_LABELS,
-  MENTALITY_LABELS,
-  PLAY_STYLE_DESCRIPTIONS,
-  PLAY_STYLE_LABELS,
   POSITION_SHORT_LABELS,
 } from '../labels'
 import type { ScreenId } from '../navigation'
@@ -41,8 +39,6 @@ import { Jersey } from '../theme'
 const SPEEDS = [1, 2, 4, 8] as const
 /** Duração de um minuto de jogo na velocidade 1x (ms): a do motor (`BASE_MINUTE_MS`), igual no solo e no online. */
 const MINUTE_MS = BASE_MINUTE_MS
-const STYLES: readonly PlayStyle[] = PLAY_STYLES
-const MENTALITIES: Mentality[] = [-2, -1, 0, 1, 2]
 
 const EVENT_ICON: Record<MatchEvent['type'], string> = {
   goal: '⚽',
@@ -246,6 +242,12 @@ function TacticPanel({
     }
   }
   const pitchCount = side.onPitch.length
+  // O estilo e a mentalidade escolhidos na partida também ficam na tática do time (a mesma da Escalação e da Tática), no solo e no online (vai ao servidor como o comando de tática).
+  const keepInTactic = (change: Partial<Pick<Tactic, 'style' | 'mentality'>>) => {
+    const g = getGame()
+    if (!g) return
+    void perform({ type: 'tactic', tactic: { ...userTeam(g).tactic, ...change } })
+  }
   const move = (id: string, point: GridPoint) => {
     act(() => live.match.setPosition(live.side, id, point))
     setPickedId(null)
@@ -299,13 +301,18 @@ function TacticPanel({
         )}
         <p className="mt-2 text-[11px] text-muted">Arraste um jogador para o ponto que quiser, ou toque em dois para trocá-los de lugar. Vale a partir do próximo lance.{pitchCount < 11 && ' Com menos de 11, os lugares vazios custam: cubra as linhas e as faixas que ficaram sem gente.'}</p>
       </Card>
-      <Card title="Estilo de jogo">
-        <Segmented value={side.style} options={STYLES.map((s) => ({ id: s, label: PLAY_STYLE_LABELS[s] }))} onChange={(s) => act(() => live.match.setStyle(live.side, s))} />
-        <p className="mt-2 text-xs text-slate-400">{PLAY_STYLE_DESCRIPTIONS[side.style]}</p>
-      </Card>
-      <Card title="Mentalidade">
-        <Segmented value={side.mentality} options={MENTALITIES.map((m) => ({ id: m, label: MENTALITY_LABELS[m] }))} onChange={(m) => act(() => live.match.setMentality(live.side, m))} />
-      </Card>
+      <StyleControls
+        style={side.style}
+        mentality={side.mentality}
+        onStyle={(s) => {
+          act(() => live.match.setStyle(live.side, s))
+          keepInTactic({ style: s })
+        }}
+        onMentality={(m) => {
+          act(() => live.match.setMentality(live.side, m))
+          keepInTactic({ mentality: m })
+        }}
+      />
       {error && <p className="rounded-lg bg-rose-900/60 p-2 text-sm text-rose-100">{error}</p>}
       <p className="text-[11px] text-slate-500">Placar atual: {snap.homeGoals} x {snap.awayGoals}. As mudanças valem a partir do próximo lance.</p>
     </div>
