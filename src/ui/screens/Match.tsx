@@ -114,7 +114,7 @@ function Scoreboard({ game, snap, label, speed, onSpeed, onOpponent, effective }
     const content = (
       <>
         <TeamBadge team={team} />
-        <span className="w-full truncate text-xs font-semibold">{shortName(team)}</span>
+        <span className="w-full truncate font-display text-[17px] font-bold leading-tight">{shortName(team)}</span>
       </>
     )
     const cls = 'flex min-w-0 flex-1 flex-col items-center gap-1 text-center'
@@ -127,24 +127,25 @@ function Scoreboard({ game, snap, label, speed, onSpeed, onOpponent, effective }
     )
   }
   return (
-    <div className="relative rounded-xl bg-slate-800 p-3 shadow">
-      <button type="button" onClick={onSpeed} aria-label={`Velocidade ${speed}x. Toque para mudar`} data-testid="speed" className="absolute right-2 top-2 z-10 min-h-7 min-w-10 rounded-full border border-line bg-bg/70 px-2 text-xs font-extrabold tabular-nums text-accent">
+    <div className="card-bg relative rounded-[14px] border border-accent/45 p-3 shadow-[inset_0_0_30px_rgb(39_224_90/0.07),0_0_18px_rgb(39_224_90/0.12)]">
+      <button type="button" onClick={onSpeed} aria-label={`Velocidade ${speed}x. Toque para mudar`} data-testid="speed" className="absolute right-2 top-2 z-10 min-h-9 min-w-[58px] rounded-[10px] border-[1.5px] border-accent px-2.5 font-display text-lg font-extrabold tabular-nums text-accent">
         {speed}x
-        {effective !== undefined && effective !== speed && <span className="ml-1 text-[10px] font-bold text-amber-300" data-testid="speed-effective">valendo {effective}x</span>}
+        {effective !== undefined && effective !== speed && <span className="ml-1 text-[10px] font-bold text-amber" data-testid="speed-effective">valendo {effective}x</span>}
       </button>
-      <div className="flex items-center justify-between gap-2">
+      {game.pendingUserMatch && <span className="absolute left-2.5 top-2.5 inline-flex max-w-[60%] items-center gap-1.5 truncate rounded-full border border-cyan/60 bg-cyan/10 px-2.5 py-1 text-[13px] font-semibold text-cyan">{matchLabel(game.season, game.pendingUserMatch).competition} · {matchLabel(game.season, game.pendingUserMatch).detail}</span>}
+      <div className="mt-10 flex items-center justify-between gap-2">
         {side(home)}
         <div className="text-center">
-          <div className="text-4xl font-bold tabular-nums">
+          <div className="font-display text-[44px] font-extrabold leading-none tabular-nums">
             {snap.homeGoals} x {snap.awayGoals}
           </div>
           {snap.penalties && snap.finished && <div className="text-xs font-bold tabular-nums text-amber-300">({snap.penalties.home} x {snap.penalties.away} nos pênaltis)</div>}
-          <div className="text-xs font-semibold text-emerald-400">{label}</div>
+          <div className="mt-1 font-display text-[15px] font-bold text-accent">{label}</div>
         </div>
         {side(away)}
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-700">
-        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(snap.minute / (snap.extraTime ? 120 : 90)) * 100}%` }} />
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#1a2528]">
+        <div className="h-full bg-gradient-to-r from-[#17b845] to-[#4bf27a] transition-all" style={{ width: `${(snap.minute / (snap.extraTime ? 120 : 90)) * 100}%` }} />
       </div>
     </div>
   )
@@ -157,12 +158,12 @@ function LogList({ game, lines, showFouls, onToggleFouls }: { game: Game; lines:
       <input type="checkbox" checked={showFouls} onChange={onToggleFouls} className="h-4 w-4" />
       Mostrar faltas
     </label>
-    <ul className="divide-y divide-slate-700/60 rounded-xl bg-slate-800">
+    <ul className="card-bg divide-y divide-white/[0.07] rounded-[14px] border border-white/[0.13]">
       {lines.map((l) => {
         const team = l.teamId ? teamById(game, l.teamId) : undefined
         return (
-          <li key={l.key} className={`flex items-start gap-2 px-3 py-2 text-sm ${l.strong ? 'bg-emerald-900/30 font-semibold' : ''}`}>
-            <span className="w-9 shrink-0 text-right text-xs tabular-nums text-slate-400">{l.minute}&apos;</span>
+          <li key={l.key} className={`flex items-start gap-2 px-3 py-2 text-sm ${l.strong ? 'border-l-[3px] border-accent bg-gradient-to-r from-accent/[0.16] to-transparent font-semibold' : ''}`}>
+            <span className="w-9 shrink-0 text-right font-display text-[15px] font-bold tabular-nums text-accent">{l.minute}&apos;</span>
             <span className="w-5 shrink-0 text-center" title={l.label} aria-label={l.label}>
               {l.icon}
             </span>
@@ -196,7 +197,7 @@ function StatsList({ game, snap }: { game: Game; snap: MatchSnapshot }) {
               <span className="font-bold tabular-nums">{a}</span>
             </div>
             <div className="mt-1 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-              <div className="bg-emerald-500" style={{ width: `${total === 0 ? 50 : (h / total) * 100}%` }} />
+              <div className="bg-accent" style={{ width: `${total === 0 ? 50 : (h / total) * 100}%` }} />
               <div className="bg-sky-500" style={{ width: `${total === 0 ? 50 : (a / total) * 100}%` }} />
             </div>
           </div>
@@ -270,13 +271,13 @@ function TacticPanel({
               key={id}
               type="button"
               onClick={() => act(() => live.match.setFormation(live.side, id))}
-              className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-semibold ${side.formationId === id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-200'}`}
+              className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-semibold ${side.formationId === id ? 'bg-accent text-slate-950' : 'bg-slate-700 text-slate-200'}`}
             >
               {id}
             </button>
           ))}
           {side.formationId === 'custom' && (
-            <span className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-slate-950">Livre · {shapeOf(side.grid)}</span>
+            <span className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-slate-950">Livre · {shapeOf(side.grid)}</span>
           )}
         </div>
         {pitchCount !== 11 && <p className="mt-1 text-xs text-amber-300">A formação só muda com 11 jogadores em campo.</p>}
@@ -487,13 +488,13 @@ function useDesktop(): boolean {
 
 /** Botões de controle do jogo (pequenos e do mesmo tamanho): mudam conforme o momento da partida. */
 function Controls({ label, onMain, onSkip, mainDisabled }: { label: string; onMain: () => void; onSkip: () => void; mainDisabled: boolean }) {
-  const base = 'min-h-10 flex-1 rounded-lg px-3 text-sm font-bold disabled:opacity-40'
+  const base = 'inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[10px] px-3 font-display text-lg font-bold disabled:opacity-40'
   return (
     <div className="flex gap-2" role="group" aria-label="Controle do jogo">
-      <button type="button" onClick={onMain} disabled={mainDisabled} className={`${base} bg-accent text-accent-ink`}>
+      <button type="button" onClick={onMain} disabled={mainDisabled} className={`${base} border-[1.5px] border-accent bg-accent/[0.08] text-white`}>
         {label}
       </button>
-      <button type="button" onClick={onSkip} className={`${base} border border-line bg-surface text-slate-100`}>
+      <button type="button" onClick={onSkip} className={`${base} btn-dark text-white`}>
         Ir ao fim
       </button>
     </div>
@@ -638,7 +639,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
 
   const logSection = (
     <section aria-label="Lances ao vivo">
-      <h2 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Lances ao vivo</h2>
+      <h2 className="mb-2 font-display text-xl font-bold">Lances ao vivo</h2>
       <LogList game={game} lines={lines} showFouls={showFouls} onToggleFouls={() => setShowFouls((v) => !v)} />
     </section>
   )
@@ -647,7 +648,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   return (
     <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 lg:space-y-0">
       <div className="space-y-3">
-        <div className="sticky top-[57px] z-10 -mx-4 bg-slate-900/95 px-4 pb-2 pt-1 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+        <div className="sticky top-[84px] z-10 -mx-4 bg-bg/95 px-4 pb-2 pt-1 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0">
           <Scoreboard game={game} snap={snap} label={label} speed={shownSpeed} onSpeed={nextSpeed} onOpponent={() => setOpponentOpen(true)} {...(online ? { effective: online.effectiveSpeed() } : {})} />
         </div>
 
@@ -668,7 +669,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
           <Controls label={mainLabel} onMain={onMain} onSkip={skip} mainDisabled={pending} />
         )}
         {online && finished && <p className="text-center text-xs text-muted">Você vê o resultado e espera: a próxima rodada só começa quando todas as partidas terminarem.</p>}
-        {online && online.lastRejected() && <p role="alert" className="rounded-lg border border-amber-400/60 bg-amber-950/60 p-2 text-xs font-semibold text-amber-100">Não valeu: {LIVE_REJECT_LABELS[online.lastRejected() as keyof typeof LIVE_REJECT_LABELS] ?? 'o servidor recusou a mudança'}</p>}
+        {online && online.lastRejected() && <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-xs font-semibold text-amber">Não valeu: {LIVE_REJECT_LABELS[online.lastRejected() as keyof typeof LIVE_REJECT_LABELS] ?? 'o servidor recusou a mudança'}</p>}
         {snap.minute === 0 && match && (
           <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
             <span>
@@ -682,7 +683,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
         {snap.minute === 0 && match?.cup && <CupPathLine game={game} cupId={match.competitionId} />}
         {snap.minute === 0 && match?.cup?.leg === 2 && <FirstLegNote game={game} match={match} />}
         {alert && (
-          <p role="alert" className="rounded-lg border border-amber-400/60 bg-amber-950/60 p-2 text-sm font-semibold text-amber-100">
+          <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-sm font-semibold text-amber">
             ✚ {alert}
           </p>
         )}

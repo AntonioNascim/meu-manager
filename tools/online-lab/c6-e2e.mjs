@@ -117,7 +117,7 @@ check('o segundo comprador, em sequência, levou o outro (clubes diferentes)', s
 check('os dois compradores eram clubes diferentes', b1 !== null && b2 !== null && b1 !== b2, `${b1} | ${b2}`)
 
 // ------------------------------------------------------------------ favoritos por conta
-await page.getByRole('button', { name: /^Mercado/ }).first().click()
+await page.getByRole('button', { name: /^Transferências/ }).first().click()
 await page.getByRole('tab', { name: 'Buscar', exact: true }).click()
 await sleep(600)
 await page.locator('main ul li').first().locator('button').last().click()
@@ -197,7 +197,7 @@ check('a aba Carreira mostra o histórico (o clube atual, até hoje)', (await pa
 await shoot('carreira')
 
 // ------------------------------------------------------------------ detalhe ao tocar: condição real de outro clube depois da rodada
-await page.getByRole('button', { name: /^Clube/ }).first().click()
+await page.getByRole('button', { name: /^Início/ }).first().click()
 await sleep(800)
 const next = await page.evaluate(() => {
   const g = window.__mm.getGame()
