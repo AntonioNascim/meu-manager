@@ -22,45 +22,43 @@ export const clubName = (game: Game, id: string | null) => (id ? shortName(teamB
 
 const shortDate = (date: string) => date.split('-').reverse().slice(0, 2).join('/')
 
-/** Aviso da janela de transferências, no topo de todas as abas do mercado. */
+/** Janela de transferências: orçamento de compras, vagas no elenco e o aviso (aberta ou fechada), no topo de todas as abas do mercado. */
 export function WindowBanner({ game }: { game: Game }) {
   const state = game.season
   const date = state.season.currentDate
   const window = windowOfTeam(state, date, game.userTeamId)
   const next = windowsFor(state, regionOfTeam(state, game.userTeamId), date).find((w) => w.start > date)
   const team = userTeam(game)
-  const budget = (
-    <div className="mt-1 text-xs text-muted">
-      Orçamento de compras: <b className="text-slate-200">{formatCompactMoney(team.finances.transferBudget)}</b> · Elenco: <b className="text-slate-200">{squadOf(game, team.id).length}/30</b>
-    </div>
-  )
-  if (window) {
-    const left = daysBetween(date, window.end)
-    return (
-      <Panel glow className="flex items-start gap-3 p-4">
-        <span className="mt-0.5 text-accent">
-          <Icon name="swap" size={26} />
-        </span>
-        <div className="min-w-0">
-          <div className="font-bold">Janela de transferências aberta</div>
-          <div className="text-sm text-muted">
-            {WINDOW_LABELS[window.name]} · {left <= 0 ? 'fecha hoje' : `fecha em ${left} ${left === 1 ? 'dia' : 'dias'}`} ({shortDate(window.end)})
-          </div>
-          {budget}
-        </div>
-      </Panel>
-    )
-  }
+  const left = window ? daysBetween(date, window.end) : 0
   return (
-    <Panel className="flex items-start gap-3 p-4">
-      <span className="mt-0.5 text-muted">
-        <Icon name="swap" size={26} />
-      </span>
-      <div className="min-w-0">
-        <div className="font-bold">Janela de transferências fechada</div>
-        <div className="text-sm text-muted">{next ? `${WINDOW_LABELS[next.name]} abre em ${formatDate(next.start)}.` : 'Só abre de novo na próxima temporada.'}</div>
-        {budget}
+    <Panel className="gap-0 p-3.5">
+      <div className="flex items-center justify-between border-b border-white/[0.07] py-1.5 text-[13.5px]">
+        <span className="text-muted">Orçamento de compras</span>
+        <b className="font-display text-xl text-accent">{formatCompactMoney(team.finances.transferBudget)}</b>
       </div>
+      <div className="flex items-center justify-between py-1.5 text-[13.5px]">
+        <span className="text-muted">Elenco</span>
+        <b className="font-display text-xl">{squadOf(game, team.id).length} / 30</b>
+      </div>
+      {window ? (
+        <div className="mt-1 flex items-start gap-2 rounded-xl border border-accent/55 bg-accent/10 px-3 py-2 text-[13px] text-accent">
+          <Icon name="check" size={16} className="mt-0.5" />
+          <div>
+            <b className="block">Janela de transferências aberta</b>
+            <span className="text-slate-200">
+              {WINDOW_LABELS[window.name]} · {left <= 0 ? 'fecha hoje' : `fecha em ${left} ${left === 1 ? 'dia' : 'dias'}`} ({shortDate(window.end)})
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-1 flex items-start gap-2 rounded-xl border border-amber/55 bg-amber/10 px-3 py-2 text-[13px] text-amber">
+          <Icon name="alert" size={16} className="mt-0.5" />
+          <div>
+            <b className="block">Janela de transferências fechada</b>
+            <span className="text-slate-200">{next ? `${WINDOW_LABELS[next.name]} abre em ${formatDate(next.start)}.` : 'Só abre de novo na próxima temporada.'}</span>
+          </div>
+        </div>
+      )}
     </Panel>
   )
 }
@@ -103,11 +101,11 @@ export function MarketRow({
   return (
     <li className="flex items-center">
       <button type="button" onClick={onOpen} className="flex min-h-[72px] min-w-0 flex-1 items-center gap-2 py-2 pl-3 pr-2 text-left">
-        <span className="w-8 shrink-0 text-xs font-bold text-muted">{POSITION_SHORT_LABELS[player.position]}</span>
+        <span className="inline-block w-9 shrink-0 rounded-[5px] bg-accent/10 px-1 py-0.5 text-center font-display text-xs font-bold tracking-wide text-accent">{POSITION_SHORT_LABELS[player.position]}</span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <Flag nationality={player.nationality} />
-            <span className="line-clamp-2 min-w-0 font-bold leading-tight [overflow-wrap:anywhere]">{playerName(player)}</span>
+            <span className="line-clamp-2 min-w-0 font-semibold leading-tight [overflow-wrap:anywhere]">{playerName(player)}</span>
           </span>
           <span className="block truncate text-xs text-muted">
             {POSITION_SHORT_LABELS[player.position]} · {clubName(game, player.teamId)}
@@ -126,7 +124,7 @@ export function MarketRow({
         <span className="shrink-0 text-right">
           {trailing ?? (
             <>
-              <span className="block text-sm font-extrabold tabular-nums">{player.teamId === null ? 'Livre' : shortMoney(value)}</span>
+              <span className="block font-display text-[17px] font-bold tabular-nums">{player.teamId === null ? 'Livre' : shortMoney(value)}</span>
               <span className="block text-[11px] text-muted">{player.teamId === null ? 'sem custo' : 'valor'}</span>
             </>
           )}
@@ -147,7 +145,7 @@ export function FavoriteStar({ game, playerId }: { game: Game; playerId: string 
       onClick={() => updateGame((g) => toggleFavorite(g, playerId))}
       aria-pressed={on}
       aria-label={on ? 'Tirar dos favoritos' : 'Marcar como favorito'}
-      className={`flex h-12 w-11 shrink-0 items-center justify-center ${on ? 'text-amber-300' : 'text-muted'}`}
+      className={`flex h-12 w-11 shrink-0 items-center justify-center ${on ? 'text-amber' : 'text-muted'}`}
     >
       <Icon name="star" size={22} className={on ? 'fill-current' : ''} />
     </button>

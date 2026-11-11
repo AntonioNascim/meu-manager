@@ -3,7 +3,7 @@ import { isWindowOpen, pendingIncoming } from '../../engine/market'
 import { lastYearContracts } from '../../store/game'
 import type { Player } from '../../engine/types'
 import type { Game } from '../../store/game'
-import { TopTabs } from '../theme'
+import { Icon, TopTabs } from '../theme'
 import { favoritesOf } from '../../store/game'
 import { Contracts } from './Contracts'
 import { History } from './market/History'
@@ -26,6 +26,11 @@ export function Market({ game, initialTab = 'search' }: { game: Game; initialTab
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Icon name="swap" size={30} className="text-accent" />
+        <h2 className="font-display text-[26px] font-bold leading-none">Transferências</h2>
+      </div>
+      <WindowBanner game={game} />
       <TopTabs
         scroll
         value={tab}
@@ -43,7 +48,6 @@ export function Market({ game, initialTab = 'search' }: { game: Game; initialTab
           ...(game.online ? [{ id: 'coaches' as const, label: 'Técnicos' }] : []),
         ]}
       />
-      <WindowBanner game={game} />
       {tab === 'search' && <Search key="search" game={game} open={open} />}
       {tab === 'favorites' && <Search key="favorites" game={game} open={open} restrict={onlyFavorites} showTier={false} empty="Toque na estrela de um jogador para acompanhá-lo aqui." />}
       {tab === 'lists' && <Lists game={game} open={open} />}
