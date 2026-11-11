@@ -55,7 +55,7 @@ export function BudgetBar({ game }: { game: Game }) {
         />
       </div>
       <div className="mt-2 flex items-start justify-between gap-3 text-sm">
-        <div className="font-bold text-pink-300">Salários {formatCompactMoney(salary)}/mês</div>
+        <div className="font-bold text-[#ff8ab4]">Salários {formatCompactMoney(salary)}/mês</div>
         <div className="text-right font-bold text-accent">Compras {formatCompactMoney(purchases)}</div>
       </div>
       <p className="mt-1 text-[11px] text-muted">Arraste: o que sobe de um lado desce do outro (um ano de salário vale o mesmo em compras). Os salários não descem abaixo da folha de hoje.</p>

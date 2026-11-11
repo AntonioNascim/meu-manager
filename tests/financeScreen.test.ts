@@ -114,7 +114,7 @@ describe('tela de finanças: alertas e avisos', () => {
     const rich = withTeam(fresh, (t) => ({ ...t, finances: { ...t.finances, balance: 900e6 } }))
     const html = renderToStaticMarkup(createElement(Finance, { game: rich }))
     expect(html).not.toContain('Atenção com o caixa')
-    expect(html).toContain('border-win/40')
+    expect(html).toContain('border-accent/45')
   })
 
   it('folha acima da sustentável e caixa indo para a dívida: o alerta explica a situação e o aviso fica vermelho', () => {

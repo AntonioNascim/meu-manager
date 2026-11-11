@@ -55,9 +55,13 @@ export function Finance({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
-      <Panel striped cut className="p-4">
+      <div className="flex items-center gap-3">
+        <Icon name="dollar" size={30} className="text-accent" />
+        <h2 className="font-display text-[26px] font-bold leading-none">Finanças</h2>
+      </div>
+      <Panel glow className="p-4">
         <Eyebrow>Caixa</Eyebrow>
-        <div className={`title mt-1 text-5xl tabular-nums ${balance < 0 ? 'text-loss' : ''}`}>{formatCompactMoney(balance)}</div>
+        <div className={`mt-1 font-display text-5xl font-extrabold tabular-nums ${balance < 0 ? 'text-loss' : 'text-accent'}`}>{formatCompactMoney(balance)}</div>
         <div className="mt-1 text-xs text-muted">{formatMoney(balance)}</div>
         <div className={`mt-3 text-sm font-bold ${STATUS_COLOR[board.status]}`}>
           Diretoria: {Math.round(board.confidence)}/100 de confiança · {BOARD_STATUS_LABELS[board.status]}
@@ -66,19 +70,19 @@ export function Finance({ game }: { game: Game }) {
           <FundsButton game={game} />
         </div>
         <div className="mt-2 flex gap-2">
-          <button type="button" onClick={() => setSheet('statement')} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-surface font-bold active:scale-95">
+          <button type="button" onClick={() => setSheet('statement')} className="btn-dark flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[10px] font-display text-lg font-bold active:scale-95">
             <Icon name="contract" size={18} /> Extrato
           </button>
-          <button type="button" onClick={() => setSheet('balance')} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-surface font-bold active:scale-95">
+          <button type="button" onClick={() => setSheet('balance')} className="btn-dark flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[10px] font-display text-lg font-bold active:scale-95">
             <Icon name="table" size={18} /> Balanço
           </button>
         </div>
       </Panel>
 
       {reasons.length > 0 && (
-        <section className="rounded-2xl border border-loss/60 bg-loss/10 p-4" role="alert">
-          <div className="flex items-center gap-2 font-bold text-loss">
-            <Icon name="finance" size={20} /> Atenção com o caixa
+        <section className="rounded-[14px] border border-amber/55 bg-gradient-to-r from-[#2a1c06] to-[#0e1210] p-4" role="alert">
+          <div className="flex items-center gap-2 font-display text-lg font-bold text-amber">
+            <Icon name="alert" size={20} /> Atenção com o caixa
           </div>
           <ul className="mt-2 space-y-2 text-sm text-slate-200">
             {reasons.map((r) => (
@@ -88,17 +92,17 @@ export function Finance({ game }: { game: Game }) {
         </section>
       )}
 
-      <button type="button" onClick={() => setSheet('ticket')} className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-4 text-left active:scale-[0.99]">
-        <span className="text-sky-300">
+      <button type="button" onClick={() => setSheet('ticket')} className="card-bg flex w-full items-center gap-3 rounded-[14px] border border-white/[0.13] p-4 text-left active:scale-[0.99]">
+        <span className="text-accent">
           <Icon name="stadium" size={28} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-lg font-extrabold">{team.stadium.name}</span>
+          <span className="block truncate font-display text-xl font-bold">{team.stadium.name}</span>
           <span className="block text-xs text-muted">
             {team.stadium.capacity.toLocaleString('pt-BR')} lugares · ingresso {formatMoney(team.ticketPrice)} · última renda {gate.last === null ? '–' : formatCompactMoney(gate.last)}
           </span>
         </span>
-        <span className="text-xl text-muted" aria-hidden="true">
+        <span className="text-xl text-accent" aria-hidden="true">
           ›
         </span>
       </button>
@@ -106,7 +110,7 @@ export function Finance({ game }: { game: Game }) {
       <BudgetBar game={game} />
 
       <section
-        className={`flex items-start gap-3 rounded-2xl border p-4 text-sm ${!outlook.coversSeason ? 'border-loss/50 bg-loss/10 text-loss' : tight ? 'border-amber-300/50 bg-amber-300/10 text-amber-300' : 'border-win/40 bg-win/10 text-win'}`}
+        className={`flex items-start gap-3 rounded-[14px] border p-4 text-sm ${!outlook.coversSeason ? 'border-loss/50 bg-loss/10 text-loss' : tight ? 'border-amber/55 bg-amber/10 text-amber' : 'border-accent/45 bg-accent/[0.06] text-accent'}`}
         role="status"
       >
         <Icon name="finance" size={20} />
@@ -122,7 +126,7 @@ export function Finance({ game }: { game: Game }) {
       </section>
 
       <Panel className="overflow-hidden">
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-white/[0.07]">
           {[...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES].map((c) => {
             const value = summary.byCategory[c] ?? 0
             const income = INCOME_CATEGORIES.includes(c)
@@ -143,12 +147,12 @@ export function Finance({ game }: { game: Game }) {
       </Panel>
 
       <Panel className="flex items-center gap-3 p-4">
-        <span className="text-sky-300">
+        <span className="text-accent">
           <Icon name="stadium" size={22} />
         </span>
         <div className="flex-1">
           <div className="text-xs text-muted">Renda média em casa</div>
-          <div className="text-xl font-extrabold tabular-nums">{gate.games > 0 ? formatMoney(gate.average) : '–'}</div>
+          <div className="font-display text-2xl font-bold tabular-nums">{gate.games > 0 ? formatMoney(gate.average) : '–'}</div>
         </div>
         <div className="text-right text-xs text-muted">{gate.games} {gate.games === 1 ? 'jogo' : 'jogos'} em casa</div>
       </Panel>
