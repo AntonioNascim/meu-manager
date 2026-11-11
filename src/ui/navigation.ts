@@ -1,7 +1,7 @@
-export type ScreenId = 'home' | 'squad' | 'tactics' | 'match' | 'standings' | 'finance' | 'market' | 'contracts' | 'academy' | 'training' | 'career' | 'league' | 'admin'
+export type ScreenId = 'home' | 'squad' | 'tactics' | 'match' | 'standings' | 'finance' | 'market' | 'contracts' | 'academy' | 'training' | 'career' | 'league' | 'admin' | 'more'
 
 export const SCREEN_LABELS: Record<ScreenId, string> = {
-  home: 'Clube',
+  home: 'Início',
   squad: 'Elenco',
   tactics: 'Tática',
   match: 'Partida',
@@ -14,12 +14,13 @@ export const SCREEN_LABELS: Record<ScreenId, string> = {
   career: 'Carreira',
   league: 'Liga',
   admin: 'ADM',
+  more: 'Mais',
 }
 
 /** Abas da barra de baixo. */
-export type NavTab = 'home' | 'squad' | 'market' | 'standings' | 'finance'
+export type NavTab = 'home' | 'standings' | 'squad' | 'market' | 'more'
 
-/** Qual aba fica acesa em cada tela (Tática pertence ao Elenco, Partida ao Clube, Contratos ao Mercado). */
+/** Qual aba fica acesa em cada tela (Tática, Base e Treino pertencem ao Elenco, Partida ao Início, Contratos às Transferências; Finanças, Carreira e liga ficam em Mais). */
 export const NAV_TAB_OF: Record<ScreenId, NavTab> = {
   home: 'home',
   match: 'home',
@@ -29,9 +30,10 @@ export const NAV_TAB_OF: Record<ScreenId, NavTab> = {
   contracts: 'market',
   academy: 'squad',
   training: 'squad',
-  career: 'home',
-  league: 'home',
-  admin: 'home',
+  career: 'more',
+  league: 'more',
+  admin: 'more',
   standings: 'standings',
-  finance: 'finance',
+  finance: 'more',
+  more: 'more',
 }

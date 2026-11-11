@@ -16,7 +16,7 @@ export function CupCard({ game, onOpen }: { game: Game; onOpen: () => void }) {
   return (
     <Panel className="p-4" data-testid="cup-card">
       <div className="flex items-start justify-between gap-2">
-        <Eyebrow>Copas</Eyebrow>
+        <Eyebrow icon="trophy">Copas</Eyebrow>
         <button type="button" onClick={onOpen} className="min-h-10 text-sm font-bold text-accent">
           Ver chaveamento
         </button>

@@ -11,7 +11,7 @@ import { LeagueScreen } from './screens/online/leagues/LeagueScreen'
 import { AdminPanel } from './screens/online/leagues/AdminPanel'
 import { BusyOverlay } from './components/BusyOverlay'
 import { TeamBadge } from './components/ui'
-import { formatDate } from './format'
+import { formatCompactMoney, formatDate } from './format'
 import { NAV_TAB_OF, SCREEN_LABELS } from './navigation'
 import type { NavTab, ScreenId } from './navigation'
 import { BottomNav } from './theme'
@@ -21,6 +21,8 @@ import { Dismissed } from './screens/Dismissed'
 import { Market } from './screens/Market'
 import type { MarketTab } from './screens/Market'
 import { Finance } from './screens/Finance'
+import { More } from './screens/More'
+import { Icon } from './theme'
 import { Dashboard } from './screens/Dashboard'
 import { MatchScreen } from './screens/Match'
 import { Start } from './screens/Start'
@@ -94,56 +96,51 @@ export function App() {
   const hasMatch = game.pendingUserMatch !== undefined || game.online !== undefined
   const current: ScreenId = screen === 'match' && !hasMatch ? 'home' : screen
   const tabs: NavItem<NavTab>[] = [
-    { id: 'home', label: 'Clube', icon: 'home' },
+    { id: 'home', label: 'Início', icon: 'home' },
+    { id: 'standings', label: 'Competições', icon: 'trophy' },
     { id: 'squad', label: 'Elenco', icon: 'squad', alert: academyAlert(game).pending > 0 || academyAlert(game).arrivals > 0 },
-    { id: 'market', label: 'Mercado', icon: 'market', alert: pendingIncoming(game.season).length > 0 || lastYearContracts(game).length > 0 },
-    { id: 'standings', label: 'Tabela', icon: 'table' },
-    { id: 'finance', label: 'Finanças', icon: 'finance' },
+    { id: 'market', label: 'Transferências', icon: 'swap', alert: pendingIncoming(game.season).length > 0 || lastYearContracts(game).length > 0 },
+    { id: 'more', label: 'Mais', icon: 'gear' },
   ]
   const goTab = (tab: NavTab) => navigate(tab)
+  const leaveGame = () => {
+    setScreen('home')
+    setHint(undefined)
+    if (game.online) {
+      // A liga é do servidor: sair do jogo só fecha o espelho (nada a salvar neste aparelho).
+      clearLive()
+      closeLeague()
+      return
+    }
+    void flushAutosave().then(() => {
+      clearLive()
+      setGame(null)
+    })
+  }
 
   return (
-    <div className={`mx-auto flex min-h-dvh flex-col bg-bg text-slate-100 ${current === 'match' ? 'max-w-6xl' : 'max-w-xl'}`}>
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-4 py-2 backdrop-blur">
-        {current === 'home' ? (
-          <div className="min-w-0 flex-1 text-xs text-muted">
-            <span className="title text-lg text-white">Meu Manager</span>
-            {saveStatus.state === 'saved' && <span className="ml-2 text-win">· salvo</span>}
-            {saveStatus.state === 'saving' && <span className="ml-2">· salvando…</span>}
-            {saveStatus.state === 'error' && <span className="ml-2 text-loss">· não salvou: {saveStatus.message}</span>}
+    <div className={`mx-auto flex min-h-dvh flex-col text-slate-100 ${current === 'match' ? 'max-w-6xl' : 'max-w-xl'}`}>
+      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.07] bg-[linear-gradient(100deg,#0a1214_0_62%,rgb(39_224_90/0.16)_62.2%,#060b0c_63%_100%)] px-3.5 py-3">
+        <TeamBadge team={team} size="md" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-display text-[22px] font-bold leading-tight">{team.name}</div>
+          <div className="flex items-center gap-1.5 text-[11.5px] text-muted">
+            Técnico
+            {saveStatus.state === 'saved' && <span className="flex items-center gap-1.5">· <i className="inline-block h-[7px] w-[7px] rounded-full bg-accent shadow-[0_0_6px_var(--color-accent)]" /> salvo</span>}
+            {saveStatus.state === 'saving' && <span>· salvando…</span>}
+            {saveStatus.state === 'error' && <span className="text-loss">· não salvou: {saveStatus.message}</span>}
           </div>
-        ) : (
-          <>
-            <TeamBadge team={team} size="sm" />
-            <div className="min-w-0 flex-1">
-              <div className="title truncate text-xl">{team.name}</div>
-              <div className="text-xs text-muted">
-                {formatDate(game.season.season.currentDate)}
-                {saveStatus.state === 'saved' && <span className="ml-2 text-win">· salvo</span>}
-                {saveStatus.state === 'saving' && <span className="ml-2">· salvando…</span>}
-                {saveStatus.state === 'error' && <span className="ml-2 text-loss">· não salvou: {saveStatus.message}</span>}
-              </div>
-            </div>
-          </>
-        )}
-        <button
-          type="button"
-          className="min-h-10 rounded-lg px-3 text-xs font-bold uppercase tracking-wider text-muted hover:bg-surface"
-          onClick={() => {
-            if (game.online) {
-              // A liga é do servidor: sair do jogo só fecha o espelho (nada a salvar neste aparelho).
-              clearLive()
-              closeLeague()
-              return
-            }
-            void flushAutosave().then(() => {
-              clearLive()
-              setGame(null)
-            })
-          }}
-        >
-          Menu
-        </button>
+        </div>
+        <div className="flex flex-none flex-col gap-1.5 border-l border-white/[0.13] pl-3">
+          <div className="flex items-center gap-2">
+            <Icon name="wallet" size={18} className="text-accent" />
+            <div><b className="block font-display text-[15px] leading-none">{formatCompactMoney(team.finances.balance)}</b><small className="text-[11px] text-accent">Saldo em caixa</small></div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Icon name="cal" size={18} className="text-accent" />
+            <div><b className="block font-display text-[15px] leading-none">{formatDate(game.season.season.currentDate)}</b></div>
+          </div>
+        </div>
       </header>
 
       {game.online?.connection === 'offline' && (
@@ -169,6 +166,7 @@ export function App() {
         {current === 'standings' && <Standings key={hint ?? ''} game={game} initialSection={initialStandingsSection(hint)} />}
         {(current === 'market' || current === 'contracts') && <Market key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'contracts' ? 'contracts' : initialMarketTab(hint)} />}
         {current === 'finance' && <Finance game={game} />}
+        {current === 'more' && <More game={game} onNavigate={navigate} onMenu={leaveGame} />}
       </main>
 
       <BottomNav items={tabs} active={NAV_TAB_OF[current]} onSelect={goTab} />

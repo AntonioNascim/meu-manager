@@ -52,12 +52,12 @@ await page.getByTestId('status-next').waitFor({ timeout: 60000 })
 // ------------------------------------------------------------------ abrir o jogo
 await page.getByTestId('open-league-game').click()
 await page.getByTestId('league-card').waitFor({ timeout: 90000 })
-const tab = async (name) => page.getByRole('button', { name, exact: true }).first().click()
+const tab = async (name) => page.getByRole('button', { name: new RegExp('^' + name) }).first().click()
 const offers = () => page.evaluate(() => window.__mm.getGame().season.market.offers.length)
 const shots1 = {}
 
 // ------------------------------------------------------------------ Mercado: buscar e propor a um clube da IA
-await tab('Mercado')
+await tab('Transferências')
 await sleep(800)
 shots1.mercado = await shoot(page, 'online-mercado')
 check('a aba Técnicos existe no Mercado online', (await page.getByRole('tab', { name: 'Técnicos', exact: true }).count()) > 0)
@@ -94,7 +94,8 @@ shots1.tecnicos = await shoot(page, 'online-tecnicos')
 await page.getByTestId('market-back').click()
 
 // ------------------------------------------------------------------ Finanças: pedir verba (a resposta da diretoria vem do servidor)
-await tab('Finanças')
+await tab('Mais')
+await page.getByRole('button', { name: 'Finanças' }).first().click()
 await sleep(800)
 shots1.financas = await shoot(page, 'online-financas')
 await page.getByRole('button', { name: 'Pedir verba' }).click()

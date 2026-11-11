@@ -25,7 +25,7 @@ export function MiniTable({ game, competition, onOpen }: { game: Game; competiti
   return (
     <Panel className="p-4" data-testid="mini-table">
       <div className="flex items-start justify-between gap-2">
-        <Eyebrow>Classificação</Eyebrow>
+        <Eyebrow icon="chart">Classificação</Eyebrow>
         <button type="button" onClick={onOpen} className="min-h-10 text-sm font-bold text-accent">
           Ver tabela
         </button>

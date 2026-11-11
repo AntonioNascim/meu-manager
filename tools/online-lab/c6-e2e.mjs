@@ -128,11 +128,11 @@ check('a estrela marcou um favorito', favs === 1, `${favs}`)
 // ------------------------------------------------------------------ rodada ao vivo com lesões repetidas e queda de conexão
 let watching = false
 for (let tries = 0; tries < 8 && !watching; tries++) {
-  await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Início', exact: true }).first().click()
   await page.getByRole('button', { name: /^ADM/ }).click()
   await page.getByTestId('advance-league').click()
   await page.getByTestId('confirm-action').click()
-  await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Início', exact: true }).first().click()
   // Avançar só abre a sala ("Jogo pronto · Agora"): a partida espera o Pronto e abre sozinha na tela depois dele.
   const ready = await page.getByTestId('league-ready').waitFor({ timeout: 10000 }).then(() => true, () => false)
   if (ready) {
@@ -213,7 +213,8 @@ check('ao abrir a página do adversário a condição física real chega (não s
 await closeOverlays()
 { const back = page.getByRole('button', { name: /Voltar|Fechar/ }).first(); if (await back.isVisible().catch(() => false)) await back.click() }
 // ------------------------------------------------------------------ sair e voltar: favoritos da conta e espelho guardado no aparelho
-await page.getByRole('button', { name: 'Menu', exact: true }).click()
+await page.getByRole('button', { name: 'Mais', exact: true }).click()
+await page.getByRole('button', { name: 'Menu · salvar e voltar ao início' }).click()
 await page.getByTestId('online-account').waitFor({ timeout: 30000 })
 const cached = await page.evaluate(async () => {
   const dbs = await indexedDB.databases()

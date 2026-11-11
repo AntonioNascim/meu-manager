@@ -76,7 +76,7 @@ await page.getByTestId('league-screen').waitFor({ timeout: 30000 })
 await page.getByTestId('status-next').waitFor({ timeout: 30000 })
 check('a sala da liga abre dentro do jogo (Pronto, Avançar e ritmo)', (await page.getByTestId('league-screen').innerText()).toLowerCase().includes('próxima rodada'))
 await shoot(page, 'online-sala-da-liga')
-await page.getByRole('button', { name: 'Clube', exact: true }).click()
+await page.getByRole('button', { name: 'Início', exact: true }).click()
 
 const tab = async (name) => page.getByRole('button', { name, exact: true }).first().click()
 // ------------------------------------------------------------------ Elenco, Treino, Base
@@ -94,7 +94,7 @@ await sleep(400)
 shots1.base = await shoot(page, 'online-base')
 
 // ------------------------------------------------------------------ Tática: muda a formação e confere no servidor reabrindo
-await tab('Clube')
+await tab('Início')
 await page.getByText('Tática', { exact: true }).first().click()
 await sleep(500)
 shots1.tatica = await shoot(page, 'online-tatica')
@@ -106,13 +106,14 @@ const g2 = await game()
 check('a tática mudou no espelho', g2.formation === target, `${before} -> ${g2.formation}`)
 
 // ------------------------------------------------------------------ Tabela
-await tab('Tabela')
+await tab('Competições')
 await sleep(600)
 shots1.tabela = await shoot(page, 'online-tabela')
 
 // ------------------------------------------------------------------ o servidor guardou: sair e abrir de novo
-await tab('Clube')
-await page.getByRole('button', { name: 'Menu', exact: true }).click()
+await tab('Início')
+await page.getByRole('button', { name: 'Mais', exact: true }).click()
+await page.getByRole('button', { name: 'Menu · salvar e voltar ao início' }).click()
 await page.getByTestId('online-account').waitFor({ timeout: 30000 })
 await page.getByRole('button', { name: 'Ligas online' }).click()
 await page.getByText('Abrir a sala').first().click()

@@ -53,7 +53,7 @@ export function Highlights({ game, onOpen }: { game: Game; onOpen: () => void })
   const h = squadHighlights(squadOf(game, userTeam(game).id))
   return (
     <Panel className="p-4" data-testid="highlights">
-      <Eyebrow>Destaques do elenco</Eyebrow>
+      <Eyebrow icon="star">Destaques do elenco</Eyebrow>
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Tile icon="ball" label="Artilheiro" entry={h.scorer} format={(v) => String(v)} onOpen={onOpen} />
         <Tile icon="boot" label="Garçom" entry={h.assister} format={(v) => String(v)} onOpen={onOpen} />

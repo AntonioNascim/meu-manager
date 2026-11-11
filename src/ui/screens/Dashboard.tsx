@@ -28,9 +28,9 @@ import { AdminShortcut } from './online/leagues/AdminShortcut'
 import { LeagueCard } from './online/leagues/LeagueCard'
 import { Card } from '../components/ui'
 import { ReportProblem } from '../components/ReportProblem'
-import { dateParts, daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
+import { daysBetween, formatCompactMoney, formatDate, formatMoney, outcomeFor } from '../format'
 import type { ScreenId } from '../navigation'
-import { BOARD_STATUS_LABELS, OUTCOME_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS } from '../labels'
+import { formationLabel, BOARD_STATUS_LABELS, OUTCOME_LABELS, TRAINING_FOCUS_LABELS, TRAINING_INTENSITY_LABELS } from '../labels'
 import { Highlights } from './dashboard/Highlights'
 import { CupCard } from './dashboard/CupCard'
 import { MiniTable } from './dashboard/MiniTable'
@@ -40,7 +40,7 @@ import { isUnavailable } from '../squadSort'
 import { teamForm } from './standings/data'
 import { Crest, Eyebrow, Icon, Panel, ProgressBar, ResultDot, SegmentedBar, ShortcutTile } from '../theme'
 
-const BOARD_CHIP = { safe: 'border-win/40 bg-win/10 text-win', warning: 'border-amber-300/40 bg-amber-300/10 text-amber-300', danger: 'border-loss/40 bg-loss/10 text-loss' } as const
+const BOARD_CHIP = { safe: 'border-accent/50 bg-accent/10 text-accent', warning: 'border-amber/50 bg-amber/10 text-amber', danger: 'border-loss/40 bg-loss/10 text-loss' } as const
 const BAR_TONE = { safe: 'accent', warning: 'warning', danger: 'danger' } as const
 
 /** Treino atual: intensidade, foco e a vaga individual. */
@@ -51,7 +51,7 @@ function TrainingCard({ game, onOpen }: { game: Game; onOpen: () => void }) {
   return (
     <Panel className="p-4">
       <div className="flex items-start justify-between gap-2">
-        <Eyebrow>Treino</Eyebrow>
+        <Eyebrow icon="dumbbell">Treino</Eyebrow>
         <button type="button" className="min-h-10 text-sm font-bold text-accent" onClick={onOpen}>
           Mudar
         </button>
@@ -104,7 +104,7 @@ function LastMatchCard({ game, match }: { game: Game; match: Match }) {
   const income = home.id === team.id ? team.finances.ledger.find((e) => e.category === 'ticket-sales' && e.date === match.date)?.amount : undefined
   return (
     <Panel className="p-4">
-      <Eyebrow>Último jogo</Eyebrow>
+      <Eyebrow icon="ball">Último jogo</Eyebrow>
       <div className="mt-3 flex items-center gap-3">
         {outcome && <ResultDot outcome={outcome} size="lg" />}
         <div className="min-w-0 flex-1">
@@ -165,6 +165,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const starters = team.tactic.startingXI.map((id) => byId.get(id)).filter((p) => p !== undefined)
   const condition = starters.length ? Math.round(starters.reduce((sum, p) => sum + p.condition.fitness, 0) / starters.length) : 0
 
+
   const finishedMine = state.matches
     .filter((m) => m.status === 'finished' && (m.homeTeamId === team.id || m.awayTeamId === team.id))
     .sort((a, b) => a.date.localeCompare(b.date) || a.round - b.round)
@@ -179,7 +180,6 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const outlook = cashOutlook(team, payroll, today, seasonEnd)
   const financeAlert = outlook.alerts.length > 0
   const salaryBudget = team.finances.salaryBudget
-  const when = dateParts(today)
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
   const advance = () => {
@@ -197,32 +197,20 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   return (
     <div className="space-y-3">
-      <header className="flex items-center gap-4">
-        <Crest team={team} size="xl" />
-        <div className="min-w-0 flex-1">
-          <h1 className={`title line-clamp-2 [overflow-wrap:anywhere] ${Math.max(...team.name.split(/s+/).map((w) => w.length)) > 12 ? 'text-3xl sm:text-5xl' : 'text-4xl sm:text-5xl'}`}>{team.name}</h1>
-          <p className="text-sm text-muted">{competition.name} · {team.stadium.name}</p>
-        </div>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
-        <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3">
-          <Icon name="trophy" size={16} className="text-muted" />
+      <div className="flex flex-wrap items-center gap-2 text-sm font-bold" data-testid="form-strip">
+        <span className="card-bg inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/[0.13] px-3">
+          <Icon name="trophy" size={16} className="text-accent" />
           {row && row.played > 0 ? `${position}º` : '–'}
         </span>
-        <span className="inline-flex min-h-9 items-center rounded-full border border-line bg-surface px-3">{row?.points ?? 0} pts</span>
-        <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3">
-          <Icon name="calendar" size={16} className="text-muted" />
+        <span className="card-bg inline-flex min-h-9 items-center rounded-full border border-white/[0.13] px-3">{row?.points ?? 0} pts</span>
+        <span className="card-bg inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/[0.13] px-3">
+          <Icon name="calendar" size={16} className="text-accent" />
           {row?.played ?? 0}/{totalRounds}
         </span>
-        <span className="flex items-center gap-1" aria-label="Últimos 5 resultados">
+        <span className="ml-auto flex items-center gap-1" aria-label="Últimos 5 resultados">
           {form.map((o, i) => (
             <ResultDot key={i} outcome={o} />
           ))}
-        </span>
-        <span className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 tabular-nums" title="Saldo em caixa">
-          <Icon name="finance" size={16} className="text-muted" />
-          {formatCompactMoney(team.finances.balance)}
         </span>
       </div>
 
@@ -230,70 +218,104 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
       {game.lastReport && <SeasonReport game={game} report={game.lastReport} />}
 
-      <Panel striped cut className="p-5">
-        <div className="flex items-end gap-3">
-          <span className="title text-7xl tabular-nums">{when.day}</span>
-          <div className="pb-1.5 leading-tight">
-            <div className="title text-2xl">
-              {when.month} <span className="text-muted">{when.weekday}</span>
-            </div>
-            <div className="text-sm font-bold text-muted">{when.year}</div>
-          </div>
+      <Panel className="p-3.5">
+        <div className="-mx-3.5 -mt-3.5 mb-3 flex items-stretch justify-between overflow-hidden rounded-t-[14px] border-b border-white/[0.07] bg-gradient-to-r from-accent/[0.12] to-transparent">
+          <span className="inline-flex items-center gap-2 bg-gradient-to-r from-[#1f9a3e] to-[#0c4f1e] py-2 pl-3.5 pr-7 font-display text-[19px] font-bold [clip-path:polygon(0_0,100%_0,calc(100%_-_16px)_100%,0_100%)]">
+            <Icon name="trophy" size={20} className="text-[#bff5cb]" />
+            Próximo jogo
+          </span>
+          {next && <span className="self-center pr-3.5 text-[13px] font-semibold text-accent">{matchLabel(state, next).competition}</span>}
         </div>
-
-        <div className="mt-6">
-          <Eyebrow>Próximo jogo</Eyebrow>
-          {next && opponent ? (
-            <>
-              <button type="button" onClick={() => setOpponentOpen(true)} aria-label={`Ver a tática de ${opponent.name}`} className="mt-2 flex w-full items-center gap-3 text-left">
-                <Crest team={opponent} size="md" />
-                <div className="min-w-0">
-                  <div className="title line-clamp-2 text-3xl">{opponent.name}</div>
-                  <div className="text-sm text-muted">
-                    {matchLabel(state, next).competition} · {matchLabel(state, next).detail.toLowerCase()} · {next.cup?.neutral ? 'campo neutro' : next.homeTeamId === team.id ? 'em casa' : 'fora'} · {inDays(daysBetween(today, next.date))}
-                  </div>
-                </div>
-              </button>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="opponent-form">
-                <span className="font-bold">{opponentRow && opponentRow.played > 0 ? `${opponentPosition}º` : '–'} · {opponentRow?.points ?? 0} pts</span>
-                <span className="flex items-center gap-1" aria-label={`Forma de ${opponent.name}`}>
-                  {opponentForm.map((o, i) => (
-                    <ResultDot key={i} outcome={o} />
-                  ))}
-                </span>
+        {next && opponent ? (
+          <>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 text-center">
+              <div className="flex flex-col items-center gap-1">
+                <Crest team={team} size="lg" />
+                <span className="font-display text-[17px] font-bold leading-tight">{team.name}</span>
+                <span className="text-xs text-muted">{row && row.played > 0 ? `${position}º` : '–'} · {row?.points ?? 0} pts</span>
               </div>
-              <button type="button" onClick={() => setOpponentOpen(true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-accent/60 text-sm font-bold text-accent">
-                <Icon name="tactics" size={18} />
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="font-display text-[44px] font-extrabold leading-none">X</span>
+                <span className="font-display text-[15px] font-bold text-accent">{formatDate(next.date)}</span>
+                <span className="text-xs text-muted">{inDays(daysBetween(today, next.date))}</span>
+              </div>
+              <button type="button" onClick={() => setOpponentOpen(true)} aria-label={`Ver a tática de ${opponent.name}`} className="flex flex-col items-center gap-1">
+                <Crest team={opponent} size="lg" />
+                <span className="font-display text-[17px] font-bold leading-tight">{opponent.name}</span>
+                <span className="text-xs text-muted" data-testid="opponent-form">
+                  {opponentRow && opponentRow.played > 0 ? `${opponentPosition}º` : '–'} · {opponentRow?.points ?? 0} pts
+                  <span className="ml-1.5 inline-flex items-center gap-1 align-middle" aria-label={`Forma de ${opponent.name}`}>
+                    {opponentForm.map((o, i) => (
+                      <ResultDot key={i} outcome={o} />
+                    ))}
+                  </span>
+                </span>
+              </button>
+            </div>
+            <p className="mt-2 text-center text-xs text-muted">
+              {matchLabel(state, next).detail} · {next.cup?.neutral ? 'campo neutro' : next.homeTeamId === team.id ? 'em casa' : 'fora'} · Força dos titulares: {teamStrength(game, team).toFixed(0)} (você) x {teamStrength(game, opponent).toFixed(0)} ({opponent.abbreviation})
+            </p>
+            <div className="mt-2 flex items-center justify-center gap-2 text-[13px] text-slate-200">
+              <Icon name="heart" size={16} className="text-muted" />
+              Condição média dos titulares: <b className="tabular-nums text-accent">{condition}</b>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              <button type="button" onClick={() => setOpponentOpen(true)} className="flex min-h-11 items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-accent bg-accent/[0.08] px-2 text-center font-display text-base font-bold leading-tight">
+                <Icon name="tactics" size={18} className="text-accent" />
                 Ver tática e escalação provável
               </button>
-              {opponentOpen && <OpponentOverlay game={game} teamId={opponent.id} onClose={() => setOpponentOpen(false)} />}
-              <div className="mt-2 text-xs text-muted">
-                Força dos titulares: {teamStrength(game, team).toFixed(0)} (você) x {teamStrength(game, opponent).toFixed(0)} ({opponent.abbreviation})
-              </div>
-            </>
-          ) : (
-            <p className="mt-2 text-lg font-bold">{seasonOver ? 'A temporada terminou.' : 'Sem jogos agendados.'}</p>
-          )}
-        </div>
-
-        <div className="mt-4 flex items-center gap-2 text-sm text-slate-200">
-          <Icon name="heart" size={18} className="text-muted" />
-          Condição média dos titulares: <b className="tabular-nums">{condition}</b>
-        </div>
+              <button type="button" onClick={() => onNavigate('tactics')} className="btn-dark flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-2 font-display text-base font-bold">
+                <Icon name="tactics" size={18} className="text-accent" />
+                Tática
+              </button>
+            </div>
+            {opponentOpen && <OpponentOverlay game={game} teamId={opponent.id} onClose={() => setOpponentOpen(false)} />}
+          </>
+        ) : (
+          <p className="text-lg font-bold">{seasonOver ? 'A temporada terminou.' : 'Sem jogos agendados.'}</p>
+        )}
 
         {game.online ? (
           // Na liga online quem avança o tempo é a liga: no lugar do botão Avançar entra o cartão da liga (Pronto e sala).
           <LeagueCard leagueId={game.online.leagueId} teamId={game.userTeamId} onOpen={() => onNavigate('league')} onWatch={() => onNavigate('match')} onCareer={() => onNavigate('career')} />
         ) : (
-          <button
-            type="button"
-            onClick={advance}
-            className="mt-5 flex min-h-14 w-full items-center justify-center rounded-xl bg-accent font-display text-2xl font-extrabold uppercase tracking-wide text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
-          >
-            {academy.pending > 0 ? 'Decidir sobre a base' : seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
-          </button>
+          <>
+            {pending && (
+              <button type="button" onClick={() => onNavigate('match')} className="btn-dark mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] font-display text-base font-bold">
+                <Icon name="play" size={18} className="text-accent" />
+                Preparar partida
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={advance}
+              className="btn-primary mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-[10px] font-display text-[21px] font-bold uppercase tracking-wide transition active:scale-[0.98]"
+            >
+              <Icon name="ffwd" size={22} />
+              {academy.pending > 0 ? 'Decidir sobre a base' : seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}
+            </button>
+          </>
         )}
       </Panel>
+
+      <div className="grid grid-cols-3 gap-2" data-testid="trio">
+        {(
+          [
+            ['finance', 'Finanças', formatCompactMoney(team.finances.balance), 'Saldo em caixa', () => onNavigate('finance')],
+            ['squad', 'Elenco', String(squad.length), 'jogadores', () => onNavigate('squad', 'players')],
+            ['tactics', 'Tática', formationLabel(team.tactic.formationId), 'Formação', () => onNavigate('tactics')],
+          ] as const
+        ).map(([icon, title, value, sub, go]) => (
+          <button key={title} type="button" onClick={go} className="card-bg flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-white/[0.13] p-2.5 text-left">
+            <span className="flex items-center gap-1.5 font-display text-[15px] font-bold">
+              <Icon name={icon} size={18} className="text-accent" />
+              {title}
+            </span>
+            <span className="max-w-full truncate font-display text-[17px] font-bold leading-tight">{value}</span>
+            <span className="text-[11px] text-muted">{sub}</span>
+          </button>
+        ))}
+      </div>
 
       <div className="grid grid-cols-5 gap-1.5" data-testid="shortcuts">
         <ShortcutTile icon="squad" label="Elenco" tone="sky" alert={unavailableCount > 0} onClick={() => onNavigate('squad', 'players')} />
@@ -321,7 +343,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
       <Panel className="p-4">
         <div className="flex items-start justify-between gap-2">
-          <Eyebrow>Diretoria</Eyebrow>
+          <Eyebrow icon="shield">Diretoria</Eyebrow>
           <span className={`rounded-full border px-3 py-1 text-xs font-bold ${BOARD_CHIP[board.status]}`}>{BOARD_STATUS_LABELS[board.status]}</span>
         </div>
         <div className="title mt-2 text-4xl">Meta: {team.objective.targetPosition}º lugar</div>
@@ -352,7 +374,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
       </Panel>
 
       <Panel className="p-4">
-        <Eyebrow>Orçamento</Eyebrow>
+        <Eyebrow icon="finance">Orçamento</Eyebrow>
         <div className="mt-3">
           <ProgressBar value={salaryBudget > 0 ? (100 * payroll) / salaryBudget : 100} tone="striped" height="h-4" label="Folha salarial no orçamento" />
         </div>

@@ -5,8 +5,8 @@ import type { DashboardNotice, NoticeTone } from './notices'
 
 const TONE: Record<NoticeTone, { dot: string; icon: string }> = {
   danger: { dot: 'bg-loss', icon: 'text-loss' },
-  warning: { dot: 'bg-amber-300', icon: 'text-amber-300' },
-  info: { dot: 'bg-sky-300', icon: 'text-sky-300' },
+  warning: { dot: 'bg-amber', icon: 'text-amber' },
+  info: { dot: 'bg-cyan', icon: 'text-cyan' },
   accent: { dot: 'bg-accent', icon: 'text-accent' },
 }
 
@@ -21,10 +21,10 @@ export function NoticeCenter({ notices, onOpen }: { notices: DashboardNotice[]; 
   return (
     <Panel glow={urgent > 0} className="p-3" data-testid="notice-center">
       <div className="flex items-center justify-between px-1 pb-1">
-        <Eyebrow>Avisos</Eyebrow>
+        <Eyebrow icon="bell">Avisos</Eyebrow>
         <span className="text-xs font-bold text-muted">{notices.length}</span>
       </div>
-      <ul className="divide-y divide-line">
+      <ul className="divide-y divide-white/[0.07]">
         {shown.map((n) => (
           <li key={n.id}>
             <button type="button" onClick={() => onOpen(n.to, n.tab)} className="flex min-h-14 w-full items-center gap-3 px-1 py-2 text-left" data-notice={n.id}>

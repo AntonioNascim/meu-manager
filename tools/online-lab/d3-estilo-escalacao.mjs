@@ -22,7 +22,7 @@ check('escolher na Escalação muda a tática do time', (await style()) === 'win
 await page.getByTestId('style-controls').scrollIntoViewIfNeeded()
 await page.screenshot({ path: resolve('../../.shots/d3-escalacao-estilo.png') })
 // A mesma escolha aparece na partida.
-await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
+await page.getByRole('button', { name: 'Início', exact: true }).first().click()
 await page.getByRole('button', { name: 'Ir para a partida' }).click()
 await page.getByTestId('speed').waitFor({ timeout: 60000 })
 await page.getByRole('button', { name: 'Tática', exact: true }).first().click()

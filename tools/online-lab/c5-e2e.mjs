@@ -55,11 +55,11 @@ await page.getByTestId('league-card').waitFor({ timeout: 90000 })
 // ------------------------------------------------------------------ o ADM avança até uma rodada em que o clube joga
 let watching = false
 for (let tries = 0; tries < 8 && !watching; tries++) {
-  await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Início', exact: true }).first().click()
   await page.getByRole('button', { name: /^ADM/ }).click()
   await page.getByTestId('advance-league').click()
   await page.getByTestId('confirm-action').click()
-  await page.getByRole('button', { name: 'Clube', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Início', exact: true }).first().click()
   // Avançar só abre a sala ("Jogo pronto · Agora"): a partida espera o Pronto e abre sozinha na tela depois dele.
   const ready = await page.getByTestId('league-ready').waitFor({ timeout: 10000 }).then(() => true, () => false)
   if (ready) {

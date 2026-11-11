@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Icon } from './icons'
+import type { IconName } from './icons'
 
 /**
  * Cartão do tema. `cut` corta o canto superior direito, `striped` põe o fundo listrado (cartões de destaque)
@@ -24,7 +26,12 @@ export function Panel({
   return <section data-testid={testId} className={`rounded-[14px] border ${border} ${fill} ${cut ? 'cut-corner' : ''} ${className}`}>{children}</section>
 }
 
-/** Rótulo pequeno em caixa alta, para títulos de cartão e legendas. */
-export function Eyebrow({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <span className={`text-[11px] font-bold uppercase tracking-[0.14em] text-muted ${className}`}>{children}</span>
+/** Título de cartão (Barlow Condensed, com ícone verde opcional). */
+export function Eyebrow({ children, className = '', icon }: { children: ReactNode; className?: string; icon?: IconName }) {
+  return (
+    <span className={`inline-flex items-center gap-2 font-display text-xl font-bold leading-tight text-white ${className}`}>
+      {icon && <Icon name={icon} size={22} className="text-accent" />}
+      {children}
+    </span>
+  )
 }
