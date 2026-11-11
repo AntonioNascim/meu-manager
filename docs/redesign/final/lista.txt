@@ -1,0 +1,81 @@
+01-menu-inicial	Menu inicial
+02-menu-primeiro-acesso	Menu inicial, primeiro acesso
+03-carregar	Carregar
+04-carregar-importar	Importar save: escolher espaço
+05-novo-jogo	Novo jogo
+06-novo-jogo-ficticio	Novo jogo: mundo fictício e erro de download
+07-pacote-dados	Novo jogo com pacote de dados
+08-editor-escolha	Editor de pacotes
+09-editor-clubes	Editor: clubes
+10-editor-jogador	Editor: jogador
+11-editor-planilhas	Editor: planilhas e problemas
+12-creditos	Créditos e avisos
+13-relatar-problema	Relatar problema
+14-criar-conta	Criar conta online
+15-entrar-codigo	Entrar com o código
+16-codigo-recuperacao	Código de recuperação
+17-saves-nuvem	Saves na nuvem
+18-saves-nuvem-conflito	Saves na nuvem: conflito
+19-dados-conta	Dados e conta
+20-apagar-conta	Apagar a conta
+21-privacidade	Aviso de privacidade
+22-ligas-hub	Ligas online
+23-criar-liga	Criar liga
+24-ligas-abertas	Ligas abertas
+25-entrar-convite	Entrar com código de convite
+26-escolher-clube	Escolher clube na liga
+27-sala-liga	Sala da liga (saguão)
+28-sala-andamento	Sala da liga em andamento
+29-painel-adm	Painel do ADM
+30-denuncia	Denúncia
+31-liga-demitido	Demitido na liga
+32-painel-solo	Painel do clube (solo)
+33-painel-online	Painel do clube (liga online)
+34-painel-bloqueio	Aviso de ação indisponível
+35-preparando-temporada	Preparando a temporada
+36-demitido-solo	Demitido
+37-carreira	Carreira
+38-mais	Aba Mais
+39-elenco-escalacao	Elenco: time principal e escalação
+40-elenco-jogadores	Elenco: jogadores
+41-jogador-detalhe	Detalhe do jogador
+42-jogador-vender	Vender, emprestar ou liberar
+43-elenco-numeros	Elenco: números
+44-elenco-base	Elenco: base
+45-elenco-treino	Elenco: treino
+46-tatica	Tática
+47-partida-antes	Partida: antes de começar
+48-partida-ao-vivo	Partida ao vivo: campo 2D
+49-partida-gol	Partida: gol em câmera lenta
+50-partida-dados	Partida: dados
+51-partida-tatica	Partida: tática
+52-partida-trocas	Partida: trocas
+53-partida-lesao	Partida: lesão no seu time
+54-partida-intervalo	Partida: intervalo
+55-partida-prorrogacao	Partida: antes da prorrogação
+56-partida-fim	Partida: fim de jogo
+57-partida-adversario	Adversário (toque no escudo)
+58-partida-online-intervalo	Partida online: intervalo
+59-partida-online-espera	Partida online: sala e avisos
+60-mercado-buscar	Mercado: buscar
+61-mercado-filtros	Mercado: filtros
+62-mercado-negociacao	Mercado: negociação
+63-mercado-favoritos	Mercado: favoritos (lista de alvos)
+64-mercado-listas	Mercado: listas
+65-mercado-livres	Mercado: livres
+66-mercado-precontrato	Mercado: pré-contrato
+67-mercado-propostas	Mercado: propostas
+68-mercado-historico	Mercado: histórico
+69-mercado-contratos	Mercado: contratos
+70-mercado-tecnicos	Mercado: técnicos (online)
+71-competicoes	Competições: em andamento
+72-competicao-classificacao	Competição: classificação
+73-competicao-rodadas	Competição: rodadas
+74-competicao-resumo	Competição: resumo do jogo
+75-competicao-artilharia	Competição: artilharia
+76-competicao-copas	Competição: copas
+77-competicoes-historico	Competições: histórico e conquistas
+78-pagina-do-time	Página do time
+79-financas	Finanças
+80-financas-extrato	Finanças: extrato e balanço
+81-financas-ingresso	Finanças: ingresso

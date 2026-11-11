@@ -19,9 +19,9 @@ export function Panel({
   className?: string
   'data-testid'?: string
 }) {
-  const border = glow ? 'border-accent/70 bg-accent/[0.06]' : 'border-line'
-  const fill = striped ? 'stripes' : glow ? '' : 'bg-surface'
-  return <section data-testid={testId} className={`rounded-2xl border ${border} ${fill} ${cut ? 'cut-corner' : ''} ${className}`}>{children}</section>
+  const border = glow ? 'border-accent/45 shadow-[inset_0_0_30px_rgb(39_224_90/0.07),0_0_18px_rgb(39_224_90/0.12)]' : 'border-white/[0.13]'
+  const fill = striped ? 'stripes' : 'card-bg'
+  return <section data-testid={testId} className={`rounded-[14px] border ${border} ${fill} ${cut ? 'cut-corner' : ''} ${className}`}>{children}</section>
 }
 
 /** Rótulo pequeno em caixa alta, para títulos de cartão e legendas. */

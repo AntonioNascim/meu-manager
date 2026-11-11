@@ -4,8 +4,10 @@
  * então funcionam offline no PWA.
  */
 @import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
 @import "@fontsource/inter/latin-600.css";
 @import "@fontsource/inter/latin-700.css";
+@import "@fontsource/barlow-condensed/latin-500.css";
 @import "@fontsource/barlow-condensed/latin-600.css";
 @import "@fontsource/barlow-condensed/latin-700.css";
 @import "@fontsource/barlow-condensed/latin-800.css";
@@ -14,33 +16,49 @@
   --font-sans: "Inter", system-ui, sans-serif;
   --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
 
-  --color-bg: #080b14;
-  --color-surface: #121828;
-  --color-surface-2: #1a2136;
-  --color-line: #262e47;
-  --color-muted: #8b94b0;
+  --color-bg: #040708;
+  --color-surface: #0a1214;
+  --color-surface-2: #0f1a1d;
+  --color-surface-3: #16252a;
+  --color-line: #1f2d31;
+  --color-muted: #9db0a8;
+  --color-muted-2: #6d807a;
 
-  --color-accent: #d4ff2e;
-  --color-accent-ink: #11160a;
+  --color-accent: #27e05a;
+  --color-accent-2: #13a63c;
+  --color-accent-ink: #03180a;
+  --color-gold: #e9b44c;
+  --color-amber: #f2a51f;
+  --color-cyan: #25d6c4;
 
-  --color-win: #9cf27a;
-  --color-draw: #b4b9cc;
-  --color-loss: #f5766b;
+  --color-win: #4bf27a;
+  --color-draw: #f2a51f;
+  --color-loss: #ff5252;
 
   /* Paleta antiga das telas ainda não redesenhadas: os mesmos nomes, agora nas cores do tema. */
-  --color-slate-950: #05070d;
-  --color-slate-900: #080b14;
-  --color-slate-800: #121828;
-  --color-slate-700: #202842;
-  --color-slate-600: #2f3857;
-  --color-emerald-400: #d4ff2e;
-  --color-emerald-500: #d4ff2e;
+  --color-slate-950: #040708;
+  --color-slate-900: #040708;
+  --color-slate-800: #0a1214;
+  --color-slate-700: #16252a;
+  --color-slate-600: #243236;
+  --color-emerald-400: #27e05a;
+  --color-emerald-500: #27e05a;
 }
 
 html,
 body {
   background: var(--color-bg);
   color-scheme: dark;
+}
+
+/* Fundo do app: brilho verde nos cantos e listras finas na diagonal (estático, sem custo de animação). */
+body {
+  background:
+    radial-gradient(90% 26% at 100% 0%, rgb(39 224 90 / 0.13), transparent 70%),
+    radial-gradient(70% 22% at 0% 100%, rgb(39 224 90 / 0.16), transparent 72%),
+    repeating-linear-gradient(118deg, rgb(255 255 255 / 0.022) 0 2px, transparent 2px 26px),
+    var(--color-bg);
+  background-attachment: fixed;
 }
 
 body {
@@ -182,4 +200,28 @@ body {
   .pitch-player {
     animation: none;
   }
+}
+
+/* Cartão do tema (degradê escuro, borda fina). */
+@utility card-bg {
+  background: linear-gradient(180deg, #0d1719, #080e10);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 6px 18px rgb(0 0 0 / 0.35);
+}
+
+/* Botão principal: verde com borda inferior "grossa". */
+@utility btn-primary {
+  background: linear-gradient(180deg, #43ec6f, #16ad3f);
+  color: var(--color-accent-ink);
+  box-shadow: 0 3px 0 #0b6a27, 0 6px 16px rgb(39 224 90 / 0.28);
+}
+
+@utility btn-dark {
+  background: linear-gradient(180deg, #0e1618, #070c0d);
+  border: 1.5px solid rgb(255 255 255 / 0.5);
+  box-shadow: 0 3px 0 rgb(0 0 0 / 0.6);
+}
+
+@utility tab-on {
+  background: linear-gradient(180deg, #27c24f, #0f7d2d);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 0 14px rgb(39 224 90 / 0.25);
 }

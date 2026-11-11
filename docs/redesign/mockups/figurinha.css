@@ -1,0 +1,83 @@
+/* Direção A — FIGURINHA: álbum de figurinhas. Papel creme, verde-gramado, dourado, cantos redondos, botões gordos em 3D. */
+@import url(base.css);
+:root{--bg:#fff3d6;--ink:#1d2b20;--muted:#6d7a68;--card:#fffdf6;--line:#eadfc2;--track:#ecdfbd;--acc:#14a45a;--acc-ink:#fff;--link:#0d7c43;--win:#14a45a;--draw:#f2b92e;--loss:#e5483b;--hot:#e5483b;--home:#1b4fb8;--away:#d8402f;--navon:#0d7c43;--fd:'Bowlby One','Arial Black',sans-serif;--fb:'Nunito',system-ui,sans-serif}
+body{background:var(--bg) radial-gradient(circle at 1px 1px,rgba(120,90,20,.13) 1.2px,transparent 1.6px) 0 0/16px 16px}
+h1{font-size:44px;color:#14a45a;text-shadow:0 3px 0 #0b5e33,0 6px 0 rgba(11,94,51,.25);letter-spacing:.01em;transform:rotate(-2deg)}
+.title,.side b,.metag,.money b,.hl b,.lastm b,.og b,.goals,.ev .m,.brand{font-weight:400}
+.logo-mark{width:78px;height:78px;border-radius:24px;background:linear-gradient(145deg,#ffd45a,#f2a60f);color:#6a3d00;display:grid;place-items:center;border:3px solid #1d2b20;box-shadow:0 5px 0 #1d2b20;transform:rotate(-6deg);animation:wob 3s ease-in-out infinite}
+@keyframes wob{50%{transform:rotate(5deg) translateY(-4px)}}
+.tag{color:#9a6a12}
+/* cartões = figurinhas */
+.card{border:3px solid #1d2b20;border-radius:22px;box-shadow:0 5px 0 #1d2b20;padding:16px}
+.card::before{content:"";position:absolute;inset:5px;border-radius:16px;border:1.5px dashed rgba(29,43,32,.18);pointer-events:none}
+.card.hero{background:linear-gradient(180deg,#e5f7e9 0%,#fffdf6 55%);transform:rotate(-.6deg)}
+.card.continue{background:linear-gradient(135deg,#fff7dc,#ffe9a8);transform:rotate(.5deg)}
+.card.online{transform:rotate(-.4deg)}
+.card.hero::after{content:"JOGO DA RODADA";position:absolute;top:-11px;right:16px;background:#f2b92e;border:2.5px solid #1d2b20;border-radius:8px;padding:2px 9px;font:900 10px 'Nunito';letter-spacing:.08em;transform:rotate(3deg)}
+.eyebrow{color:#9a6a12;font-family:'Nunito';font-weight:900}
+/* botões 3D */
+.btn{border-radius:16px;border:3px solid #1d2b20;box-shadow:0 5px 0 #1d2b20;font-weight:900;background:#fff;font-size:15px}
+.btn:active,.btn.pop{transform:translateY(4px);box-shadow:0 1px 0 #1d2b20}
+.btn.primary{background:linear-gradient(180deg,#2fd07d,#14a45a);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.btn.primary.big{font-family:var(--fd);font-weight:400;font-size:24px;letter-spacing:.03em;animation:throb 2.2s ease-in-out infinite}
+@keyframes throb{50%{filter:brightness(1.1);box-shadow:0 5px 0 #1d2b20,0 0 0 6px rgba(47,208,125,.28)}}
+.btn.secondary{background:#fff}
+.btn.ghost{border:2.5px dashed rgba(29,43,32,.3);box-shadow:none;background:transparent}
+.btn.mini{box-shadow:0 3px 0 #1d2b20;border-radius:12px;background:#ffd45a}
+.chip{border-width:2px;background:#fff}
+.banner{background:#1d2b20;color:#ffe9a8}
+.banner .btn{background:#ffd45a;border-color:#ffd45a;box-shadow:none}
+.note-strip{background:#ffe9a8;border:2.5px solid #1d2b20;border-radius:16px;font-weight:700}
+.note-strip b{background:#1d2b20;color:#ffe9a8;padding:3px 10px;border-radius:99px}
+.row-btn{border-top:2px dotted var(--line)}.row-btn:first-child{border:0}
+.row-btn svg{color:#14a45a}
+/* topo */
+.topbar{background:rgba(255,243,214,.92);backdrop-filter:blur(6px);border-bottom:3px solid #1d2b20}
+.brand{color:#14a45a;font-size:21px}
+/* avisos */
+.notice{background:#fff;border:2.5px solid #1d2b20;border-radius:16px;box-shadow:0 3px 0 #1d2b20}
+.notice.hot{background:#ffe0da;animation:nudge 2.4s ease-in-out infinite}
+@keyframes nudge{0%,88%,100%{transform:none}92%{transform:translateX(-3px) rotate(-.6deg)}96%{transform:translateX(3px) rotate(.6deg)}}
+.notice svg:first-child{color:#e5483b}
+/* versus */
+.crest{filter:drop-shadow(0 3px 0 rgba(29,43,32,.35))}
+.vs span{color:#f2a60f;font-size:34px;text-shadow:0 2px 0 #1d2b20}
+.side.opp{border-radius:16px;padding:4px;transition:transform .15s}.side.opp:active{transform:scale(.95)}
+.bar{border-radius:99px;border:2px solid #1d2b20;height:12px}.bar i{border-radius:99px;background:repeating-linear-gradient(45deg,#2fd07d 0 8px,#14a45a 8px 16px)}
+/* atalhos: figurinhas redondas coloridas */
+.tile{border-radius:18px;border:2.5px solid #1d2b20;box-shadow:0 4px 0 #1d2b20;background:#fff;color:#1d2b20}
+.tile:active,.tile.pop{transform:translateY(3px);box-shadow:0 1px 0 #1d2b20}
+.t-a{background:#bfe9ff}.t-b{background:#c8f2d4}.t-c{background:#ffe29a}.t-d{background:#ffc9c2}.t-e{background:#e4d6ff}
+.tile .dot{border:2px solid #1d2b20;animation:blink 1.4s infinite}
+.mini td{border-color:var(--line)}
+.mini tr.me{background:linear-gradient(90deg,#ffe9a8,transparent);}
+.mm{border-radius:99px;border:2px solid #1d2b20}
+.path i{height:14px;border-radius:99px;border:2px solid #1d2b20}
+.hl div{background:#fff3d6;border-radius:14px;padding:8px;border:2px solid #1d2b20}
+/* partida */
+.score{background:linear-gradient(180deg,#14a45a,#0d7c43);color:#fff;border:3px solid #1d2b20;border-radius:24px;box-shadow:0 5px 0 #1d2b20;margin-top:2px}
+.steam b{color:#fff;font-weight:400}.clock{color:#d8ffe6}
+.goals{text-shadow:0 4px 0 #0b5e33}.goals .g{background:#fffdf6;color:#1d2b20;border-radius:14px;border:3px solid #1d2b20;min-width:50px;padding:2px 8px;text-shadow:none;box-shadow:0 4px 0 #1d2b20;text-align:center}
+.goals .sep{color:#ffd45a}
+.speed{background:#ffd45a;color:#1d2b20;border:2.5px solid #1d2b20;border-radius:12px;box-shadow:0 3px 0 #1d2b20}
+.speed:active{transform:translateY(2px);box-shadow:none}
+.pitch-wrap{border:3px solid #1d2b20;border-radius:20px;overflow:hidden;box-shadow:0 5px 0 #1d2b20;background:#2a9d4f}
+.g1{fill:#34b25d}.g2{fill:#2da454}
+.lines *{fill:none;stroke:#fff;stroke-width:.9;opacity:.9}
+.pl circle{stroke:#fff;stroke-width:1}
+.pass{stroke:#ffd45a}.shot{stroke:#fff;stroke-width:1.6}.mark circle{fill:none;stroke:#ffd45a;stroke-width:1.2;animation:ring 1.4s infinite}
+@keyframes ring{from{r:3;opacity:1}to{r:10;opacity:0}}
+.toast{background:#ffd45a;border:2.5px solid #1d2b20;border-radius:99px;box-shadow:0 3px 0 #1d2b20}
+.tabs{background:#fff;border:3px solid #1d2b20;border-radius:18px;padding:4px;box-shadow:0 4px 0 #1d2b20;gap:2px}
+.tabs button{border-radius:13px}.tabs button.on{background:#14a45a;color:#fff;animation:pop .3s}
+.vs-bar{border-radius:99px;overflow:hidden;--away:#f3b4aa}.vs-bar i{background:#1b4fb8}
+.ev{background:#fff;border:2px solid #1d2b20;border-radius:14px}
+.ev.goal{background:#d7f7e1;border-width:3px;animation:pop .4s}
+.ev.goal .m{color:#14a45a}.ev.yel{background:#fff3b8}
+/* nav: pílula flutuante */
+.nav{bottom:12px;width:calc(100% - 24px);background:#1d2b20;border-radius:26px;box-shadow:0 5px 0 #000;padding:4px}
+.nav button{color:#a9bba9;border-radius:22px}
+.nav button.on{background:#ffd45a;color:#1d2b20;animation:bounce .4s}
+@keyframes bounce{40%{transform:translateY(-6px)}}
+.nav button.alert::after{border:2px solid #1d2b20}
+.app{padding-bottom:104px}
