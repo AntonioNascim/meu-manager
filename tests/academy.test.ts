@@ -322,7 +322,7 @@ describe('telas da base', () => {
     for (const text of ['Categorias de base', 'de 3 a 5 garotos', 'até 15 jovens', 'Quem faz 20 anos', 'ZAG', 'potencial']) expect(out).toContain(text)
     expect(out.match(/<li/g)).toHaveLength(userAcademy(game).length)
     expect(out).toContain('Potencial estimado')
-    expect(out.match(/role="tab"/g)).toHaveLength(5)
+    expect(out.match(/role="tab"/g)).toHaveLength(6)
     expect(out).toContain('>Base<')
   })
 

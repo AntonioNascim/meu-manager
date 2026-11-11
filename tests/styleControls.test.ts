@@ -76,7 +76,7 @@ describe('próximo adversário na Escalação', () => {
     expect(tactic).toContain(PLAY_STYLE_LABELS[opponent.tactic.style])
     expect(tactic).toContain(formationLabel(opponent.tactic.formationId))
     expect(tactic).toContain(MENTALITY_LABELS[opponent.tactic.mentality])
-    expect(html.indexOf('Próximo adversário')).toBeLessThan(html.indexOf('Formações'))
+    expect(html.indexOf('Próximo adversário')).toBeGreaterThan(html.indexOf('Formações'))
   })
 
   it('o estilo do adversário muda no cartão quando a tática dele muda (no online chega pelo detalhe do clube)', () => {

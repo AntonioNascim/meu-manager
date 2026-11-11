@@ -29,7 +29,6 @@ import { Start } from './screens/Start'
 import { Squad } from './screens/Squad'
 import type { SquadTab } from './screens/Squad'
 import { Standings } from './screens/Standings'
-import { Tactics } from './screens/Tactics'
 
 /** Em desenvolvimento, /?tela=squad abre direto numa tela (junto com ?time=). */
 function initialScreen(): ScreenId {
@@ -40,7 +39,7 @@ function initialScreen(): ScreenId {
 /** Em desenvolvimento, &aba=lineup|numbers abre a aba do Elenco. */
 function initialSquadTab(hint?: string): SquadTab {
   const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
-  return wanted === 'lineup' || wanted === 'numbers' || wanted === 'academy' || wanted === 'training' ? wanted : 'players'
+  return wanted === 'lineup' || wanted === 'numbers' || wanted === 'academy' || wanted === 'training' || wanted === 'tactics' ? wanted : 'players'
 }
 
 /** Em desenvolvimento, &aba=free|proposals abre a aba do Mercado. */
@@ -161,8 +160,7 @@ export function App() {
         {current === 'admin' && game.online && <AdminPanel leagueId={game.online.leagueId} />}
         {current === 'career' && <Career game={game} onTaken={() => navigate('home')} />}
         {current === 'match' && <MatchScreen game={game} onNavigate={navigate} />}
-        {(current === 'squad' || current === 'academy' || current === 'training') && <Squad key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : initialSquadTab(hint)} />}
-        {current === 'tactics' && <Tactics game={game} />}
+        {(current === 'squad' || current === 'academy' || current === 'training' || current === 'tactics') && <Squad key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : current === 'tactics' ? 'tactics' : initialSquadTab(hint)} />}
         {current === 'standings' && <Standings key={hint ?? ''} game={game} initialSection={initialStandingsSection(hint)} />}
         {(current === 'market' || current === 'contracts') && <Market key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'contracts' ? 'contracts' : initialMarketTab(hint)} />}
         {current === 'finance' && <Finance game={game} />}

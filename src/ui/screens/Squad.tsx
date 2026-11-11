@@ -9,13 +9,14 @@ import { Lineup } from './squad/Lineup'
 import { Numbers } from './squad/Numbers'
 import { Players } from './squad/Players'
 import { Training } from './squad/Training'
+import { Tactics } from './Tactics'
 
 export { sortSquad }
 export type { SquadSortKey }
 
-export type SquadTab = 'players' | 'lineup' | 'numbers' | 'academy' | 'training'
+export type SquadTab = 'players' | 'lineup' | 'numbers' | 'academy' | 'training' | 'tactics'
 
-/** Tela de Elenco: abas Jogadores, Escalação, Números, Base e Treino. */
+/** Tela de Elenco: abas Jogadores, Time principal (escalação), Números, Base, Treino e Tática. */
 export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab?: SquadTab }) {
   const [tab, setTab] = useState<SquadTab>(initialTab)
   const team = userTeam(game)
@@ -33,12 +34,14 @@ export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab
       <TopTabs
         value={tab}
         onChange={setTab}
+        scroll
         options={[
           { id: 'players', label: 'Jogadores' },
-          { id: 'lineup', label: 'Escalação', alert: lineupAlert },
+          { id: 'lineup', label: 'Time principal', alert: lineupAlert },
           { id: 'numbers', label: 'Números' },
           { id: 'academy', label: 'Base', alert: academy.pending > 0 || academy.arrivals > 0 },
           { id: 'training', label: 'Treino' },
+          { id: 'tactics', label: 'Tática' },
         ]}
       />
       {tab === 'players' && <Players game={game} />}
@@ -46,6 +49,7 @@ export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab
       {tab === 'numbers' && <Numbers game={game} />}
       {tab === 'academy' && <Academy game={game} />}
       {tab === 'training' && <Training game={game} />}
+      {tab === 'tactics' && <Tactics game={game} />}
     </div>
   )
 }

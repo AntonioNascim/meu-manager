@@ -121,7 +121,7 @@ function SavedLineups({ game }: { game: Game }) {
   return (
     <Panel className="p-3">
       <div className="mb-2 flex items-center justify-between">
-        <Eyebrow>Escalações salvas</Eyebrow>
+        <Eyebrow icon="folder">Escalações salvas</Eyebrow>
         <span className="text-xs font-bold text-muted">
           {slots.filter(Boolean).length}/{LINEUP_SLOTS}
         </span>
@@ -223,37 +223,26 @@ export function Lineup({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
-      <SavedLineups game={game} />
-
-      {/* Para decidir a formação e o estilo conforme o rival: o mesmo que aparece ao tocar no escudo do adversário. */}
-      <NextOpponent game={game} />
-
       <div>
-        <div className="mb-2">
-          <Eyebrow>Formações</Eyebrow>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Formações">
           {FORMATION_IDS.map((id) => (
             <button
               key={id}
               type="button"
               aria-pressed={tactic.formationId === id}
               onClick={() => apply((t) => changeFormation(t, squad, id))}
-              className={`min-h-10 rounded-full border px-4 text-sm font-bold ${tactic.formationId === id ? 'border-accent bg-accent text-accent-ink' : 'border-line bg-surface text-slate-100'}`}
+              className={`min-h-10 shrink-0 rounded-full border-[1.5px] px-4 text-[13.5px] font-semibold ${tactic.formationId === id ? 'border-accent bg-accent font-bold text-accent-ink' : 'border-accent/55 text-[#d7f7df]'}`}
             >
               {id}
             </button>
           ))}
           {tactic.formationId === 'custom' && (
-            <span aria-pressed="true" data-testid="free-chip" className="inline-flex min-h-10 items-center rounded-full border border-accent bg-accent px-4 text-sm font-bold text-accent-ink">
+            <span aria-pressed="true" data-testid="free-chip" className="inline-flex min-h-10 shrink-0 items-center rounded-full border-[1.5px] border-accent bg-accent px-4 text-[13.5px] font-bold text-accent-ink">
               Livre · {shapeOf(formationOf(tactic).grid)}
             </span>
           )}
         </div>
       </div>
-
-      {/* O estilo e a mentalidade do time: os mesmos da Tática e da partida, para decidir antes do jogo conforme o adversário. */}
-      <StyleControls style={tactic.style} mentality={tactic.mentality} onStyle={(style) => apply((t) => ({ ...t, style }))} onMentality={(mentality) => apply((t) => ({ ...t, mentality }))} />
 
       <p className="min-h-5 text-xs text-muted">
         {selected ? (
@@ -271,9 +260,9 @@ export function Lineup({ game }: { game: Game }) {
 
       <Panel className="overflow-hidden">
         <div className="px-3 pb-1 pt-3">
-          <Eyebrow>Banco de reservas ({bench.length})</Eyebrow>
+          <Eyebrow icon="squad">Banco de reservas ({bench.length})</Eyebrow>
         </div>
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-white/[0.07]">
           {bench.map((p) => (
             <ReserveRow key={p.id} player={p} selected={selectedId === p.id} onTap={() => tap(p.id)} />
           ))}
@@ -292,6 +281,16 @@ export function Lineup({ game }: { game: Game }) {
           </ul>
         </Panel>
       )}
+      {/* O estilo e a mentalidade do time: os mesmos da Tática e da partida, para decidir antes do jogo conforme o adversário. */}
+      <StyleControls style={tactic.style} mentality={tactic.mentality} onStyle={(style) => apply((t) => ({ ...t, style }))} onMentality={(mentality) => apply((t) => ({ ...t, mentality }))} />
+
+
+      {/* Para decidir a formação e o estilo conforme o rival: o mesmo que aparece ao tocar no escudo do adversário. */}
+      <NextOpponent game={game} />
+
+
+      <SavedLineups game={game} />
+
     </div>
   )
 }
