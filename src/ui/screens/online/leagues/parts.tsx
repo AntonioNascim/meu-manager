@@ -5,7 +5,7 @@ import { LEAGUE_KIND_LABELS, LEAGUE_STATUS_LABELS, PACE_LABELS } from '../../../
 /** Moldura das telas online: cabeçalho com o título e o "Voltar". */
 export function Frame({ eyebrow, title, onBack, children, backLabel = 'Voltar' }: { eyebrow?: string; title: string; onBack: () => void; children: ReactNode; backLabel?: string }) {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {eyebrow && <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{eyebrow}</p>}

@@ -17,8 +17,8 @@ export function SlotPicker({
 }) {
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center overflow-y-auto bg-black/60 p-4 sm:items-center">
-      <div className="w-full max-w-xl space-y-3 rounded-2xl border border-line bg-bg p-4">
-        <h2 className="text-lg font-bold">{title}</h2>
+      <div className="w-full max-w-xl space-y-3 rounded-t-[20px] border border-b-0 border-accent/50 bg-gradient-to-b from-[#0f1b1e] to-[#070d0f] p-4 shadow-[0_-10px_40px_rgb(0_0_0/0.6)] sm:rounded-2xl sm:border-b">
+        <h2 className="font-display text-[22px] font-bold">{title}</h2>
         {Array.from({ length: SLOT_COUNT }, (_, i) => {
           const summary = slots?.[i] ?? null
           return (

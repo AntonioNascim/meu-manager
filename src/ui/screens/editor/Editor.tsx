@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { TopBar } from '../../theme/Bits'
 import { defaultPackage } from '../../../data/package/defaultPackage'
 import { addClub, addCountry, addLeague, emptyPackage, normalizeForEditing, syncTeamCounts } from '../../../data/package/edit/ops'
 import type { DataPackage } from '../../../data/package/types'
@@ -92,13 +93,8 @@ export function Editor({ onBack, onPlay }: { onBack: () => void; onPlay: (chosen
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 bg-bg px-4 py-8 text-slate-100">
-      <div className="flex items-center justify-between">
-        <h1 className="title text-4xl">Editor</h1>
-        <button type="button" className="min-h-12 rounded-lg px-3 text-sm text-muted hover:bg-surface" onClick={onBack}>
-          Voltar
-        </button>
-      </div>
+    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 px-4 py-8 text-slate-100">
+      <TopBar title="Editor" onBack={onBack} />
       <p className="text-sm text-muted">
         Edite países, ligas, clubes, jogadores e copas de um pacote de dados. O que você edita fica guardado só neste navegador, separado dos saves, e dá para exportar o arquivo ou começar um jogo direto com ele. Pensado para o computador; funciona no celular.
       </p>

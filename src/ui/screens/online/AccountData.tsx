@@ -70,7 +70,7 @@ export function AccountData({ onBack, onShowCode, onDeleted, onPrivacy }: { onBa
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100" data-testid="account-data">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100" data-testid="account-data">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Conta online · {account.nickname ?? 'sem apelido'}</p>

@@ -22,7 +22,7 @@ export function LeagueDismissed({ state, onLeave }: { state: DismissedState; onL
   }
   const d = state.dismissal
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100" data-testid="league-dismissed">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100" data-testid="league-dismissed">
       <div className="text-center">
         <h1 className="title text-3xl text-loss">Você foi demitido</h1>
         <p className="mt-1 text-xs text-muted">{formatDate(d.date)}</p>

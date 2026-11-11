@@ -10,6 +10,7 @@ import { PwaBanner } from '../components/PwaBanner'
 import { SlotInfo } from '../components/SlotInfo'
 import { SlotPicker } from '../components/SlotPicker'
 import { Button, Card } from '../components/ui'
+import { Chip, Icon, Logo, TopBar } from '../theme'
 import { downloadText } from '../download'
 import { ImportPackage } from './ImportPackage'
 import type { ChosenPackage } from './ImportPackage'
@@ -150,83 +151,106 @@ export function Start() {
     <>
       <PwaBanner />
       <PackageUpdateBanner />
-      <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-bg px-4 py-8 text-slate-100">
-      <div className="flex flex-col items-center gap-3 pb-3 text-center">
-        <img src="icons/icon-192.png" alt="" width={72} height={72} className="rounded-2xl" />
-        <h1 className="title text-6xl">Meu Manager</h1>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted">Jogo de técnico de futebol</p>
-      </div>
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-3 px-4 py-6 text-slate-100">
+      {view === 'menu' ? <Logo /> : <TopBar title="Carregar" onBack={() => setView('menu')} />}
 
       {view === 'menu' && (
         <div className="space-y-3">
-          {latest && (
-            <Card title="Continuar">
-              <div className="flex items-center gap-3">
-                <SlotInfo summary={latest} />
-                {cloudStates[latest.slot - 1]?.enabled && <span className="rounded-full border border-win/50 px-2.5 py-1 text-[11px] font-bold text-win">Na nuvem</span>}
+          {latest ? (
+            <Card>
+              <div className="-mx-4 -mt-4 mb-1 flex items-stretch justify-between overflow-hidden rounded-t-[14px] border-b border-white/[0.07] bg-gradient-to-r from-accent/[0.12] to-transparent">
+                <span className="inline-flex items-center gap-2 bg-gradient-to-r from-[#1f9a3e] to-[#0c4f1e] py-2 pl-3.5 pr-7 font-display text-[19px] font-bold [clip-path:polygon(0_0,100%_0,calc(100%_-_16px)_100%,0_100%)]">CONTINUAR</span>
+                {cloudStates[latest.slot - 1]?.enabled && <span className="m-2 self-center"><Chip tone="c" icon="cloud">Na nuvem</Chip></span>}
               </div>
-              <Button className="mt-3 w-full" disabled={busy} onClick={() => void open(latest.slot)}>
+              <SlotInfo summary={latest} />
+              <Button className="w-full" disabled={busy} onClick={() => void open(latest.slot)}>
                 Continuar
               </Button>
             </Card>
+          ) : (
+            <Card className="border-gold/50">
+              <h3 className="font-display text-xl font-bold">Comece sua carreira</h3>
+              <p className="mb-3 text-[13px] text-muted">Escolha um clube, monte o time e leve o Meu Manager ao título.</p>
+              <Button className="w-full uppercase" icon="plus" onClick={() => setView('new')}>
+                Novo jogo
+              </Button>
+            </Card>
           )}
-          <Button className="w-full" variant={latest ? 'secondary' : 'primary'} onClick={() => setView('new')}>
-            Novo jogo
-          </Button>
-          <Button className="w-full" variant="secondary" onClick={() => setView('package')}>
+          <div className="grid grid-cols-2 gap-2.5">
+            {latest && (
+              <Button className="px-2 text-[15px]" variant="secondary" icon="plus" onClick={() => setView('new')}>
+                Novo jogo
+              </Button>
+            )}
+            <Button className={`px-2 text-[15px] ${latest ? '' : 'col-span-2'}`} variant="secondary" icon="folder" disabled={!latest} onClick={() => setView('load')}>
+              Carregar
+            </Button>
+          </div>
+          <Button className="w-full" variant="outline" icon="down2" onClick={() => setView('package')}>
             Novo jogo com pacote de dados
           </Button>
-          <Button className="w-full" variant="secondary" onClick={() => setView('editor')}>
-            Editor
-          </Button>
-          <Button className="w-full" variant="secondary" disabled={!latest} onClick={() => setView('load')}>
-            Carregar
-          </Button>
-          <Button className="w-full" variant="secondary" onClick={() => fileInput.current?.click()}>
-            Importar save de um arquivo
-          </Button>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Button className="px-2 text-[15px]" variant="secondary" icon="edit" onClick={() => setView('editor')}>
+              Editor
+            </Button>
+            <Button className="px-2 text-[15px]" variant="secondary" icon="up2" onClick={() => fileInput.current?.click()}>
+              Importar save de um arquivo
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Button className="px-2 text-[15px]" variant="secondary" icon="info" onClick={() => setView('credits')}>
+              Créditos e avisos
+            </Button>
+            <Button className="px-2 text-[15px]" variant="secondary" icon="flag" onClick={() => setReporting(true)} data-testid="report-problem">
+              Relatar problema
+            </Button>
+          </div>
           {onlineUnlockedHere() && account && !account.codeConfirmed && (
-            <button type="button" onClick={() => openOnline('code')} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-yellow-500/50 bg-yellow-500/10 px-4 py-2 text-left text-sm" data-testid="code-reminder">
+            <button type="button" onClick={() => openOnline('code')} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border-[1.5px] border-dashed border-white/30 bg-white/[0.03] px-3.5 py-3 text-left text-[13px]" data-testid="code-reminder">
               <span>Guarde o seu código de recuperação: sem ele, trocar de aparelho faz perder a conta.</span>
-              <span className="flex-none font-bold text-yellow-300">Ver</span>
+              <span className="flex flex-none items-center gap-1 font-bold text-accent"><Icon name="eye" size={18} />Ver</span>
             </button>
           )}
           {onlineUnlockedHere() && (
-          <Card title="Online">
+          <Card>
+            <div className="flex items-center gap-2.5">
+              <Icon name="globe" size={22} className="text-accent" />
+              <h3 className="flex-1 font-display text-xl font-bold">Online</h3>
+              {account && <Chip tone="g">Conta ativa</Chip>}
+            </div>
             {account ? (
-              <div className="flex flex-col gap-2" data-testid="online-account">
-                <p className="font-semibold">{account.nickname ?? 'Conta online'}</p>
-                <p className="text-xs text-muted">Conta online · criada em {new Date(account.createdAt).toLocaleDateString('pt-BR')}</p>
-                <Button variant="secondary" onClick={() => openOnline('leagues')}>
+              <div className="flex flex-col gap-2.5" data-testid="online-account">
+                <div>
+                  <p className="font-semibold">{account.nickname ?? 'Conta online'}</p>
+                  <p className="text-xs text-muted">Conta online · criada em {new Date(account.createdAt).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <Button icon="trophy" onClick={() => openOnline('leagues')}>
                   Ligas online
                 </Button>
-                <Button variant="secondary" onClick={() => openOnline('cloud')}>
-                  Saves na nuvem{cloudStates.length > 0 ? ` (${cloudStates.filter((c) => c.enabled).length} de ${SLOT_COUNT})` : ''}
-                </Button>
-                <Button variant="secondary" onClick={() => openOnline('code')}>
-                  Código de recuperação
-                </Button>
-                <Button variant="secondary" onClick={() => openOnline('data')}>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Button className="px-2 text-[15px]" variant="secondary" icon="cloud" onClick={() => openOnline('cloud')}>
+                    Saves na nuvem{cloudStates.length > 0 ? ` (${cloudStates.filter((c) => c.enabled).length} de ${SLOT_COUNT})` : ''}
+                  </Button>
+                  <Button className="px-2 text-[15px]" variant="secondary" icon="key" onClick={() => openOnline('code')}>
+                    Código de recuperação
+                  </Button>
+                </div>
+                <Button variant="secondary" icon="user" onClick={() => openOnline('data')}>
                   Dados e conta
                 </Button>
               </div>
             ) : (
-              <div className="flex flex-col gap-2" data-testid="online-no-account">
-                <p className="text-sm text-muted">Ligas entre jogadores e saves na nuvem. Sem e-mail e sem senha: a sua conta é um apelido e um código de recuperação que fica com você.</p>
-                <Button onClick={() => openOnline('create')}>Criar minha conta online</Button>
-                <button type="button" className="min-h-12 text-sm text-muted underline" onClick={() => openOnline('recover')}>
+              <div className="flex flex-col gap-2.5" data-testid="online-no-account">
+                <p className="text-[13px] text-muted">Ligas entre jogadores e saves na nuvem. Sem e-mail e sem senha: a sua conta é um apelido e um código de recuperação que fica com você.</p>
+                <Button icon="user" onClick={() => openOnline('create')}>Criar minha conta online</Button>
+                <button type="button" className="flex min-h-12 items-center justify-center gap-2 text-center text-sm text-muted" onClick={() => openOnline('recover')}>
+                  <Icon name="key" size={18} />
                   Já tem uma conta? Entrar com o código de recuperação
                 </button>
               </div>
             )}
           </Card>
           )}
-          <Button className="w-full" variant="secondary" onClick={() => setView('credits')}>
-            Créditos e avisos
-          </Button>
-          <Button className="w-full" variant="secondary" onClick={() => setReporting(true)} data-testid="report-problem">
-            Relatar problema
-          </Button>
           {reporting && <ReportProblem context={{ screen: 'menu', mode: account ? 'online' : 'solo', saveSlots: slots?.filter(Boolean).length ?? 0 }} onClose={() => setReporting(false)} />}
         </div>
       )}

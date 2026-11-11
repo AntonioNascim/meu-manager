@@ -48,7 +48,7 @@ export function OnlineArea({ start, onClose, invite }: { start: OnlineView; onCl
   if (view === 'league') return <LeagueRoomScreen id={leagueId} code={leagueCode} onBack={toHub} />
   if (view === 'code') {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100">
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100">
         {account.recoveryCode ? (
           <RecoveryCodeView code={account.recoveryCode} confirmed={account.codeConfirmed} {...(account.nickname ? { nickname: account.nickname } : {})} onConfirm={() => void confirmRecoveryCode().then(onClose)} onBack={() => setView('data')} />
         ) : (

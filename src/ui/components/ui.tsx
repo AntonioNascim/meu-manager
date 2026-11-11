@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Team } from '../../engine/types'
-import { Crest } from '../theme'
+import { Crest, Icon } from '../theme'
+import type { IconName } from '../theme'
 
 /** Escudo do time (as cores e a sigla). Mantém o nome antigo; o desenho está em theme/Crest. */
 export function TeamBadge({ team, size = 'md' }: { team: Pick<Team, 'abbreviation' | 'colors'>; size?: 'sm' | 'md' | 'lg' }) {
@@ -22,8 +23,12 @@ export function Button({
   disabled,
   variant = 'primary',
   className = '',
+  icon,
+  size = 'md',
   'data-testid': testId,
 }: {
+  icon?: IconName
+  size?: 'md' | 'sm'
   children: ReactNode
   onClick?: () => void
   disabled?: boolean
@@ -38,8 +43,9 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       data-testid={testId}
-      className={`min-h-12 rounded-[10px] px-5 font-display text-[19px] font-bold tracking-[0.02em] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${color} ${className}`}
+      className={`inline-flex ${size === 'sm' ? 'min-h-10 px-3 text-base' : 'min-h-12 px-5 text-[19px]'} items-center justify-center gap-2 rounded-[10px] font-display font-bold leading-tight tracking-[0.02em] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${color} ${className}`}
     >
+      {icon && <Icon name={icon} size={20} className={variant === 'primary' ? '' : 'text-accent'} />}
       {children}
     </button>
   )

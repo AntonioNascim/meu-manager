@@ -25,7 +25,7 @@ export function RecoverAccount({ onDone, onBack }: { onDone: () => void; onBack:
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100" data-testid="recover-account">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100" data-testid="recover-account">
       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Outro aparelho</p>
       <h1 className="title text-3xl">Entrar com o código</h1>
       <p className="text-sm text-muted">Digite o código de recuperação da conta (por exemplo K7QP-9X2M-HT4R-8WZC-3NFB). Os hífens e as maiúsculas não importam.</p>

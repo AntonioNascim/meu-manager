@@ -13,7 +13,7 @@ export function Dismissed({ game }: { game: Game }) {
   const dismissal = game.dismissal
   if (!dismissal) return null
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 bg-slate-900 px-4 text-slate-100">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 px-4 text-slate-100">
       <div className="flex flex-col items-center gap-2 text-center">
         <TeamBadge team={team} size="lg" />
         <h1 className="text-2xl font-bold text-rose-300">Você foi demitido</h1>

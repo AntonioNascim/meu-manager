@@ -68,11 +68,11 @@ function RenewForm({ game, player, onClose }: { game: Game; player: Player; onCl
       </div>
       <label className="mb-3 block text-sm">
         Salário mensal (ele pede {formatMoney(demand)})
-        <input type="number" min={0} step={500} className="mt-1 min-h-12 w-full rounded-xl bg-slate-900 px-3" value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
+        <input type="number" min={0} step={500} className="mt-1 min-h-12 w-full rounded-xl px-3" value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
       </label>
       <label className="mb-3 block text-sm">
         Anos a mais
-        <select className="mt-1 min-h-12 w-full rounded-xl bg-slate-900 px-3" value={years} onChange={(e) => setYears(Number(e.target.value))}>
+        <select className="mt-1 min-h-12 w-full rounded-xl px-3" value={years} onChange={(e) => setYears(Number(e.target.value))}>
           {[1, 2, 3, 4, 5].map((y) => (
             <option key={y} value={y}>{y} {y === 1 ? 'ano' : 'anos'}</option>
           ))}

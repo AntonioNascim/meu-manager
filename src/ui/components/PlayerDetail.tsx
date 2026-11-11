@@ -235,7 +235,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           <Stat label="Multa rescisória" value={formatMoney(player.contract.releaseClause)} />
         </Section>}
       </div>
-      {footer && <footer className="border-t border-line bg-bg px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{footer}</footer>}
+      {footer && <footer className="border-t border-line px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{footer}</footer>}
     </div>
   )
 }

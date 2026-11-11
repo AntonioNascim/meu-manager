@@ -116,7 +116,7 @@ export function CloudSaves({ onBack }: { onBack: () => void }) {
   const used = states.reduce((sum, s) => sum + (s.enabled ? manifestBytes(remoteOf(s.slot) ?? ({ parts: {} } as CloudManifest)) : 0), 0)
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100" data-testid="cloud-saves">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100" data-testid="cloud-saves">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Conta online</p>

@@ -13,6 +13,7 @@ import type { SaveSummary } from '../../store/saveFormat'
 import { worldChoices } from '../../store/worldChoices'
 import { NATIONALITY_LABELS } from '../labels'
 import { Flag } from '../theme/PlayerBits'
+import { TopBar } from '../theme/Bits'
 import { TopTabs } from '../theme/TopTabs'
 import { SlotPicker } from '../components/SlotPicker'
 import { Button, Tabs, TeamBadge } from '../components/ui'
@@ -57,14 +58,9 @@ function useRealWorld(seed: number, enabled: boolean, version: string | undefine
 
 function Header({ onBack, subtitle, extra, children }: { onBack: () => void; subtitle: string; extra?: ReactNode; children?: ReactNode }) {
   return (
-    <header className="px-4 pb-3 pt-6">
-      <div className="flex items-center justify-between">
-        <h1 className="title text-4xl">Meu Manager</h1>
-        <button type="button" className="min-h-12 rounded-lg px-3 text-sm text-slate-400 hover:bg-slate-800" onClick={onBack}>
-          Voltar
-        </button>
-      </div>
-      <p className="text-sm text-slate-400">{subtitle}Escolha o time que você vai comandar.</p>
+    <header className="px-4 pb-3">
+      <TopBar title="Novo jogo" onBack={onBack} />
+      <p className="text-[13px] text-muted">{subtitle}Escolha o time que você vai comandar.</p>
       {extra}
       {children}
     </header>
@@ -119,7 +115,7 @@ export function NewGame({ slots, onBack, dataPackage, initialSource = 'real' }: 
 
   if (useReal && real.status !== 'ready') {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-xl flex-col bg-slate-900 text-slate-100">
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col text-slate-100">
         <Header onBack={onBack} subtitle={subtitle} extra={extra} />
         <div className="px-4 py-10 text-center" data-testid="real-loading">
           {real.status === 'loading' ? (
@@ -181,7 +177,7 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
   const chosen = world.teams.find((t) => t.id === selected)
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col bg-slate-900 text-slate-100">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col text-slate-100">
       <Header onBack={onBack} subtitle={subtitle} extra={extra}>
         {countries.length > 1 && (
           <div className="mt-4" data-testid="country-picker">
@@ -222,7 +218,7 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
             <button
               type="button"
               onClick={() => setSelected(team.id)}
-              className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${selected === team.id ? 'bg-accent/10 ring-2 ring-accent' : 'bg-slate-800 hover:bg-slate-700'}`}
+              className={`flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition ${selected === team.id ? 'border-[1.5px] border-accent bg-accent/[0.08]' : 'border border-white/[0.13] card-bg'}`}
             >
               <TeamBadge team={team} />
               <span className="min-w-0 flex-1">
@@ -232,7 +228,7 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
                 </span>
               </span>
               <span className="text-right">
-                <span className="block text-lg font-bold tabular-nums">{strength.toFixed(0)}</span>
+                <span className="block font-display text-xl font-bold tabular-nums">{strength.toFixed(0)}</span>
                 <span className="block text-[10px] uppercase text-slate-400">força</span>
               </span>
             </button>
@@ -240,7 +236,7 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
         ))}
       </ul>
 
-      <footer className="fixed inset-x-0 bottom-0 border-t border-line bg-bg/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <footer className="fixed inset-x-0 bottom-0 border-t border-white/[0.13] bg-gradient-to-b from-[#0b1315] to-[#05090a] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-xl items-center gap-3">
           {chosen ? (
             <>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TopBar } from '../theme/Bits'
 import type { ReactNode } from 'react'
 import { loadRealPackage } from '../../data/package/realPackage'
 import { Button, Card } from '../components/ui'
@@ -27,13 +28,8 @@ export function Credits({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-8 text-slate-100" data-testid="credits">
-      <div className="flex items-center justify-between">
-        <h1 className="title text-4xl">Créditos</h1>
-        <button type="button" className="min-h-12 rounded-lg px-3 text-sm text-muted hover:bg-surface" onClick={onBack}>
-          Voltar
-        </button>
-      </div>
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-8 text-slate-100" data-testid="credits">
+      <TopBar title="Créditos" onBack={onBack} />
 
       <Card title="Jogo independente">
         <p className="text-sm leading-relaxed">

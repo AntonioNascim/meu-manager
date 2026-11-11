@@ -83,7 +83,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
 /** O aviso de privacidade do modo online (B8.8; texto da seção 7.2 da proposta, conferido com o que o servidor de fato faz). */
 export function PrivacyNotice({ onBack }: { onBack: () => void }) {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100" data-testid="privacy-notice">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100" data-testid="privacy-notice">
       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Online</p>
       <h1 className="title text-3xl">Privacidade</h1>
       <p className="text-xs text-muted">Versão de {PRIVACY_VERSION.split('-').reverse().join('/')}</p>

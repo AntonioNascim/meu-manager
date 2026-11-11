@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { TopBar } from '../theme/Bits'
 import { parsePackage } from '../../data/package/validate'
 import type { DataPackage, PackageReport } from '../../data/package/types'
 import { deletePackage, listPackages, loadPackage, savePackage } from '../../store/saves'
@@ -93,13 +94,8 @@ export function ImportPackage({ onBack, onUse }: { onBack: () => void; onUse: (c
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-8 text-slate-100">
-      <div className="flex items-center justify-between">
-        <h1 className="title text-4xl">Pacote de dados</h1>
-        <button type="button" className="min-h-12 rounded-lg px-3 text-sm text-muted hover:bg-surface" onClick={onBack}>
-          Voltar
-        </button>
-      </div>
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-8 text-slate-100">
+      <TopBar title="Pacote de dados" onBack={onBack} />
       <p className="text-sm text-muted">
         Escolha um arquivo de pacote (.json) deste aparelho. Ele fica guardado só neste navegador, junto com os seus saves, e nunca é enviado a lugar nenhum. O pacote pode ter vários países, cada um com de 1 a 3 divisões.
       </p>

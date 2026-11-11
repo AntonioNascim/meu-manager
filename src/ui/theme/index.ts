@@ -12,3 +12,4 @@ export { ConditionBar, ConditionStrip, Flag, Jersey, MoodIcon, Stars, Trend, Val
 export { TopTabs } from './TopTabs'
 export { Sheet } from './Sheet'
 export { RangeSlider } from './RangeSlider'
+export { Banner, Chip, Logo, TopBar } from './Bits'

@@ -35,7 +35,7 @@ export function CreateAccount({ onDone, onBack, onPrivacy }: { onDone: () => voi
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 bg-bg px-4 py-6 text-slate-100" data-testid="create-account">
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100" data-testid="create-account">
       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Conta online</p>
       <h1 className="title text-3xl">{access === 'full' ? 'Escolha seu apelido' : 'Criar a conta'}</h1>
       <fieldset className="flex flex-col gap-2" data-testid="age-band">

@@ -101,7 +101,7 @@ function PlayerSelect({ label, value, xi, onChange }: { label: string; value: st
       <select
         value={value ?? ''}
         onChange={(e) => e.target.value && onChange(e.target.value)}
-        className="min-h-11 flex-1 rounded-lg border border-slate-600 bg-slate-900 px-2 text-slate-100"
+        className="min-h-11 flex-1 rounded-lg border border-slate-600 px-2 text-slate-100"
       >
         {value === undefined && <option value="">Escolher…</option>}
         {xi.map((p) => (
