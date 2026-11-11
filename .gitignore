@@ -43,3 +43,4 @@ server/wrangler.deploy.toml
 
 # Saída da ferramenta publishPackage (Fase 6, B3)
 dist-pacote
+docs/redesign/referencias/
