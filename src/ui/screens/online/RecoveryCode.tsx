@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { TopBar } from '../../theme/Bits'
 import { formatRecoveryCode } from '../../../online/recoveryCode'
 import { downloadText } from '../../download'
 import { Button, Card } from '../../components/ui'
@@ -53,12 +54,7 @@ export function RecoveryCodeView({ code, confirmed, nickname, onConfirm, onBack 
 
   return (
     <div className="flex flex-col gap-4" data-testid="recovery-view">
-      <div className="flex items-center justify-between">
-        <h1 className="title text-3xl">Código de recuperação</h1>
-        <button type="button" className="min-h-12 rounded-lg px-3 text-sm text-muted hover:bg-surface" onClick={onBack}>
-          Voltar
-        </button>
-      </div>
+      <TopBar title="Código de recuperação" onBack={onBack} />
       <RecoveryWarning />
       {shown ? (
         <>

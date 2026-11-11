@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { TopBar } from '../../theme/Bits'
 import type { CloudManifest } from '../../../online/cloudSave'
 import { SLOT_COUNT } from '../../../store/saveFormat'
 import type { SaveSummary } from '../../../store/saveFormat'
@@ -33,9 +34,9 @@ const OUTCOME_TEXT: Partial<Record<SyncOutcome, string>> = {
 
 const TONE: Record<CloudSlotState['status'], string> = {
   synced: 'border-win/50 text-win',
-  pending: 'border-yellow-500/50 text-yellow-300',
+  pending: 'border-amber/55 text-amber',
   syncing: 'border-line text-muted',
-  offline: 'border-yellow-500/50 text-yellow-300',
+  offline: 'border-amber/55 text-amber',
   conflict: 'border-loss/60 text-loss',
   error: 'border-loss/60 text-loss',
 }
@@ -117,19 +118,12 @@ export function CloudSaves({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100" data-testid="cloud-saves">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Conta online</p>
-          <h1 className="title text-3xl">Saves na nuvem</h1>
-        </div>
-        <button type="button" className="min-h-12 rounded-lg px-3 text-sm text-muted hover:bg-surface" onClick={onBack}>
-          Voltar
-        </button>
-      </div>
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Conta online</p>
+      <TopBar title="Saves na nuvem" onBack={onBack} />
       <p className="text-xs text-muted">A nuvem é uma cópia por espaço. O jogo continua rodando e salvando neste aparelho, mesmo sem internet.</p>
-      {remote === 'offline' && <p className="text-xs text-yellow-300">Sem conexão com o servidor: o que existe só na nuvem não aparece agora.</p>}
+      {remote === 'offline' && <p className="text-xs text-amber">Sem conexão com o servidor: o que existe só na nuvem não aparece agora.</p>}
       {message && (
-        <p role="status" className="text-sm text-yellow-300" data-testid="cloud-message">
+        <p role="status" className="text-sm text-amber" data-testid="cloud-message">
           {message}
         </p>
       )}
@@ -308,8 +302,8 @@ function ConflictSheet({ slot, local, cloudSave, onClose, onResolved }: { slot: 
         </div>
       }
     >
-      <div className="mb-3 rounded-2xl border border-yellow-500/60 bg-yellow-500/10 p-3 text-sm">
-        <b className="text-yellow-300">Este espaço foi jogado em dois aparelhos.</b>
+      <div className="mb-3 rounded-2xl border border-yellow-500/60 bg-amber/10 p-3 text-sm">
+        <b className="text-amber">Este espaço foi jogado em dois aparelhos.</b>
         <p className="mt-1 text-muted">O envio ficou parado para não perder nada. Escolha qual versão vale — o jogo não mistura as duas.</p>
       </div>
       <div className="grid grid-cols-2 gap-2.5">

@@ -30,7 +30,7 @@ export function OpenLeagues({ onBack, onOpen }: { onBack: () => void; onOpen: (i
       {error && <p className="text-sm text-loss">{error}</p>}
       {leagues === null && !error && <p className="text-sm text-muted">Carregando…</p>}
       {leagues?.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-line p-4 text-sm text-muted" data-testid="no-open-leagues">
+        <p className="rounded-xl border-[1.5px] border-dashed border-line p-4 text-sm text-muted" data-testid="no-open-leagues">
           Nenhuma liga aberta com vaga agora. Que tal criar a sua?
         </p>
       )}

@@ -194,7 +194,7 @@ function Coaches({ league, clubOf, worldDate, busy, act, id, windowOpen }: { lea
   if (others.length === 0) return <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">Ainda não há outros técnicos com clube nesta liga.</p>
   return (
     <>
-      {!windowOpen && <p className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-2 text-sm text-yellow-300">A janela de transferências está fechada: dá para ver os elencos, mas não para propor.</p>}
+      {!windowOpen && <p className="rounded-xl border border-amber/55 bg-amber/10 p-2 text-sm text-amber">A janela de transferências está fechada: dá para ver os elencos, mas não para propor.</p>}
       <ul className="flex flex-col gap-2" data-testid="coach-list">
         {others.map((m) => (
           <li key={m.playerId}>

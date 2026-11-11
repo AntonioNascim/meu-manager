@@ -73,7 +73,7 @@ export function LeagueCard({ leagueId, teamId, onOpen, onWatch, onCareer }: { le
           </p>
         )}
         {locked && (
-          <p className="mt-2 text-xs font-semibold text-yellow-300" data-testid="league-locked">
+          <p className="mt-2 text-xs font-semibold text-amber" data-testid="league-locked">
             A partida começou sem o seu Pronto: a IA joga pelo seu time e você não entra no meio do jogo.
           </p>
         )}

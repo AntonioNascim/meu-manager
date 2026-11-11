@@ -12,7 +12,7 @@ export type Tone = 'gold' | 'teal' | 'amber' | 'violet'
 const TONES: Record<Tone, { icon: string; glow: string; chip: string; value: string }> = {
   gold: { icon: 'text-amber-300', glow: 'from-amber-400/20', chip: 'bg-gradient-to-b from-amber-300 to-amber-500 text-bg', value: 'text-amber-300' },
   teal: { icon: 'text-teal-300', glow: 'from-teal-400/20', chip: 'bg-gradient-to-b from-teal-200 to-teal-400 text-bg', value: 'text-teal-300' },
-  amber: { icon: 'text-yellow-300', glow: 'from-yellow-400/20', chip: 'bg-gradient-to-b from-yellow-200 to-yellow-400 text-bg', value: 'text-yellow-300' },
+  amber: { icon: 'text-amber', glow: 'from-yellow-400/20', chip: 'bg-gradient-to-b from-yellow-200 to-yellow-400 text-bg', value: 'text-amber' },
   violet: { icon: 'text-violet-300', glow: 'from-violet-400/20', chip: 'bg-gradient-to-b from-violet-400 to-sky-400 text-white', value: 'text-violet-300' },
 }
 

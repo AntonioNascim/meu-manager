@@ -70,7 +70,7 @@ export function ReportProblem({ context, onClose }: { context: TechContext; onCl
         <p className="text-sm" data-testid="problem-done">Relato enviado. Obrigado por ajudar no teste! Ele é anônimo: não temos como responder, então conte tudo o que puder.</p>
       ) : (
         <div className="space-y-3">
-          <p className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-2 text-xs text-yellow-200">
+          <p className="rounded-xl border border-amber/55 bg-amber/10 p-2 text-xs text-amber">
             Não escreva dados pessoais (nome, telefone, e-mail, endereço) nem o seu código de recuperação. O relato é anônimo.
           </p>
           <label className="block text-sm">

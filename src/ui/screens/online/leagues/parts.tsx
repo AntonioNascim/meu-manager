@@ -1,36 +1,30 @@
 import type { ReactNode } from 'react'
+import { TopBar } from '../../../theme/Bits'
 import type { LeagueSummary } from '../../../../online/leagueApi'
 import { LEAGUE_KIND_LABELS, LEAGUE_STATUS_LABELS, PACE_LABELS } from '../../../labels'
 
 /** Moldura das telas online: cabeçalho com o título e o "Voltar". */
 export function Frame({ eyebrow, title, onBack, children, backLabel = 'Voltar' }: { eyebrow?: string; title: string; onBack: () => void; children: ReactNode; backLabel?: string }) {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-4 px-4 py-6 text-slate-100">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          {eyebrow && <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{eyebrow}</p>}
-          <h1 className="title text-3xl">{title}</h1>
-        </div>
-        <button type="button" className="min-h-12 flex-none rounded-lg px-3 text-sm text-muted hover:bg-surface" onClick={onBack}>
-          {backLabel}
-        </button>
-      </div>
+    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-3 px-4 py-2 text-slate-100">
+      {eyebrow && <p className="-mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{eyebrow}</p>}
+      <TopBar title={title} onBack={onBack} backLabel={backLabel} />
       {children}
     </div>
   )
 }
 
 export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted' | 'win' | 'warn' | 'accent' }) {
-  const color = tone === 'win' ? 'border-win/50 text-win' : tone === 'warn' ? 'border-yellow-500/50 text-yellow-300' : tone === 'accent' ? 'border-accent/60 text-accent' : 'border-line text-muted'
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${color}`}>{children}</span>
+  const color = tone === 'win' ? 'text-accent bg-accent/10' : tone === 'warn' ? 'text-amber bg-amber/10' : tone === 'accent' ? 'text-accent bg-accent/10' : 'text-muted bg-white/[0.04]'
+  return <span className={`inline-flex items-center whitespace-nowrap rounded-full border border-current px-2.5 py-[3px] text-xs font-semibold ${color}`}>{children}</span>
 }
 
 /** Cartão de uma liga na lista (minhas ligas, diretório, convite). */
 export function LeagueCard({ league, onOpen, action }: { league: LeagueSummary; onOpen: () => void; action?: string }) {
   return (
-    <button type="button" onClick={onOpen} className="flex w-full flex-col gap-2 rounded-2xl border border-line bg-surface p-4 text-left active:scale-[0.99]" data-testid="league-card">
+    <button type="button" onClick={onOpen} className="flex w-full flex-col gap-2 card-bg rounded-[14px] border border-white/[0.13] p-3.5 text-left active:scale-[0.99]" data-testid="league-card">
       <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 truncate text-lg font-bold">{league.name}</span>
+        <span className="min-w-0 truncate font-display text-xl font-bold">{league.name}</span>
         <Pill tone={league.status === 'running' ? 'win' : 'warn'}>{LEAGUE_STATUS_LABELS[league.status]}</Pill>
       </div>
       <div className="flex flex-wrap items-center gap-2">

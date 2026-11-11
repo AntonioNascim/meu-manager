@@ -59,7 +59,7 @@ export function LeaguesHub({
       {error && <p className="text-sm text-loss">{error}</p>}
       {leagues === null && !error && <p className="text-sm text-muted">Carregando…</p>}
       {leagues?.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-line p-4 text-sm text-muted" data-testid="no-leagues">
+        <p className="rounded-xl border-[1.5px] border-dashed border-line p-4 text-sm text-muted" data-testid="no-leagues">
           Você ainda não está em nenhuma liga. Crie uma, procure uma aberta ou entre com o código de um amigo.
         </p>
       )}

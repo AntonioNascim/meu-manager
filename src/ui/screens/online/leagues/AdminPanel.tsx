@@ -223,7 +223,7 @@ export function AdminPanel({ leagueId }: { leagueId: string }) {
 
       <Card title="Técnicos">
         {view && view.suggestions.length > 0 && (
-          <p className="mb-2 rounded-xl border border-yellow-500/50 bg-yellow-500/10 p-2 text-xs text-yellow-300" data-testid="absence-suggestions">
+          <p className="mb-2 rounded-xl border border-amber/55 bg-amber/10 p-2 text-xs text-amber" data-testid="absence-suggestions">
             Sumidos há várias rodadas: {view.suggestions.map((s) => nick(s.playerId)).join(', ')}. A IA joga por eles.
           </p>
         )}
@@ -301,7 +301,7 @@ export function AdminPanel({ leagueId }: { leagueId: string }) {
                 O tempo salta até o horário do jogo de {view?.next ? dateLabel(view.next.date) : '—'} ({view?.next ? whenLabel(view.next.startAt) : ''}). A partida <b>não</b> começa sozinha: ela espera todos os técnicos que jogam darem Pronto, e começa sozinha só se o prazo acabar.
               </p>
               {view?.next && view.next.notReady.length > 0 ? (
-                <p className="mt-3 rounded-xl border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm" data-testid="advance-not-ready">
+                <p className="mt-3 rounded-xl border border-amber/55 bg-amber/10 p-3 text-sm" data-testid="advance-not-ready">
                   Ainda não deram Pronto: {view.next.notReady.map(nick).join(', ')}
                 </p>
               ) : (

@@ -23,13 +23,13 @@ export function Logo() {
 }
 
 /** Topo das telas antes do jogo: botão Voltar e o título. */
-export function TopBar({ title, onBack, right }: { title: string; onBack?: () => void; right?: ReactNode }) {
+export function TopBar({ title, onBack, right, backLabel = 'Voltar' }: { title: string; onBack?: () => void; right?: ReactNode; backLabel?: string }) {
   return (
     <div className="flex min-h-[60px] items-center gap-2.5 py-3.5">
       {onBack && (
         <button type="button" onClick={onBack} className="flex min-h-11 items-center gap-1.5 rounded-[10px] border border-white/[0.13] bg-surface pl-2 pr-3.5 font-semibold">
           <Icon name="left" size={18} />
-          Voltar
+          {backLabel}
         </button>
       )}
       <h2 className="flex-1 font-display text-2xl font-bold leading-none">{title}</h2>

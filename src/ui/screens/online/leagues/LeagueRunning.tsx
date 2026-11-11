@@ -74,7 +74,7 @@ export function LeagueRunning({ league, teams, onRefresh }: { league: LeagueDeta
             <>
               <p className="text-sm text-muted">{view.directResult || view.current.playing.includes(me.playerId) ? '' : 'Seu clube não joga nesta rodada. '}A rodada está acontecendo ({view.current.all - view.current.pending} de {view.current.all} partidas dos técnicos terminaram).</p>
               {!view.directResult && view.current.locked.includes(me.playerId) && (
-                <p className="mt-2 text-sm font-semibold text-yellow-300" data-testid="locked-hint">
+                <p className="mt-2 text-sm font-semibold text-amber" data-testid="locked-hint">
                   A partida começou sem o seu Pronto: a IA joga pelo seu time e você não entra no meio do jogo.
                 </p>
               )}
@@ -222,8 +222,8 @@ function Fixtures({ fixtures, clubOf }: { fixtures: LeagueFixture[] | undefined;
 function Status({ view, clubOf }: { view: LeagueView; clubOf: (teamId: string) => string }) {
   if (view.paused) {
     return (
-      <div className="rounded-2xl border border-yellow-500/50 bg-yellow-500/10 p-4" data-testid="status-paused">
-        <p className="font-bold text-yellow-300">Liga pausada</p>
+      <div className="rounded-2xl border border-amber/55 bg-amber/10 p-4" data-testid="status-paused">
+        <p className="font-bold text-amber">Liga pausada</p>
         <p className="mt-1 text-sm text-muted">O tempo está parado. Quando o ADM retomar, os horários das próximas rodadas são refeitos. Se ninguém retomar, a liga volta sozinha em {view.autoResumeAt ? whenLabel(view.autoResumeAt) : '30 dias'}.</p>
       </div>
     )
