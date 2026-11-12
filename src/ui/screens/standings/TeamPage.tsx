@@ -6,7 +6,7 @@ import { formatDate, playerName } from '../../format'
 import { POSITION_SHORT_LABELS } from '../../labels'
 import { playerOverall } from '../../../engine/overall'
 import { shortName } from './parts'
-import { Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
+import { Avatar, Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
 import { TacticSection } from './TacticSection'
 import { useOnlineDetail } from '../../useOnlineDetail'
 import type { LiveTactic } from './TacticSection'
@@ -106,6 +106,7 @@ export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; t
           {squad.map((p) => (
             <li key={p.id} className="flex items-center gap-2 px-4 py-2 text-sm">
               <span className="w-9 shrink-0 text-xs font-bold text-muted">{POSITION_SHORT_LABELS[p.position]}</span>
+              <Avatar id={p.id} colors={team.colors} size={30} ring />
               <Flag nationality={p.nationality} />
               <span className="min-w-0 flex-1 truncate font-semibold">{playerName(p)}</span>
               <span className="shrink-0 text-xs text-muted">{p.age} anos</span>

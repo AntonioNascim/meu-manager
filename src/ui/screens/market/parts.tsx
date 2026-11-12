@@ -9,7 +9,8 @@ import type { Game } from '../../../store/game'
 import { daysBetween, formatCompactMoney, formatDate, playerName } from '../../format'
 import { INTEREST_COLORS, INTEREST_LABELS, POSITION_SHORT_LABELS, WINDOW_LABELS } from '../../labels'
 import { updateGame } from '../../../store/gameStore'
-import { Flag, Icon, Panel, ValueBadge } from '../../theme'
+import { avatarColors } from '../../avatarColors'
+import { Avatar, Flag, Icon, Panel, ValueBadge } from '../../theme'
 import { shortName } from '../standings/parts'
 
 /** Valor curto para a lista: "R$ 51 mi", "R$ 8,3 mi", "R$ 840 mil". */
@@ -102,6 +103,7 @@ export function MarketRow({
     <li className="flex items-center">
       <button type="button" onClick={onOpen} className="flex min-h-[72px] min-w-0 flex-1 items-center gap-2 py-2 pl-3 pr-2 text-left">
         <span className="inline-block w-9 shrink-0 rounded-[5px] bg-accent/10 px-1 py-0.5 text-center font-display text-xs font-bold tracking-wide text-accent">{POSITION_SHORT_LABELS[player.position]}</span>
+        <Avatar id={player.id} {...(avatarColors(game, player) ? { colors: avatarColors(game, player) as [string, string] } : {})} size={40} ring />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <Flag nationality={player.nationality} />

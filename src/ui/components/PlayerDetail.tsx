@@ -15,7 +15,8 @@ import {
   POSITION_SHORT_LABELS,
 } from '../labels'
 import type { AttributeGroup } from '../labels'
-import { Eyebrow, Flag, MoodIcon, Panel, Stars, ValueBadge } from '../theme'
+import { Avatar, Eyebrow, Flag, MoodIcon, Panel, Stars, ValueBadge } from '../theme'
+import { useGame } from '../../store/gameStore'
 import { isOnYellowEdge } from '../squadSort'
 
 /** Barra de 0 a 100 com a cor da faixa. */
@@ -99,6 +100,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  */
 export function PlayerDetail({ player: shown, onClose, academy = false, stars, footer, history, currentDate }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode; history?: readonly StrengthSnapshot[]; currentDate?: IsoDate }) {
   const player = useFreshPlayer(shown)
+  const colors = useGame()?.season.teams.find((t) => t.id === player.teamId)?.colors
   const c = player.condition
   const overall = playerOverall(player)
   const isKeeper = player.position === 'GK'
@@ -109,6 +111,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
   return (
     <div className="fixed inset-0 z-30 flex flex-col bg-bg" role="dialog" aria-label={playerName(player)}>
       <header className="flex items-center gap-3 border-b border-line px-4 py-3">
+        <Avatar id={player.id} {...(colors ? { colors } : {})} size={64} ring />
         <div className="flex flex-col items-center gap-1">
           <ValueBadge value={overall} className="!min-w-14 !px-3 !py-2 !text-3xl">
             {Math.round(overall)}

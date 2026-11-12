@@ -6,40 +6,56 @@ import type { Game } from '../../../store/game'
 import { StatusTags } from '../../components/PlayerDetail'
 import { PlayerDetail } from '../../components/PlayerDetail'
 import { formatCompactMoney, playerName } from '../../format'
-import { POSITION_GROUP_LABELS, POSITION_SHORT_LABELS, SQUAD_SORT_LABELS } from '../../labels'
+import { POSITION_GROUP_LABELS, POSITION_LABELS, POSITION_SHORT_LABELS, SQUAD_SORT_LABELS } from '../../labels'
 import { NATURAL_DIRECTION, inGroup, isUnavailable, sortSquad } from '../../squadSort'
 import type { PositionGroup, SquadSortKey } from '../../squadSort'
 import { SellSheet } from '../market/SellSheet'
-import { ConditionBar, Flag, MoodIcon, Panel, Trend, ValueBadge } from '../../theme'
+import { conditionBand } from '../../colors'
+import { Avatar, ConditionBar, Flag, Icon, MoodIcon, Panel, Trend } from '../../theme'
+import { Overview } from './Overview'
 
 const GROUPS = Object.keys(POSITION_GROUP_LABELS) as PositionGroup[]
 const SORT_KEYS: SquadSortKey[] = ['position', 'overall', 'age', 'fitness', 'morale']
 
-function PlayerRow({ player, starter, change, onOpen }: { player: Player; starter: boolean; change: number; onOpen: () => void }) {
+function PlayerRow({ player, rank, colors, starter, change, onOpen }: { player: Player; rank: number; colors: [string, string]; starter: boolean; change: number; onOpen: () => void }) {
   const out = isUnavailable(player)
+  const overall = Math.round(playerOverall(player))
+  const fitness = Math.round(player.condition.fitness)
   return (
     <li>
-      <button type="button" onClick={onOpen} className={`flex min-h-16 w-full items-center gap-2 px-3 py-2 text-left ${out ? 'opacity-75' : ''}`}>
-        <span className="w-9 shrink-0 text-xs font-bold text-muted">{POSITION_SHORT_LABELS[player.position]}</span>
+      <button type="button" onClick={onOpen} className={`flex min-h-[68px] w-full items-center gap-2 px-3 py-2 text-left ${out ? 'opacity-75' : ''}`}>
+        <span className="w-4 shrink-0 text-center font-display text-[15px] font-bold text-muted">{rank}</span>
+        <Avatar id={player.id} colors={colors} size={44} ring />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
+            <span className="truncate font-display text-[17px] font-bold leading-tight">{playerName(player)}</span>
             <Flag nationality={player.nationality} />
-            <span className="truncate font-bold">{playerName(player)}</span>
           </span>
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted">
+          <span className="block truncate text-xs text-muted">
+            <span className="font-bold text-accent">{POSITION_SHORT_LABELS[player.position]}</span> · {POSITION_LABELS[player.position]} · {player.age}a
+          </span>
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted">
             <span>
-              {player.age}a · {formatCompactMoney(player.contract.salary)}/mês · até {player.contract.endDate.slice(0, 4)}
+              {formatCompactMoney(player.contract.salary)}/mês · até {player.contract.endDate.slice(0, 4)}
             </span>
             {starter && <span className="font-bold text-sky-300">titular</span>}
             <StatusTags player={player} />
           </span>
         </span>
-        <MoodIcon morale={player.condition.morale} />
-        <ConditionBar fitness={player.condition.fitness} />
-        <span className="flex w-12 shrink-0 flex-col items-center gap-0.5">
-          <ValueBadge value={playerOverall(player)}>{Math.round(playerOverall(player))}</ValueBadge>
+        <span className="flex w-[4.2rem] shrink-0 flex-col items-end gap-1">
+          <span className="flex items-center gap-1.5">
+            <MoodIcon morale={player.condition.morale} size={18} />
+            <span className="font-display text-[26px] font-extrabold leading-none tabular-nums">{overall}</span>
+          </span>
+          <span className="flex w-full items-center gap-1">
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10" role="img" aria-label={`Condição ${fitness}%`}>
+              <span className={`block h-full rounded-full ${conditionBand(fitness).bg}`} style={{ width: `${fitness}%` }} />
+            </span>
+            <span className="text-[10px] tabular-nums text-muted">{fitness}%</span>
+          </span>
           <Trend change={change} />
         </span>
+        <Icon name="chev" size={18} className="shrink-0 text-accent" />
       </button>
     </li>
   )
@@ -60,6 +76,8 @@ export function Players({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
+      <Overview game={game} onOpen={setOpenId} />
+
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
           {GROUPS.map((g) => (
@@ -117,10 +135,14 @@ export function Players({ game }: { game: Game }) {
         </span>
       </div>
 
-      <Panel className="overflow-hidden">
+      <Panel className="overflow-hidden border-l-[3px] border-l-accent">
+        <div className="flex items-center gap-2 border-b border-white/[0.07] bg-gradient-to-r from-accent/[0.10] to-transparent px-3 py-2.5">
+          <Icon name="users" size={22} className="text-white" />
+          <span className="font-display text-[19px] font-bold leading-none">Jogadores</span>
+        </div>
         <ul className="divide-y divide-line">
-          {list.map((p) => (
-            <PlayerRow key={p.id} player={p} starter={starters.has(p.id)} change={strengthChange(game, p)} onOpen={() => setOpenId(p.id)} />
+          {list.map((p, i) => (
+            <PlayerRow key={p.id} rank={i + 1} colors={team.colors} player={p} starter={starters.has(p.id)} change={strengthChange(game, p)} onOpen={() => setOpenId(p.id)} />
           ))}
           {list.length === 0 && <li className="p-4 text-sm text-muted">Nenhum jogador neste setor.</li>}
         </ul>

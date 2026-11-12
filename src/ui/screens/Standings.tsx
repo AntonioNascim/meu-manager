@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Competition } from '../../engine/types'
 import type { Game } from '../../store/game'
 import { Icon, TopTabs } from '../theme'
+import { Ongoing } from './standings/Ongoing'
 import { Titles } from './standings/Titles'
 import { Cups } from './standings/Cups'
 import { History } from './standings/History'
@@ -13,9 +14,10 @@ import { TeamPage } from './standings/TeamPage'
 
 export { latestPlayedRound, zoneOf } from './standings/Table'
 
-type Section = 'table' | 'rounds' | LeaderBoard | 'cups' | 'history' | 'titles'
+type Section = 'ongoing' | 'table' | 'rounds' | LeaderBoard | 'cups' | 'history' | 'titles'
 
 const SECTIONS: { id: Section; label: string }[] = [
+  { id: 'ongoing', label: 'Em andamento' },
   { id: 'table', label: 'Classificação' },
   { id: 'rounds', label: 'Rodadas' },
   { id: 'goals', label: 'Artilharia' },
@@ -45,7 +47,7 @@ export function Standings({ game, initialSection = 'table' }: { game: Game; init
         <span className="text-right text-xs italic text-muted">Grandes desafios,<br />grandes conquistas!</span>
       </div>
       <TopTabs scroll value={section} onChange={setSection} options={SECTIONS} />
-      {section !== 'history' && section !== 'cups' && section !== 'titles' && (
+      {section !== 'ongoing' && section !== 'history' && section !== 'cups' && section !== 'titles' && (
         <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[...competitions]
             .sort((a, b) => Number(b.pyramid === mine.pyramid) - Number(a.pyramid === mine.pyramid) || a.tier - b.tier)
@@ -61,6 +63,15 @@ export function Standings({ game, initialSection = 'table' }: { game: Game; init
               </button>
             ))}
         </div>
+      )}
+      {section === 'ongoing' && (
+        <Ongoing
+          game={game}
+          onOpen={(t) => {
+            if (t.competitionId && t.section === 'table') setCompetitionId(t.competitionId)
+            setSection(t.section)
+          }}
+        />
       )}
       {section === 'table' && <Table game={game} competition={competition} onTeam={setTeamId} />}
       {section === 'rounds' && <Rounds game={game} competition={competition} onTeam={setTeamId} />}

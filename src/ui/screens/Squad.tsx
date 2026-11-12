@@ -3,7 +3,8 @@ import { academyAlert, squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { isUnavailable, sortSquad } from '../squadSort'
 import type { SquadSortKey } from '../squadSort'
-import { TopTabs } from '../theme'
+import { Icon, TopTabs } from '../theme'
+import { squadTagline } from './squad/Overview'
 import { Academy } from './squad/Academy'
 import { Lineup } from './squad/Lineup'
 import { Numbers } from './squad/Numbers'
@@ -31,6 +32,11 @@ export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Icon name="squad" size={30} className="text-accent" />
+        <h2 className="flex-1 font-display text-[26px] font-bold leading-none">Elenco</h2>
+        <span className="max-w-[45%] text-right text-xs italic text-muted">{squadTagline(game, team)}</span>
+      </div>
       <TopTabs
         value={tab}
         onChange={setTab}

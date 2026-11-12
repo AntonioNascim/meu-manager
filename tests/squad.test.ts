@@ -56,7 +56,7 @@ describe('cores por faixa', () => {
 describe('telas de elenco', () => {
   it('a lista mostra todos os jogadores com posição e força', () => {
     const html = renderToStaticMarkup(createElement(Squad, { game }))
-    expect(html.match(/<li/g)).toHaveLength(squad.length)
+    expect(html.match(/<li[ >]/g)).toHaveLength(squad.length)
     expect(html).toContain('GOL')
     for (const tab of ['Jogadores', 'Time principal', 'Números', 'Tática']) expect(html).toContain(tab)
     expect(html).toContain('Base')

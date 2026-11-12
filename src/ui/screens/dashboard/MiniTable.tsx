@@ -1,9 +1,8 @@
-import type { Competition, Match } from '../../../engine/types'
+import type { Competition, Match, StandingRow } from '../../../engine/types'
 import { standingsOf, teamById, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { outcomeFor } from '../../format'
-import { Crest, Eyebrow, Panel, ResultDot } from '../../theme'
-import { teamForm } from '../standings/data'
+import { Crest, Icon } from '../../theme'
 
 /** Linhas da mini classificação: o seu time, os dois de cima e os dois de baixo (a janela encosta no topo ou no fim da tabela). */
 export function miniWindow<T>(rows: readonly T[], index: number, around = 2): { start: number; rows: T[] } {
@@ -12,88 +11,93 @@ export function miniWindow<T>(rows: readonly T[], index: number, around = 2): { 
   return { start, rows: rows.slice(start, start + size) }
 }
 
+/** Os cinco primeiros; se o seu time está mais abaixo, ele entra no lugar do quinto (com a posição de verdade). */
+export function topFive(rows: readonly StandingRow[], teamId: string): { position: number; row: StandingRow }[] {
+  const top = rows.slice(0, 5).map((row, i) => ({ position: i + 1, row }))
+  const mine = rows.findIndex((r) => r.teamId === teamId)
+  if (mine < 5) return top
+  return [...top.slice(0, 4), { position: mine + 1, row: rows[mine] as StandingRow }]
+}
+
+const HEAD = 'flex items-center gap-2 border-b border-white/[0.07] bg-gradient-to-r from-accent/[0.10] to-transparent px-3 py-2.5'
+const CARD = 'card-bg overflow-hidden rounded-[14px] border border-white/[0.13] border-l-[3px] border-l-accent'
+
+/** Classificação (cinco primeiros) e Últimos resultados do time, lado a lado. */
 export function MiniTable({ game, competition, onOpen }: { game: Game; competition: Competition; onOpen: () => void }) {
   const team = userTeam(game)
   const table = standingsOf(game, competition)
-  const index = Math.max(0, table.findIndex((r) => r.teamId === team.id))
-  const { start, rows } = miniWindow(table, index)
-  const matches = game.season.matches.filter((m) => m.competitionId === competition.id)
+  const rows = topFive(table, team.id)
+  const matches = game.season.matches.filter((m) => m.competitionId === competition.id || m.cup !== undefined)
   const mine = matches
     .filter((m) => m.status === 'finished' && m.result && (m.homeTeamId === team.id || m.awayTeamId === team.id))
     .sort((a, b) => a.date.localeCompare(b.date) || a.round - b.round)
     .slice(-5)
+    .reverse()
   return (
-    <Panel className="p-4" data-testid="mini-table">
-      <div className="flex items-start justify-between gap-2">
-        <Eyebrow icon="chart">Classificação</Eyebrow>
-        <button type="button" onClick={onOpen} className="min-h-10 text-sm font-bold text-accent">
-          Ver tabela
-        </button>
-      </div>
-      <table className="mt-1 w-full text-sm tabular-nums">
-        <thead>
-          <tr className="text-[11px] uppercase tracking-wider text-muted">
-            <th className="w-7 text-left font-bold">#</th>
-            <th className="text-left font-bold">Time</th>
-            <th className="w-7 font-bold">J</th>
-            <th className="w-9 font-bold">SG</th>
-            <th className="w-9 font-bold">Pts</th>
-            <th className="w-[4.2rem] text-right font-bold">Forma</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => {
-            const t = teamById(game, r.teamId)
-            const you = r.teamId === team.id
-            const form = teamForm(matches, r.teamId, 5)
-            return (
-              <tr key={r.teamId} className={you ? 'bg-accent/10 font-bold text-accent' : ''} data-mini-row={r.teamId}>
-                <td className="py-1.5 pl-1 text-left">{start + i + 1}</td>
-                <td className="py-1.5">
-                  <span className="flex items-center gap-2">
-                    <Crest team={t} size="xs" />
-                    <span className="truncate">{t.abbreviation}</span>
-                  </span>
-                </td>
-                <td className="text-center">{r.played}</td>
-                <td className="text-center">{r.goalDifference > 0 ? `+${r.goalDifference}` : r.goalDifference}</td>
-                <td className="text-center">{r.points}</td>
-                <td className="pr-1">
-                  <span className="flex justify-end gap-0.5">
-                    {form.map((o, k) => (
-                      <span key={k} className={`h-2.5 w-2.5 rounded-full ${o === 'W' ? 'bg-win' : o === 'D' ? 'bg-draw' : 'bg-loss'}`} />
-                    ))}
-                  </span>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      {mine.length > 0 && (
-        <div className="mt-3 border-t border-line pt-3" data-testid="recent-results">
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Seus últimos jogos</div>
-          <ul className="flex flex-wrap gap-2">
-            {mine.map((m) => {
-              const o = outcomeFor(m, team.id)
-              const home = m.homeTeamId === team.id
-              const rival = teamById(game, home ? m.awayTeamId : m.homeTeamId)
-              const r = m.result as NonNullable<Match['result']>
+    <div className="grid grid-cols-2 gap-2.5" data-testid="mini-table">
+      <section className={CARD}>
+        <div className={HEAD}>
+          <Icon name="chart" size={20} className="text-accent" />
+          <span className="font-display text-[17px] font-bold leading-none">Classificação</span>
+        </div>
+        <div className="px-2.5 pb-1 pt-1.5">
+          <div className="flex items-center text-[10.5px] text-muted">
+            <span className="w-5">Pos</span>
+            <span className="flex-1 pl-7">Time</span>
+            <span>Pts</span>
+          </div>
+          <ul>
+            {rows.map(({ position, row }) => {
+              const t = teamById(game, row.teamId)
+              const you = row.teamId === team.id
               return (
-                <li key={m.id} className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-1 pr-2.5 text-xs font-bold tabular-nums">
-                  {o && <ResultDot outcome={o} />}
-                  <span>
-                    {home ? r.homeGoals : r.awayGoals}–{home ? r.awayGoals : r.homeGoals}
-                  </span>
-                  <span className="text-muted">
-                    {home ? 'x' : '@'} {rival.abbreviation}
-                  </span>
+                <li key={row.teamId} data-mini-row={row.teamId} className={`-mx-1.5 flex items-center gap-1.5 rounded-md px-1.5 py-[5px] text-[13px] tabular-nums ${you ? 'bg-accent/25 font-bold' : ''}`}>
+                  <span className="w-4 text-center font-display text-[15px] font-bold">{position}</span>
+                  <Crest team={t} size="xs" />
+                  <span className="min-w-0 flex-1 truncate">{t.abbreviation}</span>
+                  <span className="font-display text-[15px] font-bold">{row.points}</span>
                 </li>
               )
             })}
           </ul>
+          <button type="button" onClick={onOpen} className="flex min-h-10 w-full items-center justify-end gap-0.5 text-[13px] font-bold text-accent">
+            Ver tabela
+            <Icon name="chev" size={16} />
+          </button>
         </div>
-      )}
-    </Panel>
+      </section>
+
+      <section className={CARD} data-testid="recent-results">
+        <div className={HEAD}>
+          <Icon name="shirt" size={20} className="text-white" />
+          <span className="font-display text-[17px] font-bold leading-none">Últimos resultados</span>
+        </div>
+        <ul className="px-2.5 py-1.5">
+          {mine.map((m) => {
+            const o = outcomeFor(m, team.id)
+            const home = teamById(game, m.homeTeamId)
+            const away = teamById(game, m.awayTeamId)
+            const r = m.result as NonNullable<Match['result']>
+            const tone = o === 'W' ? 'text-win' : o === 'L' ? 'text-loss' : 'text-draw'
+            return (
+              <li key={m.id} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 py-[5px] text-[11px]">
+                <span className="flex min-w-0 items-center gap-1">
+                  <Crest team={home} size="xs" />
+                  <span className="truncate">{home.abbreviation}</span>
+                </span>
+                <span className={`font-display text-[15px] font-bold tabular-nums ${tone}`}>
+                  {r.homeGoals} - {r.awayGoals}
+                </span>
+                <span className="flex min-w-0 items-center justify-end gap-1">
+                  <span className="truncate">{away.abbreviation}</span>
+                  <Crest team={away} size="xs" />
+                </span>
+              </li>
+            )
+          })}
+          {mine.length === 0 && <li className="py-6 text-center text-xs text-muted">Ainda não há jogos disputados.</li>}
+        </ul>
+      </section>
+    </div>
   )
 }

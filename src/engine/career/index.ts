@@ -15,6 +15,8 @@ import type { Competition, IsoDate, Match, Team, TeamId } from '../types'
 export interface Coach {
   reputation: number
   arrivedOn?: IsoDate
+  /** Nome escolhido pela pessoa ao começar o jogo (saves antigos não têm: a interface sorteia um). */
+  name?: string
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))

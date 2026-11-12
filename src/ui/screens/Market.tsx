@@ -6,6 +6,7 @@ import type { Game } from '../../store/game'
 import { Icon, TopTabs } from '../theme'
 import { favoritesOf } from '../../store/game'
 import { Contracts } from './Contracts'
+import { Overview } from './market/Overview'
 import { History } from './market/History'
 import { Lists } from './market/Lists'
 import { PreContractTab } from './market/PreContract'
@@ -14,7 +15,7 @@ import { Search } from './market/Search'
 import { WindowBanner } from './market/parts'
 import { CoachesTab } from './online/leagues/CoachesTab'
 
-export type MarketTab = 'search' | 'favorites' | 'lists' | 'free' | 'precontract' | 'proposals' | 'history' | 'contracts' | 'coaches'
+export type MarketTab = 'overview' | 'search' | 'favorites' | 'lists' | 'free' | 'precontract' | 'proposals' | 'history' | 'contracts' | 'coaches'
 
 /** Tela de Mercado: abas com rolagem horizontal e o aviso da janela de transferências no topo de todas. */
 export function Market({ game, initialTab = 'search' }: { game: Game; initialTab?: MarketTab }) {
@@ -36,6 +37,7 @@ export function Market({ game, initialTab = 'search' }: { game: Game; initialTab
         value={tab}
         onChange={setTab}
         options={[
+          { id: 'overview', label: 'Resumo' },
           { id: 'search', label: 'Buscar' },
           { id: 'favorites', label: 'Favoritos' },
           { id: 'lists', label: 'Listas' },
@@ -48,6 +50,7 @@ export function Market({ game, initialTab = 'search' }: { game: Game; initialTab
           ...(game.online ? [{ id: 'coaches' as const, label: 'Técnicos' }] : []),
         ]}
       />
+      {tab === 'overview' && <Overview game={game} open={open} onTab={setTab} />}
       {tab === 'search' && <Search key="search" game={game} open={open} />}
       {tab === 'favorites' && <Search key="favorites" game={game} open={open} restrict={onlyFavorites} showTier={false} empty="Toque na estrela de um jogador para acompanhá-lo aqui." />}
       {tab === 'lists' && <Lists game={game} open={open} />}

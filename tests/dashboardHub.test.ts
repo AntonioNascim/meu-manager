@@ -51,7 +51,7 @@ describe('central de avisos do painel', () => {
     const out = html(createElement(NoticeCenter, { notices, onOpen: () => {} }))
     expect(out).toContain('Decisão pendente na base')
     expect(out).toContain('vai embora de graça')
-    expect(out).toContain('Ver todos os avisos')
+    expect(out).toContain('Ver todos')
   })
 
   it('lesionado titular leva à Escalação', () => {
@@ -60,11 +60,12 @@ describe('central de avisos do painel', () => {
     expect(dashboardNotices(game).find((n) => n.id === 'unavailable')).toMatchObject({ tone: 'warning', to: 'squad', tab: 'lineup' })
   })
 
-  it('o painel mostra a central no topo e leva o toque a onNavigate com a aba', () => {
+  it('o painel mostra a central de avisos (depois do próximo jogo e da classificação, no lugar das notícias)', () => {
     const game = mapUser(base, (p, i) => (i === 0 ? { ...p, condition: { ...p.condition, injuryDaysLeft: 5 } } : p))
     const out = html(createElement(Dashboard, { game, onNavigate: () => {} }))
     expect(out).toContain('data-testid="notice-center"')
-    expect(out.indexOf('notice-center')).toBeLessThan(out.indexOf('Próximo jogo'))
+    expect(out.indexOf('notice-center')).toBeGreaterThan(out.indexOf('Próximo jogo'))
+    expect(out.indexOf('notice-center')).toBeGreaterThan(out.indexOf('data-testid="mini-table"'))
   })
 })
 
@@ -89,7 +90,7 @@ describe('painel reunido', () => {
     const out = html(createElement(Dashboard, { game, onNavigate: () => {} }))
     expect(out).toContain('data-testid="mini-table"')
     expect(out.match(/data-mini-row=/g)).toHaveLength(5)
-    expect(out).toContain('Seus últimos jogos')
+    expect(out).toContain('Últimos resultados')
   })
 
   it('destaques: artilheiro, garçom e melhor nota média (mínimo de jogos com nota)', () => {
@@ -109,7 +110,7 @@ describe('painel reunido', () => {
 
   it('a grade de atalhos tem os 10 destinos e acende só onde há pendência', () => {
     const calm = html(createElement(Dashboard, { game: base, onNavigate: () => {} }))
-    const shortcuts = (s: string) => s.slice(s.indexOf('data-testid="shortcuts"'), s.indexOf('data-testid="mini-table"'))
+    const shortcuts = (s: string) => s.slice(s.indexOf('data-testid="shortcuts"'), s.indexOf('Destaques do elenco'))
     for (const label of ['Elenco', 'Escalação', 'Tática', 'Base', 'Treino', 'Mercado', 'Contratos', 'Finanças', 'Tabela', 'Histórico']) expect(shortcuts(calm)).toContain(`>${label}<`)
     expect(shortcuts(calm).match(/Há algo pendente/g)?.length ?? 0).toBeLessThanOrEqual(1)
     const hurt = mapUser(base, (p, i) => (i === 0 ? { ...p, condition: { ...p.condition, injuryDaysLeft: 5 } } : p))

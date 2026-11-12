@@ -2,7 +2,7 @@
 // Várias: node docs/redesign/shotapp.cjs "url1=nome1" "url2=nome2" ...
 const { spawn } = require('child_process'), fs = require('fs'), path = require('path')
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
-const OUT = path.resolve(__dirname, '../../.shots/redesign/app')
+const OUT = path.resolve(__dirname, process.env.SHOT_OUT || '../../.shots/redesign/app')
 fs.mkdirSync(OUT, { recursive: true })
 const PORT = 9336, sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 ;(async () => {

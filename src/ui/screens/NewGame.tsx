@@ -12,6 +12,7 @@ import { openGame } from '../../store/gameStore'
 import type { SaveSummary } from '../../store/saveFormat'
 import { worldChoices } from '../../store/worldChoices'
 import { NATIONALITY_LABELS } from '../labels'
+import { drawnCoachName } from '../coachName'
 import { Flag } from '../theme/PlayerBits'
 import { TopBar } from '../theme/Bits'
 import { TopTabs } from '../theme/TopTabs'
@@ -163,6 +164,7 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
   const division = country.divisions.find((d) => d.id === divisionId) ?? (country.divisions[0] as (typeof country.divisions)[number])
   const [selected, setSelected] = useState<string | null>(null)
   const [choosingSlot, setChoosingSlot] = useState(false)
+  const [coachInput, setCoachInput] = useState(() => drawnCoachName(seed))
 
   const options: Option[] = useMemo(() => {
     const byId = new Map<string, Player>(world.players.map((p) => [p.id, p]))
@@ -211,6 +213,22 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
           )}
         </div>
       </Header>
+
+      <div className="px-4 pb-3">
+        <label className="block text-[13px] font-semibold text-slate-300" htmlFor="coach-name-input">
+          Seu nome de técnico
+        </label>
+        <input
+          id="coach-name-input"
+          data-testid="coach-name-input"
+          type="text"
+          value={coachInput}
+          maxLength={40}
+          onChange={(e) => setCoachInput(e.target.value)}
+          className="mt-1 min-h-12 w-full rounded-xl border border-white/[0.13] bg-surface px-3 text-base text-slate-100 outline-none focus:border-accent"
+        />
+        <p className="mt-1 text-xs text-muted">Sugerimos um nome; troque se quiser.</p>
+      </div>
 
       <ul className="flex-1 space-y-2 overflow-y-auto px-4 pb-32">
         {options.map(({ team, strength }) => (
@@ -262,7 +280,7 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
           title={`Onde salvar o jogo com o ${chosen.name}?`}
           slots={slots}
           onCancel={() => setChoosingSlot(false)}
-          onPick={(slot) => openGame(createGame(seed, chosen.id, { world, ...(dataPackage ? { dataPackage: dataPackage.data, dataPackageId: dataPackage.id } : {}) }), slot)}
+          onPick={(slot) => openGame(createGame(seed, chosen.id, { world, coachName: coachInput.trim() || drawnCoachName(seed), ...(dataPackage ? { dataPackage: dataPackage.data, dataPackageId: dataPackage.id } : {}) }), slot)}
         />
       )}
     </div>

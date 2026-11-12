@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Game } from '../../../store/game'
 import { formatDate, playerName } from '../../format'
 import { OFFER_KIND_LABELS } from '../../labels'
-import { Flag, Panel, TopTabs } from '../../theme'
+import { Avatar, Flag, Panel, TopTabs } from '../../theme'
 import { clubName, shortMoney } from './parts'
 
 /** Histórico: transferências e empréstimos da temporada, só os seus ou os de todo o campeonato. */
@@ -31,6 +31,7 @@ export function History({ game }: { game: Game }) {
             const mine = r.toTeamId === game.userTeamId ? 'text-win' : r.fromTeamId === game.userTeamId ? 'text-loss' : ''
             return (
               <li key={`${r.playerId}-${r.date}-${i}`} className="flex items-center gap-3 px-4 py-3">
+                {p && <Avatar id={p.id} colors={game.season.teams.find((t) => t.id === r.toTeamId)?.colors ?? ['#4b5563', '#e5e7eb']} size={40} ring />}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     {p && <Flag nationality={p.nationality} />}

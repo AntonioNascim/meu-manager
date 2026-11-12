@@ -4,6 +4,8 @@ import { academyAlert, lastYearContracts, userTeam } from '../store/game'
 import { flushAutosave, useSaveStatus } from '../store/autosave'
 import { setGame, useGame } from '../store/gameStore'
 import { useBusy } from '../store/heavy'
+import { useAccount } from '../store/onlineAccount'
+import { shortName } from './screens/standings/parts'
 import { clearLive } from '../store/liveMatch'
 import { closeLeague, clearDismissed, useDismissed } from '../store/leagueSession'
 import { LeagueDismissed } from './screens/online/leagues/LeagueDismissed'
@@ -14,7 +16,8 @@ import { TeamBadge } from './components/ui'
 import { formatCompactMoney, formatDate } from './format'
 import { NAV_TAB_OF, SCREEN_LABELS } from './navigation'
 import type { NavTab, ScreenId } from './navigation'
-import { BottomNav } from './theme'
+import { Avatar, BottomNav } from './theme'
+import { coachFaceId, coachName } from './coachName'
 import type { NavItem } from './theme'
 import { Career } from './screens/Career'
 import { Dismissed } from './screens/Dismissed'
@@ -45,18 +48,19 @@ function initialSquadTab(hint?: string): SquadTab {
 /** Em desenvolvimento, &aba=free|proposals abre a aba do Mercado. */
 function initialMarketTab(hint?: string): MarketTab {
   const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
-  return wanted === 'favorites' || wanted === 'lists' || wanted === 'free' || wanted === 'precontract' || wanted === 'proposals' || wanted === 'history' || wanted === 'contracts' ? wanted : 'search'
+  return wanted === 'search' || wanted === 'favorites' || wanted === 'lists' || wanted === 'free' || wanted === 'precontract' || wanted === 'proposals' || wanted === 'history' || wanted === 'contracts' ? wanted : 'overview'
 }
 
 /** Em desenvolvimento, &aba=rounds|goals|assists|cards|history abre a seção da Tabela. */
-function initialStandingsSection(hint?: string): 'table' | 'rounds' | 'goals' | 'assists' | 'cards' | 'cups' | 'history' | 'titles' {
+function initialStandingsSection(hint?: string): 'ongoing' | 'table' | 'rounds' | 'goals' | 'assists' | 'cards' | 'cups' | 'history' | 'titles' {
   const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
-  return wanted === 'rounds' || wanted === 'goals' || wanted === 'assists' || wanted === 'cards' || wanted === 'cups' || wanted === 'history' || wanted === 'titles' ? wanted : 'table'
+  return wanted === 'table' || wanted === 'rounds' || wanted === 'goals' || wanted === 'assists' || wanted === 'cards' || wanted === 'cups' || wanted === 'history' || wanted === 'titles' ? wanted : 'ongoing'
 }
 
 export function App() {
   const game = useGame()
   const dismissedLeague = useDismissed()
+  const account = useAccount()
   const busy = useBusy()
   const saveStatus = useSaveStatus()
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
@@ -91,6 +95,8 @@ export function App() {
   if (game.dismissal) return <Dismissed game={game} />
 
   const team = userTeam(game)
+  // Nome longo não cabe ao lado do saldo: acima de 26 letras vale o nome curto do clube (e a fonte diminui por faixa).
+  const headerName = team.name.length > 26 ? shortName(team) : team.name
   // A tela da partida só existe enquanto o time do jogador tem um jogo por jogar.
   const hasMatch = game.pendingUserMatch !== undefined || game.online !== undefined
   const current: ScreenId = screen === 'match' && !hasMatch ? 'home' : screen
@@ -122,8 +128,10 @@ export function App() {
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.07] bg-[linear-gradient(100deg,#0a1214_0_62%,rgb(39_224_90/0.16)_62.2%,#060b0c_63%_100%)] px-3.5 py-3">
         <TeamBadge team={team} size="md" />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-display text-[22px] font-bold leading-tight">{team.name}</div>
+          <div className={`font-display font-bold leading-tight ${headerName.length > 20 ? 'text-[17px]' : headerName.length > 15 ? 'text-[19px]' : 'text-[22px]'}`} data-testid="club-name">{headerName}</div>
+          <div className="truncate text-[13px] font-semibold text-sky-200/90" data-testid="coach-name">{coachName(game, account.account?.nickname)}</div>
           <div className="flex items-center gap-1.5 text-[11.5px] text-muted">
+            <Avatar id={coachFaceId(game)} role="coach" colors={team.colors} size={20} ring />
             Técnico
             {saveStatus.state === 'saved' && <span className="flex items-center gap-1.5">· <i className="inline-block h-[7px] w-[7px] rounded-full bg-accent shadow-[0_0_6px_var(--color-accent)]" /> salvo</span>}
             {saveStatus.state === 'saving' && <span>· salvando…</span>}

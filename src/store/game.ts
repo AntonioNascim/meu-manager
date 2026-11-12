@@ -107,6 +107,8 @@ export interface NewGameOptions {
   dataPackage?: DataPackage
   /** Referência do pacote guardado no navegador. */
   dataPackageId?: string
+  /** Nome do técnico, como a pessoa digitou no Novo jogo. */
+  coachName?: string
 }
 
 export function createGame(seed: number, userTeamId: TeamId, options: NewGameOptions = {}): Game {
@@ -141,7 +143,7 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
     notices: [],
     seasonLog: [],
     archive: [],
-    coach: startingCoach(world.teams.find((t) => t.id === userTeamId) as Team),
+    coach: { ...startingCoach(world.teams.find((t) => t.id === userTeamId) as Team), ...(options.coachName?.trim() ? { name: options.coachName.trim() } : {}) },
     ...(options.dataPackage ? { dataPackage: { id: options.dataPackageId ?? 'sem-id', name: options.dataPackage.name } } : {}),
   }
 }

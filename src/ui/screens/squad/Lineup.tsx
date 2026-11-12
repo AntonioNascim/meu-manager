@@ -26,7 +26,7 @@ import { formatCompactMoney, playerName } from '../../format'
 import { GridPitch } from '../../components/GridPitch'
 import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, commandErrorText, formationLabel } from '../../labels'
 import { isUnavailable } from '../../squadSort'
-import { ConditionBar, ConditionStrip, Eyebrow, Flag, Icon, Jersey, MoodIcon, Panel, ValueBadge } from '../../theme'
+import { Avatar, ConditionBar, ConditionStrip, Eyebrow, Flag, Icon, Jersey, MoodIcon, Panel, ValueBadge } from '../../theme'
 
 /** Nome curto para caber embaixo da camisa no campo. */
 function shortName(p: Player): string {
@@ -75,12 +75,13 @@ function Pitch({ tactic, players, colors, selectedId, onTap, onMove }: { tactic:
   )
 }
 
-function ReserveRow({ player, selected, onTap }: { player: Player; selected: boolean; onTap: () => void }) {
+function ReserveRow({ player, colors, selected, onTap }: { player: Player; colors: [string, string]; selected: boolean; onTap: () => void }) {
   const overall = playerOverall(player)
   return (
     <li>
       <button type="button" onClick={onTap} className={`flex min-h-14 w-full items-center gap-2 px-3 py-1.5 text-left ${selected ? 'bg-white/10 ring-2 ring-inset ring-white/70' : ''} ${isUnavailable(player) ? 'opacity-75' : ''}`}>
         <span className="w-9 shrink-0 text-xs font-bold text-muted">{POSITION_SHORT_LABELS[player.position]}</span>
+        <Avatar id={player.id} colors={colors} size={34} ring />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <Flag nationality={player.nationality} />
@@ -289,7 +290,7 @@ export function Lineup({ game }: { game: Game }) {
         </div>
         <ul className="divide-y divide-white/[0.07]">
           {bench.map((p) => (
-            <ReserveRow key={p.id} player={p} selected={selectedId === p.id} onTap={() => tap(p.id)} />
+            <ReserveRow key={p.id} player={p} colors={team.colors} selected={selectedId === p.id} onTap={() => tap(p.id)} />
           ))}
         </ul>
       </Panel>
@@ -306,7 +307,7 @@ export function Lineup({ game }: { game: Game }) {
           </div>
           <ul className="divide-y divide-line">
             {rest.map((p) => (
-              <ReserveRow key={p.id} player={p} selected={selectedId === p.id} onTap={() => tap(p.id)} />
+              <ReserveRow key={p.id} player={p} colors={team.colors} selected={selectedId === p.id} onTap={() => tap(p.id)} />
             ))}
           </ul>
         </Panel>

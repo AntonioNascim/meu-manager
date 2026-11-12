@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
 import { simulateToSeasonEnd } from '../engine/season'
-import { advanceGame, createGame, playPendingAuto, startNextSeason, setUserTrainingPlan, squadOf, startUserIndividualTraining } from '../store/game'
+import { advanceGame, createGame, playPendingAuto, startNextSeason, setUserTrainingPlan, squadOf, startUserIndividualTraining, toggleFavorite } from '../store/game'
+import { expectedSalary, marketValue } from '../engine/market'
+import { playerOverall } from '../engine/overall'
+import { contractEndIn } from '../engine/season'
 import { initPwa } from '../pwa/pwa'
 import { installErrorLog } from './techInfo'
 import { startAutosave } from '../store/autosave'
@@ -83,6 +86,24 @@ if (import.meta.env.DEV) {
       const trainee = squadOf(game, game.userTeamId).find((p) => p.position !== 'GK')
       if (trainee) game = startUserIndividualTraining(game, trainee.id, { type: 'group', group: 'physical' })
     }
+    if (params.get('mercado')) {
+      // Só para as capturas: três jogadores fortes de outros clubes viram favoritos e o primeiro recebe uma proposta.
+      const targets = game.season.players.filter((p) => p.teamId !== null && p.teamId !== game.userTeamId).sort((a, b) => playerOverall(b) - playerOverall(a)).slice(0, 3)
+      for (const t of targets) game = toggleFavorite(game, t.id)
+      setGame(game)
+      const priced = (pl: (typeof targets)[number]) => marketValue(pl, game.season.season.currentDate, game.season.teams.find((t) => t.id === pl.teamId))
+      const budget = game.season.teams.find((t) => t.id === game.userTeamId)?.finances.transferBudget ?? 0
+      const first = game.season.players.filter((p) => p.teamId !== null && p.teamId !== game.userTeamId && priced(p) < budget * 0.6).sort((x, y) => playerOverall(y) - playerOverall(x))[0]
+      if (first) {
+        game = toggleFavorite(game, first.id)
+        setGame(game)
+        const date = game.season.season.currentDate
+        const offer = { id: 'dev-offer', direction: 'outgoing' as const, kind: 'purchase' as const, playerId: first.id, buyerId: game.userTeamId, sellerId: first.teamId, fee: priced(first), salary: expectedSalary(first, game.season.teams.find((t) => t.id === game.userTeamId)), contractEnd: contractEndIn(game.season, game.userTeamId, 3), createdOn: date, dueOn: date, status: 'pending' as const }
+        game = { ...game, season: { ...game.season, market: { ...game.season.market, offers: [...game.season.market.offers, offer] } } }
+        setGame(game)
+      }
+      return
+    }
     setGame(game)
   }
   if (team) {
@@ -94,7 +115,15 @@ if (import.meta.env.DEV) {
 // Tela escondida de diagnóstico (?diagnostico=1): mede o desempenho no aparelho, sem abrir nem salvar jogos.
 const diagnostic = new URLSearchParams(window.location.search).get('diagnostico') === '1'
 
-if (diagnostic) {
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('avatares') === '1') {
+  void import('./screens/AvatarSheet').then(({ AvatarSheet }) => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <AvatarSheet />
+      </StrictMode>,
+    )
+  })
+} else if (diagnostic) {
   void import('./screens/Diagnostics').then(({ Diagnostics }) => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>

@@ -3,7 +3,7 @@ import type { Competition } from '../../../engine/types'
 import { competitionSeasonLabel } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { playerName } from '../../format'
-import { TopTabs } from '../../theme'
+import { Avatar, TopTabs } from '../../theme'
 import type { IconName } from '../../theme'
 import { leaders } from './data'
 import type { Leader, LeaderKind } from './data'
@@ -76,6 +76,7 @@ function Row({ leader, rank, tone, mine, onTeam }: { leader: Leader; rank: numbe
       ) : (
         <span className="w-9 shrink-0 text-center text-sm font-bold tabular-nums text-muted">{rank}</span>
       )}
+      <Avatar id={leader.player.id} colors={leader.team.colors} size={40} ring />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-extrabold">{playerName(leader.player)}</span>
         <TeamLink team={leader.team} onOpen={onTeam} className="text-xs text-muted" />
