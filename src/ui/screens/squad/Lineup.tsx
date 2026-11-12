@@ -3,13 +3,16 @@ import { ForeignNote } from '../../components/ForeignNote'
 import { FORMATION_IDS, formationOf } from '../../../engine/formations'
 import { shapeOf } from '../../../engine/grid'
 import { overallAt, playerOverall } from '../../../engine/overall'
-import { applySavedLineup, changeFormation, movePlayerTo, swapPlayers } from '../../../engine/tacticEdit'
+import { lineupForeign } from '../../../engine/foreign'
+import { marketValue } from '../../../engine/market'
+import { applySavedLineup, changeFormation, movePlayerTo, suggestLineup, swapPlayers } from '../../../engine/tacticEdit'
 import type { GridPoint, Player, Position, Tactic } from '../../../engine/types'
 import {
   LINEUP_SLOTS,
   deleteUserLineup,
   saveUserLineup,
   squadOf,
+  teamStrength,
   userTeam,
 } from '../../../store/game'
 import type { Game } from '../../../store/game'
@@ -19,11 +22,11 @@ import { getLive } from '../../../store/liveMatch'
 import { StatusTags } from '../../components/PlayerDetail'
 import { StyleControls } from '../../components/StyleControls'
 import { NextOpponent } from './NextOpponent'
-import { playerName } from '../../format'
+import { formatCompactMoney, playerName } from '../../format'
 import { GridPitch } from '../../components/GridPitch'
 import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, commandErrorText, formationLabel } from '../../labels'
 import { isUnavailable } from '../../squadSort'
-import { ConditionBar, ConditionStrip, Eyebrow, Flag, Jersey, MoodIcon, Panel, ValueBadge } from '../../theme'
+import { ConditionBar, ConditionStrip, Eyebrow, Flag, Icon, Jersey, MoodIcon, Panel, ValueBadge } from '../../theme'
 
 /** Nome curto para caber embaixo da camisa no campo. */
 function shortName(p: Player): string {
@@ -208,6 +211,12 @@ export function Lineup({ game }: { game: Game }) {
     setSelectedId(null)
   }
 
+  const suggest = () => {
+    if (!window.confirm('Trocar a escalação pela sugestão automática? Os 11 titulares, o banco, o capitão e os cobradores mudam (a formação, o estilo e a mentalidade ficam como estão). A mesma escolha que a IA faz para o time dela.')) return
+    apply((t) => suggestLineup(t, squad, lineupForeign(team)))
+    setSelectedId(null)
+  }
+  const squadValue = squad.reduce((sum, p) => sum + marketValue(p, game.season.season.currentDate, team), 0)
   const bench = tactic.bench.map((id) => byId.get(id)).filter((p): p is Player => p !== undefined)
   const rest = squad.filter((p) => !tactic.startingXI.includes(p.id) && !tactic.bench.includes(p.id)).sort((a, b) => playerOverall(b) - playerOverall(a))
   const selected = selectedId ? byId.get(selectedId) : undefined
@@ -223,6 +232,22 @@ export function Lineup({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
+      <Panel className="p-3.5" data-testid="lineup-summary">
+        <div className="grid grid-cols-3 divide-x divide-white/[0.07] text-center">
+          <div className="flex flex-col items-center px-1">
+            <b className="font-display text-[32px] font-extrabold leading-none">{Math.round(teamStrength(game, team))}</b>
+            <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Geral do time</span>
+          </div>
+          <div className="flex flex-col items-center px-1">
+            <b className="font-display text-[26px] font-bold leading-none text-accent">{formationLabel(tactic.formationId)}</b>
+            <span className="mt-1.5 text-xs text-muted">Formação</span>
+          </div>
+          <div className="flex flex-col items-center px-1">
+            <b className="font-display text-[22px] font-bold leading-none">{formatCompactMoney(squadValue)}</b>
+            <span className="mt-1.5 text-xs text-muted">Valor de mercado</span>
+          </div>
+        </div>
+      </Panel>
       <div>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Formações">
           {FORMATION_IDS.map((id) => (
@@ -268,6 +293,11 @@ export function Lineup({ game }: { game: Game }) {
           ))}
         </ul>
       </Panel>
+
+      <button type="button" onClick={suggest} data-testid="suggest-lineup" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-accent bg-accent/[0.08] font-display text-lg font-bold active:scale-95">
+        <Icon name="sliders" size={20} className="text-accent" />
+        Sugerir escalação automática
+      </button>
 
       {rest.length > 0 && (
         <Panel className="overflow-hidden">

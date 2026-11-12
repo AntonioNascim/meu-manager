@@ -71,6 +71,7 @@ export class D1LeagueStore implements LeagueStore {
     if (patch.name !== undefined) add('name', patch.name)
     if (patch.code !== undefined) add('code', patch.code)
     if (patch.adminId !== undefined) add('admin_id', patch.adminId)
+    if (patch.pace !== undefined) add('pace', patch.pace)
     if (patch.status !== undefined) add('status', patch.status)
     if (patch.entryClosed !== undefined) add('entry_closed', patch.entryClosed ? 1 : 0)
     if (patch.hidden !== undefined) add('hidden', patch.hidden ? 1 : 0)

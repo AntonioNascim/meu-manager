@@ -123,9 +123,14 @@ await a.getByRole('dialog').waitFor()
 await shoot(a, '07-escolher-ritmo')
 const before = await a.getByTestId('calendar').innerText()
 await a.getByTestId('pace-very-fast').click()
-await waitFor(a, () => document.querySelector('[data-testid=change-pace]')?.textContent?.includes('Bem rápido'), undefined, 30000)
-check('o ritmo mudou para Bem rápido e o botão mostra o ritmo', true)
-const after = await a.getByTestId('calendar').innerText()
+await waitFor(a, () => document.body.textContent?.includes('Bem rápido'), undefined, 30000)
+check('o ritmo mudou para Bem rápido e a sala mostra o ritmo novo', true)
+// O calendário se refaz na consulta seguinte (de 5 em 5 s): espera até mudar.
+let after = before
+for (let i = 0; i < 25 && after === before; i++) {
+  await sleep(1000)
+  after = await a.getByTestId('calendar').innerText()
+}
 check('os horários do calendário foram refeitos', after !== before)
 
 // ------------------------------------------------------------------ Avançar com confirmação
@@ -134,7 +139,7 @@ await a.getByTestId('advance-league').click()
 await a.getByRole('dialog').waitFor()
 check('a confirmação mostra quem ainda não deu Pronto', (await a.getByTestId('advance-not-ready').count()) > 0 || (await a.getByText('Todos os técnicos com partida já deram Pronto').count()) > 0)
 await shoot(a, '08-confirmar-avancar')
-await a.getByTestId('confirm-advance').click()
+await a.getByTestId('confirm-action').click()
 await waitFor(a, (t) => document.querySelector('[data-testid=status-next]')?.textContent !== t, nextBefore, 30000)
 check('Avançar fez a rodada acontecer (resultado direto) e a próxima mudou', true)
 await waitFor(a, () => document.querySelector('[data-testid=league-log]')?.textContent?.includes('avançou'), undefined, 30000)

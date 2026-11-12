@@ -6,7 +6,10 @@ import type { SeasonState } from '../season/calendar'
 import { cycleOfTeam } from '../season/cycles'
 import { potentialRange } from '../training'
 import type { IsoDate, Nationality, Player, Position, Team, TeamId } from '../types'
-import { marketValue } from './value'
+import { premiumPrice } from './decision'
+import { listingOf } from './listings'
+import { monthlyPayroll } from '../finance'
+import { askingPriceAs, expectedSalary, marketValue, squadRoleIn } from './value'
 
 export type PositionGroup = 'all' | 'GK' | 'DEF' | 'MID' | 'FWD'
 
@@ -90,6 +93,11 @@ export interface SearchContext {
   medianOverall: number
   /** Clubes por id: o preço de um jogador depende da liga do clube dele. */
   teams: ReadonlyMap<TeamId, Team>
+  /** Quanto o clube dono pede de fato por uma compra (preço pedido pelo papel do jogador no elenco, ágio de liga mais rica e anúncio); livres custam 0. É o que a proposta padrão oferece. */
+  price?: (p: Player) => number
+  /** Folga no orçamento de salários (orçamento menos a folha de hoje) e o salário que a proposta padrão oferece: quem não cabe nela é recusado por "orçamento de salários insuficiente". */
+  salaryRoom?: number
+  salary?: (p: Player) => number
 }
 
 /** Valor de mercado do jogador no clube em que está. */
@@ -101,13 +109,35 @@ export function searchContext(state: SeasonState, userTeamId: TeamId): SearchCon
     .filter((p) => p.teamId === userTeamId)
     .map(playerOverall)
     .sort((a, b) => a - b)
+  const teams = new Map(state.teams.map((t) => [t.id, t]))
+  // Forças de cada elenco em ordem decrescente, montadas só na primeira vez que o preço é pedido.
+  let strengths: Map<TeamId, number[]> | null = null
+  const strengthsOf = (id: TeamId): readonly number[] => {
+    if (!strengths) {
+      strengths = new Map()
+      for (const p of state.players) if (p.teamId !== null) (strengths.get(p.teamId) ?? strengths.set(p.teamId, []).get(p.teamId))?.push(playerOverall(p))
+      for (const list of strengths.values()) list.sort((a, b) => b - a)
+    }
+    return strengths.get(id) ?? []
+  }
+  const price = (p: Player): number => {
+    if (p.teamId === null) return 0
+    const club = teams.get(p.teamId)
+    const base = premiumPrice(askingPriceAs(p, squadRoleIn(playerOverall(p), strengthsOf(p.teamId)), state.season.currentDate, club), club ?? {}, team)
+    const listed = listingOf(state, p.id, 'purchase')
+    return listed ? Math.min(base, listed.price) : base
+  }
+  const payroll = monthlyPayroll(state.players.filter((p) => p.teamId === userTeamId))
   return {
     date: state.season.currentDate,
     year: state.season.year,
     expiring: (p) => expiresThisSeason(state, p),
     budget: team ? Math.min(team.finances.transferBudget, team.finances.balance) : 0,
     medianOverall: squad[Math.floor(squad.length / 2)] ?? 0,
-    teams: new Map(state.teams.map((t) => [t.id, t])),
+    teams,
+    price,
+    salaryRoom: team ? team.finances.salaryBudget - payroll : 0,
+    salary: (p) => expectedSalary(p, team),
   }
 }
 
@@ -115,7 +145,7 @@ export function searchContext(state: SeasonState, userTeamId: TeamId): SearchCon
 export function matchesQuick(p: Player, quick: QuickFilter, ctx: SearchContext): boolean {
   switch (quick) {
     case 'budget':
-      return p.teamId === null || valueAt(p, ctx) <= ctx.budget
+      return (p.teamId === null || (ctx.price ? ctx.price(p) : valueAt(p, ctx)) <= ctx.budget) && (!ctx.salary || ctx.salaryRoom === undefined || ctx.salary(p) <= ctx.salaryRoom)
     case 'bargain': {
       const overall = playerOverall(p)
       return overall >= ctx.medianOverall && valueAt(p, ctx) <= strengthValue(overall) * valueScale(ctx.teams.get(p.teamId as TeamId) ?? {}) * MARKET.search.bargainShare

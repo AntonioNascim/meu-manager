@@ -6,7 +6,8 @@
 import { formationOf, getFormation, labelOfGrid } from './formations'
 import { GK_POINT, gridKey, gridProblem } from './grid'
 import { BENCH_SIZE } from './config'
-import { evaluateFormation } from './lineup'
+import { buildTactic, evaluateFormation } from './lineup'
+import type { LineupOptions } from './lineup'
 import { overallAt, playerOverall } from './overall'
 import type { GridPoint, Player, PlayerId, SavedLineup, Tactic } from './types'
 
@@ -152,4 +153,13 @@ export function applySavedLineup(tactic: Tactic, squad: readonly Player[], saved
     penaltyTakerIds: keepTakers(tactic.penaltyTakerIds),
     freeKickTakerIds: keepTakers(tactic.freeKickTakerIds),
   }
+}
+
+/**
+ * Escalação automática para o jogador: a mesma que a IA usa para o time dela (`buildTactic` com quem está disponível e
+ * valorizando a condição física), mantendo a formação (inclusive o posicionamento livre), o estilo e a mentalidade do time.
+ * Troca os 11 titulares, o banco, o capitão e os cobradores; o limite de estrangeiros da escalação vale.
+ */
+export function suggestLineup(tactic: Tactic, squad: readonly Player[], foreign?: LineupOptions['foreign']): Tactic {
+  return buildTactic(squad, { formationId: tactic.formationId, grid: tactic.formationId === 'custom' ? tactic.grid : undefined, style: tactic.style, mentality: tactic.mentality }, { rested: true, ...(foreign ? { foreign } : {}) })
 }

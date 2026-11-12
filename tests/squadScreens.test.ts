@@ -234,7 +234,11 @@ describe('abas do Elenco', () => {
     expect(html).toContain('Meu time')
     expect(html.match(/\+ Vazio/g)).toHaveLength(2)
     expect(html).toContain('Banco de reservas')
-    expect(html.match(/>C</g)?.length).toBeGreaterThanOrEqual(1)
+    expect(html).toContain('Banco de reservas')
+    expect(html).toContain('data-testid="lineup-summary"')
+    expect(html).toContain('Geral do time')
+    expect(html).toContain('Valor de mercado')
+    expect(html).toContain('Sugerir escalação automática')
   })
 
   it('moral por faixa e bandeira para todas as nacionalidades', () => {

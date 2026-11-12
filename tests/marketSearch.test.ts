@@ -8,15 +8,18 @@ import {
   defaultFilters,
   interestContext,
   interestIn,
+  expectedSalary,
   marketValue,
+  salePrice,
   searchContext,
   searchPlayers,
   strengthValue,
 } from '../src/engine/market'
+import { monthlyPayroll } from '../src/engine/finance'
 import { playerOverall } from '../src/engine/overall'
 import { potentialRange } from '../src/engine/training'
 import type { Player } from '../src/engine/types'
-import { createGame, squadOf } from '../src/store/game'
+import { createGame, squadOf, userTeam } from '../src/store/game'
 import type { Game } from '../src/store/game'
 import { Market } from '../src/ui/screens/Market'
 import { Squad } from '../src/ui/screens/Squad'
@@ -70,11 +73,24 @@ describe('busca de jogadores', () => {
     expect(valued.every((p) => p.teamId !== null && valueOf(p) >= 1_000_000 && valueOf(p) <= 5_000_000)).toBe(true)
   })
 
-  it('"Cabem no bolso": só quem custa até o orçamento de compras (os livres cabem sempre)', () => {
+  it('"Cabem no bolso": só quem custa, pelo preço que o clube pede de verdade, até o orçamento de compras (os livres cabem sempre)', () => {
     const budget = searchContext(state, USER).budget
+    const buyer = userTeam(game)
     const list = searchPlayers(state, USER, { ...defaultFilters(), quick: ['budget'] })
     expect(list.length).toBeGreaterThan(0)
-    expect(list.every((p) => p.teamId === null || valueOf(p) <= budget)).toBe(true)
+    // O mesmo preço que a negociação oferece de início: se aparece no atalho, a proposta padrão cabe no orçamento.
+    const asked = (p: Player) => salePrice(state, p, squadOf(game, p.teamId as string), 'purchase', date, state.teams.find((x) => x.id === p.teamId), buyer)
+    expect(list.every((p) => p.teamId === null || asked(p) <= budget)).toBe(true)
+    // E o salário que a proposta padrão oferece cabe no orçamento de salários (senão a proposta é recusada).
+    const room = buyer.finances.salaryBudget - monthlyPayroll(squadOf(game, USER))
+    expect(list.every((p) => expectedSalary(p, buyer) <= room)).toBe(true)
+    const tooPricey = searchPlayers(state, USER, defaultFilters()).filter((p) => expectedSalary(p, buyer) > room)
+    expect(tooPricey.length).toBeGreaterThan(0)
+    expect(tooPricey.some((p) => list.includes(p))).toBe(false)
+    // Quem vale menos que o orçamento mas pede mais que ele (jogador-chave) não pode aparecer.
+    const tooDear = searchPlayers(state, USER, defaultFilters()).filter((p) => p.teamId !== null && valueOf(p) <= budget && asked(p) > budget)
+    expect(tooDear.length).toBeGreaterThan(0)
+    expect(tooDear.some((p) => list.includes(p))).toBe(false)
     expect(list.length).toBeLessThan(searchPlayers(state, USER, defaultFilters()).length)
   })
 

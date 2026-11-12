@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { generateWorld } from '../src/data/generateWorld'
 import { FORMATION_IDS, FORMATIONS } from '../src/engine/formations'
-import { MAX_TAKERS, changeFormation, locate, setCaptain, setTaker, swapPlayers } from '../src/engine/tacticEdit'
+import { MAX_TAKERS, changeFormation, locate, movePlayerTo, setCaptain, setTaker, suggestLineup, swapPlayers } from '../src/engine/tacticEdit'
 import type { Player, Tactic, Team } from '../src/engine/types'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -199,5 +199,35 @@ describe('tela de tática', () => {
     const hurtId = tactic.startingXI[2] as string
     const hurt = { ...game, season: { ...game.season, players: game.season.players.map((p) => (p.id === hurtId ? { ...p, condition: { ...p.condition, injuryDaysLeft: 6 } } : p)) } }
     expect(renderToStaticMarkup(createElement(Tactics, { game: hurt }))).toContain('indisponível')
+  })
+})
+
+describe('escalação automática sugerida ao jogador (a mesma da IA)', () => {
+  it('devolve uma tática válida e mantém formação, estilo e mentalidade do time', () => {
+    const own = { ...tactic, style: 'counter-attack' as const, mentality: -1 as const }
+    const out = suggestLineup(own, squad)
+    valid(out)
+    expect(out.formationId).toBe(own.formationId)
+    expect(out.style).toBe('counter-attack')
+    expect(out.mentality).toBe(-1)
+  })
+
+  it('deixa de fora lesionados e suspensos', () => {
+    const hurt = squad.filter((p) => tactic.startingXI.includes(p.id)).slice(0, 2)
+    const hurtIds = new Set(hurt.map((p) => p.id))
+    const players = squad.map((p) => (hurtIds.has(p.id) ? { ...p, condition: { ...p.condition, injuryDaysLeft: 9 } } : p))
+    const out = suggestLineup(tactic, players)
+    valid(out)
+    expect(out.startingXI.some((id) => hurtIds.has(id))).toBe(false)
+  })
+
+  it('mantém o posicionamento livre (formação personalizada)', () => {
+    const free = movePlayerTo(tactic, tactic.startingXI[9] as string, { row: 4, lane: 2 })
+    const out = suggestLineup(free, squad)
+    valid(out)
+    expect(out.formationId).toBe(free.formationId)
+    // Os mesmos 11 pontos (a ordem muda: os nomes são escolhidos de novo para cada vaga).
+    const key = (g: Tactic['grid']) => (g ?? []).map((p) => `${p.row}-${p.lane}`).sort()
+    expect(key(out.grid)).toEqual(key(free.grid))
   })
 })

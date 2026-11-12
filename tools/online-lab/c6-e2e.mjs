@@ -1,6 +1,6 @@
 // Teste de ponta a ponta da Fase 6C (C6): vender em sequência a clubes da IA, lesão repetida na partida, queda de conexão com ticket novo, favoritos e escalações
 // por conta, carreira e espelho guardado no aparelho. Navegador de verdade contra o servidor LOCAL (sem custo). O servidor roda com lesões frequentes:
-//   cd server && ../tools/online-lab/node_modules/.bin/wrangler dev --local --port 8787 --var LIVE_INJURY_RATE:60
+//   cd server && ../tools/online-lab/node_modules/.bin/wrangler dev --local --port 8787 --var LIVE_INJURY_RATE:150
 //   VITE_API_BASE=http://127.0.0.1:8787 VITE_TURNSTILE_BYPASS=1 npx vite --port 5173 --strictPort
 //   cd tools/online-lab && node c6-e2e.mjs [http://localhost:5173] [prefixo-das-capturas]
 import { chromium } from 'playwright'
@@ -77,6 +77,7 @@ await page.getByTestId('open-league-game').click()
 await page.getByTestId('league-card').waitFor({ timeout: 90000 })
 
 // ------------------------------------------------------------------ compradores em sequência (vender a clubes da IA, um depois do outro)
+const saleErrors = new Map()
 const sellOne = async (skip, exclude) => {
   await page.getByRole('button', { name: /^Elenco/ }).first().click()
   await page.getByRole('tab', { name: 'Jogadores', exact: true }).click()
@@ -88,7 +89,7 @@ const sellOne = async (skip, exclude) => {
     const select = page.locator('select').last()
     await select.waitFor()
     const options = await select.locator('option').allInnerTexts()
-    const picks = options.map((o, k) => k).filter((k) => k > 0 && (!exclude || !options[k].startsWith(exclude))).slice(0, 6)
+    const picks = options.map((o, k) => k).filter((k) => k > 0 && (!exclude || !options[k].startsWith(exclude))).slice(0, 12)
     for (const pick of picks) {
       await select.selectOption({ index: pick })
       const before = await squadSize()
@@ -98,6 +99,7 @@ const sellOne = async (skip, exclude) => {
         await closeOverlays()
         return options[pick]
       }
+      for (const t of await page.locator('[role=dialog] p.text-loss, [role=dialog] [role=alert]').allInnerTexts()) saleErrors.set(t, (saleErrors.get(t) ?? 0) + 1)
     }
     await page.keyboard.press('Escape')
     { const close = page.getByRole('button', { name: 'Fechar', exact: true }).last(); if (await close.isVisible().catch(() => false)) await close.click() }
@@ -112,6 +114,7 @@ const s1 = await squadSize()
 const b2 = await sellOne(0, b1 ? b1.split(' · ')[0] : undefined)
 await sleep(800)
 const s2 = await squadSize()
+if (saleErrors.size > 0) console.log('  vendas recusadas (motivo: vezes):', JSON.stringify([...saleErrors]))
 check('o primeiro comprador da IA levou o jogador (o servidor aceitou)', s1 === s0 - 1 && b1 !== null, `${s0} -> ${s1} (${b1})`)
 check('o segundo comprador, em sequência, levou o outro (clubes diferentes)', s2 === s1 - 1 && b2 !== null, `${s1} -> ${s2} (${b2})`)
 check('os dois compradores eram clubes diferentes', b1 !== null && b2 !== null && b1 !== b2, `${b1} | ${b2}`)

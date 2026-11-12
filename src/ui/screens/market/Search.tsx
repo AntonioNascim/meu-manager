@@ -141,7 +141,7 @@ export function Search({
           Mostrar mais ({list.length - shown.length})
         </button>
       )}
-      <p className="text-center text-[11px] text-muted">Atalho "Cabem no bolso": valor até {sc.budget > 0 ? 'o orçamento de compras' : 'o orçamento (hoje zerado)'}.</p>
+      <p className="text-center text-[11px] text-muted">Atalho "Cabem no bolso": preço pedido pelo clube até {sc.budget > 0 ? 'o orçamento de compras' : 'o orçamento (hoje zerado)'} e salário que cabe no orçamento de salários.</p>
 
       {sheet && <FilterSheet game={game} filters={filters} situations={situations} base={preset} restrict={restrict} onApply={(f) => update(f)} onClose={() => setSheet(false)} />}
       {picked && <Negotiation key={picked.id} game={game} player={picked} open={open} {...(initialKind ? { initialKind } : {})} onClose={() => setPickedId(null)} />}

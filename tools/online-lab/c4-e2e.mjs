@@ -69,13 +69,20 @@ await page.getByRole('button', { name: 'Enviar proposta' }).waitFor({ timeout: 1
 shots1.negociacao = await shoot(page, 'online-negociacao')
 await page.getByRole('button', { name: 'Enviar proposta' }).click()
 await sleep(1500)
-const sheetError = await page.locator('p.text-loss').allInnerTexts()
-console.log('  erro mostrado na tela:', JSON.stringify(sheetError), '| ofertas agora:', await offers())
-shots1.recusa = await shoot(page, 'online-recusa')
-await page.evaluate(async () => { const g = window.__mm.getGame(); const mine = g.season.players.filter((p) => p.teamId === g.userTeamId); mine.sort((a, b) => a.contract.salary - b.contract.salary); await window.__mm.perform({ type: 'release-player', playerId: mine[0].id }) })
-await sleep(800)
-await page.getByRole('button', { name: 'Enviar proposta' }).click()
-await sleep(2500)
+// Elenco cheio: a primeira proposta é recusada e a pessoa libera alguém. Com vaga no elenco ela já passa (a janela fecha).
+const stillOpen = (await page.getByRole('button', { name: 'Enviar proposta' }).count()) > 0
+if (stillOpen) {
+  const sheetError = await page.locator('p.text-loss').allInnerTexts()
+  console.log('  erro mostrado na tela:', JSON.stringify(sheetError), '| ofertas agora:', await offers())
+  shots1.recusa = await shoot(page, 'online-recusa')
+  await page.evaluate(async () => { const g = window.__mm.getGame(); const mine = g.season.players.filter((p) => p.teamId === g.userTeamId); mine.sort((a, b) => a.contract.salary - b.contract.salary); await window.__mm.perform({ type: 'release-player', playerId: mine[0].id }) })
+  await sleep(800)
+  await page.getByRole('button', { name: 'Enviar proposta' }).click()
+
+  await sleep(2500)
+} else {
+  await sleep(2500)
+}
 await shoot(page, 'debug')
 const after = await offers()
 check('a proposta à IA foi ao servidor e voltou no espelho', after >= before + 1, `${before} -> ${after}`)
