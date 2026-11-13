@@ -328,6 +328,30 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
     return marks
   }
 
+  /**
+   * Escanteio (só visual, a partir do evento que o motor já gerou): a bola vai ao canto, quem cobra se posiciona e a cobrança é um cruzamento
+   * para a área, onde atacantes e zagueiros disputam. Sem sorteio: as escolhas vêm de um hash.
+   */
+  const cornerBeats = (corner: Pt, moves: Record<string, Pt>): Beat[] => {
+    const outfield = placed.filter((p) => p.slot !== 'GK' && onPitch(p))
+    const mine = outfield.filter((p) => p.side === att)
+    const takers = mine.filter((p) => p.slot === 'RW' || p.slot === 'LW' || p.slot === 'AM' || p.slot === 'CM')
+    const takerPool = takers.length > 0 ? takers : mine
+    const taker = takerPool.length > 0 ? takerPool[Math.floor(hash(`${trace.minute}:${att}:ck`) * takerPool.length)] : undefined
+    if (!taker) return []
+    const target: Pt = { x: gx - dir * (0.06 + 0.03 * hash(`${trace.minute}:${att}:ckx`)), y: clamp(0.5 + (hash(`${trace.minute}:${att}:cky`) - 0.5) * 0.14, 0.4, 0.6) }
+    const heads = mine.filter((p) => p.playerId !== taker.playerId && (p.slot === 'ST' || p.slot === 'CB' || p.slot === 'AM' || p.slot === 'CM')).sort((a, b) => hash(`${trace.minute}:${a.playerId}:ckh`) - hash(`${trace.minute}:${b.playerId}:ckh`)).slice(0, 3)
+    const guards = outfield.filter((p) => p.side !== att && (p.slot === 'CB' || p.slot === 'RB' || p.slot === 'LB' || p.slot === 'DM')).slice(0, 3)
+    const inBox: Record<string, Pt> = { [taker.playerId]: corner }
+    heads.forEach((p, i) => (inBox[p.playerId] = { x: clamp(target.x - dir * (i === 0 ? 0 : 0.02) + dir * 0.01 * i, 0.02, 0.98), y: clamp(target.y + (i - 1) * 0.07, 0.3, 0.7) }))
+    guards.forEach((p, i) => (inBox[p.playerId] = { x: clamp(target.x + dir * 0.025, 0.02, 0.98), y: clamp(target.y + (i - 1) * 0.07 + 0.02, 0.3, 0.7) }))
+    const receiver = heads[0]
+    return [
+      { phase: 'chance', holder: taker.playerId, ball: corner, moves: { ...moves, [taker.playerId]: corner }, attSide: att, focusY: corner.y, marks: [{ kind: 'corner', at: corner }], weight: 1.1 },
+      { phase: 'chance', ...(receiver ? { holder: receiver.playerId } : { holder: taker.playerId }), ball: target, arrow: { from: corner, to: target, curve: true }, moves: { ...moves, ...inBox }, attSide: att, focusY: 0.5, marks: [], weight: 1.5 },
+    ]
+  }
+
   const beats: Beat[] = []
   // 1) Disputa do meio: o time com a bola sobe um pouco; a bola vai para quem recuperou ou ganhou o meio.
   const winnerPos = winner ? shifted(winner, att, 'midfield', focusMid) : { x: 0.5, y: 0.5 }
@@ -396,7 +420,10 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
     }
     if (trace.play === 'cross' && trace.outcome === 'lost' && marker) {
       const m = { x: target.x - dir * 0.03, y: target.y }
-      beats.push({ phase: 'chance', holder: marker.playerId, ball: m, arrow: { from: carrierEnd, to: m, curve: true }, moves: { ...moves, [marker.playerId]: m }, attSide: att, focusY, marks: marksFromEvents((e) => (e.type === 'corner' ? cornerPoint(att, carrierEnd.y) : undefined)), weight: 1.4 })
+      const lostMarks = marksFromEvents((e) => (e.type === 'corner' ? cornerPoint(att, carrierEnd.y) : undefined))
+      beats.push({ phase: 'chance', holder: marker.playerId, ball: m, arrow: { from: carrierEnd, to: m, curve: true }, moves: { ...moves, [marker.playerId]: m }, attSide: att, focusY, marks: lostMarks, weight: 1.4 })
+      const corner = lostMarks.find((mk) => mk.kind === 'corner')
+      if (corner) beats.push(...cornerBeats(corner.at, { ...moves, [marker.playerId]: m }))
       return beats
     }
     // Quem fica na área esperando a bola: até dois companheiros de ataque entram nela.
@@ -462,6 +489,9 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
     marks,
     weight: 1.6,
   })
+  // Chute defendido ou desviado para escanteio: a bola vai ao canto e a cobrança é um cruzamento para a área.
+  const cornerMark = marks.find((mk) => mk.kind === 'corner')
+  if (cornerMark && shot.result !== 'goal') beats.push(...cornerBeats(cornerMark.at, { ...moves, ...(shooter ? { [shooter.playerId]: from } : {}) }))
   return beats
 }
 
@@ -612,8 +642,11 @@ function positionOf(layout: Layout, id: string, att: Side, phase: Phase, focusY:
 export function playbackFor(beats: readonly Beat[], speed: number, simplified: boolean): { beats: Beat[]; arrows: boolean } {
   const last = beats[beats.length - 1]
   if (!last) return { beats: [], arrows: false }
-  if (simplified || speed >= 4) return { beats: [last], arrows: false }
-  if (speed >= 2) return { beats: [...new Set([beats[Math.min(1, beats.length - 1)] as Beat, last])], arrows: true }
+  // O desfecho é a finalização (o escanteio que vem depois é só a cena da cobrança, que não cabe nas velocidades altas).
+  const outcome = [...beats].reverse().find((b) => b.phase === 'shot') ?? last
+  if (simplified || speed >= 4) return { beats: [outcome], arrows: false }
+  // Em 2x o escanteio (bola ao canto e cruzamento, que vêm depois da finalização) ainda aparece: é o que torna o lance reconhecível.
+  if (speed >= 2) return { beats: [...new Set([beats[Math.min(1, beats.length - 1)] as Beat, outcome, ...beats.slice(beats.indexOf(outcome) + 1)])], arrows: true }
   return { beats: [...beats], arrows: true }
 }
 

@@ -2,6 +2,7 @@ import { matchLabel } from '../../engine/cups'
 import { CupPathLine } from './standings/CupPath'
 import { shortName } from './standings/parts'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { FORMATION_IDS } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
 import { playerOverall } from '../../engine/overall'
@@ -105,6 +106,22 @@ function FirstLegNote({ game, match }: { game: Game; match: NonNullable<Game['pe
       Jogo de ida: {home.name} {first.result.homeGoals} x {first.result.awayGoals} {away.name}. {game.season.cups?.find((c) => c.id === match.competitionId)?.spec.awayGoals ? 'Vale a regra do gol fora.' : 'Se a soma dos dois jogos empatar, vai para a prorrogação e os pênaltis.'}
     </p>
   )
+}
+
+/** Aviso discreto depois de mudar um jogador de posição: a mudança já aparece na tela e vale a partir do próximo lance. Some sozinho. */
+function useMovedNote(): [ReactNode, () => void] {
+  const [at, setAt] = useState(0)
+  useEffect(() => {
+    if (at === 0) return
+    const t = window.setTimeout(() => setAt(0), 4500)
+    return () => window.clearTimeout(t)
+  }, [at])
+  const note = at > 0 ? (
+    <p className="mt-1 text-[11px] font-semibold text-accent" role="status" data-testid="move-note">
+      ✓ Posição mudada: vale a partir do próximo lance.
+    </p>
+  ) : null
+  return [note, () => setAt(Date.now())]
 }
 
 function Scoreboard({ game, snap, label, speed, onSpeed, onOpponent, effective }: { game: Game; snap: MatchSnapshot; label: string; speed: number; onSpeed: () => void; onOpponent: () => void; effective?: number }) {
@@ -250,8 +267,12 @@ function TacticPanel({
     if (!g) return
     void perform({ type: 'tactic', tactic: { ...userTeam(g).tactic, ...change } })
   }
+  const [movedNote, markMoved] = useMovedNote()
   const move = (id: string, point: GridPoint) => {
-    act(() => live.match.setPosition(live.side, id, point))
+    act(() => {
+      live.match.setPosition(live.side, id, point)
+      markMoved()
+    })
     setPickedId(null)
   }
   const tapPlayer = (id: string) => {
@@ -301,6 +322,7 @@ function TacticPanel({
         ) : (
           <p className="text-xs text-amber-300">Não há jogadores em campo.</p>
         )}
+        {movedNote}
         <p className="mt-2 text-[11px] text-muted">Arraste um jogador para o ponto que quiser, ou toque em dois para trocá-los de lugar. Vale a partir do próximo lance.{pitchCount < 11 && ' Com menos de 11, os lugares vazios custam: cubra as linhas e as faixas que ficaram sem gente.'}</p>
       </Card>
       <StyleControls
@@ -345,6 +367,7 @@ function SubsPanel({
   const players = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
   const [outId, setOutId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [movedNote, markMoved] = useMovedNote()
   const get = (id: string) => players.get(id) as Player
   const sideKey = live.side
   const numberOf = (id: string, slot: Position) => assignNumber(numbers, sideKey, id, slot)
@@ -420,6 +443,7 @@ function SubsPanel({
           onMove={(id, point) => {
             try {
               live.match.setPosition(live.side, id, point)
+              markMoved()
               setMessage(null)
               refresh()
             } catch (e) {
@@ -434,6 +458,7 @@ function SubsPanel({
             setOutId(outId === id ? null : id)
           }}
         />
+        {movedNote}
         {outId && !injuredId && (
           <p className="mt-2 text-center text-sm font-semibold text-rose-200">
             Sai: {playerName(get(outId))}. Agora toque em quem entra, no banco.
@@ -677,7 +702,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
           <Controls label={mainLabel} onMain={onMain} onSkip={skip} mainDisabled={pending} />
         )}
         {online && finished && <p className="text-center text-xs text-muted">Você vê o resultado e espera: a próxima rodada só começa quando todas as partidas terminarem.</p>}
-        {online && online.lastRejected() && <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-xs font-semibold text-amber">Não valeu: {LIVE_REJECT_LABELS[online.lastRejected() as keyof typeof LIVE_REJECT_LABELS] ?? 'o servidor recusou a mudança'}</p>}
+        {online && online.lastRejected() && <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-xs font-semibold text-amber">Não valeu: {online.lastRejected() === 'engine' && online.lastRejectedDetail() ? online.lastRejectedDetail() : (LIVE_REJECT_LABELS[online.lastRejected() as keyof typeof LIVE_REJECT_LABELS] ?? 'o servidor recusou a mudança')}</p>}
         {snap.minute === 0 && match && (
           <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
             <span>
@@ -696,7 +721,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
           </p>
         )}
 
-        <Pitch data={game.season} snap={snap} speed={online ? online.effectiveSpeed() : speed} running={online ? !finished && !atHalftime && snap.minute > 0 : running} numbers={numbers.current} />
+        <Pitch data={game.season} snap={snap} seed={live.matchId} speed={online ? online.effectiveSpeed() : speed} running={online ? !finished && !atHalftime && snap.minute > 0 : running} numbers={numbers.current} />
 
         <Tabs
           value={tab}

@@ -22,6 +22,7 @@ import { getLive } from '../../../store/liveMatch'
 import { StatusTags } from '../../components/PlayerDetail'
 import { StyleControls } from '../../components/StyleControls'
 import { NextOpponent } from './NextOpponent'
+import { SubstituteSheet } from './SubstituteSheet'
 import { formatCompactMoney, playerName } from '../../format'
 import { GridPitch } from '../../components/GridPitch'
 import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, commandErrorText, formationLabel } from '../../labels'
@@ -186,6 +187,8 @@ export function Lineup({ game }: { game: Game }) {
   const squad = squadOf(game, team.id)
   const byId = useMemo(() => new Map(squad.map((p) => [p.id, p])), [squad])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Tocar num titular abre a janela de substituição (mesma posição primeiro).
+  const [subbingId, setSubbingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const apply = (change: (t: Tactic) => Tactic) => {
@@ -198,7 +201,8 @@ export function Lineup({ game }: { game: Game }) {
   }
 
   const tap = (id: string) => {
-    if (selectedId === null) setSelectedId(id)
+    if (selectedId === null && tactic.startingXI.includes(id)) setSubbingId(id)
+    else if (selectedId === null) setSelectedId(id)
     else if (selectedId === id) setSelectedId(null)
     else {
       const other = selectedId
@@ -273,10 +277,10 @@ export function Lineup({ game }: { game: Game }) {
       <p className="min-h-5 text-xs text-muted">
         {selected ? (
           <>
-            <b className="text-white">{playerName(selected)}</b> selecionado: toque em outro jogador (do campo, do banco ou de fora do banco) para trocar de lugar.
+            <b className="text-white">{playerName(selected)}</b> selecionado: toque em um titular no campo para trocar de lugar.
           </>
         ) : (
-          'Arraste um jogador para o ponto que quiser, ou toque em um e depois em outro para trocá-los de lugar.'
+          'Toque num titular para ver quem pode entrar no lugar dele. Arraste um jogador para o ponto que quiser. Toque num reserva e depois num titular para trocá-los.'
         )}
       </p>
       <Pitch tactic={tactic} players={byId} colors={team.colors} selectedId={selectedId} onTap={tap} onMove={move} />
@@ -322,6 +326,19 @@ export function Lineup({ game }: { game: Game }) {
 
       <SavedLineups game={game} />
 
+      {subbingId && byId.get(subbingId) && (
+        <SubstituteSheet
+          tactic={tactic}
+          squad={squad}
+          starter={byId.get(subbingId) as Player}
+          onClose={() => setSubbingId(null)}
+          onPick={(incomingId) => {
+            const out = subbingId
+            apply((t) => swapPlayers(t, out, incomingId))
+            setSubbingId(null)
+          }}
+        />
+      )}
     </div>
   )
 }

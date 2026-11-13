@@ -64,7 +64,8 @@ describe('movimento contínuo do campo 2D', () => {
       const { worstBall, shotLegs } = play(seed, 90)
       goals += shotLegs.filter((l) => /^GOL/.test(l.endText ?? '')).length
       // Um quadro de 16,7 ms: o chute mais veloz (campo inteiro em ~300 ms) anda menos de 6 m; um salto de lado a lado seria > 40 m.
-      expect(worstBall).toBeLessThan(6)
+      // (a cobrança de escanteio cruza a área em pouco tempo: até ~8 m por quadro; um salto de lado a lado seria > 40 m)
+      expect(worstBall).toBeLessThan(8)
     }
     // O reinício depois do gol também é movimento: a bola rola até o centro, não aparece lá.
     expect(goals).toBeGreaterThan(2)

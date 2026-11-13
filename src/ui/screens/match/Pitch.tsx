@@ -3,6 +3,9 @@ import { slotAt } from '../../../engine/grid'
 import type { MatchSnapshot } from '../../../engine/match'
 import type { Player } from '../../../engine/types'
 import { playerName } from '../../format'
+import { Crest } from '../../theme'
+import { VAR, varMoments } from './varNarrative'
+import type { VarMoment } from './varNarrative'
 import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, HOLD_MS, devFlag, devParam } from './pitchModel'
 import type { Beat, Layout, Mark, MarkKind, Placed, Side } from './pitchModel'
 import { PitchMotion, choosePlan } from './pitchMotion'
@@ -77,7 +80,7 @@ export interface PitchData {
  * O movimento é contínuo (`PitchMotion`): a cada quadro os 22 jogadores e a bola andam, e só `transform` é escrito no DOM (nada passa pelo
  * React por quadro). Cada minuto simulado vira trechos da bola (passes de ligação + as batidas do lance), que partem de onde a bola está.
  */
-export function Pitch({ data, snap, speed, running, numbers: shared }: { data: PitchData; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number> }) {
+export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }: { data: PitchData; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number>; /** Identifica a partida: a semente do VAR narrativo (a mesma no solo e no online). */ seed?: string }) {
   const teamOf = (id: string) => data.teams.find((t) => t.id === id) as PitchTeam
   const home = teamOf(snap.home.teamId)
   const away = teamOf(snap.away.teamId)
@@ -112,6 +115,23 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
   live.current = { speed, running, names, numbers: numbers.current }
 
   const [marks, setMarks] = useState<Mark[]>([])
+  // VAR narrativo: quais lances ganham a cena (pela semente da partida; a decisão é sempre a do motor).
+  const vars = useMemo(() => varMoments(snap.trace, snap.events, seed, devFlag('var') ? 50 : 1), [snap.trace.length, snap.events.length, seed]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [varShow, setVarShow] = useState<{ key: number; steps: string[]; i: number } | null>(null)
+  const varTimers = useRef<number[]>([])
+  const varKey = useRef(0)
+  const showVar = (m: VarMoment) => {
+    varTimers.current.forEach((t) => window.clearTimeout(t))
+    varTimers.current = []
+    const key = ++varKey.current
+    setVarShow({ key, steps: m.steps, i: 0 })
+    m.steps.forEach((_, i) => {
+      if (i === 0) return
+      varTimers.current.push(window.setTimeout(() => setVarShow((v) => (v && v.key === key ? { ...v, i } : v)), VAR.stepMs * i))
+    })
+    varTimers.current.push(window.setTimeout(() => setVarShow((v) => (v && v.key === key ? null : v)), VAR.stepMs * (m.steps.length - 1) + VAR.lastStepMs))
+  }
+  useEffect(() => () => varTimers.current.forEach((t) => window.clearTimeout(t)), [])
   const processed = useRef(0)
   const latest = useRef({ layout, known: known.current, snap })
   latest.current = { layout, known: known.current, snap }
@@ -140,6 +160,8 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
     const only = devParam('passo')
     if (only !== null && seq[Number(only)]) seq = [seq[Number(only)] as Beat]
     setMarks([])
+    const moment = vars.get(`t:${traces.indexOf(last)}`)
+    if (moment) showVar(moment)
     motion.current?.plan(seq, { trace: last, names: nameOf, tickMs: tick, connectors, arrows: !quick, setPiece, floors: !quick })
   }, [snap.trace.length, snap.minute]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -149,10 +171,37 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
   const cardTimer = useRef(0)
   useEffect(() => () => window.clearTimeout(cardTimer.current), [])
   const [card, setCard] = useState<{ kind: 'yellow' | 'red'; name: string; team: string; key: number } | null>(null)
+  // Gol: celebração no meio do campo com "GOL!", quem fez, quem deu o passe e o escudo (dura o tempo da câmera lenta do gol).
+  const goalTimer = useRef(0)
+  const goalDelay = useRef(0)
+  useEffect(() => () => { window.clearTimeout(goalTimer.current); window.clearTimeout(goalDelay.current) }, [])
+  const [goal, setGoal] = useState<{ key: number; scorer: string; assist: string; teamId: string; own: boolean } | null>(null)
   useEffect(() => {
     if (snap.events.length < seenEvents.current) seenEvents.current = 0
+    const base = seenEvents.current
     const fresh = snap.events.slice(seenEvents.current)
     seenEvents.current = snap.events.length
+    // Vermelho que ganhou a cena do VAR.
+    fresh.forEach((e, k) => {
+      if (e.type !== 'red-card') return
+      const m = vars.get(`e:${base + k}`)
+      if (m) showVar(m)
+    })
+    const scored = [...fresh].reverse().find((e) => e.type === 'goal' || e.type === 'own-goal')
+    if (scored) {
+      const who = names.get(scored.playerId)
+      const helper = scored.relatedPlayerId ? names.get(scored.relatedPlayerId) : undefined
+      const ti = snap.trace.findIndex((t) => t.minute === scored.minute && t.shot?.result === 'goal' && t.shot.shooterId === scored.playerId)
+      const check = ti >= 0 ? vars.get(`t:${ti}`) : undefined
+      // Com o VAR checando, a celebração espera a decisão final ("Gol confirmado").
+      const wait = check ? VAR.stepMs * (check.steps.length - 1) : 0
+      window.clearTimeout(goalDelay.current)
+      window.clearTimeout(goalTimer.current)
+      goalDelay.current = window.setTimeout(() => {
+        setGoal({ key: Date.now(), scorer: who ? playerName(who) : '', assist: scored.type === 'goal' && helper ? playerName(helper) : '', teamId: scored.teamId, own: scored.type === 'own-goal' })
+        goalTimer.current = window.setTimeout(() => setGoal(null), HOLD_MS.goal)
+      }, wait)
+    }
     const shown = [...fresh].reverse().find((e) => e.type === 'yellow-card' || e.type === 'red-card')
     if (!shown) return
     const who = names.get(shown.playerId)
@@ -339,6 +388,26 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
               <span className="whitespace-nowrap rounded-md bg-bg/90 px-2 py-0.5 text-xs font-bold text-white shadow ring-1 ring-white/30">
                 {card.name} <span className="text-muted">({card.team})</span>
               </span>
+            </div>
+          </div>
+        )}
+
+        {goal && (
+          <div key={goal.key} className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center" role="status" aria-label={`Gol de ${goal.scorer}`} data-testid="goal-celebration">
+            <div className="goal-celebration flex max-w-[86%] flex-col items-center gap-1 rounded-2xl border border-accent/60 bg-bg/85 px-5 py-3 text-center shadow-[0_0_30px_rgb(39_224_90/0.35)]">
+              {data.teams.some((t) => t.id === goal.teamId) && <Crest team={{ abbreviation: teamOf(goal.teamId).abbreviation, colors: [...teamOf(goal.teamId).colors] as [string, string] }} size="md" />}
+              <span className="title text-5xl leading-none text-accent">{goal.own ? 'GOL CONTRA' : 'GOL!'}</span>
+              <span className="text-base font-bold text-white">{goal.scorer}</span>
+              {goal.assist && <span className="text-xs font-semibold text-slate-300">Assistência: {goal.assist}</span>}
+            </div>
+          </div>
+        )}
+
+        {varShow && (
+          <div key={varShow.key} className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2" role="status" data-testid="var-banner">
+            <div className="pitch-mark flex items-center gap-2 whitespace-nowrap rounded-lg bg-bg/90 px-2.5 py-1.5 shadow ring-1 ring-white/30">
+              <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-extrabold tracking-wider text-bg">VAR</span>
+              <span className={`text-sm font-bold ${varShow.i === varShow.steps.length - 1 ? 'text-accent' : 'text-white'}`}>{varShow.steps[varShow.i]}</span>
             </div>
           </div>
         )}

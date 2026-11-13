@@ -7,12 +7,33 @@
 import type { MatchSide, MatchSnapshot } from '../engine/match'
 import type { LiveMatch } from '../engine/match'
 import type { GridPoint, Mentality, PlayStyle } from '../engine/types'
+import { gridKey } from '../engine/grid'
 import { LiveSession, myGame, mySide, type ClientGame, type LiveClientState } from '../online/liveSession'
 import { openLiveSession } from './leagues'
 import type { LiveSession as SoloLiveSession } from './liveMatch'
 
+/** Espera antes de mandar as mudanças de posição ao servidor: quem arrasta várias vezes seguidas manda só a última de cada jogador. */
+export const POSITION_SEND_DELAY_MS = 300
+/** Uma mudança de posição que a tela já mostra e o servidor ainda não confirmou fica no máximo isto de tempo. */
+export const POSITION_OVERLAY_MAX_MS = 6000
+
+interface PendingMove {
+  playerId: string
+  point: GridPoint
+  at: number
+  /** Id do comando já enviado (a resposta do servidor chega em `outcomes`). */
+  commandId?: string
+  /** O servidor aceitou: sai da tela no próximo quadro (que já traz a posição). */
+  acked?: boolean
+}
+
 /** O `LiveMatch` que a tela do solo usa, mas movido pelo servidor. */
 class OnlineLiveMatch implements LiveMatch {
+  /** Mudanças de posição que o técnico fez e ainda não voltaram no quadro do servidor (a tela as mostra já, na ordem em que foram feitas). */
+  private moves: PendingMove[] = []
+  private sendTimer: ReturnType<typeof setTimeout> | undefined
+  /** O motivo da última recusa de uma mudança de posição (o jogador já voltou ao lugar). */
+  lastPositionError: string | undefined
   /** Mudanças que o técnico acabou de pedir e ainda não voltaram no quadro (a tela as mostra já). */
   private overlay: { style?: PlayStyle; mentality?: Mentality; formationId?: string } = {}
 
@@ -20,6 +41,47 @@ class OnlineLiveMatch implements LiveMatch {
 
   clearOverlay(): void {
     this.overlay = {}
+  }
+
+  /** Aplica as mudanças de posição pendentes sobre as posições do servidor, na mesma ordem e com a mesma regra de troca do motor. */
+  private withMoves(onPitch: MatchSnapshot['home']['onPitch']): MatchSnapshot['home']['onPitch'] {
+    if (this.moves.length === 0) return onPitch
+    const points = new Map(onPitch.map((p) => [p.playerId, p.point as GridPoint]))
+    for (const m of this.moves) {
+      const from = points.get(m.playerId)
+      if (!from) continue
+      const other = [...points.entries()].find(([id, pt]) => id !== m.playerId && gridKey(pt) === gridKey(m.point))?.[0]
+      if (other) points.set(other, { ...from })
+      points.set(m.playerId, { ...m.point })
+    }
+    return onPitch.map((p) => ({ ...p, point: points.get(p.playerId) as GridPoint }))
+  }
+
+  /** Chamado a cada notícia do servidor: tira da tela as mudanças que ele já confirmou ou recusou (a recusa devolve o jogador e guarda o motivo). */
+  reconcile(outcomes: readonly { id: string; ok: boolean; reason?: string; detail?: string }[], now = Date.now()): void {
+    if (this.moves.length === 0) return
+    const byId = new Map(outcomes.map((o) => [o.id, o]))
+    const next: PendingMove[] = []
+    for (const m of this.moves) {
+      const o = m.commandId ? byId.get(m.commandId) : undefined
+      if (o && !o.ok) {
+        this.lastPositionError = o.detail ?? 'A mudança de posição não é permitida agora.'
+        continue
+      }
+      if (m.acked) continue // o quadro que chegou já traz a posição
+      if (now - m.at > POSITION_OVERLAY_MAX_MS) continue
+      next.push(o?.ok ? { ...m, acked: true } : m)
+    }
+    this.moves = next
+  }
+
+  private flushMoves(): void {
+    this.sendTimer = undefined
+    for (const m of this.moves) {
+      if (m.commandId) continue
+      const id = this.handle.session.send({ type: 'position', playerId: m.playerId, point: m.point })
+      if (id) m.commandId = id
+    }
   }
 
   private get game(): ClientGame {
@@ -41,9 +103,9 @@ class OnlineLiveMatch implements LiveMatch {
     const snap = this.game.snapshot
     const side = this.handle.side
     const o = this.overlay
-    if (!o.style && o.mentality === undefined && !o.formationId) return snap
+    if (!o.style && o.mentality === undefined && !o.formationId && this.moves.length === 0) return snap
     const mine = snap[side]
-    return { ...snap, [side]: { ...mine, ...(o.style ? { style: o.style } : {}), ...(o.mentality !== undefined ? { mentality: o.mentality, activeMentality: o.mentality } : {}), ...(o.formationId ? { formationId: o.formationId } : {}) } }
+    return { ...snap, [side]: { ...mine, onPitch: this.withMoves(mine.onPitch), ...(o.style ? { style: o.style } : {}), ...(o.mentality !== undefined ? { mentality: o.mentality, activeMentality: o.mentality } : {}), ...(o.formationId ? { formationId: o.formationId } : {}) } }
   }
   setStyle(_side: MatchSide, style: PlayStyle): void {
     this.overlay = { ...this.overlay, style }
@@ -58,7 +120,20 @@ class OnlineLiveMatch implements LiveMatch {
     this.handle.session.send({ type: 'formation', formationId })
   }
   setPosition(_side: MatchSide, playerId: string, point: GridPoint): void {
-    this.handle.session.send({ type: 'position', playerId, point })
+    const now = this.withMoves(this.game.snapshot[this.handle.side].onPitch)
+    if (!now.some((p) => p.playerId === playerId)) throw new Error('O jogador não está em campo')
+    // Vale só a última posição de cada jogador que ainda não foi enviada; a tela mostra a mudança na hora e o servidor recebe depois do tempo de espera.
+    this.moves = [...this.moves.filter((m) => !(m.playerId === playerId && !m.commandId)), { playerId, point: { row: point.row, lane: point.lane }, at: Date.now() }]
+    this.lastPositionError = undefined
+    clearTimeout(this.sendTimer)
+    this.sendTimer = setTimeout(() => {
+      this.flushMoves()
+    }, POSITION_SEND_DELAY_MS)
+    this.handle.notify()
+  }
+
+  stop(): void {
+    clearTimeout(this.sendTimer)
   }
   substitute(_side: MatchSide, outgoingId: string, incomingId: string): void {
     this.handle.session.send({ type: 'substitute', outgoingId, incomingId })
@@ -104,6 +179,7 @@ export class OnlineMatchHandle {
         this.live.side = mySide(s) ?? 'home'
         // O servidor é quem manda: o que o técnico pediu já voltou no quadro.
         this.adapter.clearOverlay()
+        this.adapter.reconcile(s.outcomes)
         const mine = g.speeds[this.playerId]
         if (mine !== undefined) this.mySpeed = mine
         this.live.halftimeDone = g.snapshot.minute > 45
@@ -162,8 +238,21 @@ export class OnlineMatchHandle {
     const o = [...this.session.state.outcomes].reverse().find((x) => !x.ok)
     return o?.reason
   }
+  /** O texto do motivo (o erro do motor) da última recusa, quando houve. */
+  lastRejectedDetail(): string | undefined {
+    const o = [...this.session.state.outcomes].reverse().find((x) => !x.ok)
+    return o?.detail
+  }
+  /** A recusa de uma mudança de posição (o jogador já voltou ao lugar). */
+  positionError(): string | undefined {
+    return this.adapter.lastPositionError
+  }
+  notify(): void {
+    for (const l of this.listeners) l()
+  }
 
   close(): void {
+    this.adapter.stop()
     this.off()
     this.session.close()
     this.listeners.clear()

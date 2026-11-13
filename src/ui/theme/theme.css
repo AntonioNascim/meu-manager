@@ -182,6 +182,21 @@ body {
   animation: pitch-pop 0.35s ease-out;
 }
 
+/* Celebração do gol no meio do campo: entra com um "pop" e some no fim (a duração vem do estilo inline). */
+.goal-celebration {
+  animation: goal-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes goal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes pitch-in {
   from {
     opacity: 0;
@@ -216,6 +231,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .pitch-mark,
+  .goal-celebration,
   .pitch-player,
   .pitch-holder::after {
     animation: none;

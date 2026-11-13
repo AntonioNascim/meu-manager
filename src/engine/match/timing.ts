@@ -6,7 +6,7 @@ import type { MatchEvent } from '../types'
 import type { PlayTrace } from './state'
 
 /** Duração (ms) da animação de cada tipo de lance; o relógio da partida espera esse tempo (`holdFor`). */
-export const HOLD_MS = { goal: 3000, shot: 2000, card: 2000, setPiece: 1000 } as const
+export const HOLD_MS = { goal: 3000, shot: 2000, card: 2000, setPiece: 1000, corner: 1500 } as const
 
 /**
  * Duração de um minuto de jogo na velocidade 1x (ms): a mesma do jogo solo e da liga online. Era 700; passou a 1.600 (Fase 6D) para os lances do campo
@@ -31,6 +31,7 @@ export function holdFor(traces: readonly PlayTrace[], events: readonly MatchEven
   for (const e of events) {
     if (e.type === 'goal' || e.type === 'own-goal') hold = Math.max(hold, HOLD_MS.goal)
     else if (e.type === 'yellow-card' || e.type === 'red-card') hold = Math.max(hold, HOLD_MS.card)
+    else if (e.type === 'corner') hold = Math.max(hold, HOLD_MS.corner)
   }
   return hold
 }
