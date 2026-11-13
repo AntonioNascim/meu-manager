@@ -22,6 +22,8 @@ export type ClientMessage =
   | { t: 'speed'; value: number }
   /** "Voltar ao jogo" no intervalo. */
   | { t: 'half' }
+  /** "Pular": a IA joga o time deste técnico até o fim; a partida só vai ao fim quando todos os técnicos dela pulam. */
+  | { t: 'skip' }
   | { t: 'ping' }
 
 export type ParseProblem = 'too-large' | 'not-json' | 'bad-shape' | 'bad-command'
@@ -64,6 +66,7 @@ export function parseClientMessage(text: string): { ok: true; message: ClientMes
   const o = raw as Record<string, unknown>
   if (o.t === 'ping') return { ok: true, message: { t: 'ping' } }
   if (o.t === 'half') return { ok: true, message: { t: 'half' } }
+  if (o.t === 'skip') return { ok: true, message: { t: 'skip' } }
   if (o.t === 'speed') return typeof o.value === 'number' && (LIVE_SPEEDS as readonly number[]).includes(o.value) ? { ok: true, message: { t: 'speed', value: o.value } } : { ok: false, problem: 'bad-shape' }
   if (o.t === 'hello') return int(o.since ?? 0, 0, 120) ? { ok: true, message: { t: 'hello', since: (o.since as number | undefined) ?? 0 } } : { ok: false, problem: 'bad-shape' }
   if (o.t === 'cmd') {
@@ -86,7 +89,8 @@ export interface GameFrame {
   speeds: Record<string, number>
   /** Intervalo em andamento: quanto falta (ms) e quem já tocou em "Voltar ao jogo". */
   halftime?: { leftMs: number; ready: string[] }
-  /** Lesão à espera da escolha do técnico (o jogo dele está parado): quem se machucou e quanto falta para entrar o melhor reserva. */
+  skipped?: string[]
+  /** Lesão à espera do técnico (o jogo dele está parado): quem se machucou e quanto falta para entrar o melhor reserva. */
   injury?: { side: 'home' | 'away'; playerId: string; leftMs: number }
   /** Só o que o cliente ainda não tinha. */
   events: MatchEvent[]
@@ -144,7 +148,7 @@ export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cur
   for (const v of views) {
     const seen = cursor[v.matchId] ?? { events: 0, trace: 0, minute: -1, meta: '' }
     // O que muda sem o jogo andar (velocidade, intervalo, lesão, quem controla, fim) também vale um quadro; o tempo que falta não (a tela conta sozinha).
-    const meta = JSON.stringify([v.controlled, v.speed, v.speeds, v.halftime?.ready ?? null, v.snapshot.injuryPending ?? null, v.snapshot.finished])
+    const meta = JSON.stringify([v.controlled, v.speed, v.speeds, v.halftime?.ready ?? null, v.snapshot.injuryPending ?? null, v.snapshot.finished, v.skipped ?? null])
     next[v.matchId] = { events: v.snapshot.events.length, trace: v.snapshot.trace.length, minute: v.snapshot.minute, meta }
     if (seen.minute === v.snapshot.minute && seen.meta === meta && seen.events === v.snapshot.events.length && seen.trace === v.snapshot.trace.length) continue
     games.push({
@@ -156,6 +160,7 @@ export function frameSince(e: LiveEvent, views: readonly LiveView[], cursor: Cur
       controlled: v.controlled,
       speed: v.speed,
       speeds: v.speeds,
+      ...(v.skipped?.length ? { skipped: v.skipped } : {}),
       ...(v.halftime ? { halftime: v.halftime } : {}),
       ...(v.snapshot.injuryPending ? { injury: { ...v.snapshot.injuryPending, leftMs: v.injuryLeftMs ?? 0 } } : {}),
       events: v.snapshot.events.slice(seen.events),

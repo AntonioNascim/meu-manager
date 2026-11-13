@@ -33,6 +33,7 @@ import { closeOnlineMatch, currentOnlineMatch, openOnlineMatch } from '../../sto
 import { getAccount } from '../../store/onlineAccount'
 import { LIVE_REJECT_LABELS } from '../labels'
 import { Pitch } from './match/Pitch'
+import { seedNumbers } from '../shirt'
 import { assignNumber, devFlag, devParam, holdFor, inkFor, kitsFor } from './match/pitchModel'
 import { Jersey } from '../theme'
 
@@ -521,7 +522,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   // Quanto da partida a tela já viu: só o que chega depois pede câmera lenta ou aviso.
   const seen = useRef({ trace: snap.trace.length, events: snap.events.length })
   // Números de camisa dos dois times: o campo e as Trocas usam os mesmos.
-  const numbers = useRef(new Map<string, number>())
+  const numbers = useRef(seedNumbers(seedNumbers(new Map<string, number>(), game.season, snap.home.teamId, 'home'), game.season, snap.away.teamId, 'away'))
   const [opponentOpen, setOpponentOpen] = useState(() => devFlag('oponente'))
   const homeTeam = teamById(game, snap.home.teamId)
   const awayTeam = teamById(game, snap.away.teamId)
@@ -657,14 +658,21 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
             {online ? 'Voltar ao painel' : 'Concluir partida'}
           </Button>
         ) : online ? (
-          atHalftime && half && (
-            <div className="space-y-1" data-testid="halftime-box">
-              <Button className="w-full" disabled={half.mine} onClick={() => online.sendHalf()} data-testid="halftime-back">
-                {half.mine ? (half.waitingOther ? 'Esperando o adversário…' : 'Voltando ao jogo…') : 'Voltar ao jogo'}
-              </Button>
-              <p className="text-center text-xs text-muted">O intervalo dura até 1 minuto. Ajuste a tática e as trocas antes de voltar.</p>
-            </div>
-          )
+          <div className="space-y-2">
+            {atHalftime && half && (
+              <div className="space-y-1" data-testid="halftime-box">
+                <Button className="w-full" disabled={half.mine} onClick={() => online.sendHalf()} data-testid="halftime-back">
+                  {half.mine ? (half.waitingOther ? 'Esperando o adversário…' : 'Voltando ao jogo…') : 'Voltar ao jogo'}
+                </Button>
+                <p className="text-center text-xs text-muted">O intervalo dura até 1 minuto. Ajuste a tática e as trocas antes de voltar.</p>
+              </div>
+            )}
+            {snap.minute > 0 && (
+              <button type="button" onClick={() => online.skip()} disabled={online.skipState().mine} data-testid="online-skip" className="btn-dark inline-flex min-h-11 w-full items-center justify-center rounded-[10px] px-3 font-display text-lg font-bold text-white disabled:opacity-60">
+                {online.skipState().mine ? 'Esperando o adversário pular' : 'Pular'}
+              </button>
+            )}
+          </div>
         ) : (
           <Controls label={mainLabel} onMain={onMain} onSkip={skip} mainDisabled={pending} />
         )}

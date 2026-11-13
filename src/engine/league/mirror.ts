@@ -8,6 +8,7 @@
  * completo a cada resposta (`own`). Puro: serve ao servidor (montar a carga) e ao aparelho (aplicar e montar o `SeasonState`).
  */
 import { createRng } from '../rng'
+import type { TalkState } from '../talk'
 import type { SeasonState } from '../season'
 import type { Attributes, Cup, CupHistory, CupSpec, Cycle, Finances, Match, MarketState, Player, PlayerCondition, PlayerSeasonStats, Season, Team, TeamId, TrainingState, TransferOffer } from '../types'
 import { ATTRIBUTE_MAX, ATTRIBUTE_MIN } from '../config'
@@ -73,8 +74,8 @@ export const publicTeam = (t: Team): Team => ({ ...t, finances: publicFinances(t
 // ---------------------------------------------------------------------------
 
 /** Pedaços do mundo que vão inteiros quando mudam. `own` não vai como pedaço: marca que o treino ou a base mudaram (o clube do técnico vai na atualização). */
-export type MirrorSection = 'season' | 'cycles' | 'focus' | 'cups' | 'cupSpecs' | 'cupHistory' | 'market' | 'counter' | 'own'
-export const SECTIONS: readonly Exclude<MirrorSection, 'own'>[] = ['season', 'cycles', 'focus', 'cups', 'cupSpecs', 'cupHistory', 'market', 'counter']
+export type MirrorSection = 'season' | 'cycles' | 'focus' | 'cups' | 'cupSpecs' | 'cupHistory' | 'market' | 'counter' | 'shirts' | 'own'
+export const SECTIONS: readonly Exclude<MirrorSection, 'own'>[] = ['season', 'cycles', 'focus', 'cups', 'cupSpecs', 'cupHistory', 'market', 'counter', 'shirts']
 
 export interface MirrorChange {
   /** Jogador → letras dos grupos que mudaram (`asrc`). Quem apareceu tem todos. */
@@ -151,7 +152,8 @@ export function diffWorlds(prev: SeasonState, next: SeasonState): MirrorChange {
   if (prev.cupHistory !== next.cupHistory) sections.push('cupHistory')
   if (prev.market !== next.market) sections.push('market')
   if (prev.playerCounter !== next.playerCounter) sections.push('counter')
-  if (prev.training !== next.training || prev.academy !== next.academy) sections.push('own')
+  if (prev.shirts !== next.shirts) sections.push('shirts')
+  if (prev.training !== next.training || prev.academy !== next.academy || prev.talks !== next.talks) sections.push('own')
   return { players, removedPlayers, teams, removedTeams: prev.teams.filter((t) => !teamIds.has(t.id)).map((t) => t.id), matches, removedMatches: prev.matches.filter((m) => !matchIds.has(m.id)).map((m) => m.id), sections }
 }
 
@@ -194,6 +196,8 @@ export interface OwnPart {
   players: Player[]
   academy: Player[]
   training: TrainingState
+  /** Conversas e promessas de vaga do clube. */
+  talks?: TalkState
   /** Clubes de técnicos humanos da liga (o mercado da IA não negocia por eles). */
   humans?: TeamId[]
   /** Propostas e pré-contratos do clube. */
@@ -211,6 +215,8 @@ export interface MirrorSections {
   /** Mercado público: anúncios e histórico; as propostas e pré-contratos do clube vão em `own`. */
   market: MarketState
   counter: number
+  /** Números de camisa escolhidos (todos veem o mesmo número no campo). */
+  shirts: Record<string, Record<string, number>> | null
 }
 
 export interface MirrorPlayerPatch {
@@ -241,6 +247,12 @@ export interface MirrorPayload {
 /** Jogadores por página da carga completa (~2 MB de texto cada). */
 export const FULL_PAGE_PLAYERS = 2_500
 
+/** As conversas do clube (o resto do mundo não precisa saber). */
+function talksOf(t: TalkState, teamId: TeamId, mine: ReadonlySet<string>): TalkState {
+  const pick = <V,>(r: Record<string, V>): Record<string, V> => Object.fromEntries(Object.entries(r).filter(([id]) => mine.has(id)))
+  return { last: pick(t.last), lockedUntil: pick(t.lockedUntil), recent: t.recent[teamId] ? { [teamId]: t.recent[teamId] } : {}, promises: t.promises.filter((p) => p.teamId === teamId) }
+}
+
 export function ownPart(world: SeasonState, teamId: TeamId, humans?: readonly TeamId[]): OwnPart {
   const team = world.teams.find((t) => t.id === teamId) as Team
   const mine = new Set(world.players.filter((p) => p.teamId === teamId).map((p) => p.id))
@@ -253,6 +265,7 @@ export function ownPart(world: SeasonState, teamId: TeamId, humans?: readonly Te
     ...(humans ? { humans: [...humans] } : {}),
     players: world.players.filter((p) => p.teamId === teamId).map(ownPlayer),
     academy: world.academy.filter((p) => p.teamId === teamId).map(ownPlayer),
+    ...(world.talks ? { talks: talksOf(world.talks, teamId, mine) } : {}),
     training: { plans: t.plans[teamId] ? { [teamId]: t.plans[teamId] } : {}, individual: t.individual[teamId] ? { [teamId]: t.individual[teamId] } : {}, finished: t.finished[teamId] ? { [teamId]: t.finished[teamId] } : {}, history },
     offers: world.market.offers.filter((o) => o.buyerId === teamId || o.sellerId === teamId),
     preContracts: world.market.preContracts.filter((c) => c.fromTeamId === teamId || c.toTeamId === teamId),
@@ -279,6 +292,8 @@ function sectionValue(world: SeasonState, name: Exclude<MirrorSection, 'own'>): 
       return { ...world.market, offers: [], preContracts: [] }
     case 'counter':
       return world.playerCounter
+    case 'shirts':
+      return world.shirts ?? null
   }
 }
 
@@ -393,6 +408,8 @@ export function toSeasonState(m: MirrorState): SeasonState | undefined {
     academy: own.academy,
     market,
     training: own.training,
+    ...(own.talks ? { talks: own.talks } : {}),
+    ...(s.shirts ? { shirts: s.shirts } : {}),
     cycles: s.cycles,
     ...(s.focus ? { focus: s.focus } : {}),
     ...(s.cups && s.cups.length > 0 ? { cups: s.cups } : {}),

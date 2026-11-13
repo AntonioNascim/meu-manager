@@ -9,6 +9,7 @@ import { perform } from '../../store/actions'
 import { Button, Card } from '../components/ui'
 import { formatDate, formatMoney, playerName } from '../format'
 import { OFFER_REASON_LABELS, POSITION_SHORT_LABELS, commandErrorText } from '../labels'
+import { MoneyInput } from '../components/MoneyInput'
 
 /** Renovação de contratos: quem vence neste ano e no próximo, com o pedido de cada jogador. */
 export function Contracts({ game }: { game: Game }) {
@@ -43,7 +44,7 @@ export function Contracts({ game }: { game: Game }) {
   )
 }
 
-function RenewForm({ game, player, onClose }: { game: Game; player: Player; onClose: () => void }) {
+export function RenewForm({ game, player, onClose }: { game: Game; player: Player; onClose: () => void }) {
   const team = userTeam(game)
   const demand = renewalDemand(player, team)
   const [salary, setSalary] = useState(demand)
@@ -68,7 +69,7 @@ function RenewForm({ game, player, onClose }: { game: Game; player: Player; onCl
       </div>
       <label className="mb-3 block text-sm">
         Salário mensal (ele pede {formatMoney(demand)})
-        <input type="number" min={0} step={500} className="mt-1 min-h-12 w-full rounded-xl px-3" value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
+        <MoneyInput className="mt-1 min-h-12 w-full rounded-xl px-3" value={salary} onChange={setSalary} />
       </label>
       <label className="mb-3 block text-sm">
         Anos a mais

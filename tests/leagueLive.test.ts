@@ -21,6 +21,7 @@ import {
   resumeLiveEvent,
   setConnected,
   setSpeed,
+  skipLiveGame,
   speedOf,
   startLiveEvent,
   stepLiveEvent,
@@ -290,5 +291,40 @@ describe('quem não deu Pronto não entra no meio da partida', () => {
     const free = startLiveEvent({ ...stepped.league, current: { ...cur, locked: undefined } }, stepped.world, now, BASE_MINUTE_MS, ['jogador-1', 'jogador-2'])
     expect(free.locked).toBeUndefined()
     expect(free.games[0]!.nextAt).toBe(now + BASE_MINUTE_MS / DEFAULT_SPEED)
+  })
+  it('Pular contra a IA leva a partida direto ao fim, refeita pelo registro dá o mesmo resultado e sobrevive à hibernação', () => {
+    const { stepped, event, now } = atFirstEvent()
+    const seats = stepped.league.seats
+    const e = tick(event, seats, now, 5_000).event
+    const mine = SEATS[0]!
+    const g = gameOf(e, mine.teamId)
+    expect(g.live.finished).toBe(false)
+    expect(skipLiveGame(e, seats, mine.playerId)).toBe(true)
+    expect(g.live.finished).toBe(true)
+    expect(viewOf(e, seats, now).find((v) => v.matchId === g.matchId)!.skipped).toEqual([mine.playerId])
+    const record = JSON.parse(JSON.stringify({ version: 1, matchId: g.matchId, input: g.input, commands: g.commands }))
+    expect(JSON.stringify(replayResult(record))).toBe(JSON.stringify(g.live.result()))
+    const back = rebuildLiveEvent(JSON.parse(JSON.stringify(toStored(e))))
+    expect(gameOf(back, mine.teamId).live.finished).toBe(true)
+    expect(JSON.stringify(gameOf(back, mine.teamId).live.result())).toBe(JSON.stringify(g.live.result()))
+    expect(skipLiveGame(e, seats, mine.playerId)).toBe(false)
+  })
+
+  it('Pular entre dois técnicos: só vai ao fim quando os dois pulam; quem pulou fica com a IA mesmo se reconectar', () => {
+    const { stepped, event, now } = atFirstEvent(DUEL)
+    const seats = stepped.league.seats
+    let e = tick(event, seats, now, 5_000).event
+    const g = gameOf(e, DUEL[0]!.teamId)
+    expect(skipLiveGame(e, seats, 'jogador-1')).toBe(true)
+    expect(g.live.finished).toBe(false)
+    const v = viewOf(e, seats, now).find((x) => x.matchId === g.matchId)!
+    expect(v.controlled.home || v.controlled.away).toBe(true)
+    e = setConnected(e, seats, 'jogador-1', false)
+    e = setConnected(e, seats, 'jogador-1', true)
+    expect(viewOf(e, seats, now).find((x) => x.matchId === g.matchId)!.controlled[DUEL[0]!.teamId === g.homeTeamId ? 'home' : 'away']).toBe(false)
+    expect(skipLiveGame(e, seats, 'jogador-2')).toBe(true)
+    expect(g.live.finished).toBe(true)
+    const record = JSON.parse(JSON.stringify({ version: 1, matchId: g.matchId, input: g.input, commands: g.commands }))
+    expect(JSON.stringify(replayResult(record))).toBe(JSON.stringify(g.live.result()))
   })
 })

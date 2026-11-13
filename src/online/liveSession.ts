@@ -18,6 +18,8 @@ export interface ClientGame {
   speeds: Record<string, number>
   /** Intervalo: o instante (ms, relógio desta máquina) em que acaba e quem já tocou em "Voltar ao jogo". */
   halftime?: { deadline: number; ready: string[] }
+  /** Quem já tocou em "Pular". */
+  skipped?: string[]
   /** Lesão à espera do técnico: quem saiu e o instante (ms, relógio desta máquina) em que entra o melhor reserva se ele não escolher. */
   injury?: { side: 'home' | 'away'; playerId: string; deadline: number }
 }
@@ -64,7 +66,7 @@ export function applyMessage(state: LiveClientState, msg: ServerMessage): LiveCl
         roster: msg.roster,
         myTeamId: msg.me.teamId,
         labels: msg.labels,
-        games: msg.games.map((g) => ({ matchId: g.matchId, snapshot: g.snapshot, controlled: g.controlled, speed: g.speed ?? 2, speeds: g.speeds ?? {}, ...(g.halftime ? { halftime: { deadline: Date.now() + g.halftime.leftMs, ready: g.halftime.ready } } : {}), ...(g.snapshot.injuryPending ? { injury: { ...g.snapshot.injuryPending, deadline: Date.now() + (g.injuryLeftMs ?? 0) } } : {}) })),
+        games: msg.games.map((g) => ({ matchId: g.matchId, snapshot: g.snapshot, controlled: g.controlled, speed: g.speed ?? 2, speeds: g.speeds ?? {}, ...(g.skipped?.length ? { skipped: g.skipped } : {}), ...(g.halftime ? { halftime: { deadline: Date.now() + g.halftime.leftMs, ready: g.halftime.ready } } : {}), ...(g.snapshot.injuryPending ? { injury: { ...g.snapshot.injuryPending, deadline: Date.now() + (g.injuryLeftMs ?? 0) } } : {}) })),
       }
     case 'frame': {
       const games = state.games.map((g) => {
@@ -88,7 +90,7 @@ export function applyMessage(state: LiveClientState, msg: ServerMessage): LiveCl
           ...(f.shootout ? { shootout: f.shootout } : {}),
         }
         const { injury: _gone, halftime: _half, ...rest } = g
-        return { ...rest, speed: f.speed ?? g.speed, speeds: f.speeds ?? g.speeds, ...(f.halftime ? { halftime: { deadline: Date.now() + f.halftime.leftMs, ready: f.halftime.ready } } : {}), snapshot: f.injury ? { ...snapshot, injuryPending: { side: f.injury.side, playerId: f.injury.playerId } } : snapshot, controlled: f.controlled, ...(f.injury ? { injury: { side: f.injury.side, playerId: f.injury.playerId, deadline: Date.now() + f.injury.leftMs } } : {}) }
+        return { ...rest, speed: f.speed ?? g.speed, speeds: f.speeds ?? g.speeds, ...(f.skipped?.length ? { skipped: f.skipped } : g.skipped ? { skipped: g.skipped } : {}), ...(f.halftime ? { halftime: { deadline: Date.now() + f.halftime.leftMs, ready: f.halftime.ready } } : {}), snapshot: f.injury ? { ...snapshot, injuryPending: { side: f.injury.side, playerId: f.injury.playerId } } : snapshot, controlled: f.controlled, ...(f.injury ? { injury: { side: f.injury.side, playerId: f.injury.playerId, deadline: Date.now() + f.injury.leftMs } } : {}) }
       })
       return { ...state, minute: msg.minute, games }
     }
@@ -209,6 +211,13 @@ export class LiveSession {
   sendSpeed(value: number): boolean {
     if (!this.socket || this.state.status !== 'live') return false
     this.socket.send(JSON.stringify({ t: 'speed', value }))
+    return true
+  }
+
+  /** "Pular": a IA joga o meu time até o fim. */
+  sendSkip(): boolean {
+    if (!this.socket || this.state.status !== 'live') return false
+    this.socket.send(JSON.stringify({ t: 'skip' }))
     return true
   }
 

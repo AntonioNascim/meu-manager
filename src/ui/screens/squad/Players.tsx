@@ -9,7 +9,6 @@ import { formatCompactMoney, playerName } from '../../format'
 import { POSITION_GROUP_LABELS, POSITION_LABELS, POSITION_SHORT_LABELS, SQUAD_SORT_LABELS } from '../../labels'
 import { NATURAL_DIRECTION, inGroup, isUnavailable, sortSquad } from '../../squadSort'
 import type { PositionGroup, SquadSortKey } from '../../squadSort'
-import { SellSheet } from '../market/SellSheet'
 import { conditionBand } from '../../colors'
 import { Avatar, ConditionBar, Flag, Icon, MoodIcon, Panel, Trend } from '../../theme'
 import { Overview } from './Overview'
@@ -72,7 +71,6 @@ export function Players({ game }: { game: Game }) {
   const starters = new Set(team.tactic.startingXI)
   const available = squad.filter((p) => !isUnavailable(p)).length
   const open = squad.find((p) => p.id === openId)
-  const [selling, setSelling] = useState(false)
 
   return (
     <div className="space-y-3">
@@ -153,28 +151,9 @@ export function Players({ game }: { game: Game }) {
           player={open}
           onClose={() => {
             setOpenId(null)
-            setSelling(false)
           }}
           history={game.season.training.history[open.id]}
           currentDate={game.season.season.currentDate}
-          footer={
-            open.contract.loanedFrom ? undefined : (
-              <button type="button" onClick={() => setSelling(true)} className="min-h-12 w-full rounded-xl border border-line bg-surface-2 font-bold active:scale-95">
-                Vender, emprestar ou liberar
-              </button>
-            )
-          }
-        />
-      )}
-      {open && selling && (
-        <SellSheet
-          game={game}
-          player={open}
-          onClose={() => setSelling(false)}
-          onDone={() => {
-            setSelling(false)
-            setOpenId(null)
-          }}
         />
       )}
     </div>

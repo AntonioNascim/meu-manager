@@ -10,6 +10,7 @@ import { formatMoney, playerName } from '../../format'
 import { OFFER_KIND_LABELS, POSITION_LABELS, commandErrorText } from '../../labels'
 import { Flag, Sheet, ValueBadge } from '../../theme'
 import { FavoriteStar, InterestText, clubName } from './parts'
+import { MoneyInput } from '../../components/MoneyInput'
 
 const Line = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="flex items-baseline justify-between gap-3 py-1 text-sm">
@@ -101,12 +102,12 @@ export function Negotiation({ game, player, open, onClose, extra, initialKind = 
       {!free && (
         <label className="mt-3 block text-sm">
           {kind === 'loan' ? 'Taxa do empréstimo' : 'Valor da compra'}
-          <input type="number" min={0} step={10_000} className={input} value={amount} onChange={(e) => setFee(Number(e.target.value))} />
+          <MoneyInput className={input} value={amount} onChange={setFee} />
         </label>
       )}
       <label className="mt-3 block text-sm">
         Salário mensal
-        <input type="number" min={0} step={500} className={input} value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
+        <MoneyInput className={input} value={salary} onChange={setSalary} />
       </label>
       {kind === 'purchase' && (
         <label className="mt-3 block text-sm">

@@ -32,6 +32,7 @@ import type {
   TeamMatchStats,
   WindowName,
 } from '../engine/types'
+import type { TalkHint, TalkKind } from '../engine/talk'
 import type { InterestLevel, MarketSort, QuickFilter, Situation, SquadRole } from '../engine/market'
 
 export const POSITION_LABELS: Record<Position, string> = {
@@ -246,9 +247,26 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   offline: 'Sem conexão: reconecte para fazer isso',
   'human-club': 'Jogador de outro técnico da liga: negocie pela aba Técnicos do Mercado',
   'too-many-offers': 'Você já tem 5 propostas abertas: espere a resposta de alguma',
+  'talk-too-soon': 'Você conversou com ele há pouco: espere o intervalo entre conversas',
+  'talk-weekly': 'Você já fez 3 conversas esta semana: espere alguns dias',
+  'talk-locked': 'A última conversa não deu certo: ele não quer falar por enquanto',
+  'has-promise': 'Ele já tem uma promessa de vaga em andamento',
   'no-mirror': 'A liga ainda não carregou: tente de novo em instantes',
   server: 'O servidor não respondeu: tente de novo',
 }
+export const TALK_KIND_LABELS: Record<TalkKind, string> = {
+  praise: 'Elogiar',
+  demand: 'Cobrar',
+  promise: 'Garantir vaga',
+  threaten: 'Ameaçar com o banco',
+}
+
+export const TALK_HINT_LABELS: Record<TalkHint, string> = {
+  good: 'Boa hora',
+  neutral: 'Hora neutra',
+  bad: 'Má hora',
+}
+
 export const commandErrorText = (error: string): string => COMMAND_ERROR_LABELS[error] ?? 'Não foi possível fazer isso agora'
 
 export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {

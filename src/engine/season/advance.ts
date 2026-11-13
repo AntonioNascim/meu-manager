@@ -26,6 +26,7 @@ import { applyBirthdays } from './birthdays'
 import { applyMatchToPlayers, cupView, progressDays } from './condition'
 import { slimResult } from './compact'
 import { daysBetween } from './dates'
+import { settlePromises } from '../talk'
 import { competitionsOf, regionOfTeam, cycleOfPyramid, focusPyramid, phaseOfPyramid, pyramidFinished, pyramidOfTeamId, seasonLabel } from './cycles'
 import { computeStandings } from './standings'
 import { cupMatchIsQuick, playQuickMatch, quickCompetitionIds } from './fidelity'
@@ -453,7 +454,8 @@ export function completeMatch(state: SeasonState, played: Match): SeasonState {
     teams: state.teams.map((t) => (t.id === home_.id && !neutral ? gate.team : t)),
     players: state.players.map((p) => changed.get(p.id) ?? p),
   })
-  return { ...moved, season: { ...moved.season, phase: phaseOfPyramid(moved, focusPyramid(moved)) } }
+  const settled = settlePromises(moved, finished)
+  return { ...settled, season: { ...settled.season, phase: phaseOfPyramid(settled, focusPyramid(settled)) } }
 }
 
 /** Troca a tática do time (o jogador edita a dele entre os jogos). Valida a escalação. */

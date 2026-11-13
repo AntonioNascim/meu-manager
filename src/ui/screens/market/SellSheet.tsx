@@ -7,6 +7,7 @@ import { perform } from '../../../store/actions'
 import { formatMoney, playerName } from '../../format'
 import { OFFER_REASON_LABELS, commandErrorText } from '../../labels'
 import { Sheet } from '../../theme'
+import { MoneyInput } from '../../components/MoneyInput'
 
 /** Vender, emprestar ou liberar um jogador do seu elenco (aberto pelo detalhe do jogador no Elenco). */
 export function SellSheet({ game, player, onClose, onDone }: { game: Game; player: Player; onClose: () => void; onDone: () => void }) {
@@ -107,7 +108,7 @@ export function SellSheet({ game, player, onClose, onDone }: { game: Game; playe
       {chosen && (
         <label className="mt-3 block text-sm">
           {kind === 'loan' ? 'Taxa do empréstimo' : 'Valor da venda'}
-          <input type="number" min={0} step={10_000} className={input} value={value} onChange={(e) => setFee(Number(e.target.value))} />
+          <MoneyInput className={input} value={value} onChange={setFee} />
         </label>
       )}
     </Sheet>

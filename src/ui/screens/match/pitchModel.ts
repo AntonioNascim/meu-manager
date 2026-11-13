@@ -7,6 +7,7 @@
  */
 import type { MatchSnapshot, PlayTrace } from '../../../engine/match'
 import type { GridPoint, MatchEvent, PlayStyle, Position } from '../../../engine/types'
+import { POSITION_NUMBERS } from '../../../engine/shirt'
 import { depthShift, shapeOf, type StyleShape } from './pitchStyle'
 
 export type Side = 'home' | 'away'
@@ -134,18 +135,7 @@ export function kitsFor(homeColors: readonly [string, string], awayColors: reado
   return { home: { shirt: h1, trim: h2, keeper: homeKeeper }, away: { shirt: a1, trim: a2, keeper: awayKeeper } }
 }
 
-const NUMBERS: Record<Position, number[]> = {
-  GK: [1, 12, 25],
-  RB: [2, 22, 26],
-  CB: [3, 4, 13, 14],
-  LB: [6, 16, 27],
-  DM: [5, 15, 23],
-  CM: [8, 18, 20, 21],
-  AM: [10, 17, 24],
-  RW: [7, 19, 28],
-  LW: [11, 17, 29],
-  ST: [9, 19, 30],
-}
+const NUMBERS = POSITION_NUMBERS
 
 /** Número de camisa pela vaga: quem ainda não tem escolhe o primeiro livre da posição (os números só valem dentro do time). */
 export function assignNumber(taken: Map<string, number>, side: Side, playerId: string, slot: Position): number {

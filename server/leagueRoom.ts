@@ -26,6 +26,7 @@ import {
   isFinished,
   nextWakeAt,
   readyForSecondHalf,
+  skipLiveGame,
   setSpeed,
   nextWakeup,
   pauseLeague,
@@ -220,13 +221,13 @@ export class LeagueRoom {
     return true
   }
 
-  private loadLive(m: Omit<StoredLiveEvent, 'games'> & { games: { matchId: string; clock: number; nextAt?: number; speeds?: Record<string, number>; halftime?: { until: number; ready: string[] }; halftimeDone?: boolean }[] }): LiveEvent {
+  private loadLive(m: Omit<StoredLiveEvent, 'games'> & { games: { matchId: string; clock: number; nextAt?: number; speeds?: Record<string, number>; halftime?: { until: number; ready: string[] }; halftimeDone?: boolean; skipped?: string[] }[] }): LiveEvent {
     const games = m.games.map((g) => {
       const input = JSON.parse(this.get(`in:${g.matchId}`) as string)
       const commands = JSON.parse(this.get(`cmds:${g.matchId}`) ?? '[]')
       this.inputSaved.add(g.matchId)
       this.cmdsSaved.set(g.matchId, commands.length)
-      return { version: 1 as const, matchId: g.matchId, input, commands, clock: g.clock, nextAt: g.nextAt ?? 0, speeds: g.speeds ?? {}, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}) }
+      return { version: 1 as const, matchId: g.matchId, input, commands, clock: g.clock, nextAt: g.nextAt ?? 0, speeds: g.speeds ?? {}, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}), ...(g.skipped?.length ? { skipped: g.skipped } : {}) }
     })
     return rebuildLiveEvent({ ...m, games })
   }
@@ -248,7 +249,7 @@ export class LeagueRoom {
             this.cmdsSaved.set(g.matchId, g.commands.length)
           }
         }
-        this.set('live', JSON.stringify({ ...stored, games: stored.games.map((g) => ({ matchId: g.matchId, clock: g.clock, nextAt: g.nextAt, speeds: g.speeds, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}) })) }))
+        this.set('live', JSON.stringify({ ...stored, games: stored.games.map((g) => ({ matchId: g.matchId, clock: g.clock, nextAt: g.nextAt, speeds: g.speeds, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}), ...(g.skipped?.length ? { skipped: g.skipped } : {}) })) }))
       } else {
         this.sql.exec("DELETE FROM kv WHERE k = 'live'")
         this.del('in:')
@@ -673,10 +674,11 @@ export class LeagueRoom {
       } else ws.send(JSON.stringify({ t: 'error', problem: 'not-in-event' } satisfies ServerMessage))
       return
     }
-    if (msg.t === 'speed' || msg.t === 'half') {
+    if (msg.t === 'speed' || msg.t === 'half' || msg.t === 'skip') {
       if (!this.live) return ws.send(JSON.stringify({ t: 'error', problem: 'not-in-event' } satisfies ServerMessage))
       const seats = (this.league as LeagueState).seats
       if (msg.t === 'speed') setSpeed(this.live, seats, playerId, msg.value)
+      else if (msg.t === 'skip') skipLiveGame(this.live, seats, playerId)
       else readyForSecondHalf(this.live, seats, playerId, now)
       this.persist()
       await this.run()

@@ -10,6 +10,7 @@ import { POSITION_SHORT_LABELS, formationLabel } from '../../labels'
 import { gridCoords } from '../../pitchLayout'
 import { isUnavailable } from '../../squadSort'
 import { assignNumber } from '../match/pitchModel'
+import { seedNumbers } from '../../shirt'
 import { MiniFormation } from '../dashboard/MiniFormation'
 import { Avatar, Icon, StadiumArt } from '../../theme'
 
@@ -86,7 +87,7 @@ export function Overview({ game, onOpen }: { game: Game; onOpen: (playerId: stri
   const strength = teamStrength(game, team)
   const value = squad.reduce((sum, p) => sum + marketValue(p, game.season.season.currentDate, team), 0)
   const formation = formationOf(team.tactic)
-  const numbers = useRef(new Map<string, number>())
+  const numbers = useRef(seedNumbers(new Map<string, number>(), game.season, game.userTeamId, 'home'))
   return (
     <div className="space-y-3" data-testid="squad-overview">
       <section className="card-bg grid grid-cols-[1fr_1fr_1.3fr] divide-x divide-white/[0.1] overflow-hidden rounded-[14px] border border-white/[0.13] py-3">

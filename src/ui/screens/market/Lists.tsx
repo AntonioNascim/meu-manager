@@ -11,17 +11,18 @@ import { POSITION_SHORT_LABELS } from '../../labels'
 import { Flag, Panel, Sheet, TopTabs, ValueBadge } from '../../theme'
 import { Search } from './Search'
 import { shortMoney } from './parts'
+import { MoneyInput } from '../../components/MoneyInput'
 
 type ListTab = 'transfer' | 'loan' | 'mine'
 
 const KIND_LABELS: Record<ListingKind, string> = { transfer: 'À venda', loan: 'Para empréstimo' }
 
-function ListSheet({ game, player, onClose }: { game: Game; player: Player; onClose: () => void }) {
+export function ListSheet({ game, player, onClose, initialKind }: { game: Game; player: Player; onClose: () => void; initialKind?: ListingKind }) {
   const date = game.season.season.currentDate
   const club = game.season.teams.find((t) => t.id === game.userTeamId)
   const current = game.season.market.listings.find((l) => l.playerId === player.id && l.by === 'user')
-  const [kind, setKind] = useState<ListingKind>(current?.kind ?? 'transfer')
-  const [price, setPrice] = useState<number>(current?.price ?? listingPrice(player, current?.kind ?? 'transfer', date, club))
+  const [kind, setKind] = useState<ListingKind>(current?.kind ?? initialKind ?? 'transfer')
+  const [price, setPrice] = useState<number>(current?.price ?? listingPrice(player, current?.kind ?? initialKind ?? 'transfer', date, club))
   const [error, setError] = useState<string | null>(null)
 
   const save = () => {
@@ -74,7 +75,7 @@ function ListSheet({ game, player, onClose }: { game: Game; player: Player; onCl
       </div>
       <label className="mt-3 block text-sm">
         {kind === 'loan' ? 'Taxa do empréstimo' : 'Preço da venda'}
-        <input type="number" min={0} step={10_000} className="mt-1 min-h-12 w-full rounded-xl border border-line bg-surface-2 px-3 font-bold" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+        <MoneyInput className="mt-1 min-h-12 w-full rounded-xl border border-line bg-surface-2 px-3 font-bold" value={price} onChange={setPrice} />
       </label>
     </Sheet>
   )

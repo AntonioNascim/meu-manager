@@ -85,7 +85,8 @@ const sellOne = async (skip, exclude) => {
   // Procura um jogador e um clube da IA que fechem negócio (a IA recusa, por exemplo, quem ficaria sem reposição na posição: a regra é a do solo).
   for (let i = skip; i < skip + 29; i++) {
     await page.locator('main ul li button').nth(i).click()
-    await page.getByRole('button', { name: 'Vender, emprestar ou liberar' }).click()
+    await page.getByRole('button', { name: 'Mercado', exact: true }).click()
+    await page.getByRole('button', { name: 'Vender ou emprestar agora' }).click()
     const select = page.locator('select').last()
     await select.waitFor()
     const options = await select.locator('option').allInnerTexts()

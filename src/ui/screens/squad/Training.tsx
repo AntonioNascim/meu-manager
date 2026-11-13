@@ -63,11 +63,12 @@ function IntensityCard({ id, selected, onPick }: { id: TrainingIntensity; select
   )
 }
 
-function IndividualSlot({ game, onMessage }: { game: Game; onMessage: (m: string) => void }) {
+export function IndividualSlot({ game, onMessage, fixedPlayerId }: { game: Game; onMessage: (m: string) => void; fixedPlayerId?: string }) {
   const squad = squadOf(game, userTeam(game).id)
   const slot = userIndividualTraining(game)
   const finished = userFinishedTraining(game)
-  const [playerId, setPlayerId] = useState('')
+  const [pickedId, setPlayerId] = useState('')
+  const playerId = fixedPlayerId ?? pickedId
   const [kind, setKind] = useState<'group' | 'position'>('group')
   const [group, setGroup] = useState<TrainingGroup>('technical')
   const [position, setPosition] = useState<Position | ''>('')
@@ -113,6 +114,7 @@ function IndividualSlot({ game, onMessage }: { game: Game; onMessage: (m: string
               <b>{finishedPlayer ? playerName(finishedPlayer) : 'O jogador'}</b> terminou o treino ({goalLabel(finished.goal).toLowerCase()}) em {formatDate(finished.date)}.
             </p>
           )}
+          {!fixedPlayerId && (
           <select
             aria-label="Jogador do treino individual"
             value={playerId}
@@ -129,6 +131,7 @@ function IndividualSlot({ game, onMessage }: { game: Game; onMessage: (m: string
               </option>
             ))}
           </select>
+          )}
           {chosen && (
             <>
               <div className="flex gap-1.5">

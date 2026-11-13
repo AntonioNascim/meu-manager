@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { PROBLEM_LIMITS, PROBLEM_RETENTION_MS, MemoryProblemStore, submitProblem, type ProblemDeps } from '../src/online/problemApi'
 import { RateLimiter } from '../src/online/rateLimit'
 import { browserFamily, collectTech } from '../src/ui/techInfo'
-import { estimateMonth } from '../server/admin'
+import { estimateMonth, serveAdmin } from '../server/admin'
 
 const T0 = 1_800_000_000_000
 const jpeg = (n: number): string => {
@@ -89,5 +89,14 @@ describe('relatar problema (teste fechado)', () => {
     expect(small.usd).toBe(5)
     expect(estimateMonth(10, 60).requests).toBeGreaterThan(small.requests)
     expect(estimateMonth(0, 0)).toMatchObject({ requests: 0, usd: 5 })
+  })
+  it('a página do /admin deixa mostrar a imagem do relato (img-src data:) e continua fechada para o resto', async () => {
+    const env = { ADMIN_TOKEN: 'x'.repeat(24) } as unknown as Parameters<typeof serveAdmin>[2]
+    const url = new URL('https://api.example/admin')
+    const res = await serveAdmin(new Request(url), url, env, undefined as never, undefined as never, undefined as never)
+    const csp = res!.headers.get('Content-Security-Policy') ?? ''
+    expect(csp).toContain("default-src 'none'")
+    expect(csp).toContain('img-src data:')
+    expect(csp).not.toMatch(/img-src[^;]*(\*|https?:)/)
   })
 })

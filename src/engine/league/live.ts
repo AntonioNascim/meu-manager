@@ -85,6 +85,8 @@ export interface LiveGame {
   /** Intervalo em andamento: até quando e quem já tocou em "Voltar ao jogo". */
   halftime?: { until: number; ready: string[] }
   halftimeDone?: boolean
+  /** Técnicos que tocaram em "Pular": a IA joga o time deles; quando todos os técnicos da partida pulam, ela vai direto ao fim. */
+  skipped?: string[]
   /** Só em memória: quanto dos lances e eventos o relógio já viu (a câmera lenta olha só o que veio depois). */
   seenTrace: number
   seenEvents: number
@@ -123,7 +125,7 @@ export interface LiveEvent {
 
 /** O que sobra do evento depois de tirar os objetos do motor: é o que vai para o armazenamento. */
 export interface StoredLiveEvent extends Omit<LiveEvent, 'games'> {
-  games: (ReplayRecord & Pick<LiveGame, 'clock' | 'nextAt' | 'speeds' | 'halftime' | 'halftimeDone'>)[]
+  games: (ReplayRecord & Pick<LiveGame, 'clock' | 'nextAt' | 'speeds' | 'halftime' | 'halftimeDone' | 'skipped'>)[]
 }
 
 export type RejectReason = 'not-your-team' | 'game-finished' | 'expired' | 'invalid' | 'engine'
@@ -228,7 +230,7 @@ export function startLiveEvent(
 
 export const toStored = (e: LiveEvent): StoredLiveEvent => ({
   ...e,
-  games: e.games.map((g) => ({ ...replayOf(g), clock: g.clock, nextAt: g.nextAt, speeds: g.speeds, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}) })),
+  games: e.games.map((g) => ({ ...replayOf(g), clock: g.clock, nextAt: g.nextAt, speeds: g.speeds, ...(g.halftime ? { halftime: g.halftime } : {}), ...(g.halftimeDone ? { halftimeDone: true } : {}), ...(g.skipped?.length ? { skipped: g.skipped } : {}) })),
 })
 
 /** Reconstrói o evento guardado (depois de hibernar ou reiniciar): cada partida volta ao minuto em que estava. */
@@ -240,6 +242,7 @@ export function rebuildLiveEvent(stored: StoredLiveEvent): LiveEvent {
     g.speeds = { ...(r.speeds ?? {}) }
     if (r.halftime) g.halftime = { until: r.halftime.until, ready: [...r.halftime.ready] }
     if (r.halftimeDone) g.halftimeDone = true
+    if (r.skipped?.length) g.skipped = [...r.skipped]
     const snap = g.live.snapshot()
     g.seenTrace = snap.trace.length
     g.seenEvents = snap.events.length
@@ -251,8 +254,8 @@ export function rebuildLiveEvent(stored: StoredLiveEvent): LiveEvent {
 export const isFinished = (e: LiveEvent): boolean => e.games.every((g) => g.live.finished)
 
 /** Os técnicos ativos e conectados que jogam esta partida (quem a assiste de verdade). */
-function humansOf(e: LiveEvent, seats: readonly Seat[], g: Pick<LiveGame, 'homeTeamId' | 'awayTeamId'>): Seat[] {
-  return seats.filter((s) => (s.teamId === g.homeTeamId || s.teamId === g.awayTeamId) && s.status === 'active' && e.connected.includes(s.playerId))
+function humansOf(e: LiveEvent, seats: readonly Seat[], g: Pick<LiveGame, 'homeTeamId' | 'awayTeamId' | 'skipped'>): Seat[] {
+  return seats.filter((s) => (s.teamId === g.homeTeamId || s.teamId === g.awayTeamId) && s.status === 'active' && e.connected.includes(s.playerId) && !g.skipped?.includes(s.playerId))
 }
 
 /**
@@ -353,6 +356,44 @@ export function readyForSecondHalf(e: LiveEvent, seats: readonly Seat[], playerI
   return false
 }
 
+/**
+ * "Pular": a IA assume o time de quem tocou pelo resto do jogo. Contra a IA (ou quando o outro técnico não está conectado) a partida vai direto ao fim;
+ * entre dois técnicos ela só vai quando os dois pularem. O resultado é jogado pelo mesmo motor, então a reprodução refaz igual (o controle e as lesões entram
+ * no registro). Devolve `true` se algo mudou.
+ */
+export function skipLiveGame(e: LiveEvent, seats: readonly Seat[], playerId: string): boolean {
+  const seat = seats.find((s) => s.playerId === playerId)
+  const found = seat && !e.locked?.includes(playerId) ? seatGame(e, seat) : undefined
+  if (!found || found.game.live.finished || found.game.skipped?.includes(playerId)) return false
+  const g = found.game
+  g.skipped = [...(g.skipped ?? []), playerId]
+  g.live.setControlled(found.side, false)
+  g.commands.push({ minute: g.clock, side: found.side, command: { type: 'control', controlled: false }, by: playerId })
+  const left = humansOf(e, seats, g)
+  if (left.length > 0) {
+    // Ainda há técnico assistindo: o intervalo só espera por ele.
+    if (g.halftime && left.every((s) => g.halftime!.ready.includes(s.playerId))) {
+      g.halftime = undefined
+      g.halftimeDone = true
+    }
+    return true
+  }
+  g.halftime = undefined
+  g.halftimeDone = true
+  for (let guard = 0; guard < 12 && !g.live.finished; guard++) {
+    const pending = g.live.injuryPending
+    if (pending) {
+      g.live.autoResolveInjury(pending.side)
+      g.commands.push({ minute: g.live.snapshot().minute, side: pending.side, command: { type: 'injury-auto' }, by: 'system' })
+    }
+    g.live.playUntil(MAX_MINUTE)
+  }
+  g.clock = MAX_MINUTE
+  delete g.injuryAt
+  delete g.injuryLeftMs
+  return true
+}
+
 /** Técnico conectou ou caiu. Muda o controle do time no próximo minuto e anota a presença. */
 export function setConnected(e: LiveEvent, seats: readonly Seat[], playerId: string, connected: boolean, now?: number): LiveEvent {
   const seat = seats.find((s) => s.playerId === playerId)
@@ -366,7 +407,7 @@ export function setConnected(e: LiveEvent, seats: readonly Seat[], playerId: str
   const found = seatGame(next, seat)
   if (found && !found.game.live.finished) {
     // Só vale do próximo lance; anota no registro para a reprodução refazer igual.
-    const controlled = connected && seat.status === 'active'
+    const controlled = connected && seat.status === 'active' && !found.game.skipped?.includes(playerId)
     found.game.live.setControlled(found.side, controlled)
     found.game.commands.push({ minute: found.game.clock, side: found.side, command: { type: 'control', controlled }, by: 'system' })
     // Todos os técnicos que deram Pronto chegaram: não precisa esperar o fim da tolerância do começo.
@@ -470,7 +511,7 @@ function settleInjury(e: LiveEvent, seats: readonly Seat[], g: LiveGame, now: nu
   }
   g.injuryAt ??= now
   const teamId = pending.side === 'home' ? g.homeTeamId : g.awayTeamId
-  const here = seats.some((s) => s.teamId === teamId && s.status === 'active' && e.connected.includes(s.playerId))
+  const here = seats.some((s) => s.teamId === teamId && s.status === 'active' && e.connected.includes(s.playerId) && !g.skipped?.includes(s.playerId))
   if (!force && here && now - g.injuryAt < INJURY_WAIT_MS) return
   g.live.autoResolveInjury(pending.side)
   g.commands.push({ minute: g.clock, side: pending.side, command: { type: 'injury-auto' }, by: 'system' })
@@ -501,10 +542,14 @@ export interface LiveView {
   halftime?: { leftMs: number; ready: string[] }
   /** Lesão à espera da escolha do técnico: quanto tempo real falta para entrar o melhor reserva. */
   injuryLeftMs?: number
+  /** Quem já tocou em "Pular" nesta partida. */
+  skipped?: string[]
 }
 
 /** O estado de todas as partidas, para quem conecta ou reconecta (o servidor manda o que o cliente perdeu: o snapshot traz todos os eventos até agora). */
 export function viewOf(e: LiveEvent, seats: readonly Seat[], now: number = Date.now()): LiveView[] {
+  const seatOf = (teamId: TeamId) => seats.find((s) => s.teamId === teamId)?.playerId ?? ''
+  const skippedIn = (g: LiveGame) => g.skipped ?? []
   const humanOf = (teamId: TeamId) => {
     const seat = seats.find((s) => s.teamId === teamId)
     return !!seat && seat.status === 'active' && e.connected.includes(seat.playerId)
@@ -512,7 +557,8 @@ export function viewOf(e: LiveEvent, seats: readonly Seat[], now: number = Date.
   return e.games.map((g) => ({
     matchId: g.matchId,
     snapshot: g.live.snapshot(),
-    controlled: { home: humanOf(g.homeTeamId), away: humanOf(g.awayTeamId) },
+    controlled: { home: humanOf(g.homeTeamId) && !skippedIn(g).includes(seatOf(g.homeTeamId)), away: humanOf(g.awayTeamId) && !skippedIn(g).includes(seatOf(g.awayTeamId)) },
+    ...(g.skipped?.length ? { skipped: g.skipped } : {}),
     speed: speedOf(e, seats, g),
     speeds: g.speeds,
     ...(g.halftime ? { halftime: { leftMs: Math.max(0, g.halftime.until - now), ready: g.halftime.ready } } : {}),

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useFreshPlayer } from '../useOnlineDetail'
 import { CONDITION } from '../../engine/config'
@@ -18,6 +19,7 @@ import type { AttributeGroup } from '../labels'
 import { Avatar, Eyebrow, Flag, MoodIcon, Panel, Stars, ValueBadge } from '../theme'
 import { useGame } from '../../store/gameStore'
 import { isOnYellowEdge } from '../squadSort'
+import { PlayerCard } from './PlayerCard'
 
 /** Barra de 0 a 100 com a cor da faixa. */
 export function Bar({ value, color }: { value: number; color: string }) {
@@ -100,7 +102,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  */
 export function PlayerDetail({ player: shown, onClose, academy = false, stars, footer, history, currentDate }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode; history?: readonly StrengthSnapshot[]; currentDate?: IsoDate }) {
   const player = useFreshPlayer(shown)
-  const colors = useGame()?.season.teams.find((t) => t.id === player.teamId)?.colors
+  const game = useGame()
+  const colors = game?.season.teams.find((t) => t.id === player.teamId)?.colors
+  // Os seus jogadores (fora da base) abrem no cartão grande, com os números atrás de um toque.
+  const mine = !academy && game !== null && game !== undefined && player.teamId === game.userTeamId
+  const [showNumbers, setShowNumbers] = useState(false)
   const c = player.condition
   const overall = playerOverall(player)
   const isKeeper = player.position === 'GK'
@@ -110,7 +116,18 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
 
   return (
     <div className="fixed inset-0 z-30 flex flex-col bg-bg" role="dialog" aria-label={playerName(player)}>
-      <header className="flex items-center gap-3 border-b border-line px-4 py-3">
+      {mine && (
+        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
+          <div className="flex min-w-0 flex-wrap gap-1">
+            <StatusTags player={player} />
+            {isOnYellowEdge(player) && <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">Pendurado</span>}
+          </div>
+          <button type="button" onClick={onClose} className="min-h-12 rounded-xl border border-line bg-surface px-4 text-sm font-bold">
+            Fechar
+          </button>
+        </header>
+      )}
+      {!mine && <header className="flex items-center gap-3 border-b border-line px-4 py-3">
         <Avatar id={player.id} {...(colors ? { colors } : {})} size={64} ring />
         <div className="flex flex-col items-center gap-1">
           <ValueBadge value={overall} className="!min-w-14 !px-3 !py-2 !text-3xl">
@@ -140,9 +157,10 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
         <button type="button" onClick={onClose} className="min-h-12 rounded-xl border border-line bg-surface px-4 text-sm font-bold">
           Fechar
         </button>
-      </header>
+      </header>}
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-10 pt-4">
+        {mine && game && <PlayerCard game={game} player={player} showNumbers={showNumbers} onToggleNumbers={() => setShowNumbers((v) => !v)} onClose={onClose} />}
         {academy && (
           <Section title="Base">
             <p className="text-sm text-slate-300">
@@ -187,7 +205,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           </Section>
         )}
 
-        <Section title="Força por posição">
+        {(!mine || showNumbers) && <Section title="Força por posição">
           <div className="flex flex-wrap gap-2">
             {positions.map((pos, i) => {
               const value = i === 0 ? overall : overallAt(player, pos)
@@ -202,9 +220,9 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
               )
             })}
           </div>
-        </Section>
+        </Section>}
 
-        {groups.map((g) => (
+        {(!mine || showNumbers) && groups.map((g) => (
           <Section key={g.id} title={ATTRIBUTE_GROUP_LABELS[g.id]}>
             {g.names.map((name) => {
               const value = player.attributes[name]

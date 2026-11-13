@@ -17,7 +17,7 @@ const STATUS_COLOR: Record<TransferOffer['status'], string> = {
   expired: 'text-muted',
 }
 
-function OfferRow({ game, offer, children }: { game: Game; offer: TransferOffer; children?: ReactNode }) {
+export function OfferRow({ game, offer, children }: { game: Game; offer: TransferOffer; children?: ReactNode }) {
   const player = game.season.players.find((p) => p.id === offer.playerId)
   const incoming = offer.direction === 'incoming'
   const other = incoming ? offer.buyerId : offer.sellerId
@@ -38,6 +38,35 @@ function OfferRow({ game, offer, children }: { game: Game; offer: TransferOffer;
       </div>
       {children}
     </li>
+  )
+}
+
+/** As propostas recebidas por um jogador (no cartão dele): aceitar ou recusar. */
+export function PlayerOffers({ game, playerId, open }: { game: Game; playerId: string; open: boolean }) {
+  const [error, setError] = useState<string | null>(null)
+  const list = pendingIncoming(game.season).filter((o) => o.playerId === playerId)
+  const answer = (id: string, accept: boolean) => {
+    void perform({ type: 'respond-offer', offerId: id, accept }).then((out) => setError(out.ok ? null : commandErrorText(out.error)))
+  }
+  return (
+    <div>
+      {error && <p className="px-4 pt-3 text-sm text-loss">{error}</p>}
+      <ul className="divide-y divide-line">
+        {list.map((o) => (
+          <OfferRow key={o.id} game={game} offer={o}>
+            <div className="flex gap-2">
+              <button type="button" disabled={!open} onClick={() => answer(o.id, true)} className="min-h-12 flex-1 rounded-xl bg-accent font-bold text-accent-ink active:scale-95 disabled:opacity-40">
+                Aceitar
+              </button>
+              <button type="button" onClick={() => answer(o.id, false)} className="min-h-12 flex-1 rounded-xl border border-line bg-surface-2 font-bold active:scale-95">
+                Recusar
+              </button>
+            </div>
+          </OfferRow>
+        ))}
+        {list.length === 0 && <li className="p-4 text-sm text-muted">Nenhuma proposta por este jogador no momento.</li>}
+      </ul>
+    </div>
   )
 }
 

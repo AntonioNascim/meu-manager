@@ -15,6 +15,9 @@ import { PRE_CONTRACT_YEARS, offerPreContract } from '../market/precontract'
 import { listUserPlayer, ListingError, unlistUserPlayer } from '../market/listings'
 import { OfferError } from '../market/offers'
 import { releaseUserPlayer } from '../market/sell'
+import { setShirt } from '../shirt'
+import { TALK_KINDS, talkToPlayer } from '../talk'
+import type { TalkKind } from '../talk'
 import { setTeamTactic } from '../season/advance'
 import type { SeasonState } from '../season'
 import { isGridPoint } from '../grid'
@@ -38,11 +41,13 @@ export type LeagueCommand =
   | { type: 'sell'; playerId: string; buyerId: string; kind: OfferKind; fee: number; contractEnd: string }
   | { type: 'pre-contract'; playerId: string; salary: number; years: number }
   | { type: 'request-funds' }
+  | { type: 'talk'; playerId: string; kind: TalkKind }
+  | { type: 'shirt'; playerId: string; number: number }
 
 export type CommandError = 'invalid' | 'not-found' | 'busy' | 'squad-full' | 'foreign-limit' | 'refused' | 'salary' | string
 /** O resultado de uma negociação que a tela precisa ler (aceitou? por quê recusou? quanto pagaria?). */
 export type CommandInfo = Record<string, unknown>
-export type CommandResult = { ok: true; world: SeasonState; info?: CommandInfo } | { ok: false; error: CommandError; minimumSalary?: number }
+export type CommandResult = { ok: true; world: SeasonState; info?: CommandInfo } | { ok: false; error: CommandError; minimumSalary?: number; until?: string }
 
 /** O que a liga acrescenta às regras: quais clubes são de técnicos humanos (a IA não negocia por eles pelo mercado da IA). */
 export interface CommandContext {
@@ -140,6 +145,10 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
       return only(raw, ['type', 'playerId', 'salary', 'years']) && isId(raw.playerId) && money(raw.salary, 1e9) && Number.isInteger(raw.years) && (PRE_CONTRACT_YEARS as readonly number[]).includes(raw.years as number) ? { type: 'pre-contract', playerId: raw.playerId, salary: raw.salary, years: raw.years as number } : undefined
     case 'request-funds':
       return only(raw, ['type']) ? { type: 'request-funds' } : undefined
+    case 'talk':
+      return only(raw, ['type', 'playerId', 'kind']) && isId(raw.playerId) && TALK_KINDS.includes(raw.kind as TalkKind) ? { type: 'talk', playerId: raw.playerId, kind: raw.kind as TalkKind } : undefined
+    case 'shirt':
+      return only(raw, ['type', 'playerId', 'number']) && isId(raw.playerId) && Number.isInteger(raw.number) && (raw.number as number) >= 1 && (raw.number as number) <= 99 ? { type: 'shirt', playerId: raw.playerId, number: raw.number as number } : undefined
     default:
       return undefined
   }
@@ -217,6 +226,14 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
         const r = requestFunds(world, teamId, boardConfidence(world, teamId))
         const { state: next, ...info } = r
         return { ok: true, world: r.granted ? next : world, info }
+      }
+      case 'talk': {
+        const r = talkToPlayer(world, teamId, command.playerId, command.kind)
+        return r.ok ? { ok: true, world: r.world, info: { ...r.outcome } } : { ok: false, error: r.error, ...(r.until ? { until: r.until } : {}) }
+      }
+      case 'shirt': {
+        const r = setShirt(world, teamId, command.playerId, command.number)
+        return r.ok ? { ok: true, world: r.world } : { ok: false, error: r.error }
       }
     }
   } catch (e) {

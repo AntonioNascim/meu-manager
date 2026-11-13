@@ -4,6 +4,7 @@
  */
 import { SEASON } from '../config'
 import { createCups } from '../cups'
+import type { TalkState } from '../talk'
 import { refreshListings } from '../market/listings'
 import { createRng, hashSeed } from '../rng'
 import { emptyTraining } from '../types'
@@ -41,6 +42,10 @@ export interface SeasonState {
   cupHistory?: CupHistory
   /** Último número usado nos ids dos jogadores (`player-N`): jovens novos continuam daqui. */
   playerCounter: number
+  /** Números de camisa escolhidos pelos técnicos (clube → jogador → número); o resto vem da posição (`engine/shirt.ts`). */
+  shirts?: Record<string, Record<string, number>>
+  /** Conversas com os jogadores e promessas de vaga (`engine/talk.ts`). */
+  talks?: TalkState
 }
 
 export interface RoundSlot {

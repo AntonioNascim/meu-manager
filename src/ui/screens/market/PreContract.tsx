@@ -10,6 +10,7 @@ import { OFFER_REASON_LABELS, commandErrorText } from '../../labels'
 import { Flag, Panel, Sheet, ValueBadge } from '../../theme'
 import { Search } from './Search'
 import { InterestText, clubName } from './parts'
+import { MoneyInput } from '../../components/MoneyInput'
 
 function PreContractSheet({ game, player, onClose }: { game: Game; player: Player; onClose: () => void }) {
   const state = game.season
@@ -83,7 +84,7 @@ function PreContractSheet({ game, player, onClose }: { game: Game; player: Playe
       </div>
       <label className="mt-3 block text-sm">
         Salário mensal
-        <input type="number" min={0} step={500} className={input} value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
+        <MoneyInput className={input} value={salary} onChange={setSalary} />
       </label>
       <label className="mt-3 block text-sm">
         Duração do contrato

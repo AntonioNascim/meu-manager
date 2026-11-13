@@ -149,6 +149,14 @@ export class OnlineMatchHandle {
     this.session.sendHalf()
   }
 
+  /** "Pular": a IA joga o meu time até o fim (a partida só acaba quando todos os técnicos dela pulam). */
+  skip(): void {
+    this.session.sendSkip()
+  }
+  skipState(): { mine: boolean } {
+    return { mine: this.game?.skipped?.includes(this.playerId) ?? false }
+  }
+
   /** Respostas mais recentes do servidor aos comandos (para a tela mostrar o motivo de uma recusa). */
   lastRejected(): string | undefined {
     const o = [...this.session.state.outcomes].reverse().find((x) => !x.ok)
