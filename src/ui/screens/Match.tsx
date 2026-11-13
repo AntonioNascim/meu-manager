@@ -648,7 +648,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   return (
     <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 lg:space-y-0">
       <div className="space-y-3">
-        <div className="sticky top-[84px] z-10 -mx-4 bg-bg/95 px-4 pb-2 pt-1 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+        <div className="sticky top-[84px] z-20 -mx-4 bg-bg px-4 pb-2 pt-1 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0">
           <Scoreboard game={game} snap={snap} label={label} speed={shownSpeed} onSpeed={nextSpeed} onOpponent={() => setOpponentOpen(true)} {...(online ? { effective: online.effectiveSpeed() } : {})} />
         </div>
 

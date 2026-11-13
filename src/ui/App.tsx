@@ -162,7 +162,7 @@ export function App() {
         </div>
       )}
 
-      <main className="flex-1 px-4 pb-28 pt-4">
+      <main className={`flex-1 px-4 pt-4 ${current === 'match' ? 'pb-8' : 'pb-28'}`}>
         {current === 'home' && <Dashboard game={game} onNavigate={navigate} />}
         {current === 'league' && game.online && <LeagueScreen leagueId={game.online.leagueId} />}
         {current === 'admin' && game.online && <AdminPanel leagueId={game.online.leagueId} />}
@@ -175,7 +175,8 @@ export function App() {
         {current === 'more' && <More game={game} onNavigate={navigate} onMenu={leaveGame} />}
       </main>
 
-      <BottomNav items={tabs} active={NAV_TAB_OF[current]} onSelect={goTab} />
+      {/* Durante a partida a barra some: um toque sem querer tiraria a pessoa do jogo. */}
+      {current !== 'match' && <BottomNav items={tabs} active={NAV_TAB_OF[current]} onSelect={goTab} />}
       {busy !== null && <BusyOverlay label={busy} />}
     </div>
   )

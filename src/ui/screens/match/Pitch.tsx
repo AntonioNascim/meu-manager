@@ -292,7 +292,7 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-green-700 to-green-800 shadow-inner" data-testid="pitch">
+    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-green-700 to-green-800 shadow-inner" data-testid="pitch">
       <div ref={field} className="relative aspect-[105/68] w-full select-none">
         <FieldLines />
         <svg viewBox="0 0 105 68" className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
