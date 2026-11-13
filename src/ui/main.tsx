@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { App } from './App'
 import { simulateToSeasonEnd } from '../engine/season'
-import { advanceGame, createGame, playPendingAuto, startNextSeason, setUserTrainingPlan, squadOf, startUserIndividualTraining, toggleFavorite } from '../store/game'
+import { advanceGame, createGame, playPendingAuto, setUserTactic, startNextSeason, setUserTrainingPlan, squadOf, startUserIndividualTraining, toggleFavorite, userTeam } from '../store/game'
+import type { Mentality, PlayStyle } from '../engine/types'
 import { expectedSalary, marketValue } from '../engine/market'
 import { playerOverall } from '../engine/overall'
 import { contractEndIn } from '../engine/season'
@@ -58,6 +59,12 @@ if (import.meta.env.DEV) {
       game = createGame(seed, found.id, { world, dataPackage: real, dataPackageId: REAL_PACKAGE_ID })
     } else game = createGame(seed, `team-${team.toLowerCase()}`)
     for (let i = 0; i < Number(params.get('dias') ?? 0); i++) game = playPendingAuto(advanceGame(game))
+    // &estilo=wings&mentalidade=2: o seu time joga com esse estilo e mentalidade (para conferir o campo da partida).
+    const wantedStyle = params.get('estilo')
+    if (wantedStyle) {
+      const mine = userTeam(game)
+      game = setUserTactic(game, { ...mine.tactic, style: wantedStyle as PlayStyle, mentality: Number(params.get('mentalidade') ?? mine.tactic.mentality) as Mentality })
+    }
     if (params.get('jogo')) {
       while (!game.pendingUserMatch && game.season.matches.some((m) => m.status === 'scheduled')) game = advanceGame(game)
       const minute = params.get('minuto')

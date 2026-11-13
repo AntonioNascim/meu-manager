@@ -3,12 +3,9 @@ import { slotAt } from '../../../engine/grid'
 import type { MatchSnapshot } from '../../../engine/match'
 import type { Player } from '../../../engine/types'
 import { playerName } from '../../format'
-import { BASE_MINUTE_MS, MIN_BEAT_MS } from '../../../engine/match/timing'
-import { assignNumber, beatsFor, fitBeats, inkFor, kitsFor, layoutFrom, pickTrace, playbackFor, shifted, slowFor, HOLD_MS, devFlag, devParam } from './pitchModel'
-import type { Beat, Layout, MarkKind, Placed, Pt, Side } from './pitchModel'
-
-/** Tempo de um minuto de jogo em 1x (ms), o mesmo da tela de partida. */
-const MINUTE_MS = BASE_MINUTE_MS
+import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, HOLD_MS, devFlag, devParam } from './pitchModel'
+import type { Beat, Layout, Mark, MarkKind, Placed, Side } from './pitchModel'
+import { PitchMotion, choosePlan } from './pitchMotion'
 
 const MARK_ICON: Record<MarkKind, { icon: string; cls: string; label: string }> = {
   goal: { icon: '⚽', cls: 'bg-accent text-accent-ink', label: 'Gol' },
@@ -75,16 +72,10 @@ export interface PitchData {
   players: readonly Pick<Player, 'id' | 'name' | 'nickname'>[]
 }
 
-interface View {
-  beat: Beat | null
-  /** Duração das transições (ms). */
-  glide: number
-}
-
 /**
- * Campo 2D animado: desenha o que o motor já gerou (rastro dos lances e eventos do snapshot), sincronizado com o
- * relógio da partida. A cada minuto simulado o lance mais recente vira uma sequência curta de batidas (meio,
- * progressão, chance, finalização); em 4x e 8x só a batida final aparece, sem setas.
+ * Campo 2D animado: desenha o que o motor já gerou (rastro dos lances e eventos do snapshot), sincronizado com o relógio da partida.
+ * O movimento é contínuo (`PitchMotion`): a cada quadro os 22 jogadores e a bola andam, e só `transform` é escrito no DOM (nada passa pelo
+ * React por quadro). Cada minuto simulado vira trechos da bola (passes de ligação + as batidas do lance), que partem de onde a bola está.
  */
 export function Pitch({ data, snap, speed, running, numbers: shared }: { data: PitchData; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number> }) {
   const teamOf = (id: string) => data.teams.find((t) => t.id === id) as PitchTeam
@@ -104,58 +95,53 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
   for (const [id, p] of layout) known.current.set(id, p)
   for (const p of layout.values()) assignNumber(numbers.current, p.side, p.playerId, p.slot)
 
-  const [view, setView] = useState<View>({ beat: null, glide: 400 })
+  // O movimento mora fora do React: o objeto guarda posição e velocidade de todos e é escrito no DOM por quadro.
+  const motion = useRef<PitchMotion | null>(null)
+  if (!motion.current) motion.current = new PitchMotion()
+  motion.current.setLayout(layout, { home: snap.home.activeMentality, away: snap.away.activeMentality })
+  const field = useRef<HTMLDivElement | null>(null)
+  const size = useRef({ w: 0, h: 0 })
+  const playerEls = useRef(new Map<string, HTMLElement>())
+  const ballEl = useRef<HTMLDivElement | null>(null)
+  const labelEl = useRef<HTMLDivElement | null>(null)
+  const labelText = useRef<HTMLSpanElement | null>(null)
+  const arrowEl = useRef<SVGPathElement | null>(null)
+  const lineEl = useRef<HTMLParagraphElement | null>(null)
+  const fpsEl = useRef<HTMLSpanElement | null>(null)
+  const live = useRef({ speed, running, names, numbers: numbers.current })
+  live.current = { speed, running, names, numbers: numbers.current }
+
+  const [marks, setMarks] = useState<Mark[]>([])
   const processed = useRef(0)
-  const timers = useRef<number[]>([])
   const latest = useRef({ layout, known: known.current, snap })
   latest.current = { layout, known: known.current, snap }
+  const nameOf = (id: string): string => {
+    const p = live.current.names.get(id)
+    return p ? playerName(p) : ''
+  }
 
+  // Novo lance do motor: vira trechos da bola, a partir de onde ela está.
   useEffect(() => {
     const traces = snap.trace
     if (traces.length < processed.current) processed.current = 0
     const fresh = traces.slice(processed.current)
     processed.current = traces.length
     if (fresh.length === 0) return
-    timers.current.forEach((t) => window.clearTimeout(t))
-    timers.current = []
     const last = pickTrace(fresh)
     if (!last) return
     const beats = beatsFor(last, new Map([...latest.current.known, ...latest.current.layout]), snap.events, new Set(latest.current.layout.keys()))
     if (beats.length === 0) return
     // Finalizações e gols passam em câmera lenta em qualquer velocidade (o relógio da partida espera: ver `holdFor`).
-    // Em desenvolvimento, &anim=1 mostra a sequência completa mesmo ao abrir a partida no meio (para conferir as setas).
-    const forceFull = devFlag('anim')
-    const slow = fresh.length <= 2 || forceFull ? slowFor(last) : 0
-    const tick = slow || MINUTE_MS / speed
-    const simplified = !forceFull && !slow && (speed >= 4 || fresh.length > 2)
-    // Até 2x (ou em câmera lenta) o lance toca inteiro dentro do tempo do minuto; passos que não cabem (cada um precisa de MIN_BEAT_MS) são omitidos.
-    const played = simplified || (!slow && speed >= 4) ? playbackFor(beats, slow ? 1 : speed, simplified) : { beats: fitBeats(beats, tick, MIN_BEAT_MS), arrows: true }
-    const { arrows } = played
+    // Em desenvolvimento, &anim=1 mostra a sequência completa mesmo ao abrir a partida no meio.
+    const choice = choosePlan(beats, last, fresh.length, speed, devFlag('anim'))
+    const { tick, connectors, quick, setPiece } = choice
+    let seq = choice.seq
     // Em desenvolvimento, &passo=N mostra só a batida N da sequência (para conferir a cena parada).
     const only = devParam('passo')
-    const seq = only !== null && played.beats[Number(only)] ? [played.beats[Number(only)] as Beat] : played.beats
-    // O tempo de cada passo é proporcional ao peso dele (passe curto menos, bola longa e cruzamento mais; o chute fica mais tempo na tela).
-    const weights = seq.map((b) => b.weight ?? 1)
-    const total = weights.reduce((a, b) => a + b, 0) || 1
-    const minSlot = (tick * Math.min(...weights)) / total
-    const glide = !arrows ? Math.min(160, tick) : Math.max(90, Math.min(520, minSlot * 0.95))
-    let at = 0
-    seq.forEach((beat, i) => {
-      const show = () => setView({ beat: { ...beat, arrow: arrows ? beat.arrow : undefined } as Beat, glide })
-      if (i === 0) show()
-      else timers.current.push(window.setTimeout(show, at))
-      at += (tick * (weights[i] as number)) / total
-    })
+    if (only !== null && seq[Number(only)]) seq = [seq[Number(only)] as Beat]
+    setMarks([])
+    motion.current?.plan(seq, { trace: last, names: nameOf, tickMs: tick, connectors, arrows: !quick, setPiece, floors: !quick })
   }, [snap.trace.length, snap.minute]) // eslint-disable-line react-hooks/exhaustive-deps
-  // Ao sair (ou no remonte do modo estrito de desenvolvimento) os temporizadores caem e o campo volta a desenhar o último lance.
-  useEffect(
-    () => () => {
-      timers.current.forEach((t) => window.clearTimeout(t))
-      timers.current = []
-      processed.current = 0
-    },
-    [],
-  )
 
   // Cartão: aparece na tela, com o nome de quem levou, por um instante.
   // (em desenvolvimento, &anim=1 mostra também os cartões do minuto em que a partida foi aberta)
@@ -175,16 +161,129 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
     cardTimer.current = window.setTimeout(() => setCard(null), HOLD_MS.card)
   }, [snap.events.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const beat = view.beat
-  const position = (p: Placed): Pt => {
-    if (!beat) return p.base
-    return beat.moves[p.playerId] ?? shifted(p, beat.attSide, beat.phase, beat.focusY)
-  }
-  const holder = beat?.holder ? layout.get(beat.holder) : undefined
-  const holderName = beat?.holder ? names.get(beat.holder) : undefined
-  const ball = beat?.ball ?? { x: 0.5, y: 0.5 }
-  const transition = { transition: `left ${view.glide}ms ease-in-out, top ${view.glide}ms ease-in-out` }
-  const arrow = beat?.arrow
+  // Tamanho do campo em pixels (as posições do movimento são proporções; o DOM recebe px por transform).
+  useEffect(() => {
+    const el = field.current
+    if (!el) return
+    const measure = () => {
+      size.current = { w: el.clientWidth, h: el.clientHeight }
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // O laço de quadros: avança o movimento e escreve só `transform` (e o texto da narração quando muda de trecho).
+  useEffect(() => {
+    const m = motion.current as PitchMotion
+    const stats = { frames: 0, since: 0, worst: 0, cpu: 0, deltas: [] as number[] }
+    const wantFps = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('fps')
+    const lastPx = new Map<string, number>()
+    let raf = 0
+    let prev = performance.now()
+    let lastHolder: string | undefined
+
+    const draw = () => {
+      const { w, h } = size.current
+      if (w === 0) return
+      for (const [id, body] of m.bodies) {
+        const el = playerEls.current.get(id)
+        if (!el) continue
+        const dx = (body.pos.x - body.placed.base.x) * w
+        const dy = (body.pos.y - body.placed.base.y) * h
+        const key = dx * 4096 + dy
+        if (lastPx.get(id) === key) continue
+        lastPx.set(id, key)
+        el.style.transform = `translate3d(${dx.toFixed(1)}px,${dy.toFixed(1)}px,0)`
+      }
+      const ball = ballEl.current
+      if (ball) {
+        const s = 1 + 0.7 * m.ball.height
+        ball.style.transform = `translate3d(${((m.ball.pos.x - 0.5) * w).toFixed(1)}px,${((m.ball.pos.y - 0.5) * h).toFixed(1)}px,0) scale(${s.toFixed(2)})`
+      }
+      const label = labelEl.current
+      const who = lastHolder ? m.bodies.get(lastHolder) : undefined
+      if (label) {
+        if (who) {
+          const x = Math.min(0.88, Math.max(0.12, who.pos.x)) * w
+          const below = who.pos.y < 0.2
+          label.style.transform = `translate3d(${x.toFixed(1)}px,${(who.pos.y * h + (below ? 14 : -11)).toFixed(1)}px,0)`
+          label.style.visibility = 'visible'
+        } else label.style.visibility = 'hidden'
+      }
+    }
+
+    const showArrow = (leg: NonNullable<PitchMotion['leg']>) => {
+      const path = arrowEl.current
+      if (!path) return
+      if (!leg.arrow || !leg.start) {
+        path.setAttribute('d', '')
+        return
+      }
+      const a = leg.start
+      const b = leg.toPt
+      const d = leg.curve ? `M${a.x * 105} ${a.y * 68} Q${((a.x + b.x) / 2) * 105} ${(Math.min(a.y, b.y) - 0.12) * 68} ${b.x * 105} ${b.y * 68}` : `M${a.x * 105} ${a.y * 68} L${b.x * 105} ${b.y * 68}`
+      const solid = leg.kind === 'shot'
+      path.setAttribute('d', d)
+      path.setAttribute('stroke', solid ? '#fde047' : '#7dd3fc')
+      if (solid) path.removeAttribute('stroke-dasharray')
+      else path.setAttribute('stroke-dasharray', '2 1.4')
+    }
+
+    const loop = (now: number) => {
+      const t0 = performance.now()
+      const dt = now - prev
+      prev = now
+      const events = m.step(dt, { running: live.current.running, speed: live.current.speed })
+      for (const ev of events) {
+        if (ev.type === 'start') {
+          if (lineEl.current) lineEl.current.textContent = ev.leg.text
+          showArrow(ev.leg)
+        } else {
+          if (ev.leg.endText && lineEl.current) lineEl.current.textContent = ev.leg.endText
+          if (ev.leg.marks.length > 0) setMarks(ev.leg.marks)
+          if (arrowEl.current) arrowEl.current.setAttribute('d', '')
+        }
+        const holder = ev.type === 'end' ? ev.holder : undefined
+        if (holder && holder !== lastHolder) {
+          // O destaque e o nome seguem quem recebe a bola (classe no próprio elemento: nada passa pelo React).
+          if (lastHolder) playerEls.current.get(lastHolder)?.classList.remove('pitch-holder')
+          playerEls.current.get(holder)?.classList.add('pitch-holder')
+          lastHolder = holder
+          const p = live.current.names.get(holder)
+          const body = m.bodies.get(holder)
+          if (labelText.current && p && body) labelText.current.textContent = `${live.current.numbers.get(`${body.placed.side}:${holder}`) ?? ''} ${playerName(p)}`
+        }
+      }
+      draw()
+      if (wantFps) {
+        const cost = performance.now() - t0
+        stats.frames++
+        stats.cpu += cost
+        stats.worst = Math.max(stats.worst, dt)
+        stats.deltas.push(dt)
+        if (stats.since === 0) stats.since = now
+        if (now - stats.since >= 1000) {
+          const sorted = [...stats.deltas].sort((x, y) => x - y)
+          const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0
+          const out = { fps: Math.round((stats.frames * 1000) / (now - stats.since)), p95: Math.round(p95 * 10) / 10, worst: Math.round(stats.worst), cpu: Math.round((stats.cpu / stats.frames) * 100) / 100 }
+          const w = window as unknown as { __pitchFps?: unknown[] }
+          w.__pitchFps = [...(w.__pitchFps ?? []), out]
+          if (fpsEl.current) fpsEl.current.textContent = `${out.fps} fps · p95 ${out.p95} ms · cpu ${out.cpu} ms`
+          stats.frames = 0
+          stats.since = now
+          stats.worst = 0
+          stats.cpu = 0
+          stats.deltas = []
+        }
+      }
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   const colorsOf = (side: Side, slot: Placed['slot']) => {
     const k = kits[side]
@@ -192,62 +291,40 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
     return { shirt, trim: slot === 'GK' ? k.shirt : k.trim, ink: inkFor(shirt) }
   }
 
-  const holderPos = holder ? position(holder) : undefined
-
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-green-700 to-green-800 shadow-inner" data-testid="pitch">
-      <div className="relative aspect-[105/68] w-full select-none">
+      <div ref={field} className="relative aspect-[105/68] w-full select-none">
         <FieldLines />
-        {arrow && (
-          <svg viewBox="0 0 105 68" className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <marker id="pitch-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="4" markerHeight="4" orient="auto">
-                <path d="M0 0 6 3 0 6Z" fill={arrow.solid ? '#fde047' : '#7dd3fc'} />
-              </marker>
-            </defs>
-            <path
-              d={
-                arrow.curve
-                  ? `M${arrow.from.x * 105} ${arrow.from.y * 68} Q${((arrow.from.x + arrow.to.x) / 2) * 105} ${(Math.min(arrow.from.y, arrow.to.y) - 0.12) * 68} ${arrow.to.x * 105} ${arrow.to.y * 68}`
-                  : `M${arrow.from.x * 105} ${arrow.from.y * 68} L${arrow.to.x * 105} ${arrow.to.y * 68}`
-              }
-              fill="none"
-              stroke={arrow.solid ? '#fde047' : '#7dd3fc'}
-              strokeWidth="0.6"
-              strokeDasharray={arrow.solid ? undefined : '2 1.4'}
-              markerEnd="url(#pitch-arrow)"
-            />
-          </svg>
-        )}
+        <svg viewBox="0 0 105 68" className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
+          <path ref={arrowEl} d="" fill="none" stroke="#7dd3fc" strokeWidth="0.6" strokeDasharray="2 1.4" opacity="0.9" />
+        </svg>
 
         {[...layout.values()].map((p) => {
-          const at = position(p)
           const c = colorsOf(p.side, p.slot)
-          const isHolder = holder?.playerId === p.playerId
           return (
             <div
               key={p.playerId}
-              className={`pitch-player absolute h-[8%] min-h-[20px] w-[5.4%] min-w-[20px] -translate-x-1/2 -translate-y-1/2 ${isHolder ? 'z-20 drop-shadow-[0_0_6px_rgba(212,255,46,0.95)]' : 'z-10'}`}
-              style={{ left: pct(at.x), top: pct(at.y), ...transition }}
+              ref={(el) => {
+                if (el) playerEls.current.set(p.playerId, el)
+                else playerEls.current.delete(p.playerId)
+              }}
+              className={`pitch-player absolute h-[8%] min-h-[20px] w-[5.4%] min-w-[20px] -translate-x-1/2 -translate-y-1/2 will-change-transform z-10`}
+              style={{ left: pct(p.base.x), top: pct(p.base.y) }}
               data-player={p.playerId}
               data-side={p.side}
             >
-              {isHolder && <span className="absolute -inset-1 animate-pulse rounded-full border-2 border-accent/80" />}
               <Shirt shirt={c.shirt} trim={c.trim} ink={c.ink} number={numbers.current.get(`${p.side}:${p.playerId}`) ?? 0} />
             </div>
           )
         })}
 
-        {holder && holderPos && holderName && (
-          <div className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-bg/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow ring-1 ring-accent/60" style={{ left: pct(Math.min(0.88, Math.max(0.12, holderPos.x))), top: holderPos.y < 0.2 ? `calc(${pct(holderPos.y)} + 14px)` : `calc(${pct(holderPos.y)} - 11px)`, transform: holderPos.y < 0.2 ? 'translateX(-50%)' : undefined, ...transition }}>
-            <span className="mr-1 rounded bg-accent px-1 text-accent-ink">{numbers.current.get(`${holder.side}:${holder.playerId}`)}</span>
-            {playerName(holderName)}
-          </div>
-        )}
+        <div ref={labelEl} className="pointer-events-none absolute left-0 top-0 z-30 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-bg/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow ring-1 ring-accent/60 will-change-transform" style={{ visibility: 'hidden' }}>
+          <span ref={labelText} />
+        </div>
 
-        <div className="pointer-events-none absolute z-30 h-[3.2%] min-h-[7px] w-[2.2%] min-w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow ring-1 ring-black/60" style={{ left: pct(ball.x), top: pct(ball.y), ...transition }} aria-label="Bola" />
+        <div ref={ballEl} className="pointer-events-none absolute z-30 h-[3.2%] min-h-[7px] w-[2.2%] min-w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow ring-1 ring-black/60 will-change-transform" style={{ left: '50%', top: '50%' }} aria-label="Bola" />
 
-        {beat?.marks.map((m, i) => (
+        {marks.map((m, i) => (
           <div key={`${m.kind}-${i}-${snap.minute}`} className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2" style={{ left: pct(Math.min(0.94, Math.max(0.06, m.at.x))), top: pct(Math.min(0.95, Math.max(0.05, m.at.y))) }} title={MARK_ICON[m.kind].label}>
             <span className={`pitch-mark flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-extrabold shadow ring-2 ring-white/70 ${MARK_ICON[m.kind].cls}`} role="img" aria-label={MARK_ICON[m.kind].label}>
               {MARK_ICON[m.kind].icon}
@@ -269,7 +346,9 @@ export function Pitch({ data, snap, speed, running, numbers: shared }: { data: P
         <span className="pointer-events-none absolute left-2 top-1 text-[10px] font-bold uppercase tracking-wider text-white/70">{home.abbreviation} →</span>
         <span className="pointer-events-none absolute right-2 top-1 text-[10px] font-bold uppercase tracking-wider text-white/70">← {away.abbreviation}</span>
         {!running && snap.minute > 0 && !snap.finished && <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-bg/70 px-2 py-0.5 text-[10px] font-bold text-muted">pausado</span>}
+        <span ref={fpsEl} className="pointer-events-none absolute bottom-1 right-1 z-50 text-[10px] font-bold text-white/80" />
       </div>
+      <p ref={lineEl} className="min-h-[2.1rem] border-t border-white/10 bg-black/25 px-3 py-1.5 text-[12.5px] font-semibold leading-snug text-slate-100" data-testid="pitch-line" aria-live="off" />
     </div>
   )
 }
