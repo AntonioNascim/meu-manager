@@ -10,7 +10,8 @@ import { SHIRT_MAX, SHIRT_MIN } from '../../engine/shirt'
 import { perform } from '../../store/actions'
 import { formatDate, formatMoney, playerName } from '../format'
 import { NATIONALITY_LABELS, POSITION_LABELS, TALK_HINT_LABELS, TALK_KIND_LABELS, commandErrorText } from '../labels'
-import { Avatar, Crest, Flag, ValueBadge } from '../theme'
+import { Avatar, Crest, Flag, Icon, ValueBadge } from '../theme'
+import type { IconName } from '../theme/icons'
 import { teamNumbers } from '../shirt'
 import { RenewForm } from '../screens/Contracts'
 import { ListSheet } from '../screens/market/Lists'
@@ -20,13 +21,13 @@ import { IndividualSlot } from '../screens/squad/Training'
 
 type PanelId = 'talk' | 'renew' | 'training' | 'market' | 'offers' | 'release'
 
-const ACTIONS: { id: PanelId; label: string }[] = [
-  { id: 'talk', label: 'Conversar' },
-  { id: 'renew', label: 'Renovar' },
-  { id: 'training', label: 'Treino' },
-  { id: 'market', label: 'Mercado' },
-  { id: 'offers', label: 'Propostas' },
-  { id: 'release', label: 'Dispensar' },
+const ACTIONS: { id: PanelId; label: string; icon: IconName }[] = [
+  { id: 'talk', label: 'Conversar', icon: 'mail' },
+  { id: 'renew', label: 'Renovar', icon: 'doc' },
+  { id: 'training', label: 'Treino', icon: 'dumbbell' },
+  { id: 'market', label: 'Mercado', icon: 'swap' },
+  { id: 'offers', label: 'Propostas', icon: 'hand' },
+  { id: 'release', label: 'Dispensar', icon: 'trash' },
 ]
 
 /** Escolha do número da camisa: digita ou toca; se outro jogador já usa o número, os dois trocam. */
@@ -159,7 +160,7 @@ function TalkPanel({ game, player }: { game: Game; player: Player }) {
  * Cartão grande do seu jogador (aberto ao tocar nele): força, bandeira, clube, nome, posição, idade, valor, camisa, "Ver números" e, ao lado,
  * os botões que abrem embaixo do cartão renovação, treino individual, mercado (anunciar e vender), propostas e dispensa.
  */
-export function PlayerCard({ game, player, showNumbers, onToggleNumbers, onClose }: { game: Game; player: Player; showNumbers: boolean; onToggleNumbers: () => void; onClose: () => void }) {
+export function PlayerCard({ game, player, onClose }: { game: Game; player: Player; onClose: () => void }) {
   const [panel, setPanel] = useState<PanelId | null>(null)
   const [shirtOpen, setShirtOpen] = useState(false)
   const [listing, setListing] = useState<ListingKind | null>(null)
@@ -208,60 +209,64 @@ export function PlayerCard({ game, player, showNumbers, onToggleNumbers, onClose
 
   return (
     <div data-testid="player-card" className="space-y-3">
-      <section className="card-bg overflow-hidden rounded-[16px] border border-accent/40 p-3 shadow-[inset_0_0_30px_rgb(39_224_90/0.06),0_0_18px_rgb(39_224_90/0.1)]">
-        <div className="flex gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-2.5">
-              <Avatar id={player.id} {...(team ? { colors: team.colors } : {})} size={84} ring />
-              <div className="flex flex-col items-center gap-1">
-                <ValueBadge value={overall} className="!min-w-14 !px-3 !py-2 !text-4xl">
-                  {Math.round(overall)}
-                </ValueBadge>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Força</span>
-              </div>
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Flag nationality={player.nationality} />
-              {team && <Crest team={team} size="sm" />}
-              <span className="truncate text-xs text-muted">{NATIONALITY_LABELS[player.nationality]}</span>
-            </div>
-            <div className="title mt-1 line-clamp-2 text-[26px] leading-tight">{playerName(player)}</div>
-            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-              <dt className="text-muted">Posição</dt>
-              <dd className="text-right font-bold">{POSITION_LABELS[player.position]}</dd>
-              <dt className="text-muted">Idade</dt>
-              <dd className="text-right font-bold">{player.age} anos</dd>
-              <dt className="text-muted">Valor de mercado</dt>
-              <dd className="text-right font-bold tabular-nums" data-testid="card-value">
-                {formatMoney(marketValue(player, date, team))}
-              </dd>
-              <dt className="text-muted">Camisa</dt>
-              <dd className="text-right font-bold">
-                <button type="button" onClick={() => setShirtOpen((v) => !v)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-line bg-surface-2 px-2 tabular-nums" aria-label="Trocar o número da camisa" data-testid="shirt-number">
-                  {number ?? '–'} <span className="text-[10px] text-accent">trocar</span>
-                </button>
-              </dd>
-            </dl>
+      <section className="card-bg overflow-hidden rounded-[16px] border border-accent/45 p-2.5 shadow-[inset_0_0_30px_rgb(39_224_90/0.06),0_0_18px_rgb(39_224_90/0.1)]" data-testid="player-top-card">
+        <div className="grid grid-cols-[92px_minmax(0,1fr)_104px] gap-x-2.5 gap-y-1 min-[440px]:grid-cols-[116px_minmax(0,1fr)_128px] min-[440px]:gap-x-4">
+          <div className="relative flex h-[150px] flex-col items-center justify-start overflow-hidden rounded-[12px] border border-accent/55 bg-gradient-to-b from-[#12201a] to-[#070d0a] pt-2 shadow-[inset_0_0_24px_rgb(39_224_90/0.12)] min-[440px]:row-span-2 min-[440px]:h-[200px]" data-testid="player-avatar">
+            <Avatar id={player.id} {...(team ? { colors: team.colors } : {})} size={96} />
+            {team && (
+              <span className="absolute bottom-2">
+                <Crest team={team} size="sm" />
+              </span>
+            )}
           </div>
-          <div className="flex w-[104px] shrink-0 flex-col gap-1.5" role="group" aria-label="Ações do jogador">
+          <div className="min-w-0">
+            <div className="flex items-end gap-1.5">
+              <ValueBadge value={overall} className="!min-w-12 !px-2.5 !py-1 !text-[34px] !leading-none" data-testid="card-force">
+                {Math.round(overall)}
+              </ValueBadge>
+              <span className="pb-1 text-[11px] font-bold uppercase tracking-wider text-accent">Força</span>
+            </div>
+            <div className="title mt-1 line-clamp-3 text-[18px] leading-[1.05] min-[440px]:text-[24px]" data-testid="card-name">
+              {playerName(player)}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-200">
+              <Flag nationality={player.nationality} />
+              <span className="truncate">{NATIONALITY_LABELS[player.nationality]}</span>
+            </div>
+          </div>
+          <div className="col-start-3 row-span-2 flex flex-col gap-1.5 min-[440px]:row-span-2" role="group" aria-label="Ações do jogador">
             {ACTIONS.map((a) => (
               <button
                 key={a.id}
                 type="button"
                 aria-pressed={panel === a.id}
                 onClick={() => toggle(a.id)}
-                className={`relative min-h-12 rounded-xl border px-2 text-sm font-bold active:scale-95 ${panel === a.id ? 'border-accent bg-accent text-accent-ink' : a.id === 'release' ? 'border-loss/50 bg-surface text-loss' : 'border-line bg-surface-2 text-slate-100'}`}
+                className={`relative flex min-h-[44px] items-center gap-2 rounded-xl border px-2 text-left text-[13.5px] font-semibold active:scale-95 ${panel === a.id ? 'border-accent bg-accent text-accent-ink' : a.id === 'release' ? 'border-loss/60 bg-loss/[0.12] text-loss' : 'border-accent/45 bg-accent/[0.07] text-slate-100'}`}
               >
+                <Icon name={a.icon} size={18} className={panel === a.id ? '' : a.id === 'release' ? 'text-loss' : 'text-accent'} />
                 {a.label}
                 {a.id === 'offers' && offers > 0 && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-loss ring-2 ring-surface-2" role="img" aria-label="Há propostas" />}
               </button>
             ))}
           </div>
+          <dl className="col-span-2 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1.5 border-t border-white/[0.08] pt-2 text-[12px] min-[440px]:col-span-1 min-[440px]:col-start-2">
+            <dt className="flex items-center gap-1.5 text-muted"><Icon name="target" size={14} className="text-slate-300" />Posição</dt>
+            <dd className="text-right font-bold">{POSITION_LABELS[player.position]}</dd>
+            <dt className="flex items-center gap-1.5 text-muted"><Icon name="user" size={14} className="text-slate-300" />Idade</dt>
+            <dd className="text-right font-bold">{player.age} anos</dd>
+            <dt className="flex items-center gap-1.5 whitespace-nowrap text-muted"><Icon name="dollar" size={14} className="text-slate-300" />Valor de mercado</dt>
+            <dd className="whitespace-nowrap text-right font-bold tabular-nums" data-testid="card-value">
+              {formatMoney(marketValue(player, date, team))}
+            </dd>
+            <dt className="flex items-center gap-1.5 text-muted"><Icon name="shirt" size={14} className="text-slate-300" />Camisa</dt>
+            <dd className="text-right font-bold">
+              <button type="button" onClick={() => setShirtOpen((v) => !v)} className="inline-flex min-h-8 items-center gap-2 rounded-lg border border-line bg-surface-2 px-2.5 tabular-nums" aria-label="Trocar o número da camisa" data-testid="shirt-number">
+                {number ?? '–'} <span className="text-accent">trocar</span>
+              </button>
+            </dd>
+          </dl>
         </div>
         {shirtOpen && <ShirtPicker game={game} player={player} onDone={() => setShirtOpen(false)} />}
-        <button type="button" onClick={onToggleNumbers} aria-expanded={showNumbers} data-testid="toggle-numbers" className="mt-3 min-h-12 w-full rounded-xl border border-accent/60 bg-accent/[0.08] font-bold text-white active:scale-95">
-          {showNumbers ? 'Esconder os números' : 'Ver os números'}
-        </button>
       </section>
 
       {body && <section className="card-bg overflow-hidden rounded-[14px] border border-white/[0.13]">{body}</section>}

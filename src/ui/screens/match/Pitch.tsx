@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { slotAt } from '../../../engine/grid'
 import type { MatchSnapshot } from '../../../engine/match'
 import type { Player } from '../../../engine/types'
-import { playerName } from '../../format'
+import { playerName, shortPlayerName } from '../../format'
 import { Crest } from '../../theme'
 import { VAR, varMoments } from './varNarrative'
 import type { VarMoment } from './varNarrative'
@@ -53,11 +53,12 @@ function FieldLines() {
   )
 }
 
+/** Jogador como bolinha numerada nas cores do time (o goleiro com a cor própria). */
 function Shirt({ shirt, trim, number, ink }: { shirt: string; trim: string; number: number; ink: string }) {
   return (
     <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true">
-      <path d="M8 3 4 5 1.5 9l3 2L6 10v10h12V10l1.5 1 3-2L20 5l-4-2c-.5 1.5-2 2.3-4 2.3S8.5 4.5 8 3Z" fill={shirt} stroke={trim} strokeWidth="1.2" strokeLinejoin="round" />
-      <text x="12" y="16.2" textAnchor="middle" fontSize="8.5" fontWeight="800" fontFamily="Barlow Condensed, sans-serif" fill={ink}>
+      <circle cx="12" cy="12" r="10.4" fill={shirt} stroke={trim} strokeWidth="1.7" />
+      <text x="12" y="16" textAnchor="middle" fontSize="12.5" fontWeight="800" fontFamily="Barlow Condensed, sans-serif" fill={ink}>
         {number}
       </text>
     </svg>
@@ -303,7 +304,7 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
           lastHolder = holder
           const p = live.current.names.get(holder)
           const body = m.bodies.get(holder)
-          if (labelText.current && p && body) labelText.current.textContent = `${live.current.numbers.get(`${body.placed.side}:${holder}`) ?? ''} ${playerName(p)}`
+          if (labelText.current && p && body) labelText.current.textContent = `${live.current.numbers.get(`${body.placed.side}:${holder}`) ?? ''} ${shortPlayerName(p)}`
         }
       }
       draw()

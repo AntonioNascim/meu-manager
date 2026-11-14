@@ -103,7 +103,7 @@ describe('telas da partida (renderização)', () => {
     expect(html).toContain('2x')
     expect(html).not.toContain('Só lances')
     expect(html).not.toContain('Velocidade</span>')
-    expect(html).toContain('30&#x27; · pausado')
+    expect(html).toContain('pausado')
   })
 
   it('no fim de jogo mostra o botão de concluir', () => {

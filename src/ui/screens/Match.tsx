@@ -18,7 +18,7 @@ import { FieldLineup } from '../components/FieldLineup'
 import type { Kit } from '../components/FieldLineup'
 import { OpponentOverlay } from '../components/OpponentOverlay'
 import { StyleControls } from '../components/StyleControls'
-import { Button, Card, Tabs, TeamBadge } from '../components/ui'
+import { Button, Card, TeamBadge } from '../components/ui'
 import { formatDate, playerName } from '../format'
 import {
   MATCH_EVENT_LABELS,
@@ -31,6 +31,8 @@ import { closeOnlineMatch, currentOnlineMatch, openOnlineMatch } from '../../sto
 import { getAccount } from '../../store/onlineAccount'
 import { LIVE_REJECT_LABELS } from '../labels'
 import { Pitch } from './match/Pitch'
+import { CardShell, LiveTabs, MatchHeader, PerformanceCard, TeamPanel, TimelineCard } from './match/LiveParts'
+import { periodText, visibleColor } from './match/liveStats'
 import { seedNumbers } from '../shirt'
 import { assignNumber, devFlag, devParam, holdFor, kitsFor } from './match/pitchModel'
 import { Sheet } from '../theme'
@@ -120,51 +122,6 @@ function useMovedNote(): [ReactNode, () => void] {
     </p>
   ) : null
   return [note, () => setAt(Date.now())]
-}
-
-function Scoreboard({ game, snap, label, speed, onSpeed, onOpponent, effective }: { game: Game; snap: MatchSnapshot; label: string; speed: number; onSpeed: () => void; onOpponent: () => void; effective?: number }) {
-  const home = teamById(game, snap.home.teamId)
-  const away = teamById(game, snap.away.teamId)
-  // O escudo do adversário abre a página dele (formação, estilo, mentalidade e escalação).
-  const side = (team: typeof home) => {
-    const content = (
-      <>
-        <TeamBadge team={team} />
-        <span className="w-full truncate font-display text-[17px] font-bold leading-tight">{shortName(team)}</span>
-      </>
-    )
-    const cls = 'flex min-w-0 flex-1 flex-col items-center gap-1 text-center'
-    return team.id === game.userTeamId ? (
-      <div className={cls}>{content}</div>
-    ) : (
-      <button type="button" onClick={onOpponent} aria-label={`Ver a tática de ${team.name}`} data-testid="opponent-crest" className={`${cls} rounded-lg active:bg-white/5`}>
-        {content}
-      </button>
-    )
-  }
-  return (
-    <div className="card-bg relative rounded-[14px] border border-accent/45 p-3 shadow-[inset_0_0_30px_rgb(39_224_90/0.07),0_0_18px_rgb(39_224_90/0.12)]">
-      <button type="button" onClick={onSpeed} aria-label={`Velocidade ${speed}x. Toque para mudar`} data-testid="speed" className="absolute right-2 top-2 z-10 min-h-9 min-w-[58px] rounded-[10px] border-[1.5px] border-accent px-2.5 font-display text-lg font-extrabold tabular-nums text-accent">
-        {speed}x
-        {effective !== undefined && effective !== speed && <span className="ml-1 text-[10px] font-bold text-amber" data-testid="speed-effective">valendo {effective}x</span>}
-      </button>
-      {game.pendingUserMatch && <span className="absolute left-2.5 top-2.5 inline-flex max-w-[60%] items-center gap-1.5 truncate rounded-full border border-cyan/60 bg-cyan/10 px-2.5 py-1 text-[13px] font-semibold text-cyan">{matchLabel(game.season, game.pendingUserMatch).competition} · {matchLabel(game.season, game.pendingUserMatch).detail}</span>}
-      <div className="mt-10 flex items-center justify-between gap-2">
-        {side(home)}
-        <div className="text-center">
-          <div className="font-display text-[44px] font-extrabold leading-none tabular-nums">
-            {snap.homeGoals} x {snap.awayGoals}
-          </div>
-          {snap.penalties && snap.finished && <div className="text-xs font-bold tabular-nums text-amber-300">({snap.penalties.home} x {snap.penalties.away} nos pênaltis)</div>}
-          <div className="mt-1 font-display text-[15px] font-bold text-accent">{label}</div>
-        </div>
-        {side(away)}
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#1a2528]">
-        <div className="h-full bg-gradient-to-r from-[#17b845] to-[#4bf27a] transition-all" style={{ width: `${(snap.minute / (snap.extraTime ? 120 : 90)) * 100}%` }} />
-      </div>
-    </div>
-  )
 }
 
 function LogList({ game, lines, showFouls, onToggleFouls }: { game: Game; lines: LogLine[]; showFouls: boolean; onToggleFouls: () => void }) {
@@ -478,20 +435,6 @@ function TacticPanel({
 type LiveTab = 'games' | 'stats' | 'tactics'
 
 /** Tela larga (computador): os lances ficam numa coluna ao lado, como na referência. */
-function useDesktop(): boolean {
-  const query = '(min-width: 1024px)'
-  const [wide, setWide] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches)
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return
-    const media = window.matchMedia(query)
-    const on = () => setWide(media.matches)
-    media.addEventListener('change', on)
-    return () => media.removeEventListener('change', on)
-  }, [])
-  return wide
-}
-
-/** Botões de controle do jogo (pequenos e do mesmo tamanho): mudam conforme o momento da partida. */
 function Controls({ label, onMain, onSkip, mainDisabled }: { label: string; onMain: () => void; onSkip: () => void; mainDisabled: boolean }) {
   const base = 'inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[10px] px-3 font-display text-lg font-bold disabled:opacity-40'
   return (
@@ -516,11 +459,10 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1)
   // Na liga online o servidor joga: cada quadro dele chega aqui e a tela só o mostra (sem relógio local).
   const [, bump] = useState(0)
-  const desktop = useDesktop()
   const names = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
   // Se a partida está parada por uma lesão (ao voltar para a tela, por exemplo), as Trocas já abrem com o aviso.
   const hurtAtOpen = snap.injuryPending?.side === live.side ? snap.injuryPending.playerId : undefined
-  const [tab, setTab] = useState<LiveTab>(hurtAtOpen || devParam('aba') === 'trocas' || devParam('aba') === 'tatica' ? 'tactics' : 'games')
+  const [tab, setTab] = useState<LiveTab | null>(hurtAtOpen || devParam('aba') === 'trocas' || devParam('aba') === 'tatica' ? 'tactics' : devParam('aba') === 'dados' ? 'stats' : devParam('aba') === 'jogos' ? 'games' : null)
   const [alert, setAlert] = useState<string | null>(() => (hurtAtOpen ? `${names.get(hurtAtOpen) ? playerName(names.get(hurtAtOpen) as Player) : 'Um jogador'} se machucou. ${CHOOSE_ALERT} na aba Tática.` : null))
   const [showFouls, setShowFouls] = useState(false)
   // Quanto da partida a tela já viu: só o que chega depois pede câmera lenta ou aviso.
@@ -604,7 +546,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const atHalftime = online ? half !== undefined : !finished && !running && snap.minute === 45 && live.halftimeDone
   const beforeExtra = !online && !finished && !running && snap.minute === 90 && snap.extraTime === true
   const halfLeft = half ? Math.max(0, Math.ceil((half.deadline - Date.now()) / 1000)) : 0
-  const label = finished ? 'Fim de jogo' : online ? (atHalftime ? `Intervalo · ${halfLeft} s` : `${snap.minute}'${snap.minute > 90 ? ' · prorrogação' : ''}`) : atHalftime ? 'Intervalo' : beforeExtra ? 'Fim do tempo normal' : snap.minute === 0 ? 'Antes do apito' : `${snap.minute}'${snap.minute > 90 ? ' · prorrogação' : ''}${running ? '' : ' · pausado'}`
+  const label = finished ? 'Fim de jogo' : atHalftime ? (online ? `Intervalo · ${halfLeft} s` : 'Intervalo') : beforeExtra ? 'Fim do tempo normal' : snap.minute === 0 ? 'Antes do apito' : `${periodText(snap, false)}${online || running ? '' : ' · pausado'}`
   const lines = useMemo(() => buildLog(snap, live.halftimeDone, showFouls), [snap, live.halftimeDone, showFouls])
   const mySide = live.side === 'home' ? snap.home : snap.away
   const opponentSide = live.side === 'home' ? snap.away : snap.home
@@ -650,78 +592,110 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   )
 
   const match = game.pendingUserMatch
+  const teamsById = useMemo(() => new Map(game.season.teams.map((t) => [t.id, t])), [game.season.teams])
+  const homeColor = visibleColor(kits.home.shirt, kits.home.trim)
+  const awayColor = visibleColor(kits.away.shirt, kits.away.trim)
+  const context = match ? `${matchLabel(game.season, match).competition} · ${matchLabel(game.season, match).detail}` : undefined
   return (
-    <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 lg:space-y-0">
-      <div className="space-y-3">
-        <div className="sticky top-[84px] z-20 -mx-4 bg-bg px-4 pb-2 pt-1 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0">
-          <Scoreboard game={game} snap={snap} label={label} speed={shownSpeed} onSpeed={nextSpeed} onOpponent={() => setOpponentOpen(true)} {...(online ? { effective: online.effectiveSpeed() } : {})} />
-        </div>
-
-        {finished ? (
-          <Button className="w-full text-lg" onClick={conclude}>
-            {online ? 'Voltar ao painel' : 'Concluir partida'}
-          </Button>
-        ) : online ? (
-          <div className="space-y-2">
-            {atHalftime && half && (
-              <div className="space-y-1" data-testid="halftime-box">
-                <Button className="w-full" disabled={half.mine} onClick={() => online.sendHalf()} data-testid="halftime-back">
-                  {half.mine ? (half.waitingOther ? 'Esperando o adversário…' : 'Voltando ao jogo…') : 'Voltar ao jogo'}
-                </Button>
-                <p className="text-center text-xs text-muted">O intervalo dura até 1 minuto. Ajuste a tática e as trocas antes de voltar.</p>
-              </div>
-            )}
-            {snap.minute > 0 && (
-              <button type="button" onClick={() => online.skip()} disabled={online.skipState().mine} data-testid="online-skip" className="btn-dark inline-flex min-h-11 w-full items-center justify-center rounded-[10px] px-3 font-display text-lg font-bold text-white disabled:opacity-60">
-                {online.skipState().mine ? 'Esperando o adversário pular' : 'Pular'}
-              </button>
-            )}
-          </div>
-        ) : (
-          <Controls label={mainLabel} onMain={onMain} onSkip={skip} mainDisabled={pending} />
-        )}
-        {online && finished && <p className="text-center text-xs text-muted">Você vê o resultado e espera: a próxima rodada só começa quando todas as partidas terminarem.</p>}
-        {online && online.lastRejected() && <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-xs font-semibold text-amber">Não valeu: {online.lastRejected() === 'engine' && online.lastRejectedDetail() ? online.lastRejectedDetail() : (LIVE_REJECT_LABELS[online.lastRejected() as keyof typeof LIVE_REJECT_LABELS] ?? 'o servidor recusou a mudança')}</p>}
-        {snap.minute === 0 && match && (
-          <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-            <span>
-              {matchLabel(game.season, match).competition} · {matchLabel(game.season, match).detail} · {formatDate(match.date)} · {match.cup?.neutral ? 'campo neutro' : teamById(game, match.homeTeamId).stadium.name}
-            </span>
-            <button type="button" onClick={adjust} className="font-bold text-accent underline">
-              Ajustar tática e escalação
-            </button>
-          </p>
-        )}
-        {snap.minute === 0 && match?.cup && <CupPathLine game={game} cupId={match.competitionId} />}
-        {snap.minute === 0 && match?.cup?.leg === 2 && <FirstLegNote game={game} match={match} />}
-        {alert && (
-          <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-sm font-semibold text-amber">
-            ✚ {alert}
-          </p>
-        )}
-
-        <Pitch data={game.season} snap={snap} seed={live.matchId} speed={online ? online.effectiveSpeed() : speed} running={online ? !finished && !atHalftime && snap.minute > 0 : running} numbers={numbers.current} />
-
-        <Tabs
-          value={tab}
-          options={[
-            { id: 'games' as LiveTab, label: 'Jogos' },
-            { id: 'stats' as LiveTab, label: 'Dados' },
-            { id: 'tactics' as LiveTab, label: 'Tática' },
-          ]}
-          onChange={setTab}
+    <div className="space-y-3">
+      <div className="sticky top-[84px] z-20 -mx-4 bg-bg px-4 pb-2 pt-1">
+        <MatchHeader
+          home={homeTeam}
+          away={awayTeam}
+          snap={snap}
+          label={label}
+          names={names}
+          userTeamId={game.userTeamId}
+          speed={shownSpeed}
+          {...(online ? { effective: online.effectiveSpeed() } : { onTogglePlay: onMain })}
+          running={running}
+          onSpeed={nextSpeed}
+          onOpponent={() => setOpponentOpen(true)}
+          context={context}
         />
-
-        {tab === 'games' && (online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={snap.minute} />)}
-        {tab === 'stats' && <StatsList game={game} snap={snap} />}
-        {tab === 'tactics' && <TacticPanel game={game} live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} injuredId={pending ? snap.injuryPending?.playerId : undefined} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
-
-        {!desktop && <div className="max-h-[28rem] overflow-y-auto">{logSection}</div>}
       </div>
 
-      {opponentOpen && <OpponentOverlay game={game} teamId={opponentSide.teamId} live={{ teamId: opponentSide.teamId, formationId: opponentSide.formationId, style: opponentSide.style, mentality: opponentSide.mentality, activeMentality: opponentSide.activeMentality, onPitch: opponentSide.onPitch }} onClose={() => setOpponentOpen(false)} />}
+      {finished ? (
+        <Button className="w-full text-lg" onClick={conclude}>
+          {online ? 'Voltar ao painel' : 'Concluir partida'}
+        </Button>
+      ) : online ? (
+        <div className="space-y-2">
+          {atHalftime && half && (
+            <div className="space-y-1" data-testid="halftime-box">
+              <Button className="w-full" disabled={half.mine} onClick={() => online.sendHalf()} data-testid="halftime-back">
+                {half.mine ? (half.waitingOther ? 'Esperando o adversário…' : 'Voltando ao jogo…') : 'Voltar ao jogo'}
+              </Button>
+              <p className="text-center text-xs text-muted">O intervalo dura até 1 minuto. Ajuste a tática e as trocas antes de voltar.</p>
+            </div>
+          )}
+          {snap.minute > 0 && (
+            <button type="button" onClick={() => online.skip()} disabled={online.skipState().mine} data-testid="online-skip" className="btn-dark inline-flex min-h-11 w-full items-center justify-center rounded-[10px] px-3 font-display text-lg font-bold text-white disabled:opacity-60">
+              {online.skipState().mine ? 'Esperando o adversário pular' : 'Pular'}
+            </button>
+          )}
+        </div>
+      ) : (
+        <Controls label={mainLabel} onMain={onMain} onSkip={skip} mainDisabled={pending} />
+      )}
+      {online && finished && <p className="text-center text-xs text-muted">Você vê o resultado e espera: a próxima rodada só começa quando todas as partidas terminarem.</p>}
+      {online && online.lastRejected() && <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-xs font-semibold text-amber">Não valeu: {online.lastRejected() === 'engine' && online.lastRejectedDetail() ? online.lastRejectedDetail() : (LIVE_REJECT_LABELS[online.lastRejected() as keyof typeof LIVE_REJECT_LABELS] ?? 'o servidor recusou a mudança')}</p>}
+      {snap.minute === 0 && match && (
+        <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+          <span>
+            {matchLabel(game.season, match).competition} · {matchLabel(game.season, match).detail} · {formatDate(match.date)} · {match.cup?.neutral ? 'campo neutro' : teamById(game, match.homeTeamId).stadium.name}
+          </span>
+          <button type="button" onClick={adjust} className="font-bold text-accent underline">
+            Ajustar tática e escalação
+          </button>
+        </p>
+      )}
+      {snap.minute === 0 && match?.cup && <CupPathLine game={game} cupId={match.competitionId} />}
+      {snap.minute === 0 && match?.cup?.leg === 2 && <FirstLegNote game={game} match={match} />}
+      {alert && (
+        <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-sm font-semibold text-amber">
+          ✚ {alert}
+        </p>
+      )}
 
-      {desktop && <aside className="max-h-[calc(100dvh-140px)] overflow-y-auto lg:sticky lg:top-16">{logSection}</aside>}
+      {/* Em pé: o campo e, embaixo, os dois painéis lado a lado. Deitado e no computador: painel, campo e painel, como na referência. */}
+      <div className="grid grid-cols-2 gap-3 min-[720px]:grid-cols-[190px_minmax(0,1fr)_190px] min-[720px]:items-start">
+        <div className="col-span-2 min-w-0 min-[720px]:col-span-1 min-[720px]:col-start-2 min-[720px]:row-start-1">
+          <Pitch data={game.season} snap={snap} seed={live.matchId} speed={online ? online.effectiveSpeed() : speed} running={online ? !finished && !atHalftime && snap.minute > 0 : running} numbers={numbers.current} />
+        </div>
+        <div className="min-w-0 min-[720px]:col-start-1 min-[720px]:row-start-1">
+          <TeamPanel team={homeTeam} stats={snap.homeStats} color={homeColor} side="home" />
+        </div>
+        <div className="min-w-0 min-[720px]:col-start-3 min-[720px]:row-start-1">
+          <TeamPanel team={awayTeam} stats={snap.awayStats} color={awayColor} side="away" />
+        </div>
+      </div>
+
+      <div className="grid gap-3 min-[720px]:grid-cols-3">
+        <CardShell title="Jogos ao vivo" icon="calendar" testId="live-games-card">
+          <div className="px-3 py-1">{online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={snap.minute} compact />}</div>
+        </CardShell>
+        <TimelineCard snap={snap} teams={teamsById} names={names} />
+        <PerformanceCard snap={snap} home={homeTeam} away={awayTeam} homeColor={homeColor} awayColor={awayColor} />
+      </div>
+
+      <LiveTabs
+        value={tab}
+        options={[
+          { id: 'games' as LiveTab, label: 'Jogos', icon: 'table' },
+          { id: 'stats' as LiveTab, label: 'Dados', icon: 'chart' },
+          { id: 'tactics' as LiveTab, label: 'Tática', icon: 'tactics' },
+        ]}
+        onChange={setTab}
+      />
+
+      {tab === 'games' && (online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={snap.minute} />)}
+      {tab === 'stats' && <StatsList game={game} snap={snap} />}
+      {tab === 'tactics' && <TacticPanel game={game} live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} injuredId={pending ? snap.injuryPending?.playerId : undefined} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
+
+      <div className="max-h-[28rem] overflow-y-auto">{logSection}</div>
+
+      {opponentOpen && <OpponentOverlay game={game} teamId={opponentSide.teamId} live={{ teamId: opponentSide.teamId, formationId: opponentSide.formationId, style: opponentSide.style, mentality: opponentSide.mentality, activeMentality: opponentSide.activeMentality, onPitch: opponentSide.onPitch }} onClose={() => setOpponentOpen(false)} />}
     </div>
   )
 }

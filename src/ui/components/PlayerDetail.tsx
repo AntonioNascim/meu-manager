@@ -16,10 +16,11 @@ import {
   POSITION_SHORT_LABELS,
 } from '../labels'
 import type { AttributeGroup } from '../labels'
-import { Avatar, Eyebrow, Flag, MoodIcon, Panel, Stars, ValueBadge } from '../theme'
+import { Avatar, Eyebrow, Flag, Icon, MoodIcon, Panel, Stars, ValueBadge } from '../theme'
 import { useGame } from '../../store/gameStore'
 import { isOnYellowEdge } from '../squadSort'
 import { PlayerCard } from './PlayerCard'
+import { AttributesCard, ClubFooter, StateCard } from './PlayerSheetParts'
 
 /** Barra de 0 a 100 com a cor da faixa. */
 export function Bar({ value, color }: { value: number; color: string }) {
@@ -117,12 +118,14 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
   return (
     <div className="fixed inset-0 z-30 flex flex-col bg-bg" role="dialog" aria-label={playerName(player)}>
       {mine && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
-          <div className="flex min-w-0 flex-wrap gap-1">
-            <StatusTags player={player} />
-            {isOnYellowEdge(player) && <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">Pendurado</span>}
-          </div>
-          <button type="button" onClick={onClose} className="min-h-12 rounded-xl border border-line bg-surface px-4 text-sm font-bold">
+        <header className="flex items-center gap-2 border-b border-accent/30 bg-gradient-to-r from-accent/[0.08] to-transparent px-3 py-2">
+          <button type="button" onClick={onClose} aria-label="Voltar" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-accent active:scale-95">
+            <Icon name="left" size={26} />
+          </button>
+          <h1 className="title flex-1 text-[26px]">Jogador</h1>
+          {isOnYellowEdge(player) && <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">Pendurado</span>}
+          <button type="button" onClick={onClose} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 text-sm font-bold">
+            <Icon name="x" size={16} />
             Fechar
           </button>
         </header>
@@ -160,7 +163,9 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
       </header>}
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-10 pt-4">
-        {mine && game && <PlayerCard game={game} player={player} showNumbers={showNumbers} onToggleNumbers={() => setShowNumbers((v) => !v)} onClose={onClose} />}
+        {mine && game && <PlayerCard game={game} player={player} onClose={onClose} />}
+        {mine && <AttributesCard player={player} showAll={showNumbers} onToggleAll={() => setShowNumbers((v) => !v)} />}
+        {mine && <StateCard player={player} />}
         {academy && (
           <Section title="Base">
             <p className="text-sm text-slate-300">
@@ -170,7 +175,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           </Section>
         )}
 
-        {!academy && <Section title="Estado atual">
+        {!academy && !mine && <Section title="Estado atual">
           <Stat label="Condição física" value={`${Math.round(c.fitness)}%`} bar={c.fitness} color={conditionBand(c.fitness).bg} />
           <div className="flex items-center gap-2 py-1 text-sm">
             <span className="w-32 shrink-0 text-slate-300">Moral</span>
@@ -255,6 +260,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           <Stat label="Término" value={player.contract.endDate.split('-').reverse().join('/')} />
           <Stat label="Multa rescisória" value={formatMoney(player.contract.releaseClause)} />
         </Section>}
+        {mine && <ClubFooter team={game?.season.teams.find((t) => t.id === player.teamId)} />}
       </div>
       {footer && <footer className="border-t border-line px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{footer}</footer>}
     </div>
