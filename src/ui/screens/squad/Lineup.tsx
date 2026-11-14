@@ -120,16 +120,16 @@ function SavedLineups({ game }: { game: Game }) {
   const name = (slot: number) => window.prompt('Nome da escalação:', slots[slot]?.name ?? `Escalação ${slot + 1}`)
 
   return (
-    <Panel className="p-3">
-      <div className="mb-2 flex items-center justify-between">
+    <Panel className="p-2.5">
+      <div className="mb-1.5 flex items-center justify-between">
         <Eyebrow icon="folder">Escalações salvas</Eyebrow>
         <span className="text-xs font-bold text-muted">
           {slots.filter(Boolean).length}/{LINEUP_SLOTS}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {slots.map((saved, i) => (
-          <div key={i} className="flex min-h-[4.5rem] overflow-hidden rounded-xl border border-line bg-surface-2">
+          <div key={i} className="flex min-h-12 w-40 shrink-0 overflow-hidden rounded-xl border border-line bg-surface-2">
             {saved ? (
               <>
                 <button type="button" className="min-w-0 flex-1 px-2.5 py-2 text-left" onClick={() => loadSlot(i)}>
@@ -270,6 +270,8 @@ export function Lineup({ game }: { game: Game }) {
         </div>
       </div>
 
+      <SavedLineups game={game} />
+
       <p className="min-h-5 text-xs text-muted">
         {selected ? (
           <>
@@ -318,8 +320,6 @@ export function Lineup({ game }: { game: Game }) {
           </ul>
         </Panel>
       )}
-      <SavedLineups game={game} />
-
       {subbingId && byId.get(subbingId) && (
         <SubstituteSheet
           tactic={tactic}
