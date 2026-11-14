@@ -51,14 +51,17 @@ export interface PlanChoice {
  * que o jogador vê. `freshCount` é quantos momentos chegaram de uma vez (vários = o campo mostra só o último).
  */
 export function choosePlan(beats: readonly Beat[], last: PlayTrace, freshCount: number, speed: number, forceFull = false): PlanChoice {
-  const slow = freshCount <= 2 || forceFull ? slowFor(last) : 0
+  // Escanteio: a cena (caminhada até o canto, jogadores na área e cruzamento) pede o seu tempo, mais curto no 2x.
+  const hasCorner = beats.some((b) => b.marks.some((m) => m.kind === 'corner'))
+  const slow = freshCount <= 2 || forceFull ? slowFor(last, speed, hasCorner) : 0
   const tick = slow || BASE_MINUTE_MS / speed
   const simplified = !forceFull && !slow && (speed >= 2 || freshCount > 2)
   const quick = simplified || (!slow && speed >= 2)
   let seq: Beat[]
   let connectors = 0
   let relays = 0
-  if (quick) seq = [beats[beats.length - 1] as Beat]
+  // Nas velocidades altas só o desfecho do lance; as cenas de bola parada que vêm depois dele (tiro de meta, saída, escanteio) não entram.
+  if (quick) seq = [([...beats].reverse().find((b) => !b.scene) ?? beats[beats.length - 1]) as Beat]
   else {
     // Cada trecho precisa de LEG_MIN_MS para ser visto: uns 30% do tempo vão para os passes de ligação e outros 20% para apoios nos passes longos, o resto para as batidas do lance.
     const room = Math.max(1, Math.floor(tick / LEG_MIN_MS))
@@ -327,7 +330,7 @@ export class PitchMotion {
       const sameSide = !!prev && !!to && this.bodies.get(prev)?.placed.side === body?.placed.side
       const arrow = beat.arrow
       let kind: LegKind
-      if (ctx.setPiece && !arrow) kind = 'set'
+      if ((ctx.setPiece && !arrow) || beat.still) kind = 'set'
       else if (beat.phase === 'shot') kind = 'shot'
       else if (arrow) kind = arrow.curve ? (beat.phase === 'chance' ? 'cross' : 'long') : 'pass'
       else if (to && prev === to) kind = 'carry'
@@ -356,7 +359,7 @@ export class PitchMotion {
         att: beat.attSide,
         ctx,
         beat,
-        text: this.textFor(kind, prev, to, ctx),
+        text: beat.note ? beat.note.replace('{who}', to ? ctx.names(to) : '').replace('{from}', prev ? ctx.names(prev) : '') : this.textFor(kind, prev, to, ctx),
         ...(kind === 'shot' ? { endText: this.shotEnd(ctx, to) } : {}),
       })
       leg.marks = beat.marks

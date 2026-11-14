@@ -94,8 +94,8 @@ describe('partida ao vivo na liga online: um relógio por partida (C5)', () => {
     expect(setSpeed(event, seats, 'jogador-1', 1)).toBe(true)
     expect(setSpeed(event, seats, 'jogador-2', 2)).toBe(true)
     const after = tick(event, seats, now, 12_000).event
-    // Em 12 s a 2x a partida anda o dobro da de 1x.
-    expect(gameOf(after, SEATS[0]!.teamId).clock).toBeGreaterThan(5)
+    // Em 12 s a 2x a partida anda mais que a de 1x (as cenas de bola parada seguram o relógio, e menos no 2x).
+    expect(gameOf(after, SEATS[0]!.teamId).clock).toBeGreaterThan(3)
     expect(gameOf(after, SEATS[1]!.teamId).clock).toBeGreaterThan(gameOf(after, SEATS[0]!.teamId).clock)
     expect(setSpeed(event, seats, 'jogador-1', 3)).toBe(false)
     expect(setSpeed(event, seats, 'estranho', 2)).toBe(false)

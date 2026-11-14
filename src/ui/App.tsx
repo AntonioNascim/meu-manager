@@ -48,7 +48,7 @@ function initialSquadTab(hint?: string): SquadTab {
 /** Em desenvolvimento, &aba=free|proposals abre a aba do Mercado. */
 function initialMarketTab(hint?: string): MarketTab {
   const wanted = hint ?? (import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('aba') : null)
-  return wanted === 'search' || wanted === 'favorites' || wanted === 'lists' || wanted === 'free' || wanted === 'precontract' || wanted === 'proposals' || wanted === 'history' || wanted === 'contracts' ? wanted : 'overview'
+  return wanted === 'search' || wanted === 'favorites' || wanted === 'lists' || wanted === 'free' || wanted === 'precontract' || wanted === 'proposals' || wanted === 'history' || wanted === 'contracts' || wanted === 'coaches' ? wanted : 'overview'
 }
 
 /** Em desenvolvimento, &aba=rounds|goals|assists|cards|history abre a seção da Tabela. */
@@ -76,8 +76,15 @@ export function App() {
       timer = setTimeout(() => setBlocked(false), 4000)
     }
     window.addEventListener('mm-online-blocked', on)
+    const go = (e: Event) => {
+      const d = (e as CustomEvent<{ screen: ScreenId; tab?: string }>).detail
+      setHint(d.tab)
+      setScreen(d.screen)
+    }
+    window.addEventListener('mm-navigate', go)
     return () => {
       window.removeEventListener('mm-online-blocked', on)
+      window.removeEventListener('mm-navigate', go)
       if (timer !== undefined) clearTimeout(timer)
     }
   }, [])

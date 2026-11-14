@@ -484,7 +484,7 @@ export function stepLiveEvent(from: LiveEvent, seats: readonly Seat[], now: numb
       g.clock = minute
       const snap = g.live.snapshot()
       const watchers = humansOf(e, seats, g).length
-      const hold = watchers > 0 ? holdFor(snap.trace.slice(g.seenTrace), snap.events.slice(g.seenEvents)) : 0
+      const hold = watchers > 0 ? holdFor(snap.trace.slice(g.seenTrace), snap.events.slice(g.seenEvents), speedOf(e, seats, g)) : 0
       g.seenTrace = snap.trace.length
       g.seenEvents = snap.events.length
       g.nextAt += BASE_MINUTE_MS_OF(e) / speedOf(e, seats, g) + hold

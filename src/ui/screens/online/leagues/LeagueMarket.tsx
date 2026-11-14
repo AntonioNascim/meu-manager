@@ -10,6 +10,7 @@ import { Sheet } from '../../../theme'
 import type { Position } from '../../../../engine/types'
 import { inLabel } from './LeagueRunning'
 import { Pill } from './parts'
+import type { CoachTarget } from '../../../navigation'
 
 type Tab = 'offers' | 'coaches' | 'history'
 type Body = Omit<Extract<TradeReply, { ok: true }>, 'ok'>
@@ -25,7 +26,7 @@ const endAfter = (worldDate: string, years: number): string => `${Number(worldDa
  * Mercado entre técnicos da liga (B8.6): propostas com dinheiro reservado e contrapropostas, elencos dos outros técnicos, jogadores livres e o histórico público
  * (com denúncia). O servidor aplica todas as regras (janela, limite de estrangeiros, faixa de preço, limites por par de técnicos); a tela só mostra e pede.
  */
-export function LeagueMarket({ league, teams, worldDate, onClose }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; worldDate: string; onClose: () => void }) {
+export function LeagueMarket({ league, teams, worldDate, focus, onClose }: { league: LeagueDetail; teams?: { byId: Map<string, LeagueTeam> }; worldDate: string; focus?: CoachTarget; onClose: () => void }) {
   const id = league.id
   const [tab, setTab] = useState<Tab>('coaches')
   const [body, setBody] = useState<TradeBody | null>(null)
@@ -89,7 +90,7 @@ export function LeagueMarket({ league, teams, worldDate, onClose }: { league: Le
             <Offers body={body} busy={busy} nick={nick} clubOf={clubOf} act={act} id={id} myTeamId={league.myTeamId} />
           </>
         )}
-        {body && tab === 'coaches' && <Coaches league={league} clubOf={clubOf} worldDate={worldDate} busy={busy} act={act} id={id} windowOpen={body.windowOpen} />}
+        {body && tab === 'coaches' && <Coaches league={league} clubOf={clubOf} worldDate={worldDate} busy={busy} act={act} id={id} windowOpen={body.windowOpen} {...(focus ? { focus } : {})} />}
         {body && tab === 'history' && <History body={body} clubOf={clubOf} act={act} id={id} isAdmin={league.isAdmin} />}
       </div>
     </div>
@@ -180,7 +181,7 @@ function Offers({ body, busy, nick, clubOf, act, id, myTeamId }: { myTeamId?: st
   )
 }
 
-function Coaches({ league, clubOf, worldDate, busy, act, id, windowOpen }: { league: LeagueDetail; clubOf: (t: string | null) => string; worldDate: string; busy: boolean; act: (c: () => Promise<Answer<Body>>, onRefuse?: (minimumSalary: number) => void) => Promise<boolean>; id: string; windowOpen: boolean }) {
+function Coaches({ league, clubOf, worldDate, busy, act, id, windowOpen, focus }: { focus?: CoachTarget; league: LeagueDetail; clubOf: (t: string | null) => string; worldDate: string; busy: boolean; act: (c: () => Promise<Answer<Body>>, onRefuse?: (minimumSalary: number) => void) => Promise<boolean>; id: string; windowOpen: boolean }) {
   const others = league.members.filter((m) => m.teamId && m.teamId !== league.myTeamId)
   const [squad, setSquad] = useState<{ teamId: string; rows: SquadRow[] } | null>(null)
   const [pick, setPick] = useState<{ row: SquadRow; kind: 'purchase' | 'loan' } | null>(null)
@@ -191,6 +192,22 @@ function Coaches({ league, clubOf, worldDate, busy, act, id, windowOpen }: { lea
     const r = await leagueApi.tradeSquad(id, teamId)
     if (r.ok && r.squad) setSquad({ teamId, rows: r.squad })
   }
+  // Pedido vindo do cartão do jogador: abre o elenco do técnico e já a compra desse jogador.
+  useEffect(() => {
+    if (!focus) return
+    void leagueApi.tradeSquad(id, focus.teamId).then((r) => {
+      if (!r.ok || !r.squad) return
+      setSquad({ teamId: focus.teamId, rows: r.squad })
+      const row = r.squad.find((x) => x.playerId === focus.playerId)
+      if (row && !row.loaned) {
+        setFee(Math.round((row.buy.min + row.buy.max) / 2 / 10_000) * 10_000)
+        setSalary(Math.round((row.salary * 1.2) / 1_000) * 1_000)
+        setYears(2)
+        setPick({ row, kind: 'purchase' })
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   if (others.length === 0) return <p className="rounded-2xl border border-line bg-surface p-3 text-sm text-muted">Ainda não há outros técnicos com clube nesta liga.</p>
   return (
     <>

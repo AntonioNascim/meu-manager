@@ -375,7 +375,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
       <CupCard game={game} onOpen={() => onNavigate('standings', 'cups')} />
 
-      <Highlights game={game} onOpen={() => onNavigate('squad', 'players')} />
+      <Highlights game={game} />
 
       <TrainingCard game={game} onOpen={() => onNavigate('training')} />
 

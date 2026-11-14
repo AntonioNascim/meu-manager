@@ -6,7 +6,7 @@ import type { Game } from '../../../store/game'
 import { MARKET_SORT_LABELS, POSITION_GROUP_LABELS, QUICK_FILTER_LABELS } from '../../labels'
 import { Icon, Panel } from '../../theme'
 import { FilterSheet } from './FilterSheet'
-import { Negotiation } from './Negotiation'
+import { PlayerDetail } from '../../components/PlayerDetail'
 import { FavoriteStar, MarketRow } from './parts'
 import type { ReactNode } from 'react'
 
@@ -24,7 +24,7 @@ const quickChip = (on: boolean) => `min-h-10 shrink-0 rounded-full border border
  */
 export function Search({
   game,
-  open,
+  open: _open,
   preset,
   situations = ['all', 'club', 'free', 'expiring'],
   showTier = true,
@@ -144,7 +144,7 @@ export function Search({
       <p className="text-center text-[11px] text-muted">Atalho "Cabem no bolso": preço pedido pelo clube até {sc.budget > 0 ? 'o orçamento de compras' : 'o orçamento (hoje zerado)'} e salário que cabe no orçamento de salários.</p>
 
       {sheet && <FilterSheet game={game} filters={filters} situations={situations} base={preset} restrict={restrict} onApply={(f) => update(f)} onClose={() => setSheet(false)} />}
-      {picked && <Negotiation key={picked.id} game={game} player={picked} open={open} {...(initialKind ? { initialKind } : {})} onClose={() => setPickedId(null)} />}
+      {picked && <PlayerDetail key={picked.id} player={picked} {...(initialKind ? { offerKind: initialKind } : {})} onClose={() => setPickedId(null)} />}
     </div>
   )
 }

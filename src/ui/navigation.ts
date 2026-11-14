@@ -37,3 +37,23 @@ export const NAV_TAB_OF: Record<ScreenId, NavTab> = {
   finance: 'more',
   more: 'more',
 }
+
+/** Jogador de outro técnico humano que a pessoa quer propor: o Mercado abre na aba Técnicos já com ele escolhido. */
+export interface CoachTarget {
+  playerId: string
+  teamId: string
+}
+let coachTarget: CoachTarget | null = null
+
+/** Pede ao app para ir à aba Técnicos do Mercado com este jogador escolhido (a tela de origem se fecha ao trocar de tela). */
+export function goToCoachTrade(target: CoachTarget): void {
+  coachTarget = target
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mm-navigate', { detail: { screen: 'market' satisfies ScreenId, tab: 'coaches' } }))
+}
+
+/** Entrega o pedido uma vez só (a aba Técnicos o consome ao abrir). */
+export function takeCoachTarget(): CoachTarget | null {
+  const t = coachTarget
+  coachTarget = null
+  return t
+}

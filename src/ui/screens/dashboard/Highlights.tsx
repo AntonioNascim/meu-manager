@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { squadOf, userTeam } from '../../../store/game'
+import { PlayerDetail } from '../../components/PlayerDetail'
 import type { Game } from '../../../store/game'
 import type { Player } from '../../../engine/types'
 import { Eyebrow, Icon, Panel } from '../../theme'
@@ -49,16 +51,20 @@ function Tile({ icon, label, entry, format, onOpen }: { icon: IconName; label: s
   )
 }
 
-export function Highlights({ game, onOpen }: { game: Game; onOpen: () => void }) {
+export function Highlights({ game }: { game: Game }) {
   const h = squadHighlights(squadOf(game, userTeam(game).id))
+  const [openId, setOpenId] = useState<string | null>(null)
+  const opened = [h.scorer, h.assister, h.rated].find((e) => e?.player.id === openId)?.player
+  const open = (e: Entry | undefined) => () => e && setOpenId(e.player.id)
   return (
     <Panel className="p-4" data-testid="highlights">
       <Eyebrow icon="star">Destaques do elenco</Eyebrow>
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <Tile icon="ball" label="Artilheiro" entry={h.scorer} format={(v) => String(v)} onOpen={onOpen} />
-        <Tile icon="boot" label="Garçom" entry={h.assister} format={(v) => String(v)} onOpen={onOpen} />
-        <Tile icon="star" label="Nota média" entry={h.rated} format={(v) => v.toFixed(2).replace('.', ',')} onOpen={onOpen} />
+        <Tile icon="ball" label="Artilheiro" entry={h.scorer} format={(v) => String(v)} onOpen={open(h.scorer)} />
+        <Tile icon="boot" label="Garçom" entry={h.assister} format={(v) => String(v)} onOpen={open(h.assister)} />
+        <Tile icon="star" label="Nota média" entry={h.rated} format={(v) => v.toFixed(2).replace('.', ',')} onOpen={open(h.rated)} />
       </div>
+      {opened && <PlayerDetail key={opened.id} player={opened} onClose={() => setOpenId(null)} />}
     </Panel>
   )
 }

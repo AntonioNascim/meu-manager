@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { POSITIONS } from '../../../engine/types'
 import type { Match, StandingRow } from '../../../engine/types'
 import { competitionMatches, squadOf, standingsOf, teamById, teamStrength } from '../../../store/game'
@@ -7,6 +8,7 @@ import { POSITION_SHORT_LABELS } from '../../labels'
 import { playerOverall } from '../../../engine/overall'
 import { shortName } from './parts'
 import { Avatar, Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
+import { PlayerDetail } from '../../components/PlayerDetail'
 import { TacticSection } from './TacticSection'
 import { useOnlineDetail } from '../../useOnlineDetail'
 import type { LiveTactic } from './TacticSection'
@@ -14,6 +16,7 @@ import type { LiveTactic } from './TacticSection'
 /** Página simples de um time para estudar o adversário: posição, força, últimos resultados e elenco. */
 export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; teamId: string; onBack: () => void; onTeam: (id: string) => void; live?: LiveTactic | undefined }) {
   useOnlineDetail(teamId)
+  const [openId, setOpenId] = useState<string | null>(null)
   const team = teamById(game, teamId)
   const competition = game.season.season.competitions.find((c) => c.teamIds.includes(teamId))
   const rows: StandingRow[] = competition ? standingsOf(game, competition) : []
@@ -104,17 +107,20 @@ export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; t
         </div>
         <ul className="mt-2 divide-y divide-line">
           {squad.map((p) => (
-            <li key={p.id} className="flex items-center gap-2 px-4 py-2 text-sm">
+            <li key={p.id}>
+              <button type="button" onClick={() => setOpenId(p.id)} className="flex min-h-12 w-full items-center gap-2 px-4 py-2 text-left text-sm" aria-label={`Abrir ${playerName(p)}`}>
               <span className="w-9 shrink-0 text-xs font-bold text-muted">{POSITION_SHORT_LABELS[p.position]}</span>
               <Avatar id={p.id} colors={team.colors} size={30} ring />
               <Flag nationality={p.nationality} />
               <span className="min-w-0 flex-1 truncate font-semibold">{playerName(p)}</span>
               <span className="shrink-0 text-xs text-muted">{p.age} anos</span>
               <ValueBadge value={playerOverall(p)}>{Math.round(playerOverall(p))}</ValueBadge>
+              </button>
             </li>
           ))}
         </ul>
       </Panel>
+      {squad.find((p) => p.id === openId) && <PlayerDetail key={openId} player={squad.find((p) => p.id === openId) as (typeof squad)[number]} onClose={() => setOpenId(null)} />}
     </div>
   )
 }

@@ -85,7 +85,11 @@ describe('escanteio no campo 2D (só visual)', () => {
         if (at < 0) continue
         scenes++
         const setup = beats[at]!
-        const cross = beats[at + 1]!
+        // o batedor caminha até o canto, os jogadores se posicionam na área e só então vem o cruzamento
+        const gather = beats[at + 1]!
+        expect(setup.still && gather.still).toBe(true)
+        expect(Object.keys(gather.moves).length).toBeGreaterThan(Object.keys(setup.moves).length - 1)
+        const cross = beats[at + 2]!
         const flag = setup.marks.find((m) => m.kind === 'corner')!.at
         // a bola vai ao canto (perto da linha de fundo e de uma das laterais) ...
         expect(Math.min(flag.x, 1 - flag.x)).toBeLessThan(0.05)

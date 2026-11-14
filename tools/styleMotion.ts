@@ -103,6 +103,8 @@ export function measureStyle(cfg: StyleConfig, seeds: readonly number[]): StyleM
         for (const ev of motion.step(FRAME_MS, { running: true, speed: 1 })) {
           if (ev.type !== 'end') continue
           const leg = ev.leg
+          // As cenas de bola parada (tiro de meta, saída de bola, escanteio) são iguais para todos os estilos: ficam fora da medição.
+          if (leg.beat?.scene) continue
           const holderSide = ev.holder ? motion.bodies.get(ev.holder)?.placed.side : undefined
           if (holderSide && holderSide !== lastSide) {
             if (holderSide === 'home') seqCount++
@@ -129,8 +131,10 @@ export function measureStyle(cfg: StyleConfig, seeds: readonly number[]): StyleM
           withSum += avg
           withN++
           const step = meters(before, ball)
-          total += step
-          if (ball.y < 0.25 || ball.y > 0.75) flank += step
+          if (!motion.leg?.beat?.scene) {
+            total += step
+            if (ball.y < 0.25 || ball.y > 0.75) flank += step
+          }
           aheadSum += mine.filter((body) => depth(body.pos.x) > depth(ball.x) + 2).length
           aheadN++
           for (const body of mine) {

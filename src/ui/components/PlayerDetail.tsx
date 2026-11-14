@@ -4,7 +4,7 @@ import { useFreshPlayer } from '../useOnlineDetail'
 import { CONDITION } from '../../engine/config'
 import { overallAt, playerOverall } from '../../engine/overall'
 import { GOALKEEPER_ATTRIBUTES, MENTAL_ATTRIBUTES, PHYSICAL_ATTRIBUTES, TECHNICAL_ATTRIBUTES } from '../../engine/types'
-import type { AttributeName, IsoDate, Player, Position, StrengthSnapshot } from '../../engine/types'
+import type { AttributeName, IsoDate, OfferKind, Player, Position, StrengthSnapshot } from '../../engine/types'
 import { bandFor, conditionBand, formBand } from '../colors'
 import { formatMoney, playerName } from '../format'
 import {
@@ -19,6 +19,7 @@ import type { AttributeGroup } from '../labels'
 import { Avatar, Eyebrow, Flag, Icon, MoodIcon, Panel, Stars, ValueBadge } from '../theme'
 import { useGame } from '../../store/gameStore'
 import { isOnYellowEdge } from '../squadSort'
+import { OtherPlayerCard } from './OtherPlayerCard'
 import { PlayerCard } from './PlayerCard'
 import { AttributesCard, ClubFooter, StateCard } from './PlayerSheetParts'
 
@@ -101,12 +102,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * Detalhe do jogador. Na base (`academy`), mostra a estimativa de potencial em estrelas (`stars`) no lugar de estado,
  * temporada e contrato, e o `footer` traz os botões de promover e dispensar.
  */
-export function PlayerDetail({ player: shown, onClose, academy = false, stars, footer, history, currentDate }: { player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode; history?: readonly StrengthSnapshot[]; currentDate?: IsoDate }) {
+export function PlayerDetail({ player: shown, onClose, academy = false, stars, footer, history, currentDate, offerKind }: { offerKind?: OfferKind; player: Player; onClose: () => void; academy?: boolean; stars?: number; footer?: ReactNode; history?: readonly StrengthSnapshot[]; currentDate?: IsoDate }) {
   const player = useFreshPlayer(shown)
   const game = useGame()
   const colors = game?.season.teams.find((t) => t.id === player.teamId)?.colors
   // Os seus jogadores (fora da base) abrem no cartão grande, com os números atrás de um toque.
   const mine = !academy && game !== null && game !== undefined && player.teamId === game.userTeamId
+  // Jogador de outro clube (ou livre) abre no mesmo cartão grande, com "Fazer proposta" no lugar das ações do seu elenco.
+  const card = !academy && game !== null && game !== undefined
   const [showNumbers, setShowNumbers] = useState(false)
   const c = player.condition
   const overall = playerOverall(player)
@@ -117,7 +120,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
 
   return (
     <div className="fixed inset-0 z-30 flex flex-col bg-bg" role="dialog" aria-label={playerName(player)}>
-      {mine && (
+      {card && (
         <header className="flex items-center gap-2 border-b border-accent/30 bg-gradient-to-r from-accent/[0.08] to-transparent px-3 py-2">
           <button type="button" onClick={onClose} aria-label="Voltar" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-accent active:scale-95">
             <Icon name="left" size={26} />
@@ -130,7 +133,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           </button>
         </header>
       )}
-      {!mine && <header className="flex items-center gap-3 border-b border-line px-4 py-3">
+      {!card && <header className="flex items-center gap-3 border-b border-line px-4 py-3">
         <Avatar id={player.id} {...(colors ? { colors } : {})} size={64} ring />
         <div className="flex flex-col items-center gap-1">
           <ValueBadge value={overall} className="!min-w-14 !px-3 !py-2 !text-3xl">
@@ -164,8 +167,9 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-10 pt-4">
         {mine && game && <PlayerCard game={game} player={player} onClose={onClose} />}
-        {mine && <AttributesCard player={player} showAll={showNumbers} onToggleAll={() => setShowNumbers((v) => !v)} />}
-        {mine && <StateCard player={player} />}
+        {card && !mine && game && <OtherPlayerCard game={game} player={player} {...(offerKind ? { offerKind } : {})} />}
+        {card && <AttributesCard player={player} showAll={showNumbers} onToggleAll={() => setShowNumbers((v) => !v)} />}
+        {card && <StateCard player={player} />}
         {academy && (
           <Section title="Base">
             <p className="text-sm text-slate-300">
@@ -175,7 +179,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           </Section>
         )}
 
-        {!academy && !mine && <Section title="Estado atual">
+        {!academy && !card && <Section title="Estado atual">
           <Stat label="Condição física" value={`${Math.round(c.fitness)}%`} bar={c.fitness} color={conditionBand(c.fitness).bg} />
           <div className="flex items-center gap-2 py-1 text-sm">
             <span className="w-32 shrink-0 text-slate-300">Moral</span>
@@ -210,7 +214,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           </Section>
         )}
 
-        {(!mine || showNumbers) && <Section title="Força por posição">
+        {(!card || showNumbers) && <Section title="Força por posição">
           <div className="flex flex-wrap gap-2">
             {positions.map((pos, i) => {
               const value = i === 0 ? overall : overallAt(player, pos)
@@ -227,7 +231,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           </div>
         </Section>}
 
-        {(!mine || showNumbers) && groups.map((g) => (
+        {(!card || showNumbers) && groups.map((g) => (
           <Section key={g.id} title={ATTRIBUTE_GROUP_LABELS[g.id]}>
             {g.names.map((name) => {
               const value = player.attributes[name]
@@ -260,7 +264,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
           <Stat label="Término" value={player.contract.endDate.split('-').reverse().join('/')} />
           <Stat label="Multa rescisória" value={formatMoney(player.contract.releaseClause)} />
         </Section>}
-        {mine && <ClubFooter team={game?.season.teams.find((t) => t.id === player.teamId)} />}
+        {card && <ClubFooter team={game?.season.teams.find((t) => t.id === player.teamId)} />}
       </div>
       {footer && <footer className="border-t border-line px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{footer}</footer>}
     </div>

@@ -489,7 +489,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
       setAlert(next.injuryPending ? `${name} se machucou. ${CHOOSE_ALERT} na aba Tática.` : `${name} se machucou e não há mais trocas disponíveis: o time vai ficar com um a menos.`)
       return 0
     }
-    return holdFor(freshTrace, freshEvents)
+    return holdFor(freshTrace, freshEvents, online ? online.effectiveSpeed() : speed)
   }
   const refresh = () => {
     const next = live.match.snapshot()

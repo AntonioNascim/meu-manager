@@ -1,3 +1,4 @@
+import { PlayerDetail } from '../../components/PlayerDetail'
 import { useMemo, useState } from 'react'
 import type { Competition } from '../../../engine/types'
 import { competitionSeasonLabel } from '../../../store/game'
@@ -64,7 +65,7 @@ const MEDALS = [
   { label: 'Bronze', cls: 'bg-gradient-to-b from-orange-300 to-orange-600 text-bg', ring: 'border-orange-400/50 bg-orange-400/10' },
 ]
 
-function Row({ leader, rank, tone, mine, onTeam }: { leader: Leader; rank: number; tone: Tone; mine: boolean; onTeam: (id: string) => void }) {
+function Row({ leader, rank, tone, mine, onTeam, onPlayer }: { leader: Leader; rank: number; tone: Tone; mine: boolean; onTeam: (id: string) => void; onPlayer: (id: string) => void }) {
   const podium = rank <= 3
   const medal = MEDALS[rank - 1]
   return (
@@ -76,9 +77,11 @@ function Row({ leader, rank, tone, mine, onTeam }: { leader: Leader; rank: numbe
       ) : (
         <span className="w-9 shrink-0 text-center text-sm font-bold tabular-nums text-muted">{rank}</span>
       )}
-      <Avatar id={leader.player.id} colors={leader.team.colors} size={40} ring />
+      <button type="button" onClick={() => onPlayer(leader.player.id)} className="flex min-h-12 shrink-0 items-center" aria-label={`Abrir ${playerName(leader.player)}`}>
+        <Avatar id={leader.player.id} colors={leader.team.colors} size={40} ring />
+      </button>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-extrabold">{playerName(leader.player)}</span>
+        <button type="button" onClick={() => onPlayer(leader.player.id)} className="block max-w-full truncate text-left font-extrabold">{playerName(leader.player)}</button>
         <TeamLink team={leader.team} onOpen={onTeam} className="text-xs text-muted" />
       </span>
       <span className={`title text-4xl tabular-nums ${podium ? toneOf(tone).value : ''}`}>{leader.value}</span>
@@ -93,6 +96,8 @@ export function Leaders({ game, competition, board, onTeam }: { game: Game; comp
   const active = cfg.tabs.some((t) => t.id === kind) ? kind : (cfg.tabs[0] as LeaderTab).id
   const list = useMemo(() => leaders(game, competition, active), [game, competition, active])
   const tone = toneOf(cfg.tone)
+  const [playerId, setPlayerId] = useState<string | null>(null)
+  const opened = list.find((l) => l.player.id === playerId)?.player
 
   return (
     <div className="space-y-3">
@@ -107,10 +112,11 @@ export function Leaders({ game, competition, board, onTeam }: { game: Game; comp
       ) : (
         <ol className="space-y-2">
           {list.map((l, i) => (
-            <Row key={l.player.id} leader={l} rank={i + 1} tone={cfg.tone} mine={l.team.id === game.userTeamId} onTeam={onTeam} />
+            <Row key={l.player.id} leader={l} rank={i + 1} tone={cfg.tone} mine={l.team.id === game.userTeamId} onTeam={onTeam} onPlayer={setPlayerId} />
           ))}
         </ol>
       )}
+      {opened && <PlayerDetail key={opened.id} player={opened} onClose={() => setPlayerId(null)} />}
     </div>
   )
 }

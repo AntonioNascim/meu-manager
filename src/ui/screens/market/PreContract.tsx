@@ -8,6 +8,7 @@ import { perform } from '../../../store/actions'
 import { formatDate, formatMoney, playerName } from '../../format'
 import { OFFER_REASON_LABELS, commandErrorText } from '../../labels'
 import { Flag, Panel, Sheet, ValueBadge } from '../../theme'
+import { PlayerDetail } from '../../components/PlayerDetail'
 import { Search } from './Search'
 import { InterestText, clubName } from './parts'
 import { MoneyInput } from '../../components/MoneyInput'
@@ -132,7 +133,9 @@ export function PreContractTab({ game, open }: { game: Game; open: boolean }) {
   const available = preContractsOpen(state)
   const eligible = useMemo(() => (p: Player) => canPreContract(state, p), [state])
   const [pickedId, setPickedId] = useState<string | null>(null)
+  const [cardId, setCardId] = useState<string | null>(null)
   const picked = state.players.find((p) => p.id === pickedId)
+  const card = state.players.find((p) => p.id === cardId)
   void open
   return (
     <div className="space-y-3">
@@ -148,7 +151,7 @@ export function PreContractTab({ game, open }: { game: Game; open: boolean }) {
           open
           restrict={eligible}
           showTier={false}
-          onPick={(p) => setPickedId(p.id)}
+          onPick={(p) => setCardId(p.id)}
           situations={['expiring']}
           preset={{ situation: 'expiring' }}
           trailing={() => (
@@ -159,6 +162,18 @@ export function PreContractTab({ game, open }: { game: Game; open: boolean }) {
           )}
           note={() => <span> · vence em dez.</span>}
           empty="Ninguém disponível para pré-contrato com esses filtros."
+        />
+      )}
+      {card && (
+        <PlayerDetail
+          key={card.id}
+          player={card}
+          onClose={() => setCardId(null)}
+          footer={
+            <button type="button" onClick={() => (setPickedId(card.id), setCardId(null))} className="btn-primary min-h-12 w-full rounded-[10px] font-display text-lg font-bold active:scale-95" data-testid="pre-contract-open">
+              Fazer pré-contrato
+            </button>
+          }
         />
       )}
       {picked && <PreContractSheet key={picked.id} game={game} player={picked} onClose={() => setPickedId(null)} />}

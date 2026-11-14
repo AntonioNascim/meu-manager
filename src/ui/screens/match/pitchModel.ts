@@ -202,6 +202,12 @@ export interface Beat {
   marks: Mark[]
   /** Peso do tempo do passo na animação do lance (padrão 1): passe curto menos, cruzamento e bola longa mais. */
   weight?: number
+  /** Cena de bola parada: a bola vai ao ponto e fica lá enquanto os jogadores se posicionam (tiro de meta, escanteio, pênalti, saída de bola). */
+  still?: boolean
+  /** Narração do passo; `{who}` vira quem fica com a bola e `{from}` quem a tinha. */
+  note?: string
+  /** Passo de cena que vem depois do desfecho do lance (não conta como desfecho nas velocidades altas). */
+  scene?: boolean
 }
 
 export type Layout = Map<string, Placed>
@@ -284,7 +290,7 @@ function longBall(att: Side, from: Placed, to: Placed, focusY: number, tempo: nu
 export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly MatchEvent[], active?: ReadonlySet<string>): Beat[] {
   if (trace.shot && (trace.shot.type === 'penalty' || trace.shot.type === 'freeKick')) {
     const scene = setPieceBeats(trace, layout, events)
-    if (scene.length > 0) return scene
+    if (scene.length > 0) return [...scene, ...afterShotBeats(trace, layout, active)]
   }
   const att = trace.side
   const def: Side = att === 'home' ? 'away' : 'home'
@@ -346,9 +352,13 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
     heads.forEach((p, i) => (inBox[p.playerId] = { x: clamp(target.x - dir * (i === 0 ? 0 : 0.02) + dir * 0.01 * i, 0.02, 0.98), y: clamp(target.y + (i - 1) * 0.07, 0.3, 0.7) }))
     guards.forEach((p, i) => (inBox[p.playerId] = { x: clamp(target.x + dir * 0.025, 0.02, 0.98), y: clamp(target.y + (i - 1) * 0.07 + 0.02, 0.3, 0.7) }))
     const receiver = heads[0]
+    // O batedor caminha até o canto com a bola; os jogadores se posicionam dentro da área; e então vem o cruzamento.
+    const gather: Record<string, Pt> = { ...inBox }
+    delete gather[taker.playerId]
     return [
-      { phase: 'chance', holder: taker.playerId, ball: corner, moves: { ...moves, [taker.playerId]: corner }, attSide: att, focusY: corner.y, marks: [{ kind: 'corner', at: corner }], weight: 1.1 },
-      { phase: 'chance', ...(receiver ? { holder: receiver.playerId } : { holder: taker.playerId }), ball: target, arrow: { from: corner, to: target, curve: true }, moves: { ...moves, ...inBox }, attSide: att, focusY: 0.5, marks: [], weight: 1.5 },
+      { phase: 'chance', holder: taker.playerId, ball: corner, moves: { ...moves, [taker.playerId]: corner }, attSide: att, focusY: corner.y, marks: [{ kind: 'corner', at: corner }], weight: 1.4, still: true, scene: true, note: '{who} caminha até o canto para cobrar o escanteio' },
+      { phase: 'chance', holder: taker.playerId, ball: corner, moves: { ...moves, ...inBox }, attSide: att, focusY: corner.y, marks: [], weight: 1, still: true, scene: true, note: 'Os jogadores se posicionam dentro da área' },
+      { phase: 'chance', ...(receiver ? { holder: receiver.playerId } : { holder: taker.playerId }), ball: target, arrow: { from: corner, to: target, curve: true }, moves: { ...moves, ...inBox, ...gather }, attSide: att, focusY: 0.5, marks: [], weight: 1.5, scene: true },
     ]
   }
 
@@ -492,6 +502,7 @@ export function beatsFor(trace: PlayTrace, layout: Layout, events: readonly Matc
   // Chute defendido ou desviado para escanteio: a bola vai ao canto e a cobrança é um cruzamento para a área.
   const cornerMark = marks.find((mk) => mk.kind === 'corner')
   if (cornerMark && shot.result !== 'goal') beats.push(...cornerBeats(cornerMark.at, { ...moves, ...(shooter ? { [shooter.playerId]: from } : {}) }))
+  else beats.push(...afterShotBeats(trace, layout, active))
   return beats
 }
 
@@ -617,7 +628,104 @@ export function setPieceBeats(trace: PlayTrace, layout: Layout, events: readonly
     focusY: ballY,
     marks: kind ? [{ kind, at: end }] : [],
   }
+  if (penalty) {
+    // Pênalti em quatro tempos: os jogadores saem da área, o batedor põe a bola na marca, o goleiro se posiciona na linha e só então a corrida e a cobrança.
+    const clear: Record<string, Pt> = { ...moves }
+    if (keeper) delete clear[keeper.playerId]
+    const ballFrom: Pt = { x: ballX - dir * 0.1, y: 0.5 + (hash(`${trace.minute}:${shot.shooterId}:pf`) < 0.5 ? -0.12 : 0.12) }
+    const leave: Beat = { phase: 'chance', holder: taker.playerId, ball: ballFrom, moves: { ...clear, [taker.playerId]: { x: ballFrom.x - dir * 0.015, y: ballFrom.y } }, attSide: S, focusY: 0.5, marks: fouled ? [{ kind: 'foul', at: ballFrom }] : [], still: true, note: 'Pênalti! Os jogadores saem da área' }
+    const place: Beat = { phase: 'chance', holder: taker.playerId, ball: spot, moves: { ...clear, [taker.playerId]: setupTaker }, attSide: S, focusY: ballY, marks: [], still: true, note: '{who} coloca a bola na marca do pênalti' }
+    const stand: Beat = { ...place, holder: keeper?.playerId ?? taker.playerId, moves: { ...setup.moves }, still: true, note: '{who} se posiciona na linha do gol' }
+    return [leave, place, stand, { ...runUp, note: '{who} parte para a cobrança' }, kick]
+  }
   return [setup, runUp, kick]
+}
+
+/**
+ * Cenas que vêm depois do chute (só visuais): o tiro de meta depois de um chute para fora e a saída de bola depois do gol.
+ * Tiro de meta: a bola volta para a área, o goleiro a pega, ajeita e cobra; com toque de bola sai jogando curto perto da área, com lançamento direto
+ * é bola longa e nos outros estilos um meio-termo. Saída: a bola volta ao meio, os dois times se reorganizam cada um no seu lado e quem sofreu o gol dá a saída.
+ */
+export function afterShotBeats(trace: PlayTrace, layout: Layout, active?: ReadonlySet<string>): Beat[] {
+  const shot = trace.shot
+  if (!shot) return []
+  const placed = [...layout.values()].filter((p) => !active || active.has(p.playerId))
+  const shooter = layout.get(shot.shooterId)
+  const att: Side = shooter?.side ?? trace.side
+  if (shot.result === 'goal') return kickoffBeats(att, placed, trace.minute)
+  if (shot.result === 'off-target') return goalKickBeats(att, placed, trace.minute, shot.keeperId ? layout.get(shot.keeperId) : undefined)
+  return []
+}
+
+function kickoffBeats(scorer: Side, placed: readonly Placed[], minute: number): Beat[] {
+  const k: Side = scorer === 'home' ? 'away' : 'home'
+  const kdir = k === 'home' ? 1 : -1
+  const mates = placed.filter((p) => p.side === k && p.slot !== 'GK')
+  const rank = (p: Placed) => (p.slot === 'ST' ? 0 : p.slot === 'AM' ? 1 : p.slot === 'CM' ? 2 : 3)
+  const sorted = [...mates].sort((a, b) => rank(a) - rank(b) || hash(`${minute}:${a.playerId}:ko`) - hash(`${minute}:${b.playerId}:ko`))
+  const kicker = sorted[0]
+  const partner = sorted.find((p) => p.playerId !== kicker?.playerId && (p.slot === 'CM' || p.slot === 'AM' || p.slot === 'ST')) ?? sorted[1]
+  if (!kicker || !partner) return []
+  const moves: Record<string, Pt> = {}
+  for (const p of placed) {
+    // Cada time no seu lado; quem não dá a saída fica fora do círculo central.
+    const own = p.side === 'home' ? Math.min(p.base.x, p.side === k ? 0.46 : 0.39) : Math.max(p.base.x, p.side === k ? 0.54 : 0.61)
+    moves[p.playerId] = { x: p.slot === 'GK' ? p.base.x : own, y: p.base.y }
+  }
+  const kickerAt: Pt = { x: 0.5 - kdir * 0.012, y: 0.5 }
+  const partnerAt: Pt = { x: 0.5 - kdir * 0.07, y: 0.57 }
+  moves[kicker.playerId] = kickerAt
+  moves[partner.playerId] = partnerAt
+  const centre: Pt = { x: 0.5, y: 0.5 }
+  return [
+    { phase: 'midfield', holder: kicker.playerId, ball: centre, moves, attSide: k, focusY: 0.5, marks: [], weight: 1.4, still: true, scene: true, note: 'A bola volta ao meio do campo e os times se reorganizam' },
+    { phase: 'progress', holder: partner.playerId, ball: partnerAt, arrow: { from: centre, to: partnerAt, curve: false }, moves, attSide: k, focusY: 0.5, marks: [], weight: 0.9, scene: true, note: '{from} dá a saída de bola para {who}' },
+  ]
+}
+
+function goalKickBeats(att: Side, placed: readonly Placed[], minute: number, keeperHint: Placed | undefined): Beat[] {
+  const D: Side = att === 'home' ? 'away' : 'home'
+  const adir = att === 'home' ? 1 : -1 // o time que chutou ataca neste sentido; o goleiro defende o gol de lá
+  const gx = goalX(att)
+  const keeper = keeperHint && keeperHint.side === D ? keeperHint : placed.find((p) => p.side === D && p.slot === 'GK')
+  if (!keeper) return []
+  const mates = placed.filter((p) => p.side === D && p.slot !== 'GK')
+  const spot: Pt = { x: gx - adir * 0.05, y: clamp(0.5 + (hash(`${minute}:${keeper.playerId}:gk`) - 0.5) * 0.3, 0.38, 0.62) }
+  const behind: Pt = { x: spot.x - adir * 0.018, y: spot.y }
+  const style = keeper.style ?? mates.find((p) => p.style)?.style
+  const byHash = (list: readonly Placed[]) => [...list].sort((a, b) => hash(`${minute}:${a.playerId}:gkr`) - hash(`${minute}:${b.playerId}:gkr`))
+  const pick = (slots: readonly Position[], toward: number): Placed | undefined => {
+    const pool = mates.filter((p) => slots.includes(p.slot))
+    return byHash(pool.length > 0 ? pool : mates).sort((a, b) => Math.abs(a.base.x - toward) - Math.abs(b.base.x - toward))[0]
+  }
+  // Companheiros abrem para a saída: zagueiros na beira da área.
+  const spread: Record<string, Pt> = {}
+  byHash(mates.filter((p) => p.slot === 'CB')).slice(0, 2).forEach((p, i) => (spread[p.playerId] = { x: gx - adir * 0.17, y: i === 0 ? 0.32 : 0.68 }))
+  let receiver: Placed | undefined
+  let target: Pt
+  let curve = false
+  if (style === 'direct') {
+    // Lançamento direto: bola longa para o atacante, perto do meio do campo.
+    receiver = pick(['ST', 'AM', 'RW', 'LW'], 0.5)
+    target = { x: 0.5 - adir * 0.04, y: clamp(receiver ? receiver.base.y * 0.6 + 0.2 : 0.5, 0.25, 0.75) }
+    curve = true
+  } else if (style === 'possession') {
+    // Toque de bola: sai jogando curto, para um zagueiro ou lateral perto da área.
+    receiver = pick(['CB', 'RB', 'LB'], gx - adir * 0.15)
+    target = { x: gx - adir * 0.16, y: clamp(receiver ? receiver.base.y : 0.5, 0.2, 0.8) }
+  } else {
+    // Meio-termo: bola até o volante ou meia, a uns 30 m do gol.
+    receiver = pick(['DM', 'CM', 'RB', 'LB'], gx - adir * 0.3)
+    target = { x: gx - adir * 0.3, y: clamp(receiver ? receiver.base.y : 0.5, 0.2, 0.8) }
+  }
+  if (!receiver) return []
+  // O destinatário já vai ao ponto enquanto o goleiro ajeita a bola, então a bola não cruza o campo atrás dele.
+  const moves = { ...spread, [receiver.playerId]: target }
+  return [
+    { phase: 'progress', holder: keeper.playerId, ball: spot, moves: { [keeper.playerId]: behind, ...moves }, attSide: D, focusY: spot.y, marks: [], weight: 1.2, still: true, scene: true, note: 'Bola para fora: tiro de meta. {who} vai buscar a bola' },
+    { phase: 'progress', holder: keeper.playerId, ball: spot, moves: { [keeper.playerId]: behind, ...moves }, attSide: D, focusY: spot.y, marks: [], weight: 0.9, scene: true, note: '{who} pega a bola e ajeita para a cobrança' },
+    { phase: 'progress', holder: receiver.playerId, ball: nudge(target, -adir), arrow: { from: spot, to: target, curve }, moves, attSide: D, focusY: target.y, marks: [], weight: curve ? 1.4 : 1, scene: true, note: curve ? '{from} cobra o tiro de meta com bola longa para {who}' : '{from} cobra o tiro de meta e toca para {who}' },
+  ]
 }
 
 const isFoulOrCard = (e: MatchEvent) => e.type === 'foul' || e.type === 'yellow-card' || e.type === 'red-card'

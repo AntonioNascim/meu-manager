@@ -10,7 +10,7 @@ import { formatMoney, playerName } from '../../format'
 import { POSITION_SHORT_LABELS } from '../../labels'
 import { Avatar, Crest, Icon, ValueBadge } from '../../theme'
 import { InterestText, clubName, shortMoney } from './parts'
-import { Negotiation } from './Negotiation'
+import { PlayerDetail } from '../../components/PlayerDetail'
 import type { MarketTab } from '../Market'
 
 const CARD = 'card-bg overflow-hidden rounded-[14px] border border-white/[0.13] border-l-[3px] border-l-accent'
@@ -30,7 +30,7 @@ export function mainTarget(game: Game): { player: Player; offer?: TransferOffer 
 }
 
 /** Resumo do mercado: alvo principal, lista de alvos (favoritos) e atividade recente. Nada some: as abas de busca, listas e propostas seguem ao lado. */
-export function Overview({ game, open, onTab }: { game: Game; open: boolean; onTab: (tab: MarketTab) => void }) {
+export function Overview({ game, onTab }: { game: Game; open: boolean; onTab: (tab: MarketTab) => void }) {
   const [pickedId, setPickedId] = useState<string | null>(null)
   const state = game.season
   const date = state.season.currentDate
@@ -196,7 +196,7 @@ export function Overview({ game, open, onTab }: { game: Game; open: boolean; onT
         )}
       </section>
 
-      {picked && <Negotiation key={picked.id} game={game} player={picked} open={open} onClose={() => setPickedId(null)} />}
+      {picked && <PlayerDetail key={picked.id} player={picked} onClose={() => setPickedId(null)} />}
     </div>
   )
 }

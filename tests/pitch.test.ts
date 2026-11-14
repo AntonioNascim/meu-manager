@@ -211,13 +211,14 @@ describe('bola, setas e marcações de cada lance', () => {
   it('a bola segue quem o motor escolheu: condutor, receptor, finalizador e goleiro', () => {
     const t = snap.trace.find((x) => x.play === 'through' && x.outcome === 'won' && x.shot?.result === 'saved')
     if (t) {
-      const holders = beatsFor(t, everyone, snap.events).map((x) => x.holder)
+      // (as cenas de bola parada que vêm depois do desfecho não contam aqui)
+      const holders = beatsFor(t, everyone, snap.events).filter((x) => !x.scene).map((x) => x.holder)
       expect(holders).toContain(t.carrierId)
       expect(holders).toContain(t.receiverId)
       expect(holders[holders.length - 1]).toBe(t.shot?.keeperId)
     }
     const g = snap.trace.find((x) => x.shot?.result === 'goal')!
-    const beats = beatsFor(g, everyone, snap.events)
+    const beats = beatsFor(g, everyone, snap.events).filter((x) => !x.scene)
     expect(beats.map((x) => x.holder)).toContain(g.carrierId)
     expect(beats[beats.length - 1]?.holder).toBe(g.shot?.shooterId)
   })
@@ -350,7 +351,7 @@ describe('outros jogos da rodada (revelados pelo relógio)', () => {
 })
 
 describe('câmera lenta em finalizações, gols e cartões', () => {
-  const trace = (shot?: 'goal' | 'saved'): MatchSnapshot['trace'][number] => ({
+  const trace = (shot?: 'goal' | 'saved' | 'off-target'): MatchSnapshot['trace'][number] => ({
     minute: 10,
     side: 'home',
     transition: false,
@@ -360,15 +361,23 @@ describe('câmera lenta em finalizações, gols e cartões', () => {
   const event = (type: 'goal' | 'yellow-card' | 'red-card' | 'foul') => ({ minute: 10, type, teamId: 't', playerId: 'p', text: '' })
 
   it('gol é mais lento que finalização, que é mais lenta que o lance comum (que segue a velocidade)', () => {
-    expect(slowFor(trace('goal'))).toBe(HOLD_MS.goal)
+    // O gol espera também a saída de bola (a bola volta ao meio, os times se reorganizam); a cena é mais curta no 2x.
+    expect(slowFor(trace('goal'))).toBe(HOLD_MS.goal + HOLD_MS.restart)
+    expect(slowFor(trace('goal'), 2)).toBe(HOLD_MS.goal + HOLD_MS.restart * 0.5)
     expect(slowFor(trace('saved'))).toBe(HOLD_MS.shot)
+    // Chute para fora: tiro de meta. Defesa que vira escanteio: a cena do escanteio.
+    expect(slowFor(trace('off-target'))).toBe(HOLD_MS.shot + HOLD_MS.goalKick)
+    expect(slowFor(trace('off-target'), 2)).toBe(HOLD_MS.shot + HOLD_MS.goalKick * 0.5)
+    expect(slowFor(trace('saved'), 1, true)).toBe(HOLD_MS.shot + HOLD_MS.corner)
     expect(slowFor(trace())).toBe(0)
     expect(HOLD_MS.goal).toBeGreaterThan(HOLD_MS.shot)
     expect(HOLD_MS.shot).toBeGreaterThan(700 / 8)
   })
 
   it('o relógio espera depois de gol, finalização e cartão, em qualquer velocidade, e não espera por falta', () => {
-    expect(holdFor([trace('goal')], [event('goal')])).toBe(HOLD_MS.goal)
+    expect(holdFor([trace('goal')], [event('goal')])).toBe(HOLD_MS.goal + HOLD_MS.restart)
+    expect(holdFor([trace('goal')], [event('goal')], 2)).toBe(HOLD_MS.goal + HOLD_MS.restart * 0.5)
+    expect(holdFor([trace('off-target')], [])).toBe(HOLD_MS.shot + HOLD_MS.goalKick)
     expect(holdFor([trace('saved')], [])).toBe(HOLD_MS.shot)
     expect(holdFor([trace()], [event('yellow-card')])).toBe(HOLD_MS.card)
     expect(holdFor([trace()], [event('red-card')])).toBe(HOLD_MS.card)
@@ -563,12 +572,16 @@ describe('cenas de bola parada no campo', () => {
     const list = scenes('penalty')
     expect(list.length).toBeGreaterThan(0)
     for (const { trace, layout, snap } of list) {
-      const beats = beatsFor(trace, layout, snap.events)
-      expect(beats).toHaveLength(3)
+      // Quatro tempos antes da cobrança: sair da área, bola na marca, goleiro na linha e a corrida; depois a cobrança.
+      const beats = beatsFor(trace, layout, snap.events).filter((b) => !b.scene)
+      expect(beats).toHaveLength(5)
       const taker = layout.get(trace.shot!.shooterId)!
       const gx = taker.side === 'home' ? 1 : 0
       const dir = taker.side === 'home' ? 1 : -1
-      const [setup, , kick] = beats as [(typeof beats)[number], (typeof beats)[number], (typeof beats)[number]]
+      const kick = beats[4]!
+      const setup = beats[2]!
+      expect(beats[0]!.still).toBe(true)
+      expect(beats[1]!.ball).toEqual({ x: gx - dir * PENALTY_MARK, y: 0.5 })
       expect(setup.ball).toEqual({ x: gx - dir * PENALTY_MARK, y: 0.5 })
       expect(setup.arrow).toBeUndefined()
       expect(Math.abs((setup.moves[taker.playerId] as { x: number }).x - setup.ball.x)).toBeLessThan(0.05)
@@ -587,7 +600,7 @@ describe('cenas de bola parada no campo', () => {
     const list = scenes('freeKick')
     expect(list.length).toBeGreaterThan(0)
     for (const { trace, layout, snap } of list) {
-      const beats = beatsFor(trace, layout, snap.events)
+      const beats = beatsFor(trace, layout, snap.events).filter((b) => !b.scene)
       expect(beats).toHaveLength(3)
       const taker = layout.get(trace.shot!.shooterId)!
       const gx = taker.side === 'home' ? 1 : 0

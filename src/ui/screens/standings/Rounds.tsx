@@ -3,6 +3,7 @@ import type { Competition, Match, MatchEvent } from '../../../engine/types'
 import { competitionMatches, competitionSeasonLabel, teamById } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { formatDate, playerName } from '../../format'
+import { PlayerDetail } from '../../components/PlayerDetail'
 import { Icon, Sheet } from '../../theme'
 import { SectionHeader, TeamLink } from './parts'
 
@@ -17,11 +18,21 @@ export function MatchSummary({ game, match, onClose }: { game: Game; match: Matc
   const home = teamById(game, match.homeTeamId)
   const away = teamById(game, match.awayTeamId)
   const result = match.result as NonNullable<Match['result']>
+  const [playerId, setPlayerId] = useState<string | null>(null)
   const players = new Map(game.season.players.map((p) => [p.id, p]))
   const name = (id: string) => {
     const p = players.get(id)
     return p ? playerName(p) : 'Jogador'
   }
+  // O nome abre o cartão do jogador (se ele ainda está no jogo).
+  const nameLink = (id: string, label: string) =>
+    players.has(id) ? (
+      <button type="button" onClick={() => setPlayerId(id)} className="max-w-full truncate text-left underline decoration-white/25 underline-offset-2">
+        {label}
+      </button>
+    ) : (
+      label
+    )
   const events = result.events.filter((e) => e.type === 'goal' || e.type === 'own-goal' || e.type === 'yellow-card' || e.type === 'red-card').sort((a, b) => a.minute - b.minute)
   const line = (e: MatchEvent) => {
     const side = e.teamId === match.homeTeamId ? 'justify-start' : 'justify-end text-right'
@@ -32,10 +43,10 @@ export function MatchSummary({ game, match, onClose }: { game: Game; match: Matc
         {e.teamId === match.homeTeamId && <span className="w-9 shrink-0 text-xs font-bold tabular-nums text-muted">{e.minute}'</span>}
         {icon}
         <span className="min-w-0">
-          <span className="block truncate font-bold">{label}</span>
+          <span className="block truncate font-bold">{nameLink(e.playerId, label)}</span>
           {e.type === 'goal' && e.relatedPlayerId && (
             <span className="block truncate text-[11px] text-muted">
-              assist.: {name(e.relatedPlayerId)}
+              assist.: {nameLink(e.relatedPlayerId, name(e.relatedPlayerId))}
               {e.assistKind === 'cross' ? ' (cruzamento)' : e.assistKind === 'pass' ? ' (passe)' : ''}
             </span>
           )}
@@ -45,6 +56,8 @@ export function MatchSummary({ game, match, onClose }: { game: Game; match: Matc
     )
   }
   const goals = result.homeGoals + result.awayGoals
+  const opened = playerId ? players.get(playerId) : undefined
+  if (opened) return <PlayerDetail key={opened.id} player={opened} onClose={() => setPlayerId(null)} />
   return (
     <Sheet title="Resumo do jogo" onClose={onClose}>
       <div className="flex items-center justify-between gap-2 py-2">
