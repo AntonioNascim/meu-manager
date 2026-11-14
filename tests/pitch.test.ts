@@ -237,15 +237,15 @@ describe('bola, setas e marcações de cada lance', () => {
     for (const k of ['corner', 'foul', 'yellow']) expect(kinds.has(k), k).toBe(true)
   })
 
-  it('em 4x e 8x a animação se simplifica (só o desfecho, sem setas); em 2x pula o meio; em 1x toca tudo', () => {
+  it('em 2x a animação se simplifica (só o desfecho, sem setas); em 1x vem resumida (pula o meio)', () => {
     const t = snap.trace.find((x) => x.play === 'through' && x.outcome === 'won' && x.shot)!
     const beats = beatsFor(t, everyone, snap.events)
     expect(beats.length).toBeGreaterThanOrEqual(4)
-    expect(playbackFor(beats, 1, false)).toEqual({ beats, arrows: true })
-    const two = playbackFor(beats, 2, false)
-    expect(two.beats.length).toBe(2)
-    expect(two.beats[1]).toBe(beats[beats.length - 1])
-    for (const speed of [4, 8]) expect(playbackFor(beats, speed, false)).toEqual({ beats: [beats[beats.length - 1]], arrows: false })
+    const one = playbackFor(beats, 1, false)
+    expect(one.arrows).toBe(true)
+    expect(one.beats.length).toBe(2)
+    expect(one.beats[1]).toBe(beats[beats.length - 1])
+    for (const speed of [2, 4, 8]) expect(playbackFor(beats, speed, false)).toEqual({ beats: [beats[beats.length - 1]], arrows: false })
     expect(playbackFor(beats, 1, true).arrows).toBe(false)
     expect(playbackFor([], 1, false).beats).toEqual([])
   })
@@ -509,10 +509,10 @@ describe('tela de partida: abas, controles e velocidade', () => {
     expect(html).toContain('data-testid="pitch"')
     expect(html).not.toContain('Só lances')
     expect(html).not.toContain('Como ver a partida')
-    for (const old of ['>1x<', '>4x<', '>8x<', 'Velocidade</span>']) expect(html).not.toContain(old)
+    for (const old of ['>4x<', '>8x<', 'Velocidade</span>']) expect(html).not.toContain(old)
   })
 
-  it('um único botão de velocidade (2x de início) fica no placar', () => {
+  it('um único botão de velocidade (1x de início, só 1x e 2x) fica no placar', () => {
     const html = renderToStaticMarkup(createElement(MatchScreen, { game: toDay(), onNavigate: () => {} }))
     expect(html.match(/data-testid="speed"/g)).toHaveLength(1)
     expect(html.indexOf('data-testid="speed"')).toBeLessThan(html.indexOf('data-testid="pitch"'))
@@ -522,7 +522,7 @@ describe('tela de partida: abas, controles e velocidade', () => {
     const g = toDay()
     beginLive(g, true).match.playUntil(20)
     const html = renderToStaticMarkup(createElement(MatchScreen, { game: g, onNavigate: () => {} }))
-    expect(html.indexOf('>Trocas<')).toBeLessThan(html.indexOf('Lances ao vivo'))
+    expect(html.indexOf('>Tática<')).toBeLessThan(html.indexOf('Lances ao vivo'))
     expect(html).toContain('Mostrar faltas')
   })
 

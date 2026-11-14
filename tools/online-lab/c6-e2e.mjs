@@ -152,8 +152,6 @@ for (let tries = 0; tries < 8 && !watching; tries++) {
 check('depois do Pronto a partida abre sozinha na tela', watching)
 await page.getByTestId('speed').waitFor({ timeout: 40000 })
 await page.getByTestId('speed').click()
-await page.getByTestId('speed').click()
-await page.getByTestId('speed').click()
 const ticketsBefore = tickets.length
 let injuries = 0
 const hurtSeen = new Set()
@@ -162,16 +160,17 @@ const end = Date.now() + 240000
 while (Date.now() < end) {
   if (await page.getByRole('button', { name: 'Voltar ao painel' }).isVisible().catch(() => false)) break
   if (await page.getByTestId('halftime-back').isVisible().catch(() => false)) await page.getByTestId('halftime-back').click().catch(() => {})
-  const hurt = await page.getByText('Banco (toque em quem entra)').isVisible().catch(() => false)
-  const alertText = await page.getByRole('alert').first().innerText().catch(() => '')
-  if (/Escolha quem entra|Toque em quem entra/.test(alertText + (await page.locator('main').innerText().catch(() => '')).slice(0, 4000)) && hurt) {
-    const bench = page.getByText('Banco (toque em quem entra)').locator('xpath=ancestor::*[self::section or self::div][1]').locator('button:not([disabled])').first()
+  // Lesão no meu time: a aba Tática mostra o aviso e abre a janela com os reservas (a mesma da substituição); toco no primeiro reserva.
+  const hurt = await page.getByTestId('injury-box').isVisible().catch(() => false)
+  if (hurt) {
+    const boxText = await page.getByTestId('injury-box').innerText().catch(() => '')
+    const who = (/✚ (.+?) se machucou/.exec(boxText) ?? [])[1] ?? ''
+    const pickable = () => page.locator('[data-testid^=sub-]:not([disabled])').first()
+    if (!(await pickable().isVisible().catch(() => false))) await page.getByRole('button', { name: 'Escolher quem entra' }).click().catch(() => {})
     const less = page.getByRole('button', { name: 'Seguir com um a menos' })
-    if (!(await bench.isVisible().catch(() => false)) && (await less.isVisible().catch(() => false))) await less.click().catch(() => {})
-    if (await bench.isVisible().catch(() => false)) {
-      const hurtText = alertText + ' ' + (await page.locator('main').innerText().catch(() => ''))
-      const who = (/(\S+(?: \S+)?) se machucou/.exec(hurtText) ?? [])[1] ?? ''
-      await bench.click().catch(() => {})
+    if (!(await pickable().isVisible().catch(() => false)) && (await less.isVisible().catch(() => false))) await less.click().catch(() => {})
+    if (await pickable().isVisible().catch(() => false)) {
+      await pickable().click().catch(() => {})
       if (who && !hurtSeen.has(who)) {
         hurtSeen.add(who)
         injuries++

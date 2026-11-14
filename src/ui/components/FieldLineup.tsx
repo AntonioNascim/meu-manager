@@ -4,9 +4,8 @@ import type { GridPoint, Player, Position } from '../../engine/types'
 import { playerName } from '../format'
 import { gridCoords, pitchLayout } from '../pitchLayout'
 import type { PitchPoint } from '../pitchLayout'
-import { inkFor } from '../screens/match/pitchModel'
 import { conditionBand } from '../colors'
-import { Jersey } from '../theme'
+import { Avatar, FitName } from '../theme'
 import { GridPitch } from './GridPitch'
 
 export interface FieldSlot {
@@ -14,13 +13,6 @@ export interface FieldSlot {
   slot: Position
   /** Ponto da grade que ocupa (posicionamento livre); sem ele, a vaga da formação pelo papel. */
   point?: GridPoint | undefined
-}
-
-/** Nome curto para caber embaixo da camisa. */
-export function shortPlayerName(p: Pick<Player, 'name' | 'nickname'>): string {
-  const name = playerName(p)
-  const parts = name.split(' ')
-  return parts.length > 1 && !p.nickname ? (parts[parts.length - 1] as string) : name
 }
 
 /**
@@ -56,13 +48,13 @@ function Token({ player, number, fitness, yellow, kit, selected, onTap }: { play
   const body = (
     <>
       <span className={`relative rounded-full p-0.5 ${selected ? 'bg-white/90 ring-4 ring-white/60' : ''}`}>
-        <Jersey team={{ colors: [kit.shirt, kit.trim] }} size={40} />
-        <span className="absolute inset-x-0 top-[44%] -translate-y-1/2 text-center font-display text-[13px] font-extrabold leading-none" style={{ color: inkFor(kit.shirt) }}>
-          {number}
-        </span>
+        <Avatar id={player.id} colors={[kit.shirt, kit.trim]} size={38} ring />
+        <span className="absolute -right-2.5 -top-1 rounded-full bg-black/75 px-1 font-display text-[12px] font-bold leading-[16px] text-accent">{number}</span>
         {yellow && <span className="absolute -right-1 -top-0.5 h-3.5 w-2.5 rounded-[2px] bg-amber-300 ring-1 ring-black/40" role="img" aria-label="Cartão amarelo" />}
       </span>
-      <span className="w-full truncate rounded bg-black/75 px-1 text-center text-[11px] font-bold leading-[18px] text-white">{shortPlayerName(player)}</span>
+      <span className="w-full rounded bg-black/75 px-1 leading-[18px] text-white">
+        <FitName player={player} sizes={[11, 10.5, 10, 9.5]} />
+      </span>
       <span className={`rounded px-1.5 text-[11px] font-extrabold leading-[18px] tabular-nums text-bg ${conditionBand(fitness).bg}`} title="Condição física">
         {Math.round(fitness)}%
       </span>

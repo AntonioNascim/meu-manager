@@ -12,7 +12,7 @@ import { isUnavailable } from '../../squadSort'
 import { assignNumber } from '../match/pitchModel'
 import { seedNumbers } from '../../shirt'
 import { MiniFormation } from '../dashboard/MiniFormation'
-import { Avatar, Icon, StadiumArt } from '../../theme'
+import { Avatar, FitName, Icon, StadiumArt } from '../../theme'
 
 /** Estrelas do time (de meia em meia), pela força média dos titulares. */
 export function teamStars(strength: number): number {
@@ -52,7 +52,7 @@ export function squadTagline(game: Game, team: Team): string {
 }
 
 /** Posição na tela: o fundo do campo fica mais largo que o topo (perspectiva). */
-const squeeze = (y: number) => 0.62 + 0.38 * (y / 100)
+const squeeze = (y: number) => 0.8 + 0.2 * (y / 100)
 const project = (x: number, y: number): [number, number] => [50 + (x - 50) * squeeze(y), y]
 const poly = (points: [number, number][]) => `M${points.map(([x, y]) => project(x, y).map((n) => n.toFixed(2)).join(' ')).join('L')}Z`
 const line = (points: [number, number][]) => `M${points.map(([x, y]) => project(x, y).map((n) => n.toFixed(2)).join(' ')).join('L')}`
@@ -90,7 +90,7 @@ export function Overview({ game, onOpen }: { game: Game; onOpen: (playerId: stri
   const numbers = useRef(seedNumbers(new Map<string, number>(), game.season, game.userTeamId, 'home'))
   return (
     <div className="space-y-3" data-testid="squad-overview">
-      <section className="card-bg grid grid-cols-[1fr_1fr_1.3fr] divide-x divide-white/[0.1] overflow-hidden rounded-[14px] border border-white/[0.13] py-3">
+      <section className="card-bg grid grid-cols-[0.95fr_1.25fr_1.2fr] divide-x divide-white/[0.1] overflow-hidden rounded-[14px] border border-white/[0.13] py-3">
         <div className="flex flex-col items-center gap-1 px-2">
           <b className="font-display text-[38px] font-extrabold leading-none">{Math.round(strength)}</b>
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">Geral do time</span>
@@ -100,9 +100,9 @@ export function Overview({ game, onOpen }: { game: Game; onOpen: (playerId: stri
           </span>
         </div>
         <div className="flex items-center justify-center gap-2 px-2">
-          <MiniFormation tactic={team.tactic} className="h-12 w-8 shrink-0" />
-          <span>
-            <b className="block font-display text-[24px] font-bold leading-none">{formationLabel(team.tactic.formationId)}</b>
+          <MiniFormation tactic={team.tactic} className="h-11 w-7 shrink-0" />
+          <span className="min-w-0">
+            <b className="block whitespace-nowrap font-display text-[21px] font-bold leading-none" data-testid="overview-formation">{formationLabel(team.tactic.formationId)}</b>
             <span className="text-[11px] text-muted">Formação</span>
           </span>
         </div>
@@ -115,7 +115,7 @@ export function Overview({ game, onOpen }: { game: Game; onOpen: (playerId: stri
         </div>
       </section>
 
-      <section className="relative aspect-[100/118] w-full overflow-hidden rounded-[14px] border border-white/[0.13] bg-[#06100b]" data-testid="squad-field">
+      <section className="relative aspect-[100/126] w-full overflow-hidden rounded-[14px] border border-white/[0.13] bg-[#06100b]" data-testid="squad-field">
         <StadiumArt className="absolute inset-0 h-full w-full opacity-50" />
         <PitchLines />
         {team.tactic.startingXI.map((id, i) => {
@@ -136,13 +136,15 @@ export function Overview({ game, onOpen }: { game: Game; onOpen: (playerId: stri
 function Token({ player, slotPosition, number, colors, style, onOpen }: { player: Player; slotPosition: Player['position']; number: number; colors: [string, string]; style: React.CSSProperties; onOpen: () => void }) {
   const out = isUnavailable(player)
   return (
-    <button type="button" onClick={onOpen} aria-label={`${playerName(player)}, ${POSITION_SHORT_LABELS[slotPosition]}, geral ${Math.round(playerOverall(player))}`} className="absolute flex w-[4.3rem] flex-col items-center" style={style}>
+    <button type="button" onClick={onOpen} aria-label={`${playerName(player)}, ${POSITION_SHORT_LABELS[slotPosition]}, geral ${Math.round(playerOverall(player))}`} className="absolute flex w-[3.2rem] flex-col items-center" style={style}>
       <span className="relative">
-        <Avatar id={player.id} colors={colors} size={38} ring />
+        <Avatar id={player.id} colors={colors} size={34} ring />
         <span className="absolute -right-3 -top-1 rounded-full bg-black/75 px-1 font-display text-[12px] font-bold leading-[16px] text-accent">{number}</span>
         {out && <span className="absolute -left-1 -top-0.5 h-3 w-3 rounded-full bg-loss ring-2 ring-black/50" role="img" aria-label="Indisponível" />}
       </span>
-      <span className="-mt-1 w-full truncate rounded bg-black/75 px-0.5 text-center text-[10.5px] font-bold leading-[16px] text-white">{playerName(player)}</span>
+      <span className="-mt-1 w-full rounded bg-black/75 px-0.5 leading-[15px] text-white">
+        <FitName player={player} sizes={[10, 9.5, 9, 8.5]} />
+      </span>
       <span className="rounded-b bg-black/60 px-1.5 text-[9.5px] font-extrabold leading-[13px] tracking-wide text-accent">{POSITION_SHORT_LABELS[slotPosition]}</span>
     </button>
   )

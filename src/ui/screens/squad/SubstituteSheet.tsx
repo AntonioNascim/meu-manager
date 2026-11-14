@@ -46,6 +46,18 @@ export function substituteCandidates(tactic: Tactic, squad: readonly Player[], s
   return { slot, same, others }
 }
 
+/**
+ * Quem pode entrar na partida ao vivo no lugar de quem sai: só o banco. Mesma posição primeiro; depois os de outras posições, com a força mais baixa
+ * (fora de posição). Goleiro só entra no lugar de goleiro, e goleiro não entra na linha.
+ */
+export function liveSubstituteCandidates(slot: Position, bench: readonly Player[]): { slot: Position; same: SubCandidate[]; others: SubCandidate[] } {
+  const out: SubCandidate[] = bench
+    .filter((p) => (slot === 'GK') === (p.position === 'GK'))
+    .map((p) => ({ player: p, strength: overallAt(p, slot), where: { zone: 'bench' as const }, samePosition: p.position === slot }))
+  const byStrength = (a: SubCandidate, b: SubCandidate) => b.strength - a.strength || (a.player.id < b.player.id ? -1 : 1)
+  return { slot, same: out.filter((c) => c.samePosition).sort(byStrength), others: out.filter((c) => !c.samePosition).sort(byStrength) }
+}
+
 function Row({ c, onPick, starterPosition }: { c: SubCandidate; onPick: () => void; starterPosition: Position }) {
   const p = c.player
   const blocked = isUnavailable(p)
@@ -77,15 +89,12 @@ function Row({ c, onPick, starterPosition }: { c: SubCandidate; onPick: () => vo
   )
 }
 
-/** Janela de baixo para cima: quem entra no lugar do titular tocado. Tocar num jogador faz a troca. */
-export function SubstituteSheet({ tactic, squad, starter, onPick, onClose }: { tactic: Tactic; squad: readonly Player[]; starter: Player; onPick: (incomingId: string) => void; onClose: () => void }) {
-  const found = useMemo(() => substituteCandidates(tactic, squad, starter.id), [tactic, squad, starter.id])
-  if (!found) return null
-  const { slot, same, others } = found
+/** Janela de baixo para cima com a lista de quem pode entrar (mesma posição primeiro, depois as outras). Serve à Escalação e à partida ao vivo. */
+export function SubstituteList({ title, slot, same, others, note, onPick, onClose }: { title: string; slot: Position; same: SubCandidate[]; others: SubCandidate[]; note: string; onPick: (incomingId: string) => void; onClose: () => void }) {
   return (
-    <Sheet title={`Substituir ${playerName(starter)}`} onClose={onClose}>
+    <Sheet title={title} onClose={onClose}>
       <p className="mb-2 text-sm text-muted">
-        Vaga de {POSITION_LABELS[slot]}. Mesma posição primeiro; depois quem pode jogar ali, com a força mais baixa por estar fora de posição. Quem já é titular troca de lugar com ele.
+        Vaga de {POSITION_LABELS[slot]}. {note}
       </p>
       <div data-testid="substitute-sheet" className="space-y-3">
         <section>
@@ -94,7 +103,7 @@ export function SubstituteSheet({ tactic, squad, starter, onPick, onClose }: { t
             {same.map((c) => (
               <Row key={c.player.id} c={c} starterPosition={slot} onPick={() => onPick(c.player.id)} />
             ))}
-            {same.length === 0 && <li className="p-3 text-sm text-muted">Não há outro jogador dessa posição no elenco.</li>}
+            {same.length === 0 && <li className="p-3 text-sm text-muted">Não há outro jogador dessa posição disponível.</li>}
           </ul>
         </section>
         <section>
@@ -103,10 +112,17 @@ export function SubstituteSheet({ tactic, squad, starter, onPick, onClose }: { t
             {others.map((c) => (
               <Row key={c.player.id} c={c} starterPosition={slot} onPick={() => onPick(c.player.id)} />
             ))}
-            {others.length === 0 && <li className="p-3 text-sm text-muted">Ninguém de outra posição encaixa bem aqui.</li>}
+            {others.length === 0 && <li className="p-3 text-sm text-muted">Ninguém de outra posição disponível.</li>}
           </ul>
         </section>
       </div>
     </Sheet>
   )
+}
+
+/** Janela de baixo para cima na Escalação: quem entra no lugar do titular tocado. Tocar num jogador faz a troca. */
+export function SubstituteSheet({ tactic, squad, starter, onPick, onClose }: { tactic: Tactic; squad: readonly Player[]; starter: Player; onPick: (incomingId: string) => void; onClose: () => void }) {
+  const found = useMemo(() => substituteCandidates(tactic, squad, starter.id), [tactic, squad, starter.id])
+  if (!found) return null
+  return <SubstituteList title={`Substituir ${playerName(starter)}`} slot={found.slot} same={found.same} others={found.others} note="Mesma posição primeiro; depois quem pode jogar ali, com a força mais baixa por estar fora de posição. Quem já é titular troca de lugar com ele." onPick={onPick} onClose={onClose} />
 }

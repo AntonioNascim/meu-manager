@@ -4,7 +4,7 @@
  */
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
-import { LIVE_SPEEDS, replayResult, type CommandOutcome, type LiveEvent, type LiveView, type QueuedCommand, type ReplayRecord } from '../engine/league/live'
+import { normalizeSpeed, replayResult, type CommandOutcome, type LiveEvent, type LiveView, type QueuedCommand, type ReplayRecord } from '../engine/league/live'
 import { PLAY_STYLES } from '../engine/types'
 import type { MatchEvent, Mentality, PlayStyle, TeamMatchStats } from '../engine/types'
 import type { MatchSnapshot, PlayTrace, SideSnapshot } from '../engine/match'
@@ -18,7 +18,7 @@ export type ClientMessage =
   /** Abre ou retoma a conexão. `since` = último minuto que o cliente já viu (0 = tudo). */
   | { t: 'hello'; since: number }
   | { t: 'cmd'; id: string; command: QueuedCommand['command'] }
-  /** A velocidade do jogo deste técnico (1, 2, 4 ou 8; a mesma do jogo solo). */
+  /** A velocidade do jogo deste técnico (1x normal ou 2x rápida; a mesma do jogo solo). */
   | { t: 'speed'; value: number }
   /** "Voltar ao jogo" no intervalo. */
   | { t: 'half' }
@@ -67,7 +67,7 @@ export function parseClientMessage(text: string): { ok: true; message: ClientMes
   if (o.t === 'ping') return { ok: true, message: { t: 'ping' } }
   if (o.t === 'half') return { ok: true, message: { t: 'half' } }
   if (o.t === 'skip') return { ok: true, message: { t: 'skip' } }
-  if (o.t === 'speed') return typeof o.value === 'number' && (LIVE_SPEEDS as readonly number[]).includes(o.value) ? { ok: true, message: { t: 'speed', value: o.value } } : { ok: false, problem: 'bad-shape' }
+  if (o.t === 'speed') return typeof o.value === 'number' && normalizeSpeed(o.value) !== undefined ? { ok: true, message: { t: 'speed', value: normalizeSpeed(o.value) as number } } : { ok: false, problem: 'bad-shape' }
   if (o.t === 'hello') return int(o.since ?? 0, 0, 120) ? { ok: true, message: { t: 'hello', since: (o.since as number | undefined) ?? 0 } } : { ok: false, problem: 'bad-shape' }
   if (o.t === 'cmd') {
     if (!isId(o.id)) return { ok: false, problem: 'bad-shape' }

@@ -46,9 +46,11 @@ describe('protocolo da partida ao vivo', () => {
     expect(replayKey('liga1', '2026-11-07', match.id)).toBe(`replays/liga1/2026-11-07/${match.id}.json`)
   })
 
-  it('o tempo do 1x online é o do solo (1.600 ms por minuto) e o protocolo aceita só as velocidades do solo e o Voltar ao jogo', () => {
-    expect(BASE_MINUTE_MS).toBe(1600)
-    for (const v of [1, 2, 4, 8]) expect(parseClientMessage(JSON.stringify({ t: 'speed', value: v }))).toEqual({ ok: true, message: { t: 'speed', value: v } })
+  it('o tempo do 1x online é o do solo (800 ms por minuto) e o protocolo aceita só as velocidades do solo e o Voltar ao jogo', () => {
+    expect(BASE_MINUTE_MS).toBe(800)
+    for (const v of [1, 2]) expect(parseClientMessage(JSON.stringify({ t: 'speed', value: v }))).toEqual({ ok: true, message: { t: 'speed', value: v } })
+    // um aparelho da versão anterior ainda pode mandar 4x e 8x: viram a velocidade rápida (2x)
+    for (const v of [4, 8]) expect(parseClientMessage(JSON.stringify({ t: 'speed', value: v }))).toEqual({ ok: true, message: { t: 'speed', value: 2 } })
     for (const v of [0, 3, 16, -1, '2', null]) expect(parseClientMessage(JSON.stringify({ t: 'speed', value: v })).ok).toBe(false)
     expect(parseClientMessage('{"t":"half"}')).toEqual({ ok: true, message: { t: 'half' } })
   })

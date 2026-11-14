@@ -27,12 +27,15 @@ export const MAX_MINUTE = 120
 export const INJURY_WAIT_MS = 45_000
 
 /** Velocidades que o técnico escolhe (as mesmas do jogo solo). */
-export const LIVE_SPEEDS = [1, 2, 4, 8] as const
+/** As velocidades que o técnico escolhe: 1x (normal, 800 ms por minuto de jogo) e 2x (rápida, 400 ms). */
+export const LIVE_SPEEDS = [1, 2] as const
 export type LiveSpeed = (typeof LIVE_SPEEDS)[number]
+/** Velocidades antigas (1x, 2x, 4x e 8x) que um aparelho com a versão anterior ainda pode mandar: de 2x para cima vale a rápida. */
+export const normalizeSpeed = (speed: number): LiveSpeed | undefined => ([1, 2, 4, 8].includes(speed) ? ((speed >= 2 ? 2 : 1) as LiveSpeed) : undefined)
 /** A velocidade de quem ainda não escolheu (a mesma do solo). */
-export const DEFAULT_SPEED: LiveSpeed = 2
+export const DEFAULT_SPEED: LiveSpeed = 1
 /** Partida sem técnico conectado: ninguém assiste, roda na velocidade máxima e sem câmera lenta. */
-export const UNWATCHED_SPEED: LiveSpeed = 8
+export const UNWATCHED_SPEED = 4
 /** O intervalo dura até 1 minuto; termina antes quando todos os técnicos do jogo tocam em "Voltar ao jogo". */
 export const HALFTIME_MS = 60_000
 /** O alarme da sala acorda em segundos cheios: no máximo uma vez por segundo, qualquer que seja o número de partidas. */
@@ -262,10 +265,11 @@ function humansOf(e: LiveEvent, seats: readonly Seat[], g: Pick<LiveGame, 'homeT
  * A velocidade que vale para a partida: a **mais lenta** entre as escolhas dos técnicos conectados nela (o jogo é o mesmo para os dois), a de quem
  * escolheu ou `DEFAULT_SPEED`; sem técnico conectado ninguém assiste e roda na máxima.
  */
-export function speedOf(e: LiveEvent, seats: readonly Seat[], g: LiveGame): LiveSpeed {
+export function speedOf(e: LiveEvent, seats: readonly Seat[], g: LiveGame): number {
   const humans = humansOf(e, seats, g)
   if (humans.length === 0) return UNWATCHED_SPEED
-  return Math.min(...humans.map((s) => g.speeds[s.playerId] ?? DEFAULT_SPEED)) as LiveSpeed
+  // (jogo guardado com a escolha antiga de 4x ou 8x: conta como a velocidade rápida)
+  return Math.min(...humans.map((s) => Math.min(2, g.speeds[s.playerId] ?? DEFAULT_SPEED)))
 }
 
 /**
@@ -328,11 +332,12 @@ export function enqueueCommand(e: LiveEvent, seats: readonly Seat[], playerId: s
 
 /** O técnico escolhe a velocidade do jogo dele (vale do minuto seguinte). `false` se ele não joga neste evento ou a velocidade não existe. */
 export function setSpeed(e: LiveEvent, seats: readonly Seat[], playerId: string, speed: number): boolean {
-  if (!(LIVE_SPEEDS as readonly number[]).includes(speed)) return false
+  const wanted = normalizeSpeed(speed)
+  if (wanted === undefined) return false
   const seat = seats.find((s) => s.playerId === playerId)
   const found = seat && !e.locked?.includes(playerId) ? seatGame(e, seat) : undefined
   if (!found || found.game.live.finished) return false
-  found.game.speeds = { ...found.game.speeds, [playerId]: speed }
+  found.game.speeds = { ...found.game.speeds, [playerId]: wanted }
   return true
 }
 
@@ -536,7 +541,7 @@ export interface LiveView {
   /** Quem controla cada lado agora (`false` = IA). */
   controlled: { home: boolean; away: boolean }
   /** A velocidade que vale para a partida (a mais lenta entre as escolhas dos técnicos conectados) e a escolha de cada um. */
-  speed: LiveSpeed
+  speed: number
   speeds: Record<string, number>
   /** Intervalo em andamento: quanto falta e quem já tocou em "Voltar ao jogo". */
   halftime?: { leftMs: number; ready: string[] }

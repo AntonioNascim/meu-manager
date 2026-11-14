@@ -66,7 +66,7 @@ export function applyMessage(state: LiveClientState, msg: ServerMessage): LiveCl
         roster: msg.roster,
         myTeamId: msg.me.teamId,
         labels: msg.labels,
-        games: msg.games.map((g) => ({ matchId: g.matchId, snapshot: g.snapshot, controlled: g.controlled, speed: g.speed ?? 2, speeds: g.speeds ?? {}, ...(g.skipped?.length ? { skipped: g.skipped } : {}), ...(g.halftime ? { halftime: { deadline: Date.now() + g.halftime.leftMs, ready: g.halftime.ready } } : {}), ...(g.snapshot.injuryPending ? { injury: { ...g.snapshot.injuryPending, deadline: Date.now() + (g.injuryLeftMs ?? 0) } } : {}) })),
+        games: msg.games.map((g) => ({ matchId: g.matchId, snapshot: g.snapshot, controlled: g.controlled, speed: g.speed ?? 1, speeds: g.speeds ?? {}, ...(g.skipped?.length ? { skipped: g.skipped } : {}), ...(g.halftime ? { halftime: { deadline: Date.now() + g.halftime.leftMs, ready: g.halftime.ready } } : {}), ...(g.snapshot.injuryPending ? { injury: { ...g.snapshot.injuryPending, deadline: Date.now() + (g.injuryLeftMs ?? 0) } } : {}) })),
       }
     case 'frame': {
       const games = state.games.map((g) => {

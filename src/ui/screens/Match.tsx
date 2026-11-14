@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { FORMATION_IDS } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
-import { playerOverall } from '../../engine/overall'
 import type { MatchSnapshot, SideSnapshot } from '../../engine/match'
 import { BASE_MINUTE_MS } from '../../engine/match/timing'
 import type { GridPoint, MatchEvent, Player, Position, Tactic } from '../../engine/types'
@@ -15,7 +14,6 @@ import { perform } from '../../store/actions'
 import { getGame, updateGame } from '../../store/gameStore'
 import { beginLive, clearLive, getLive } from '../../store/liveMatch'
 import type { LiveSession } from '../../store/liveMatch'
-import { bandFor, conditionBand } from '../colors'
 import { FieldLineup } from '../components/FieldLineup'
 import type { Kit } from '../components/FieldLineup'
 import { OpponentOverlay } from '../components/OpponentOverlay'
@@ -25,7 +23,6 @@ import { formatDate, playerName } from '../format'
 import {
   MATCH_EVENT_LABELS,
   MATCH_STAT_LABELS,
-  POSITION_SHORT_LABELS,
 } from '../labels'
 import type { ScreenId } from '../navigation'
 import { OtherGames } from './match/Others'
@@ -35,10 +32,11 @@ import { getAccount } from '../../store/onlineAccount'
 import { LIVE_REJECT_LABELS } from '../labels'
 import { Pitch } from './match/Pitch'
 import { seedNumbers } from '../shirt'
-import { assignNumber, devFlag, devParam, holdFor, inkFor, kitsFor } from './match/pitchModel'
-import { Jersey } from '../theme'
+import { assignNumber, devFlag, devParam, holdFor, kitsFor } from './match/pitchModel'
+import { Sheet } from '../theme'
+import { SubstituteList, liveSubstituteCandidates } from './squad/SubstituteSheet'
 
-const SPEEDS = [1, 2, 4, 8] as const
+const SPEEDS = [1, 2] as const
 /** Duração de um minuto de jogo na velocidade 1x (ms): a do motor (`BASE_MINUTE_MS`), igual no solo e no online. */
 const MINUTE_MS = BASE_MINUTE_MS
 
@@ -225,6 +223,11 @@ function StatsList({ game, snap }: { game: Game; snap: MatchSnapshot }) {
   )
 }
 
+/**
+ * A aba Tática da partida (a das antigas Tática e Trocas reunidas): estilo, mentalidade, formação e o campo. Tocar num jogador do campo abre as opções
+ * "Mudar de posição" e "Substituir"; esta abre a mesma janela de substituição da Escalação (reservas da mesma posição primeiro, depois os de outras posições
+ * com a força mais baixa). As regras de troca são as do motor (5 trocas em até 3 paradas além do intervalo).
+ */
 function TacticPanel({
   game,
   live,
@@ -235,6 +238,7 @@ function TacticPanel({
   kit,
   keeperKit,
   numbers,
+  injuredId,
 }: {
   game: Game
   live: LiveSession
@@ -245,12 +249,22 @@ function TacticPanel({
   kit: Kit
   keeperKit: Kit
   numbers: Map<string, number>
+  /** Jogador do seu time que se machucou e espera a escolha de quem entra (o jogo está parado). */
+  injuredId?: string
 }) {
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  /** Quem foi tocado no campo (abre as opções), quem está sendo movido de posição e quem está sendo substituído. */
+  const [menuId, setMenuId] = useState<string | null>(null)
   const [pickedId, setPickedId] = useState<string | null>(null)
+  const [subbingId, setSubbingId] = useState<string | null>(null)
+  const [injurySheet, setInjurySheet] = useState(true)
   const players = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
+  const get = (id: string) => players.get(id) as Player
   const fitness = new Map(side.onPitch.map((p) => [p.playerId, p.fitness]))
   const yellow = new Map(side.onPitch.map((p) => [p.playerId, p.yellowCards > 0]))
+  const noSubs = side.subsLeft <= 0
+  const noStops = side.stopsLeft <= 0
   const act = (change: () => void) => {
     try {
       change()
@@ -276,227 +290,192 @@ function TacticPanel({
     setPickedId(null)
   }
   const tapPlayer = (id: string) => {
-    if (!pickedId || pickedId === id) {
-      setPickedId(pickedId === id ? null : id)
-      return
-    }
-    const target = side.onPitch.find((p) => p.playerId === id)?.point
-    if (target) move(pickedId, target)
-  }
-  return (
-    <div className={`space-y-3 ${canEdit ? '' : 'pointer-events-none opacity-60'}`}>
-      {!canEdit && <p className="pointer-events-auto rounded-lg bg-slate-800 p-2 text-xs text-slate-300">Pause o jogo para mexer na tática.</p>}
-      <Card title="Formação">
-        <div className="flex gap-1 overflow-x-auto pb-1">
-          {FORMATION_IDS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => act(() => live.match.setFormation(live.side, id))}
-              className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-semibold ${side.formationId === id ? 'bg-accent text-slate-950' : 'bg-slate-700 text-slate-200'}`}
-            >
-              {id}
-            </button>
-          ))}
-          {side.formationId === 'custom' && (
-            <span className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-slate-950">Livre · {shapeOf(side.grid)}</span>
-          )}
-        </div>
-        {pitchCount !== 11 && <p className="mt-1 text-xs text-amber-300">A formação só muda com 11 jogadores em campo.</p>}
-      </Card>
-      <Card title="Posição dos jogadores">
-        {pitchCount > 0 ? (
-          <FieldLineup
-            formationId={side.formationId}
-            lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point }))}
-            players={players}
-            kit={kit}
-            keeperKit={keeperKit}
-            numberOf={(id, slot) => assignNumber(numbers, live.side, id, slot)}
-            fitnessOf={(id) => fitness.get(id) ?? 0}
-            yellowOf={(id) => yellow.get(id) ?? false}
-            selectedId={pickedId}
-            onTap={tapPlayer}
-            onMove={move}
-          />
-        ) : (
-          <p className="text-xs text-amber-300">Não há jogadores em campo.</p>
-        )}
-        {movedNote}
-        <p className="mt-2 text-[11px] text-muted">Arraste um jogador para o ponto que quiser, ou toque em dois para trocá-los de lugar. Vale a partir do próximo lance.{pitchCount < 11 && ' Com menos de 11, os lugares vazios custam: cubra as linhas e as faixas que ficaram sem gente.'}</p>
-      </Card>
-      <StyleControls
-        style={side.style}
-        mentality={side.mentality}
-        onStyle={(s) => {
-          act(() => live.match.setStyle(live.side, s))
-          keepInTactic({ style: s })
-        }}
-        onMentality={(m) => {
-          act(() => live.match.setMentality(live.side, m))
-          keepInTactic({ mentality: m })
-        }}
-      />
-      {error && <p className="rounded-lg bg-rose-900/60 p-2 text-sm text-rose-100">{error}</p>}
-      <p className="text-[11px] text-slate-500">Placar atual: {snap.homeGoals} x {snap.awayGoals}. As mudanças valem a partir do próximo lance.</p>
-    </div>
-  )
-}
-
-function SubsPanel({
-  game,
-  live,
-  side,
-  canEdit,
-  refresh,
-  injuredId,
-  kit,
-  keeperKit,
-  numbers,
-}: {
-  game: Game
-  live: LiveSession
-  side: SideSnapshot
-  canEdit: boolean
-  refresh: () => void
-  injuredId?: string
-  kit: Kit
-  keeperKit: Kit
-  numbers: Map<string, number>
-}) {
-  const players = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
-  const [outId, setOutId] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [movedNote, markMoved] = useMovedNote()
-  const get = (id: string) => players.get(id) as Player
-  const sideKey = live.side
-  const numberOf = (id: string, slot: Position) => assignNumber(numbers, sideKey, id, slot)
-  const fitness = new Map(side.onPitch.map((p) => [p.playerId, p.fitness]))
-  const yellow = new Map(side.onPitch.map((p) => [p.playerId, p.yellowCards > 0]))
-  const noSubs = side.subsLeft <= 0
-  const noStops = side.stopsLeft <= 0
-
-  const chooseIn = (inId: string) => {
     if (injuredId) {
-      try {
-        live.match.resolveInjury(live.side, inId)
-        setMessage(`${playerName(get(inId))} entra no lugar de ${playerName(get(injuredId))}.`)
-        refresh()
-      } catch (e) {
-        setMessage(e instanceof Error ? e.message : 'Não foi possível substituir')
-      }
+      setMessage('Escolha quem entra no lugar de quem se machucou.')
+      setInjurySheet(true)
       return
     }
-    if (!outId) {
-      setMessage('Escolha primeiro quem sai (toque num titular no campo).')
+    if (pickedId && pickedId !== id) {
+      const target = side.onPitch.find((p) => p.playerId === id)?.point
+      if (target) move(pickedId, target)
       return
     }
+    if (pickedId === id) {
+      setPickedId(null)
+      return
+    }
+    setMenuId(id)
+  }
+  const bench = side.bench.map(get)
+  const slotOf = (id: string): Position => (side.onPitch.find((p) => p.playerId === id)?.slot ?? get(id).position) as Position
+  const enter = (outId: string, inId: string) => {
     try {
-      live.match.substitute(live.side, outId, inId)
+      if (injuredId) live.match.resolveInjury(live.side, inId)
+      else live.match.substitute(live.side, outId, inId)
       setMessage(`${playerName(get(inId))} entra no lugar de ${playerName(get(outId))}.`)
-      setOutId(null)
+      setError(null)
+      setSubbingId(null)
+      setMenuId(null)
       refresh()
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Não foi possível substituir')
+      // Regras de troca do motor: limite de trocas, de paradas e de estrangeiros.
+      setSubbingId(null)
+      setError(e instanceof Error ? e.message : 'Não foi possível substituir')
     }
   }
+  const sheetFor = injuredId ? (injurySheet ? injuredId : null) : subbingId
+  const sheet = sheetFor ? liveSubstituteCandidates(injuredId ? (get(injuredId).position as Position) : slotOf(sheetFor), bench) : undefined
+  const menuPlayer = menuId ? get(menuId) : undefined
 
   return (
-    <div className={`space-y-3 ${canEdit ? '' : 'pointer-events-none opacity-60'}`}>
-      {!canEdit && <p className="pointer-events-auto rounded-lg bg-slate-800 p-2 text-xs text-slate-300">Pause o jogo para fazer substituições.</p>}
-      {injuredId && (
-        <div className="pointer-events-auto space-y-2 rounded-xl border border-amber-400/60 bg-amber-950/50 p-3">
-          <p className="text-sm font-bold text-amber-100">✚ {playerName(get(injuredId))} se machucou. Toque em quem entra no lugar dele, no banco abaixo.</p>
-          <button
-            type="button"
-            onClick={() => {
-              live.match.resolveInjury(live.side)
-              setMessage('O time segue com um a menos.')
-              refresh()
-            }}
-            className="min-h-10 w-full rounded-lg border border-line bg-surface text-sm font-bold"
-          >
-            Seguir com um a menos
-          </button>
-        </div>
-      )}
-      <p className="text-sm">
-        Substituições restantes: <b>{side.subsLeft}</b> · Paradas além do intervalo: <b>{side.stopsLeft}</b>
-      </p>
-      <p className="text-[11px] text-slate-500">Máximo de 5 trocas em até 3 paradas além do intervalo. Várias trocas na mesma parada contam uma só. Toque em quem sai e depois em quem entra.</p>
-      {(noSubs || noStops) && !injuredId && (
-        <p className="rounded-lg border border-amber-400/50 bg-amber-950/40 p-2 text-xs font-semibold text-amber-100">
-          {noSubs ? 'Acabaram as 5 trocas: se alguém se machucar, o time fica com um a menos.' : 'As 3 paradas já foram usadas: só dá para trocar numa parada já aberta neste minuto. Se alguém se machucar, o time fica com um a menos.'}
-        </p>
-      )}
-      <Card title="Em campo (toque em quem sai, arraste para mudar de posição)">
-        <FieldLineup
-          formationId={side.formationId}
-          lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point }))}
-          players={players}
-          kit={kit}
-          keeperKit={keeperKit}
-          numberOf={numberOf}
-          fitnessOf={(id) => fitness.get(id) ?? 0}
-          yellowOf={(id) => yellow.get(id) ?? false}
-          selectedId={outId}
-          onMove={(id, point) => {
-            try {
-              live.match.setPosition(live.side, id, point)
-              markMoved()
-              setMessage(null)
-              refresh()
-            } catch (e) {
-              setMessage(e instanceof Error ? e.message : 'Não foi possível mudar de posição')
-            }
+    <>
+      <div className={`space-y-3 ${canEdit ? '' : 'pointer-events-none opacity-60'}`}>
+        {!canEdit && <p className="pointer-events-auto rounded-lg bg-slate-800 p-2 text-xs text-slate-300">Pause o jogo para mexer na tática e fazer substituições.</p>}
+        {injuredId && (
+          <div className="pointer-events-auto space-y-2 rounded-xl border border-amber-400/60 bg-amber-950/50 p-3" data-testid="injury-box">
+            <p className="text-sm font-bold text-amber-100">✚ {playerName(get(injuredId))} se machucou. Escolha quem entra no lugar dele.</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setInjurySheet(true)} disabled={noSubs} className="min-h-10 flex-1 rounded-lg bg-accent text-sm font-bold text-accent-ink disabled:opacity-40">
+                Escolher quem entra
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  live.match.resolveInjury(live.side)
+                  setMessage('O time segue com um a menos.')
+                  refresh()
+                }}
+                className="min-h-10 flex-1 rounded-lg border border-line bg-surface text-sm font-bold"
+              >
+                Seguir com um a menos
+              </button>
+            </div>
+          </div>
+        )}
+        <Card title="Formação">
+          <div className="flex gap-1 overflow-x-auto pb-1">
+            {FORMATION_IDS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => act(() => live.match.setFormation(live.side, id))}
+                className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-semibold ${side.formationId === id ? 'bg-accent text-slate-950' : 'bg-slate-700 text-slate-200'}`}
+              >
+                {id}
+              </button>
+            ))}
+            {side.formationId === 'custom' && (
+              <span className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-slate-950">Livre · {shapeOf(side.grid)}</span>
+            )}
+          </div>
+          {pitchCount !== 11 && <p className="mt-1 text-xs text-amber-300">A formação só muda com 11 jogadores em campo.</p>}
+        </Card>
+        <StyleControls
+          style={side.style}
+          mentality={side.mentality}
+          onStyle={(s) => {
+            act(() => live.match.setStyle(live.side, s))
+            keepInTactic({ style: s })
           }}
-          onTap={(id) => {
-            if (injuredId) {
-              setMessage('Escolha quem entra no lugar de quem se machucou (banco abaixo).')
-              return
-            }
-            setOutId(outId === id ? null : id)
+          onMentality={(m) => {
+            act(() => live.match.setMentality(live.side, m))
+            keepInTactic({ mentality: m })
           }}
         />
-        {movedNote}
-        {outId && !injuredId && (
-          <p className="mt-2 text-center text-sm font-semibold text-rose-200">
-            Sai: {playerName(get(outId))}. Agora toque em quem entra, no banco.
+        <Card title="Jogadores em campo (toque num jogador para mudar de posição ou substituir)">
+          {pitchCount > 0 ? (
+            <FieldLineup
+              formationId={side.formationId}
+              lineup={side.onPitch.map((p) => ({ playerId: p.playerId, slot: p.slot, point: p.point }))}
+              players={players}
+              kit={kit}
+              keeperKit={keeperKit}
+              numberOf={(id, slot) => assignNumber(numbers, live.side, id, slot)}
+              fitnessOf={(id) => fitness.get(id) ?? 0}
+              yellowOf={(id) => yellow.get(id) ?? false}
+              selectedId={pickedId}
+              onTap={tapPlayer}
+              onMove={move}
+            />
+          ) : (
+            <p className="text-xs text-amber-300">Não há jogadores em campo.</p>
+          )}
+          {pickedId && (
+            <p className="mt-2 text-center text-sm font-semibold text-accent" data-testid="move-hint">
+              {playerName(get(pickedId))}: toque em outro jogador para trocar de lugar ou arraste para o ponto que quiser.{' '}
+              <button type="button" className="underline" onClick={() => setPickedId(null)}>
+                Cancelar
+              </button>
+            </p>
+          )}
+          {movedNote}
+          <p className="mt-2 text-[11px] text-muted">As mudanças valem a partir do próximo lance.{pitchCount < 11 && ' Com menos de 11, os lugares vazios custam: cubra as linhas e as faixas que ficaram sem gente.'}</p>
+        </Card>
+        <p className="text-sm">
+          Substituições restantes: <b>{side.subsLeft}</b> · Paradas além do intervalo: <b>{side.stopsLeft}</b>
+        </p>
+        <p className="text-[11px] text-slate-500">Máximo de 5 trocas em até 3 paradas além do intervalo. Várias trocas na mesma parada contam uma só.</p>
+        {(noSubs || noStops) && !injuredId && (
+          <p className="rounded-lg border border-amber-400/50 bg-amber-950/40 p-2 text-xs font-semibold text-amber-100">
+            {noSubs ? 'Acabaram as 5 trocas: se alguém se machucar, o time fica com um a menos.' : 'As 3 paradas já foram usadas: só dá para trocar numa parada já aberta neste minuto. Se alguém se machucar, o time fica com um a menos.'}
           </p>
         )}
-      </Card>
-      <Card title="Banco (toque em quem entra)" flush>
-        <ul className="divide-y divide-slate-700">
-          {side.bench.map((id) => {
-            const player = get(id)
-            const overall = playerOverall(player)
-            return (
-              <li key={id}>
-                <button type="button" onClick={() => chooseIn(id)} disabled={side.subsLeft <= 0} className="flex min-h-14 w-full items-center gap-2 px-3 text-left disabled:opacity-40">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center">
-                    <span className="relative">
-                      <Jersey team={{ colors: [kit.shirt, kit.trim] }} size={34} />
-                      <span className="absolute inset-x-0 top-[44%] -translate-y-1/2 text-center font-display text-[12px] font-extrabold leading-none" style={{ color: inkFor(kit.shirt) }}>
-                        {numberOf(id, player.position)}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="w-9 text-xs font-semibold text-slate-300">{POSITION_SHORT_LABELS[player.position]}</span>
-                  <span className="flex-1 truncate text-sm font-semibold">{playerName(player)}</span>
-                  <span className={`w-8 text-sm font-bold tabular-nums ${bandFor(overall).text}`}>{Math.round(overall)}</span>
-                  <span className={`w-10 text-right text-sm tabular-nums ${conditionBand(player.condition.fitness).text}`}>{Math.round(player.condition.fitness)}%</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </Card>
-      {message && <p className="rounded-lg bg-slate-800 p-2 text-sm text-slate-200">{message}</p>}
-    </div>
+        {error && (
+          <p role="alert" className="rounded-lg bg-rose-900/60 p-2 text-sm text-rose-100">
+            {error}
+          </p>
+        )}
+        {message && <p className="rounded-lg bg-slate-800 p-2 text-sm text-slate-200">{message}</p>}
+        <p className="text-[11px] text-slate-500">Placar atual: {snap.homeGoals} x {snap.awayGoals}.</p>
+      </div>
+
+      {menuPlayer && !injuredId && (
+        <Sheet title={playerName(menuPlayer)} onClose={() => setMenuId(null)}>
+          <div className="space-y-2" data-testid="player-menu">
+            <button
+              type="button"
+              data-testid="menu-move"
+              onClick={() => {
+                setPickedId(menuPlayer.id)
+                setMenuId(null)
+              }}
+              className="min-h-12 w-full rounded-xl border border-line bg-surface-2 font-bold active:scale-95"
+            >
+              Mudar de posição
+            </button>
+            <button
+              type="button"
+              data-testid="menu-sub"
+              disabled={noSubs || bench.length === 0}
+              onClick={() => {
+                setSubbingId(menuPlayer.id)
+                setMenuId(null)
+              }}
+              className="min-h-12 w-full rounded-xl bg-accent font-bold text-accent-ink active:scale-95 disabled:opacity-40"
+            >
+              Substituir
+            </button>
+            {noSubs && <p className="text-xs text-amber-300">Acabaram as 5 trocas.</p>}
+            {!noSubs && noStops && <p className="text-xs text-amber-300">As 3 paradas já foram usadas: só dá para trocar numa parada já aberta neste minuto.</p>}
+          </div>
+        </Sheet>
+      )}
+      {sheet && sheetFor && (
+        <SubstituteList
+          title={injuredId ? `Quem entra no lugar de ${playerName(get(injuredId))}` : `Substituir ${playerName(get(sheetFor))}`}
+          slot={sheet.slot}
+          same={sheet.same}
+          others={sheet.others}
+          note="Reservas da mesma posição primeiro; depois os de outras posições, com a força mais baixa por estarem fora de posição."
+          onPick={(inId) => enter(sheetFor, inId)}
+          onClose={() => (injuredId ? setInjurySheet(false) : setSubbingId(null))}
+        />
+      )}
+    </>
   )
 }
 
-type LiveTab = 'games' | 'stats' | 'tactics' | 'subs'
+type LiveTab = 'games' | 'stats' | 'tactics'
 
 /** Tela larga (computador): os lances ficam numa coluna ao lado, como na referência. */
 function useDesktop(): boolean {
@@ -534,15 +513,15 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   // (em desenvolvimento, &iniciar=1 já começa com o jogo rodando)
   const online = live.online
   const [running, setRunning] = useState(() => devFlag('iniciar'))
-  const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(2)
+  const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1)
   // Na liga online o servidor joga: cada quadro dele chega aqui e a tela só o mostra (sem relógio local).
   const [, bump] = useState(0)
   const desktop = useDesktop()
   const names = useMemo(() => new Map(game.season.players.map((p) => [p.id, p])), [game.season.players])
   // Se a partida está parada por uma lesão (ao voltar para a tela, por exemplo), as Trocas já abrem com o aviso.
   const hurtAtOpen = snap.injuryPending?.side === live.side ? snap.injuryPending.playerId : undefined
-  const [tab, setTab] = useState<LiveTab>(hurtAtOpen || devParam('aba') === 'trocas' ? 'subs' : devParam('aba') === 'tatica' ? 'tactics' : 'games')
-  const [alert, setAlert] = useState<string | null>(() => (hurtAtOpen ? `${names.get(hurtAtOpen) ? playerName(names.get(hurtAtOpen) as Player) : 'Um jogador'} se machucou. ${CHOOSE_ALERT} na aba Trocas.` : null))
+  const [tab, setTab] = useState<LiveTab>(hurtAtOpen || devParam('aba') === 'trocas' || devParam('aba') === 'tatica' ? 'tactics' : 'games')
+  const [alert, setAlert] = useState<string | null>(() => (hurtAtOpen ? `${names.get(hurtAtOpen) ? playerName(names.get(hurtAtOpen) as Player) : 'Um jogador'} se machucou. ${CHOOSE_ALERT} na aba Tática.` : null))
   const [showFouls, setShowFouls] = useState(false)
   // Quanto da partida a tela já viu: só o que chega depois pede câmera lenta ou aviso.
   const seen = useRef({ trace: snap.trace.length, events: snap.events.length })
@@ -564,8 +543,8 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
       const who = names.get(hurt.playerId)
       const name = who ? playerName(who) : 'Um jogador'
       setRunning(false)
-      setTab('subs')
-      setAlert(next.injuryPending ? `${name} se machucou. ${CHOOSE_ALERT} na aba Trocas.` : `${name} se machucou e não há mais trocas disponíveis: o time vai ficar com um a menos.`)
+      setTab('tactics')
+      setAlert(next.injuryPending ? `${name} se machucou. ${CHOOSE_ALERT} na aba Tática.` : `${name} se machucou e não há mais trocas disponíveis: o time vai ficar com um a menos.`)
       return 0
     }
     return holdFor(freshTrace, freshEvents)
@@ -729,15 +708,13 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
             { id: 'games' as LiveTab, label: 'Jogos' },
             { id: 'stats' as LiveTab, label: 'Dados' },
             { id: 'tactics' as LiveTab, label: 'Tática' },
-            { id: 'subs' as LiveTab, label: 'Trocas' },
           ]}
           onChange={setTab}
         />
 
         {tab === 'games' && (online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={snap.minute} />)}
         {tab === 'stats' && <StatsList game={game} snap={snap} />}
-        {tab === 'tactics' && <TacticPanel game={game} live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
-        {tab === 'subs' && <SubsPanel game={game} live={live} side={mySide} canEdit={canEdit} refresh={refresh} injuredId={pending ? snap.injuryPending?.playerId : undefined} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
+        {tab === 'tactics' && <TacticPanel game={game} live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} injuredId={pending ? snap.injuryPending?.playerId : undefined} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
 
         {!desktop && <div className="max-h-[28rem] overflow-y-auto">{logSection}</div>}
       </div>

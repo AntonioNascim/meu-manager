@@ -7,6 +7,20 @@ export function formatDate(date: IsoDate): string {
 
 export const playerName = (p: Pick<Player, 'name' | 'nickname'>) => p.nickname ?? p.name
 
+const NAME_TAIL = /^(jr\.?|j[uú]nior|filho|neto|sobrinho)$/i
+/**
+ * Nome curto para caber no campo: uma palavra só, a última ("Alex Sandro" vira "Sandro"); se a última é "Júnior", "Filho"..., vale a anterior
+ * ("Castro Filho" vira "Castro"). Assim os nomes não se sobrepõem no campo do Elenco.
+ */
+export function shortPlayerName(p: Pick<Player, 'name' | 'nickname'>): string {
+  const full = (p.nickname ?? p.name).trim()
+  const parts = full.split(/\s+/)
+  if (parts.length <= 1) return full
+  const last = parts[parts.length - 1] as string
+  const prev = parts[parts.length - 2] as string
+  return NAME_TAIL.test(last) ? prev : last
+}
+
 export const formatMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 /** Resultado do ponto de vista de um time: V, E ou D (undefined se a partida não foi jogada). */

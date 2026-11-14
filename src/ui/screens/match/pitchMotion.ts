@@ -53,8 +53,8 @@ export interface PlanChoice {
 export function choosePlan(beats: readonly Beat[], last: PlayTrace, freshCount: number, speed: number, forceFull = false): PlanChoice {
   const slow = freshCount <= 2 || forceFull ? slowFor(last) : 0
   const tick = slow || BASE_MINUTE_MS / speed
-  const simplified = !forceFull && !slow && (speed >= 4 || freshCount > 2)
-  const quick = simplified || (!slow && speed >= 4)
+  const simplified = !forceFull && !slow && (speed >= 2 || freshCount > 2)
+  const quick = simplified || (!slow && speed >= 2)
   let seq: Beat[]
   let connectors = 0
   let relays = 0
@@ -701,7 +701,7 @@ export class PitchMotion {
     const ball = this.ball.pos
     if (this.frame % 6 === 1) this.updateMarking(ball)
     const leg = this.current
-    const sprint = 17 * Math.sqrt(Math.max(1, this.speed))
+    const sprint = 17 * Math.sqrt(Math.max(1, this.speed * 2))
     const k = 1 - Math.exp(-dt * 7)
     const wander = running ? 1 : 0.3
     for (const body of this.bodies.values()) {

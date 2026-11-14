@@ -161,7 +161,7 @@ export class OnlineMatchHandle {
   private readonly adapter: OnlineLiveMatch
   private listeners = new Set<() => void>()
   /** A velocidade que o técnico pediu (a tela a mostra já; o servidor confirma no quadro). */
-  mySpeed = 2
+  mySpeed = 1
   private off: () => void
 
   constructor(

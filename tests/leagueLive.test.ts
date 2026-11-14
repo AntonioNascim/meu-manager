@@ -83,21 +83,25 @@ const gameOf = (e: LiveEvent, teamId: string) => e.games.find((g) => g.homeTeamI
 const sameResults = (a: LiveEvent) => a.games.map((g) => JSON.stringify(g.live.result())) as string[]
 
 describe('partida ao vivo na liga online: um relógio por partida (C5)', () => {
-  it('a 1x o minuto de jogo dura 1.600 ms (o do jogo solo) e a velocidade escolhida o divide', () => {
-    expect(BASE_MINUTE_MS).toBe(1600)
-    expect(DEFAULT_SPEED).toBe(2)
+  it('a 1x o minuto de jogo dura 800 ms (o do jogo solo), a 2x 400 ms, e a velocidade escolhida o divide', () => {
+    expect(BASE_MINUTE_MS).toBe(800)
+    expect(DEFAULT_SPEED).toBe(1)
     const { stepped, event, now } = atFirstEvent()
     const seats = stepped.league.seats
     const slow = gameOf(event, SEATS[0]!.teamId)
     const fast = gameOf(event, SEATS[1]!.teamId)
     if (slow === fast) return
     expect(setSpeed(event, seats, 'jogador-1', 1)).toBe(true)
-    expect(setSpeed(event, seats, 'jogador-2', 8)).toBe(true)
+    expect(setSpeed(event, seats, 'jogador-2', 2)).toBe(true)
     const after = tick(event, seats, now, 12_000).event
-    // Em 12 s a 8x a partida passa de 40 minutos; a 1x ainda não chegou ao intervalo.
+    // Em 12 s a 2x a partida anda o dobro da de 1x.
+    expect(gameOf(after, SEATS[0]!.teamId).clock).toBeGreaterThan(5)
     expect(gameOf(after, SEATS[1]!.teamId).clock).toBeGreaterThan(gameOf(after, SEATS[0]!.teamId).clock)
     expect(setSpeed(event, seats, 'jogador-1', 3)).toBe(false)
-    expect(setSpeed(event, seats, 'estranho', 4)).toBe(false)
+    expect(setSpeed(event, seats, 'estranho', 2)).toBe(false)
+    // um aparelho da versão anterior ainda pode mandar 4x ou 8x: vale a rápida
+    expect(setSpeed(event, seats, 'jogador-2', 8)).toBe(true)
+    expect(gameOf(event, SEATS[1]!.teamId).speeds['jogador-2']).toBe(2)
   })
 
   it('dois técnicos na mesma partida: vale a velocidade mais lenta; quem cai deixa a do outro; sem ninguém roda na máxima', () => {
@@ -105,17 +109,17 @@ describe('partida ao vivo na liga online: um relógio por partida (C5)', () => {
     const seats = stepped.league.seats
     const g = gameOf(event, DUEL[0]!.teamId)
     expect(g).toBe(gameOf(event, DUEL[1]!.teamId))
-    setSpeed(event, seats, 'jogador-1', 8)
-    expect(speedOf(event, seats, g)).toBe(2) // o outro ainda não escolheu: vale a padrão
-    setSpeed(event, seats, 'jogador-2', 4)
-    expect(speedOf(event, seats, g)).toBe(4)
+    setSpeed(event, seats, 'jogador-1', 2)
+    expect(speedOf(event, seats, g)).toBe(DEFAULT_SPEED) // o outro ainda não escolheu: vale a padrão (1x)
+    setSpeed(event, seats, 'jogador-2', 2)
+    expect(speedOf(event, seats, g)).toBe(2)
     setSpeed(event, seats, 'jogador-2', 1)
     expect(speedOf(event, seats, g)).toBe(1)
     const v = viewOf(event, seats, T0).find((x) => x.matchId === g.matchId)!
     expect(v.speed).toBe(1)
-    expect(v.speeds).toEqual({ 'jogador-1': 8, 'jogador-2': 1 })
+    expect(v.speeds).toEqual({ 'jogador-1': 2, 'jogador-2': 1 })
     let e = setConnected(event, seats, 'jogador-2', false)
-    expect(speedOf(e, seats, gameOf(e, DUEL[0]!.teamId))).toBe(8)
+    expect(speedOf(e, seats, gameOf(e, DUEL[0]!.teamId))).toBe(2)
     e = setConnected(e, seats, 'jogador-1', false)
     expect(speedOf(e, seats, gameOf(e, DUEL[0]!.teamId))).toBe(UNWATCHED_SPEED)
   })

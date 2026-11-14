@@ -27,14 +27,8 @@ import { formatCompactMoney, playerName } from '../../format'
 import { GridPitch } from '../../components/GridPitch'
 import { PLAY_STYLE_LABELS, POSITION_SHORT_LABELS, commandErrorText, formationLabel } from '../../labels'
 import { isUnavailable } from '../../squadSort'
-import { Avatar, ConditionBar, ConditionStrip, Eyebrow, Flag, Icon, Jersey, MoodIcon, Panel, ValueBadge } from '../../theme'
+import { Avatar, ConditionBar, ConditionStrip, Eyebrow, FitName, Flag, Icon, MoodIcon, Panel, ValueBadge } from '../../theme'
 
-/** Nome curto para caber embaixo da camisa no campo. */
-function shortName(p: Player): string {
-  const name = playerName(p)
-  const parts = name.split(' ')
-  return parts.length > 1 && !p.nickname ? (parts[parts.length - 1] as string) : name
-}
 
 const outOfPosition = (p: Player, slot: Position) => p.position !== slot && !p.secondaryPositions.includes(slot)
 
@@ -44,14 +38,16 @@ function Token({ player, slot, captain, selected, colors }: { player: Player; sl
   return (
     <div className="flex w-[3.9rem] flex-col items-center gap-0.5" aria-label={`${playerName(player)}, ${POSITION_SHORT_LABELS[slot]}`}>
       <span className={`relative rounded-full p-0.5 ${selected ? 'bg-white/90 ring-4 ring-white/60' : ''}`}>
-        <Jersey team={{ colors }} size={38} />
+        <Avatar id={player.id} colors={colors} size={38} ring />
         <span className="absolute -right-2 -top-1">
           <MoodIcon morale={player.condition.morale} size={18} />
         </span>
         {captain && <span className="absolute -left-2 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-amber-300 text-[11px] font-extrabold text-bg ring-1 ring-black/30">C</span>}
         {isUnavailable(player) && <span className="absolute -bottom-0.5 -right-1 h-3 w-3 rounded-full bg-loss ring-2 ring-black/40" role="img" aria-label="Indisponível" />}
       </span>
-      <span className="w-full truncate rounded bg-black/75 px-1 text-center text-[11px] font-bold leading-[18px] text-white">{shortName(player)}</span>
+      <span className="w-full rounded bg-black/75 px-1 leading-[18px] text-white">
+        <FitName player={player} sizes={[11, 10.5, 10, 9.5]} />
+      </span>
       <span
         className={`rounded px-1.5 text-[11px] font-extrabold leading-[18px] tabular-nums text-bg ${improvised ? 'bg-violet-300 ring-1 ring-violet-100' : 'bg-white/90'}`}
         title={improvised ? 'Fora da posição natural' : undefined}

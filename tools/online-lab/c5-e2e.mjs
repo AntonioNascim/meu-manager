@@ -78,7 +78,7 @@ check('depois do Pronto a partida abre sozinha na tela', watching)
 await page.getByTestId('speed').waitFor({ timeout: 40000 })
 check('a tela da partida abre com campo e placar', (await page.getByTestId('pitch').count()) > 0 || (await page.locator('svg').count()) > 0)
 const speedText = async () => (await page.getByTestId('speed').innerText()).replace(/\s+/g, ' ').trim()
-check('a velocidade começa em 2x (como no solo)', (await speedText()).startsWith('2x'), await speedText())
+check('a velocidade começa em 1x (como no solo)', (await speedText()).startsWith('1x'), await speedText())
 const t0 = Date.now()
 const minuteLabel = () => page.locator('main').innerText().then((t) => (/(\d+)'/.exec(t) ?? [])[1] ?? '')
 const m0 = await minuteLabel()
@@ -86,10 +86,19 @@ await sleep(4000)
 const m1 = await minuteLabel()
 check('o relógio anda sozinho (o servidor joga)', m1 !== m0 || Number(m1) > 0, `${m0}' → ${m1}'`)
 await shoot(page, 'online-partida')
-await page.getByTestId('speed').click()
+// Uma lesão natural abre a janela com os reservas por cima da tela: resolvo antes de tocar na velocidade.
+const settleInjury = async () => {
+  for (let i = 0; i < 6; i++) {
+    const pick = page.locator('[data-testid^=sub-]:not([disabled])').first()
+    if (!(await pick.isVisible().catch(() => false))) return
+    await pick.click().catch(() => {})
+    await sleep(700)
+  }
+}
+await settleInjury()
 await page.getByTestId('speed').click()
 await sleep(300)
-check('tocar na velocidade percorre 4x e 8x', (await speedText()).startsWith('8x'), await speedText())
+check('tocar na velocidade vai a 2x (só há 1x e 2x)', (await speedText()).startsWith('2x'), await speedText())
 
 // ------------------------------------------------------------------ intervalo de até 1 minuto, com "Voltar ao jogo"
 // Lesão no meu time para a partida até eu escolher (ou 45 s): aqui sigo com um a menos para não esperar.
@@ -97,8 +106,11 @@ const waitCtl = async (testid, ms) => {
   const end = Date.now() + ms
   while (Date.now() < end) {
     if (await page.getByTestId(testid).isVisible().catch(() => false)) return true
+    // Lesão: a janela com os reservas abre sozinha na aba Tática; escolho o primeiro (ou sigo com um a menos).
+    const pick = page.locator('[data-testid^=sub-]:not([disabled])').first()
     const less = page.getByRole('button', { name: 'Seguir com um a menos' })
-    if (await less.isVisible().catch(() => false)) await less.click().catch(() => {})
+    if (await pick.isVisible().catch(() => false)) await pick.click().catch(() => {})
+    else if (await less.isVisible().catch(() => false)) await less.click().catch(() => {})
     await sleep(500)
   }
   return false
@@ -120,7 +132,7 @@ check('depois de Voltar ao jogo a partida segue (sai do intervalo antes de 1 min
 await page.getByRole('button', { name: 'Voltar ao painel' }).waitFor({ timeout: 240000 })
 check('no fim aparece o resultado e o aviso de que a rodada espera as outras partidas', (await page.locator('main').innerText()).includes('Fim de jogo'))
 const total = Math.round((Date.now() - t0) / 1000)
-check('a partida inteira durou poucos minutos reais (700 ms por minuto, até 8x)', total < 330, `${total} s desde a entrada`)
+check('a partida inteira durou poucos minutos reais (800 ms por minuto em 1x, 400 ms em 2x)', total < 330, `${total} s desde a entrada`)
 await shoot(page, 'online-fim')
 await page.getByRole('button', { name: 'Voltar ao painel' }).click()
 await page.getByTestId('league-card').waitFor()

@@ -644,9 +644,9 @@ export function playbackFor(beats: readonly Beat[], speed: number, simplified: b
   if (!last) return { beats: [], arrows: false }
   // O desfecho é a finalização (o escanteio que vem depois é só a cena da cobrança, que não cabe nas velocidades altas).
   const outcome = [...beats].reverse().find((b) => b.phase === 'shot') ?? last
-  if (simplified || speed >= 4) return { beats: [outcome], arrows: false }
-  // Em 2x o escanteio (bola ao canto e cruzamento, que vêm depois da finalização) ainda aparece: é o que torna o lance reconhecível.
-  if (speed >= 2) return { beats: [...new Set([beats[Math.min(1, beats.length - 1)] as Beat, outcome, ...beats.slice(beats.indexOf(outcome) + 1)])], arrows: true }
+  if (simplified || speed >= 2) return { beats: [outcome], arrows: false }
+  // Em 1x (800 ms por minuto) o lance vem resumido, com o escanteio (bola ao canto e cruzamento, que vêm depois da finalização).
+  if (speed >= 1) return { beats: [...new Set([beats[Math.min(1, beats.length - 1)] as Beat, outcome, ...beats.slice(beats.indexOf(outcome) + 1)])], arrows: true }
   return { beats: [...beats], arrows: true }
 }
 
