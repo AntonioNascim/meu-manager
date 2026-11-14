@@ -284,6 +284,12 @@ export function Lineup({ game }: { game: Game }) {
       <ForeignNote team={team} tactic={tactic} squad={squad} />
       {error && <p className="rounded-xl border border-loss/40 bg-loss/10 p-2 text-sm text-loss">{error}</p>}
 
+      {/* O estilo e a mentalidade do time: os mesmos da Tática e da partida, para decidir antes do jogo conforme o adversário. */}
+      <StyleControls style={tactic.style} mentality={tactic.mentality} onStyle={(style) => apply((t) => ({ ...t, style }))} onMentality={(mentality) => apply((t) => ({ ...t, mentality }))} />
+
+      {/* Para decidir a formação e o estilo conforme o rival: o mesmo que aparece ao tocar no escudo do adversário. */}
+      <NextOpponent game={game} />
+
       <Panel className="overflow-hidden">
         <div className="px-3 pb-1 pt-3">
           <Eyebrow icon="squad">Banco de reservas ({bench.length})</Eyebrow>
@@ -312,14 +318,6 @@ export function Lineup({ game }: { game: Game }) {
           </ul>
         </Panel>
       )}
-      {/* O estilo e a mentalidade do time: os mesmos da Tática e da partida, para decidir antes do jogo conforme o adversário. */}
-      <StyleControls style={tactic.style} mentality={tactic.mentality} onStyle={(style) => apply((t) => ({ ...t, style }))} onMentality={(mentality) => apply((t) => ({ ...t, mentality }))} />
-
-
-      {/* Para decidir a formação e o estilo conforme o rival: o mesmo que aparece ao tocar no escudo do adversário. */}
-      <NextOpponent game={game} />
-
-
       <SavedLineups game={game} />
 
       {subbingId && byId.get(subbingId) && (
