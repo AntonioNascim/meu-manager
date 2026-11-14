@@ -1,0 +1,71 @@
+name: Ponta a ponta
+
+# Roda à mão pela aba Actions (Run workflow), na branch escolhida em "Use workflow from". Serve para os testes de ponta a ponta no navegador
+# (c3, c4, c5, c6 e e3), que não cabem na memória do computador de desenvolvimento. O servidor local (Worker no workerd) e o site (Vite) sobem aqui
+# dentro, sem custo e sem tocar no servidor de verdade. Os testes rodam um de cada vez. O resultado aparece no resumo da execução e as capturas,
+# os logs e o resumo ficam para baixar em "Artifacts" (30 dias).
+on:
+  workflow_dispatch:
+    inputs:
+      testes:
+        description: "Quais testes rodar (todos = c3, c4, c5, e3 e c6, nessa ordem, um de cada vez)"
+        type: choice
+        required: true
+        default: todos
+        options:
+          - todos
+          - c3
+          - c4
+          - c5
+          - c6
+          - e3
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TESTES: ${{ inputs.testes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências do jogo
+        run: npm ci
+
+      - name: Instalar o laboratório (Playwright e Wrangler)
+        working-directory: tools/online-lab
+        run: npm ci
+
+      - name: Instalar o navegador (Chromium)
+        working-directory: tools/online-lab
+        run: npx playwright install --with-deps chromium
+
+      # O valor escolhido vai por variável de ambiente (nunca direto no comando) e o script só aceita os nomes da lista.
+      - name: Rodar os testes de ponta a ponta
+        run: bash tools/online-lab/run-e2e.sh "$TESTES"
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "## Ponta a ponta ($TESTES)" >> "$GITHUB_STEP_SUMMARY"
+          [ -f e2e-out/resumo.md ] && cat e2e-out/resumo.md >> "$GITHUB_STEP_SUMMARY" || echo "Nenhum teste chegou a rodar (veja o log do passo anterior)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar logs e capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ponta-a-ponta
+          path: |
+            e2e-out/
+            .shots/*.png
+            .shots/*.webm
+          if-no-files-found: ignore
+          retention-days: 30
