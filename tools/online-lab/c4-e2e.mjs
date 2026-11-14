@@ -65,7 +65,17 @@ await page.getByRole('tab', { name: 'Buscar', exact: true }).click().catch(() =>
 const before = await offers()
 await page.getByRole('button', { name: /Cabem no bolso/ }).click()
 await sleep(500)
-await page.locator('ul.divide-y li button').first().click()
+// Tocar no jogador abre o cartão dele; "Fazer proposta" abre a negociação, mas só se ele tiver interesse em vir (senão aparece o aviso): procura um que tenha.
+let negotiating = false
+for (let i = 0; i < 12 && !negotiating; i++) {
+  await page.locator('ul.divide-y li button').nth(i).click()
+  await page.getByTestId('make-offer').click()
+  negotiating = await page.getByRole('button', { name: 'Enviar proposta' }).waitFor({ timeout: 2500 }).then(() => true, () => false)
+  if (!negotiating) {
+    check('sem interesse: o cartão avisa e não abre a negociação', (await page.getByTestId('offer-note').innerText()).includes('não tem interesse'))
+    await page.getByRole('button', { name: 'Fechar' }).first().click()
+  }
+}
 await page.getByRole('button', { name: 'Enviar proposta' }).waitFor({ timeout: 15000 })
 shots1.negociacao = await shoot(page, 'online-negociacao')
 await page.getByRole('button', { name: 'Enviar proposta' }).click()
