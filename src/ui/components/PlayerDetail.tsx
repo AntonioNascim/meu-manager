@@ -167,7 +167,7 @@ export function PlayerDetail({ player: shown, onClose, academy = false, stars, f
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-10 pt-4">
         {mine && game && <PlayerCard game={game} player={player} onClose={onClose} />}
-        {card && !mine && game && <OtherPlayerCard game={game} player={player} {...(offerKind ? { offerKind } : {})} />}
+        {card && !mine && game && <OtherPlayerCard game={game} player={player} onClose={onClose} {...(offerKind ? { offerKind } : {})} />}
         {card && <AttributesCard player={player} showAll={showNumbers} onToggleAll={() => setShowNumbers((v) => !v)} />}
         {card && <StateCard player={player} />}
         {academy && (

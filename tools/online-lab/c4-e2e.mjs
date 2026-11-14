@@ -20,6 +20,20 @@ const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 380, height: 844 }, deviceScaleFactor: 2, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR' })
 const page = await ctx.newPage()
 page.on('pageerror', (e) => console.log('  [erro na página]', e.message))
+// Diagnóstico: antes de cada clique, o log diz qual botão vai ser clicado (e, se o clique falhar, o que está por cima dele).
+const Loc = Object.getPrototypeOf(page.locator('html'))
+const realClick = Loc.click
+Loc.click = async function (...args) {
+  console.log('  >> clique:', String(this))
+  try {
+    return await realClick.apply(this, args)
+  } catch (e) {
+    console.log('  !! o clique falhou:', String(this), '|', String(e.message).split(/\r?\n/).slice(0, 6).join(' | '))
+    console.log('  !! diálogos abertos:', await page.locator('[role=dialog]').count(), '| botões Fechar:', await page.getByRole('button', { name: 'Fechar' }).count())
+    await page.screenshot({ path: resolve(shots, prefix + '-falha-clique.png') }).catch(() => {})
+    throw e
+  }
+}
 const shoot = async (p, name) => {
   await sleep(500)
   const file = resolve(shots, `${prefix}-${name}.png`)

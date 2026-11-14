@@ -14,7 +14,7 @@ import { goToCoachTrade } from '../navigation'
  * Cartão grande de um jogador de outro clube (ou livre): o mesmo desenho do cartão do seu jogador, mas em vez das ações do seu elenco
  * tem um botão só: "Fazer proposta" (ou "Contratar", se ele é livre). Sem interesse dele em vir, o toque só avisa; com interesse, abre a negociação do mercado.
  */
-export function OtherPlayerCard({ game, player, offerKind }: { game: Game; player: Player; offerKind?: OfferKind }) {
+export function OtherPlayerCard({ game, player, offerKind, onClose }: { game: Game; player: Player; offerKind?: OfferKind; /** Fecha o cartão (depois de enviar a proposta a pessoa volta à lista). */ onClose?: () => void }) {
   const [negotiating, setNegotiating] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const state = game.season
@@ -86,7 +86,7 @@ export function OtherPlayerCard({ game, player, offerKind }: { game: Game; playe
           </p>
         )}
       </section>
-      {negotiating && <Negotiation key={player.id} game={game} player={player} open={open} {...(offerKind ? { initialKind: offerKind } : {})} onClose={() => setNegotiating(false)} />}
+      {negotiating && <Negotiation key={player.id} game={game} player={player} open={open} {...(offerKind ? { initialKind: offerKind } : {})} onClose={() => setNegotiating(false)} onSent={() => (setNegotiating(false), onClose?.())} />}
     </div>
   )
 }

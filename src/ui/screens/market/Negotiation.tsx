@@ -20,7 +20,7 @@ const Line = ({ label, value }: { label: string; value: React.ReactNode }) => (
 )
 
 /** Negociação numa janela de baixo para cima: compra ou empréstimo, valor, salário e duração. */
-export function Negotiation({ game, player, open, onClose, extra, initialKind = 'purchase' }: { game: Game; player: Player; open: boolean; onClose: () => void; extra?: React.ReactNode; initialKind?: OfferKind }) {
+export function Negotiation({ game, player, open, onClose, onSent, extra, initialKind = 'purchase' }: { game: Game; player: Player; open: boolean; onClose: () => void; /** Chamado quando a proposta foi enviada (no lugar de `onClose`): o cartão do jogador aproveita para fechar também. */ onSent?: () => void; extra?: React.ReactNode; initialKind?: OfferKind }) {
   const state = game.season
   const date = state.season.currentDate
   const free = player.teamId === null
@@ -39,7 +39,7 @@ export function Negotiation({ game, player, open, onClose, extra, initialKind = 
 
   const submit = () => {
     const contractEnd = contractEndIn(state, game.userTeamId, kind === 'loan' ? 0 : years)
-    void perform({ type: 'offer', kind, playerId: player.id, fee: amount, salary, contractEnd }).then((out) => (out.ok ? onClose() : setError(commandErrorText(out.error))))
+    void perform({ type: 'offer', kind, playerId: player.id, fee: amount, salary, contractEnd }).then((out) => (out.ok ? (onSent ?? onClose)() : setError(commandErrorText(out.error))))
   }
 
   const input = 'mt-1 min-h-12 w-full rounded-xl border border-line bg-surface-2 px-3 font-bold'
