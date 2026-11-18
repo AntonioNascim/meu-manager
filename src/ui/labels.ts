@@ -210,6 +210,13 @@ export const ZONE_LABELS: Record<Zone, string> = {
   relegation: 'Zona de rebaixamento',
 }
 
+/** Onde a posição projetada coloca o time na tabela ("se terminar assim"). */
+export const PROJECTION_ZONE_LABELS: Record<'leader' | 'promotion' | 'relegation', string> = {
+  leader: 'na liderança',
+  promotion: 'na zona de acesso',
+  relegation: 'na zona de rebaixamento',
+}
+
 export const SET_PIECE_LABELS: Record<'penalty' | 'free-kick', string> = {
   penalty: 'Pênaltis',
   'free-kick': 'Faltas',

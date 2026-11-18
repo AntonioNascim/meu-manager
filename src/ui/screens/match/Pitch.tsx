@@ -9,6 +9,8 @@ import type { VarMoment } from './varNarrative'
 import { assignNumber, beatsFor, inkFor, kitsFor, layoutFrom, pickTrace, HOLD_MS, devFlag, devParam } from './pitchModel'
 import type { Beat, Layout, Mark, MarkKind, Placed, Side } from './pitchModel'
 import { PitchMotion, choosePlan } from './pitchMotion'
+import { CAMERA, FpsGuard, cameraTransform, discScale, initialCamera, stepCamera, viewRatio } from './pitchCamera'
+import type { CameraMode } from './pitchCamera'
 
 const MARK_ICON: Record<MarkKind, { icon: string; cls: string; label: string }> = {
   goal: { icon: '⚽', cls: 'bg-accent text-accent-ink', label: 'Gol' },
@@ -22,6 +24,74 @@ const MARK_ICON: Record<MarkKind, { icon: string; cls: string; label: string }> 
 }
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`
+
+const readPref = (key: string, fallback: string): string => {
+  try {
+    return window.localStorage.getItem(key) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+const writePref = (key: string, value: string) => {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    /* sem armazenamento: vale só nesta tela */
+  }
+}
+
+/** Preferências da câmera e da arquibancada (por aparelho): "seguir a bola" ou "campo inteiro", e a torcida ligada ou não. */
+function useCameraPrefs() {
+  const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const dev = devParam('camera')
+  const [mode, setModeState] = useState<CameraMode>(() => (dev === 'full' || dev === 'follow' ? dev : readPref('mm-camera', reduced ? 'full' : 'follow') === 'full' ? 'full' : 'follow'))
+  const [stands, setStandsState] = useState(() => readPref('mm-stands', '1') !== '0')
+  /** O aparelho não acompanhou: a câmera desligou sozinha (a escolha guardada do jogador não muda). */
+  const [autoOff, setAutoOff] = useState(false)
+  const setMode = (m: CameraMode) => {
+    setModeState(m)
+    setAutoOff(false)
+    writePref('mm-camera', m)
+  }
+  const setStands = (v: boolean) => {
+    setStandsState(v)
+    writePref('mm-stands', v ? '1' : '0')
+  }
+  return { mode, stands, autoOff, setMode, setStands, setAutoOff, setModeSilently: setModeState }
+}
+
+/** Tela estreita (celular em pé): a janela da câmera fica mais alta que o campo. */
+function useNarrow(): boolean {
+  const query = `(max-width: ${CAMERA.narrowPx - 1}px)`
+  const get = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches
+  const [narrow, setNarrow] = useState(get)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia(query)
+    const on = () => setNarrow(mq.matches)
+    mq.addEventListener?.('change', on)
+    return () => mq.removeEventListener?.('change', on)
+  }, [query])
+  return narrow
+}
+
+/** Arquibancada atrás do campo: só CSS (pontinhos nas cores dos dois times), visível quando a câmera chega perto da linha. */
+function Stands({ home, away }: { home: readonly [string, string]; away: readonly [string, string] }) {
+  const crowd = (a: string, b: string) => ({
+    backgroundColor: '#141b24',
+    backgroundImage: `radial-gradient(circle, ${a} 1.7px, transparent 2.3px), radial-gradient(circle, ${b} 1.5px, transparent 2.1px)`,
+    backgroundSize: '7px 7px, 7px 7px',
+    backgroundPosition: '0 0, 3.5px 3.5px',
+  })
+  return (
+    <div className="pointer-events-none absolute -inset-[16%]" aria-hidden="true" data-testid="stands">
+      <div className="absolute inset-0 opacity-90" style={crowd(home[0], away[0])} />
+      <div className="absolute inset-y-0 left-0 w-[22%] opacity-100" style={crowd(home[0], home[1])} />
+      <div className="absolute inset-y-0 right-0 w-[22%] opacity-100" style={crowd(away[0], away[1])} />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
+    </div>
+  )
+}
 
 /** Linhas do campo (105 × 68). */
 function FieldLines() {
@@ -104,6 +174,12 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
   if (!motion.current) motion.current = new PitchMotion()
   motion.current.setLayout(layout, { home: snap.home.activeMentality, away: snap.away.activeMentality })
   const field = useRef<HTMLDivElement | null>(null)
+  const camEl = useRef<HTMLDivElement | null>(null)
+  const camState = useRef(initialCamera())
+  const guard = useRef(new FpsGuard())
+  const prefs = useCameraPrefs()
+  const narrow = useNarrow()
+  const tall = prefs.mode === 'follow' && narrow
   const size = useRef({ w: 0, h: 0 })
   const playerEls = useRef(new Map<string, HTMLElement>())
   const ballEl = useRef<HTMLDivElement | null>(null)
@@ -112,13 +188,18 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
   const arrowEl = useRef<SVGPathElement | null>(null)
   const lineEl = useRef<HTMLParagraphElement | null>(null)
   const fpsEl = useRef<HTMLSpanElement | null>(null)
+  const lowFps = useRef(() => {})
+  lowFps.current = () => {
+    prefs.setModeSilently('full')
+    prefs.setAutoOff(true)
+  }
   const onRevealRef = useRef(onReveal)
   onRevealRef.current = onReveal
   const lastShot = useRef<PlayTrace['shot']>(undefined)
   /** Os trechos do plano atual: o fim forçado de um trecho de plano antigo (abandonado) não é a bola entrando. */
   const planLegs = useRef<ReadonlySet<unknown>>(new Set())
-  const live = useRef({ speed, running, names, numbers: numbers.current })
-  live.current = { speed, running, names, numbers: numbers.current }
+  const live = useRef({ speed, running, names, numbers: numbers.current, mode: prefs.mode, overscan: prefs.stands ? CAMERA.overscan : 0, ky: viewRatio(tall) })
+  live.current = { speed, running, names, numbers: numbers.current, mode: prefs.mode, overscan: prefs.stands ? CAMERA.overscan : 0, ky: viewRatio(tall) }
 
   const [marks, setMarks] = useState<Mark[]>([])
   // VAR narrativo: quais lances ganham a cena (pela semente da partida; a decisão é sempre a do motor).
@@ -228,7 +309,7 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
 
   // Tamanho do campo em pixels (as posições do movimento são proporções; o DOM recebe px por transform).
   useEffect(() => {
-    const el = field.current
+    const el = camEl.current
     if (!el) return
     const measure = () => {
       size.current = { w: el.clientWidth, h: el.clientHeight }
@@ -246,6 +327,7 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
     const stats = { frames: 0, since: 0, worst: 0, cpu: 0, deltas: [] as number[] }
     const wantFps = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('fps')
     const lastPx = new Map<string, number>()
+    let lastCam = ''
     let raf = 0
     let prev = performance.now()
     let lastHolder: string | undefined
@@ -253,20 +335,21 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
     const draw = () => {
       const { w, h } = size.current
       if (w === 0) return
+      const ds = discScale(camState.current.zoom)
       for (const [id, body] of m.bodies) {
         const el = playerEls.current.get(id)
         if (!el) continue
         const dx = (body.pos.x - body.placed.base.x) * w
         const dy = (body.pos.y - body.placed.base.y) * h
-        const key = dx * 4096 + dy
+        const key = dx * 4096 + dy + ds * 1e7
         if (lastPx.get(id) === key) continue
         lastPx.set(id, key)
-        el.style.transform = `translate3d(${dx.toFixed(1)}px,${dy.toFixed(1)}px,0)`
+        el.style.transform = `translate3d(${dx.toFixed(1)}px,${dy.toFixed(1)}px,0)${ds === 1 ? '' : ` scale(${ds.toFixed(3)})`}`
       }
       const ball = ballEl.current
       if (ball) {
         const s = 1 + 0.7 * m.ball.height
-        ball.style.transform = `translate3d(${((m.ball.pos.x - 0.5) * w).toFixed(1)}px,${((m.ball.pos.y - 0.5) * h).toFixed(1)}px,0) scale(${s.toFixed(2)})`
+        ball.style.transform = `translate3d(${((m.ball.pos.x - 0.5) * w).toFixed(1)}px,${((m.ball.pos.y - 0.5) * h).toFixed(1)}px,0) scale(${(s * ds).toFixed(2)})`
       }
       const label = labelEl.current
       const who = lastHolder ? m.bodies.get(lastHolder) : undefined
@@ -274,7 +357,7 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
         if (who) {
           const x = Math.min(0.88, Math.max(0.12, who.pos.x)) * w
           const below = who.pos.y < 0.2
-          label.style.transform = `translate3d(${x.toFixed(1)}px,${(who.pos.y * h + (below ? 14 : -11)).toFixed(1)}px,0)`
+          label.style.transform = `translate3d(${x.toFixed(1)}px,${(who.pos.y * h + (below ? 14 : -11) * ds).toFixed(1)}px,0) scale(${(1 / camState.current.zoom).toFixed(3)})`
           label.style.visibility = 'visible'
         } else label.style.visibility = 'hidden'
       }
@@ -332,6 +415,18 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
           if (labelText.current && p && body) labelText.current.textContent = `${live.current.numbers.get(`${body.placed.side}:${holder}`) ?? ''} ${shortPlayerName(p)}`
         }
       }
+      // Câmera: acompanha a bola (ou volta ao campo inteiro) e escreve só um transform no contêiner.
+      {
+        const { w, h } = size.current
+        camState.current = stepCamera(camState.current, m.ball.pos, live.current.mode, live.current.speed, dt, live.current.overscan, live.current.ky)
+        const t = cameraTransform(camState.current, w, h)
+        const css = t.scale <= 1.001 ? '' : `translate3d(${t.x.toFixed(1)}px,${t.y.toFixed(1)}px,0) scale(${t.scale.toFixed(3)})`
+        if (css !== lastCam && camEl.current) {
+          lastCam = css
+          camEl.current.style.transform = css
+        }
+        if (live.current.mode === 'follow' && live.current.running && guard.current.push(now, dt)) lowFps.current()
+      }
       draw()
       if (wantFps) {
         const cost = performance.now() - t0
@@ -367,8 +462,11 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
   }
 
   return (
-    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-line bg-gradient-to-b from-green-700 to-green-800 shadow-inner" data-testid="pitch">
-      <div ref={field} className="relative aspect-[105/68] w-full select-none">
+    <div className="relative isolate z-0 overflow-hidden rounded-2xl border border-line bg-green-800 shadow-inner" data-testid="pitch">
+      <div ref={field} className={`relative w-full select-none overflow-hidden ${tall ? 'aspect-[23/20]' : 'aspect-[105/68]'}`}>
+        <div ref={camEl} className="absolute inset-x-0 top-1/2 aspect-[105/68] -translate-y-1/2 will-change-transform" data-testid="pitch-camera">
+        {prefs.stands && <Stands home={home.colors} away={away.colors} />}
+        <div className="absolute inset-0 bg-gradient-to-b from-green-700 to-green-800" />
         <FieldLines />
         <svg viewBox="0 0 105 68" className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
           <path ref={arrowEl} d="" fill="none" stroke="#7dd3fc" strokeWidth="0.6" strokeDasharray="2 1.4" opacity="0.9" />
@@ -407,6 +505,8 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
           </div>
         ))}
 
+        </div>
+
         {card && (
           <div key={card.key} className="pointer-events-none absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2" role="status" aria-label={`Cartão ${card.kind === 'red' ? 'vermelho' : 'amarelo'}: ${card.name}`} data-testid="pitch-card">
             <div className="pitch-mark flex flex-col items-center gap-1">
@@ -419,7 +519,7 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
         )}
 
         {goal && (
-          <div key={goal.key} className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center" role="status" aria-label={`Gol de ${goal.scorer}`} data-testid="goal-celebration">
+          <div key={goal.key} className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/35" role="status" aria-label={`Gol de ${goal.scorer}`} data-testid="goal-celebration">
             <div className="goal-celebration flex max-w-[86%] flex-col items-center gap-1 rounded-2xl border border-accent/60 bg-bg/85 px-5 py-3 text-center shadow-[0_0_30px_rgb(39_224_90/0.35)]">
               {data.teams.some((t) => t.id === goal.teamId) && <Crest team={{ abbreviation: teamOf(goal.teamId).abbreviation, colors: [...teamOf(goal.teamId).colors] as [string, string] }} size="md" />}
               <span className="title text-5xl leading-none text-accent">{goal.own ? 'GOL CONTRA' : 'GOL!'}</span>
@@ -448,6 +548,30 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', 
         <span className="pointer-events-none absolute right-2 top-1 text-[10px] font-bold uppercase tracking-wider text-white/70">← {away.abbreviation}</span>
         {!running && snap.minute > 0 && !snap.finished && <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-bg/70 px-2 py-0.5 text-[10px] font-bold text-muted">pausado</span>}
         <span ref={fpsEl} className="pointer-events-none absolute bottom-1 right-1 z-50 text-[10px] font-bold text-white/80" />
+        <div className="absolute right-1.5 top-5 z-50 flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              guard.current.reset()
+              prefs.setMode(prefs.mode === 'follow' ? 'full' : 'follow')
+            }}
+            className="rounded-full bg-bg/80 px-2.5 py-1 text-[11px] font-bold text-white ring-1 ring-white/25 active:scale-95"
+            aria-pressed={prefs.mode === 'follow'}
+            data-testid="camera-toggle"
+          >
+            {prefs.mode === 'follow' ? 'Campo inteiro' : 'Seguir a bola'}
+          </button>
+          {prefs.mode === 'follow' && (
+            <button type="button" onClick={() => prefs.setStands(!prefs.stands)} className="rounded-full bg-bg/70 px-2.5 py-1 text-[11px] font-bold text-white/90 ring-1 ring-white/20 active:scale-95" aria-pressed={prefs.stands} data-testid="stands-toggle">
+              Torcida: {prefs.stands ? 'sim' : 'não'}
+            </button>
+          )}
+        </div>
+        {prefs.autoOff && (
+          <p className="pointer-events-none absolute inset-x-2 bottom-5 z-50 rounded-md bg-bg/85 px-2 py-1 text-center text-[11px] font-semibold text-amber" role="status" data-testid="camera-auto-off">
+            A câmera voltou ao campo inteiro: o aparelho não acompanhou. Toque em "Seguir a bola" para tentar de novo.
+          </p>
+        )}
       </div>
       <p ref={lineEl} className="min-h-[2.1rem] border-t border-white/10 bg-black/25 px-3 py-1.5 text-[12.5px] font-semibold leading-snug text-slate-100" data-testid="pitch-line" aria-live="off" />
     </div>

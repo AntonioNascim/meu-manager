@@ -19,10 +19,11 @@ import type { Kit } from '../components/FieldLineup'
 import { OpponentOverlay } from '../components/OpponentOverlay'
 import { StyleControls } from '../components/StyleControls'
 import { Button, Card, TeamBadge } from '../components/ui'
-import { formatDate, playerName } from '../format'
+import { formatDate, playerName, shortPlayerName } from '../format'
 import {
   MATCH_EVENT_LABELS,
   MATCH_STAT_LABELS,
+  MENTALITY_LABELS,
 } from '../labels'
 import type { ScreenId } from '../navigation'
 import { OtherGames } from './match/Others'
@@ -31,10 +32,14 @@ import { closeOnlineMatch, currentOnlineMatch, openOnlineMatch } from '../../sto
 import { getAccount } from '../../store/onlineAccount'
 import { LIVE_REJECT_LABELS } from '../labels'
 import { Pitch } from './match/Pitch'
+import { AnalystCard, Ceremony, ProjectionLine } from './match/Insights'
+import { analystRead } from './match/analyst'
+import type { AnalystAction } from './match/analyst'
+import { projectNow, prognosisOf } from './match/projection'
 import { CardShell, LiveTabs, MatchHeader, PerformanceCard, TeamPanel, TimelineCard } from './match/LiveParts'
 import { periodText, visibleColor } from './match/liveStats'
 import { seedNumbers } from '../shirt'
-import { assignNumber, devFlag, devParam, holdFor, kitsFor } from './match/pitchModel'
+import { assignNumber, devFlag, devParam, holdFor, inkFor, kitsFor } from './match/pitchModel'
 import { Sheet } from '../theme'
 import { SubstituteList, liveSubstituteCandidates } from './squad/SubstituteSheet'
 
@@ -451,6 +456,25 @@ function Controls({ label, onMain, onSkip, mainDisabled }: { label: string; onMa
 
 const CHOOSE_ALERT = 'Escolha quem entra'
 
+/** A entrada dos times aparece a menos que o jogador tenha pedido para não mostrar mais (ou prefira menos movimento). */
+function wantsCeremony(): boolean {
+  if (devFlag('iniciar')) return false
+  try {
+    if (window.localStorage.getItem('mm-ceremony') === 'off') return false
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
+  } catch {
+    /* sem armazenamento: mostra */
+  }
+  return true
+}
+function neverCeremony() {
+  try {
+    window.localStorage.setItem('mm-ceremony', 'off')
+  } catch {
+    /* vale só agora */
+  }
+}
+
 function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; onNavigate: (s: ScreenId) => void }) {
   const [snap, setSnap] = useState(() => live.match.snapshot())
   // (em desenvolvimento, &iniciar=1 já começa com o jogo rodando)
@@ -465,6 +489,10 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const [tab, setTab] = useState<LiveTab | null>(hurtAtOpen || devParam('aba') === 'trocas' || devParam('aba') === 'tatica' ? 'tactics' : devParam('aba') === 'dados' ? 'stats' : devParam('aba') === 'jogos' ? 'games' : null)
   const [alert, setAlert] = useState<string | null>(() => (hurtAtOpen ? `${names.get(hurtAtOpen) ? playerName(names.get(hurtAtOpen) as Player) : 'Um jogador'} se machucou. ${CHOOSE_ALERT} na aba Tática.` : null))
   const [showFouls, setShowFouls] = useState(false)
+  // Entrada dos times (só no jogo solo, antes do apito) e avisos do analista já dispensados ou aplicados.
+  const [ceremony, setCeremony] = useState(false)
+  const ceremonyDone = useRef(false)
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())
   // Quanto da partida a tela já viu: só o que chega depois pede câmera lenta ou aviso.
   const seen = useRef({ trace: snap.trace.length, events: snap.events.length })
   // Gol (e pênalti perdido) só aparece quando a bola chega ao destino na animação: até lá, placar, linha do tempo e narração ficam como antes do lance.
@@ -578,7 +606,17 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
 
   const onMain = () => {
     if (!running) setAlert((a) => (a && !a.includes(CHOOSE_ALERT) ? null : a))
+    // O primeiro "Começar" do jogo solo abre a entrada dos times; ela termina sozinha (ou no "Pular") e só então a bola rola.
+    if (!running && !online && snap.minute === 0 && !ceremonyDone.current && wantsCeremony()) {
+      ceremonyDone.current = true
+      setCeremony(true)
+      return
+    }
     setRunning((r) => !r)
+  }
+  const endCeremony = () => {
+    setCeremony(false)
+    setRunning(true)
   }
   const skip = () => {
     live.halftimeDone = true
@@ -618,6 +656,36 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const homeColor = visibleColor(kits.home.shirt, kits.home.trim)
   const awayColor = visibleColor(kits.away.shirt, kits.away.trim)
   const context = match ? `${matchLabel(game.season, match).competition} · ${matchLabel(game.season, match).detail}` : undefined
+  // "Se terminar assim" (ao vivo) e o prognóstico (antes do apito): só leitura, com os outros jogos do dia no minuto da partida.
+  const revealedMinute = held ? snap.minute - 1 : snap.minute
+  const projection = useMemo(() => (snap.minute > 0 ? projectNow(game, match, game.userTeamId, { home: view.homeGoals, away: view.awayGoals }, revealedMinute) : null), [game, match, snap.minute, view.homeGoals, view.awayGoals, revealedMinute])
+  const prognosis = useMemo(() => (snap.minute === 0 ? prognosisOf(game, match, game.userTeamId) : null), [game, match, snap.minute])
+  const analystNameOf = (id: string) => {
+    const p = names.get(id)
+    return p ? shortPlayerName(p) : 'Um jogador'
+  }
+  const analyst = (() => {
+    if (finished || snap.minute === 0) return undefined
+    const read = analystRead({ snap: view, side: live.side, nameOf: analystNameOf })
+    return read && !dismissed.has(read.id) ? read : null
+  })()
+  const applyAnalyst = (a: AnalystAction) => {
+    if (analyst) setDismissed((d) => new Set([...d, analyst.id]))
+    if (a.kind === 'open-tactics') {
+      setTab('tactics')
+      return
+    }
+    try {
+      live.match.setMentality(live.side, a.value)
+      refresh()
+    } catch (e) {
+      setAlert(e instanceof Error ? e.message : 'Não foi possível mudar a mentalidade.')
+    }
+  }
+  const ceremonySide = (side: 'home' | 'away') => {
+    const kit = kits[side]
+    return { abbreviation: (side === 'home' ? homeTeam : awayTeam).abbreviation, shirt: kit.shirt, trim: kit.trim, ink: inkFor(kit.shirt), numbers: (side === 'home' ? snap.home : snap.away).onPitch.map((p) => numbers.current.get(`${side}:${p.playerId}`) ?? 0) }
+  }
   return (
     <div className="space-y-3">
       <div className="sticky top-[84px] z-20 -mx-4 bg-bg px-4 pb-2 pt-1">
@@ -658,7 +726,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
           )}
         </div>
       ) : (
-        <Controls label={mainLabel} onMain={onMain} onSkip={skip} mainDisabled={pending} />
+        <Controls label={mainLabel} onMain={onMain} onSkip={skip} mainDisabled={pending || ceremony} />
       )}
       {online && finished && <p className="text-center text-xs text-muted">Você vê o resultado e espera: a próxima rodada só começa quando todas as partidas terminarem.</p>}
       {online && online.lastRejected() && <p role="alert" className="rounded-lg border border-amber/55 bg-amber/10 p-2.5 text-xs font-semibold text-amber">Não valeu: {online.lastRejected() === 'engine' && online.lastRejectedDetail() ? online.lastRejectedDetail() : (LIVE_REJECT_LABELS[online.lastRejected() as keyof typeof LIVE_REJECT_LABELS] ?? 'o servidor recusou a mudança')}</p>}
@@ -682,8 +750,13 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
 
       {/* Em pé: o campo e, embaixo, os dois painéis lado a lado. Deitado e no computador: painel, campo e painel, como na referência. */}
       <div className="grid grid-cols-2 gap-3 min-[720px]:grid-cols-[190px_minmax(0,1fr)_190px] min-[720px]:items-start">
-        <div className="col-span-2 min-w-0 min-[720px]:col-span-1 min-[720px]:col-start-2 min-[720px]:row-start-1">
+        <div className="col-span-2 min-w-0 space-y-2 min-[720px]:col-span-1 min-[720px]:col-start-2 min-[720px]:row-start-1">
+          <ProjectionLine projection={projection} prognosis={prognosis} />
+          <div className="relative">
           <Pitch data={game.season} snap={snap} {...(held ? { reveal: held.limit } : {})} onReveal={reveal} seed={live.matchId} speed={online ? online.effectiveSpeed() : speed} running={online ? !finished && !atHalftime && snap.minute > 0 : running} numbers={numbers.current} />
+          {ceremony && <Ceremony home={ceremonySide('home')} away={ceremonySide('away')} title={`${homeTeam.abbreviation} × ${awayTeam.abbreviation}`} subtitle={[context, match?.cup?.neutral ? 'campo neutro' : teamById(game, match?.homeTeamId ?? snap.home.teamId).stadium.name].filter(Boolean).join(' · ')} onDone={endCeremony} onNeverAgain={() => { neverCeremony(); endCeremony() }} />}
+          </div>
+          {analyst !== undefined && <AnalystCard read={analyst} actionLabel={(a) => (a.kind === 'mentality' ? `Aplicar: ${MENTALITY_LABELS[a.value]}` : 'Ver a Tática')} onApply={applyAnalyst} onDismiss={() => analyst && setDismissed((d) => new Set([...d, analyst.id]))} disabled={finished} />}
         </div>
         <div className="min-w-0 min-[720px]:col-start-1 min-[720px]:row-start-1">
           <TeamPanel team={homeTeam} stats={snap.homeStats} color={homeColor} side="home" />
