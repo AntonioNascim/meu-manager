@@ -359,7 +359,8 @@ describe('sala: Pronto antes da partida e códigos de vaga', () => {
     expect(await room.post('ready', { playerId: 'ana', ready: true })).toMatchObject({ ok: true })
     const after = (await room.post('state', { playerId: 'ana' })) as Reply
     expect(after.view.log.some((l: { type: string }) => l.type === 'event-started')).toBe(true)
-    expect(after.view.next?.waiting).toBeUndefined()
+    // O jogo foi disputado. (Se o relógio real já passou da data do próximo evento, a sala abre a espera dele na hora: por isso não se exige `waiting` vazio.)
+    expect(after.view.progress.played).toBeGreaterThan(0)
   }, 120_000)
 
   it('código de vaga: reserva o clube, barra quem não tem o código e é gasto ao entrar', async () => {
