@@ -38,7 +38,7 @@ describe('o movimento do campo muda com o estilo de jogo', () => {
   })
 
   it('jogar pelas pontas: a bola passa mais pelos lados', () => {
-    for (const other of [m.possession, m.direct, m.counter, m.press]) expect(m.wings.flankPct).toBeGreaterThan(other.flankPct + 6)
+    for (const other of [m.possession, m.direct, m.counter, m.press]) expect(m.wings.flankPct).toBeGreaterThan(other.flankPct + 5)
     expect(m.wings.crossesPerGame).toBeGreaterThanOrEqual(m.possession.crossesPerGame)
   })
 

@@ -10,7 +10,7 @@
  */
 import type { PlayTrace } from '../../../engine/match'
 import type { Position } from '../../../engine/types'
-import { BASE_MINUTE_MS } from '../../../engine/match/timing'
+import { BASE_MINUTE_MS, sceneScale } from '../../../engine/match/timing'
 import { fitBeats, hash, shifted, slowFor } from './pitchModel'
 import type { Beat, Layout, Mark, Phase, Placed, Pt, Side } from './pitchModel'
 import { shapeOf } from './pitchStyle'
@@ -44,6 +44,8 @@ export interface PlanChoice {
   relays: number
   quick: boolean
   setPiece: boolean
+  /** Quanto das durações fixas das jogadas paradas vale nesta velocidade (`sceneScale`). */
+  scale: number
 }
 
 /**
@@ -70,7 +72,7 @@ export function choosePlan(beats: readonly Beat[], last: PlayTrace, freshCount: 
     seq = fitBeats(beats, Math.max(1, room - connectors - relays) * LEG_MIN_MS, LEG_MIN_MS)
   }
   const setPiece = !!last.shot && (last.shot.type === 'penalty' || last.shot.type === 'freeKick') && beats[0]?.phase === 'chance'
-  return { seq, tick, connectors, relays, quick, setPiece }
+  return { seq, tick, connectors, relays, quick, setPiece, scale: sceneScale(speed) }
 }
 
 /** Batida de troca de passes do campo do meio (passe curto com seta, sem finalização). */
@@ -141,6 +143,8 @@ export interface PlanContext {
   setPiece: boolean
   /** Respeita a velocidade máxima da bola (desligado nas velocidades altas, em que o lance tem que caber no minuto). */
   floors: boolean
+  /** Escala das durações fixas das batidas de jogada parada (`Beat.hold`); padrão 1. */
+  scale?: number
 }
 
 /** Velocidade máxima média da bola por tipo de trecho (m/s), já esticando o tempo real da partida: acima disso o passe parece teletransporte. */
@@ -164,6 +168,8 @@ export class PitchMotion {
   private marking = new Map<string, string>()
   private pressers = new Set<string>()
   private speed = 1
+  /** Velocidade máxima de caminhada (m/s) enquanto dura uma jogada parada; 0 = correndo normalmente. */
+  private walkV = 0
   private style: Partial<Record<Side, ReturnType<typeof shapeOf>>> = {}
   private mentality: Record<Side, number> = { home: 0, away: 0 }
 
@@ -215,6 +221,7 @@ export class PitchMotion {
     this.current = null
     this.legs = []
     this.override = {}
+    this.walkV = 0
     const first = beats[0]
     if (!first) return []
     const att = first.attSide
@@ -378,7 +385,7 @@ export class PitchMotion {
       legs.push(centre)
     }
     // Cada tipo de trecho tem uma velocidade máxima da bola: se o tempo do lance não comporta, os passes de ligação saem primeiro.
-    this.assignTimes(legs, ctx.tickMs, at, ctx.floors)
+    this.assignTimes(legs, ctx.tickMs, at, ctx.floors, ctx.scale ?? 1)
     if (ctx.floors) return this.finishPlan(legs, ctx, at)
     this.legs = legs
     return legs
@@ -394,7 +401,7 @@ export class PitchMotion {
       if (idx < 0) break
       legs.splice(idx, 1)
       this.relink(legs, ctx)
-      this.assignTimes(legs, ctx.tickMs, at, ctx.floors)
+      this.assignTimes(legs, ctx.tickMs, at, ctx.floors, ctx.scale ?? 1)
     }
     this.legs = legs
     return legs
@@ -504,7 +511,7 @@ export class PitchMotion {
   }
 
   /** Reparte o tempo do lance pelos trechos, na proporção da distância que a bola percorre (com um piso por tipo). */
-  private assignTimes(legs: Leg[], tickMs: number, from: Pt, floors: boolean): void {
+  private assignTimes(legs: Leg[], tickMs: number, from: Pt, floors: boolean, scale = 1): void {
     let at = from
     const dists: number[] = []
     const weights = legs.map((l) => {
@@ -518,10 +525,17 @@ export class PitchMotion {
       at = l.toPt
       return w
     })
-    const total = weights.reduce((a, b) => a + b, 0) || 1
+    // Batidas de jogada parada têm tempo próprio (ritmo natural); o resto do lance divide o que sobra.
+    const fixed = legs.map((l) => (l.beat?.hold ? l.beat.hold * scale : 0))
+    const free = Math.max(tickMs - fixed.reduce((a, b) => a + b, 0), 0)
+    const total = weights.reduce((a, b, i) => a + (fixed[i] ? 0 : b), 0) || 1
     legs.forEach((l, i) => {
+      if (fixed[i]) {
+        l.ms = fixed[i] as number
+        return
+      }
       const floor = floors && BALL_V[l.kind] > 0 ? ((dists[i] as number) / BALL_V[l.kind]) * 1000 : 0
-      l.ms = Math.max(40, floor, (tickMs * (weights[i] as number)) / total)
+      l.ms = Math.max(40, floor, (free * (weights[i] as number)) / total)
     })
   }
 
@@ -571,6 +585,16 @@ export class PitchMotion {
     this.phase = leg.beat?.phase ?? 'midfield'
     this.att = leg.attSide
     if (leg.beat) this.override = { ...this.override, ...leg.beat.moves }
+    // Jogada parada: todos andam (não correm), na velocidade que leva o mais distante ao destino perto do fim do trecho.
+    this.walkV = 0
+    if (leg.beat?.hold) {
+      let far = 0
+      for (const [id, to] of Object.entries(this.override)) {
+        const b = this.bodies.get(id)
+        if (b) far = Math.max(far, meters(b.pos, to))
+      }
+      this.walkV = clamp(far / Math.max(0.5, (leg.ms / 1000) * 0.8), 3, 14)
+    }
     // Condução: a bola acompanha o condutor. Se ela não está com ele (um passe de apoio foi cortado por falta de tempo), ela viaja até ele: nunca cola.
     const carrier = leg.kind === 'carry' && leg.toId ? this.bodies.get(leg.toId) : undefined
     if (leg.kind === 'carry' && (!carrier || this.ball.holder === leg.toId || meters(this.ball.pos, carrier.pos) <= 2.5)) {
@@ -772,7 +796,8 @@ export class PitchMotion {
       const dx = (target.x - body.pos.x) * FIELD_W
       const dy = (target.y - body.pos.y) * FIELD_H
       const d = Math.hypot(dx, dy)
-      const vmax = sprint * boost * (p.slot === 'GK' ? 0.55 : 1)
+      let vmax = sprint * boost * (p.slot === 'GK' ? 0.55 : 1)
+      if (this.walkV > 0) vmax = Math.min(vmax, this.walkV)
       const want = d > 1e-4 ? Math.min(vmax, d * 4.2) / d : 0
       body.vel.x += (dx * want - body.vel.x) * k
       body.vel.y += (dy * want - body.vel.y) * k

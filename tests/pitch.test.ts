@@ -363,11 +363,11 @@ describe('câmera lenta em finalizações, gols e cartões', () => {
   it('gol é mais lento que finalização, que é mais lenta que o lance comum (que segue a velocidade)', () => {
     // O gol espera também a saída de bola (a bola volta ao meio, os times se reorganizam); a cena é mais curta no 2x.
     expect(slowFor(trace('goal'))).toBe(HOLD_MS.goal + HOLD_MS.restart)
-    expect(slowFor(trace('goal'), 2)).toBe(HOLD_MS.goal + HOLD_MS.restart * 0.5)
+    expect(slowFor(trace('goal'), 2)).toBe(HOLD_MS.goal + HOLD_MS.restart * 0.75)
     expect(slowFor(trace('saved'))).toBe(HOLD_MS.shot)
     // Chute para fora: tiro de meta. Defesa que vira escanteio: a cena do escanteio.
     expect(slowFor(trace('off-target'))).toBe(HOLD_MS.shot + HOLD_MS.goalKick)
-    expect(slowFor(trace('off-target'), 2)).toBe(HOLD_MS.shot + HOLD_MS.goalKick * 0.5)
+    expect(slowFor(trace('off-target'), 2)).toBe(HOLD_MS.shot + HOLD_MS.goalKick * 0.75)
     expect(slowFor(trace('saved'), 1, true)).toBe(HOLD_MS.shot + HOLD_MS.corner)
     expect(slowFor(trace())).toBe(0)
     expect(HOLD_MS.goal).toBeGreaterThan(HOLD_MS.shot)
@@ -376,7 +376,7 @@ describe('câmera lenta em finalizações, gols e cartões', () => {
 
   it('o relógio espera depois de gol, finalização e cartão, em qualquer velocidade, e não espera por falta', () => {
     expect(holdFor([trace('goal')], [event('goal')])).toBe(HOLD_MS.goal + HOLD_MS.restart)
-    expect(holdFor([trace('goal')], [event('goal')], 2)).toBe(HOLD_MS.goal + HOLD_MS.restart * 0.5)
+    expect(holdFor([trace('goal')], [event('goal')], 2)).toBe(HOLD_MS.goal + HOLD_MS.restart * 0.75)
     expect(holdFor([trace('off-target')], [])).toBe(HOLD_MS.shot + HOLD_MS.goalKick)
     expect(holdFor([trace('saved')], [])).toBe(HOLD_MS.shot)
     expect(holdFor([trace()], [event('yellow-card')])).toBe(HOLD_MS.card)
@@ -572,13 +572,13 @@ describe('cenas de bola parada no campo', () => {
     const list = scenes('penalty')
     expect(list.length).toBeGreaterThan(0)
     for (const { trace, layout, snap } of list) {
-      // Quatro tempos antes da cobrança: sair da área, bola na marca, goleiro na linha e a corrida; depois a cobrança.
+      // Cinco tempos antes da cobrança: sair da área, bola na marca, goleiro na linha, a espera e a corrida; depois a cobrança.
       const beats = beatsFor(trace, layout, snap.events).filter((b) => !b.scene)
-      expect(beats).toHaveLength(5)
+      expect(beats).toHaveLength(6)
       const taker = layout.get(trace.shot!.shooterId)!
       const gx = taker.side === 'home' ? 1 : 0
       const dir = taker.side === 'home' ? 1 : -1
-      const kick = beats[4]!
+      const kick = beats[5]!
       const setup = beats[2]!
       expect(beats[0]!.still).toBe(true)
       expect(beats[1]!.ball).toEqual({ x: gx - dir * PENALTY_MARK, y: 0.5 })

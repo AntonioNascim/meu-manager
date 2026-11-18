@@ -5,11 +5,40 @@
 import type { MatchEvent } from '../types'
 import type { PlayTrace } from './state'
 
-/** Duração (ms) da animação de cada tipo de lance; o relógio da partida espera esse tempo (`holdFor`). */
-export const HOLD_MS = { goal: 3000, shot: 2000, card: 2000, setPiece: 1000, corner: 2400, goalKick: 1800, restart: 1800, penalty: 1800 } as const
+/**
+ * Cada passo das jogadas paradas (ms a 1x). A tela dá a cada batida exatamente este tempo (vezes `sceneScale`) e os jogadores andam, não correm.
+ * - Depois do gol: voltam ao seu campo caminhando, ficam parados na formação, e sai a saída de bola.
+ * - Pênalti: saem da área andando, o cobrador ajeita a bola, o goleiro se posiciona, pausa de expectativa, corrida.
+ * - Tiro de meta: saem da área e os times se organizam, o goleiro ajeita a bola e cobra.
+ */
+export const SCENE_MS = {
+  goalWalk: 3000,
+  goalStand: 1000,
+  kickoff: 1200,
+  penLeave: 2000,
+  penBall: 1000,
+  penKeeper: 1000,
+  penWait: 2000,
+  penRun: 700,
+  gkLeave: 2000,
+  gkBall: 1000,
+  gkKick: 900,
+} as const
 
-/** As cenas de bola parada (tiro de meta, pênalti, escanteio, saída depois do gol) ficam mais curtas no 2x. */
-export const sceneScale = (speed: number): number => (speed >= 2 ? 0.5 : 1)
+/** Duração (ms) da animação de cada tipo de lance; o relógio da partida espera esse tempo (`holdFor`). */
+export const HOLD_MS = {
+  goal: 3000,
+  shot: 2000,
+  card: 2000,
+  setPiece: 1000,
+  corner: 2400,
+  goalKick: SCENE_MS.gkLeave + SCENE_MS.gkBall + SCENE_MS.gkKick,
+  restart: SCENE_MS.goalWalk + SCENE_MS.goalStand + SCENE_MS.kickoff,
+  penalty: SCENE_MS.penLeave + SCENE_MS.penBall + SCENE_MS.penKeeper + SCENE_MS.penWait + SCENE_MS.penRun,
+} as const
+
+/** As cenas de bola parada ficam um pouco mais curtas no 2x (75%, não a metade). As velocidades antigas de 4x e 8x contam como 2x. */
+export const sceneScale = (speed: number): number => (speed >= 2 ? 0.75 : 1)
 
 /**
  * Duração de um minuto de jogo na velocidade 1x (ms): a mesma do jogo solo e da liga online. Era 700; passou a 1.600 (Fase 6D) para os lances do campo

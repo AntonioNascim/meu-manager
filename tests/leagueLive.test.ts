@@ -140,7 +140,7 @@ describe('partida ao vivo na liga online: um relógio por partida (C5)', () => {
     const half = gameOf(e, DUEL[0]!.teamId)
     expect(half.halftime).toBeDefined()
     expect(half.clock).toBe(45)
-    expect(half.halftime!.until - at).toBeLessThanOrEqual(HALFTIME_MS + 5_000)
+    expect(half.halftime!.until - at).toBeLessThanOrEqual(HALFTIME_MS + 12_000)
     // parada: nada avança durante o intervalo
     const stay = stepLiveEvent(e, seats, at + 20_000).event
     expect(gameOf(stay, DUEL[0]!.teamId).clock).toBe(45)

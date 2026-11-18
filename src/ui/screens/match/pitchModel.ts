@@ -8,6 +8,7 @@
 import type { MatchSnapshot, PlayTrace } from '../../../engine/match'
 import type { GridPoint, MatchEvent, PlayStyle, Position } from '../../../engine/types'
 import { POSITION_NUMBERS } from '../../../engine/shirt'
+import { SCENE_MS } from '../../../engine/match/timing'
 import { depthShift, shapeOf, type StyleShape } from './pitchStyle'
 
 export type Side = 'home' | 'away'
@@ -208,6 +209,8 @@ export interface Beat {
   note?: string
   /** Passo de cena que vem depois do desfecho do lance (não conta como desfecho nas velocidades altas). */
   scene?: boolean
+  /** Tempo fixo do passo (ms a 1x; a tela aplica `sceneScale`) e os jogadores andam: as jogadas paradas (saída, pênalti, tiro de meta) têm ritmo natural. */
+  hold?: number
 }
 
 export type Layout = Map<string, Placed>
@@ -633,10 +636,11 @@ export function setPieceBeats(trace: PlayTrace, layout: Layout, events: readonly
     const clear: Record<string, Pt> = { ...moves }
     if (keeper) delete clear[keeper.playerId]
     const ballFrom: Pt = { x: ballX - dir * 0.1, y: 0.5 + (hash(`${trace.minute}:${shot.shooterId}:pf`) < 0.5 ? -0.12 : 0.12) }
-    const leave: Beat = { phase: 'chance', holder: taker.playerId, ball: ballFrom, moves: { ...clear, [taker.playerId]: { x: ballFrom.x - dir * 0.015, y: ballFrom.y } }, attSide: S, focusY: 0.5, marks: fouled ? [{ kind: 'foul', at: ballFrom }] : [], still: true, note: 'Pênalti! Os jogadores saem da área' }
-    const place: Beat = { phase: 'chance', holder: taker.playerId, ball: spot, moves: { ...clear, [taker.playerId]: setupTaker }, attSide: S, focusY: ballY, marks: [], still: true, note: '{who} coloca a bola na marca do pênalti' }
-    const stand: Beat = { ...place, holder: keeper?.playerId ?? taker.playerId, moves: { ...setup.moves }, still: true, note: '{who} se posiciona na linha do gol' }
-    return [leave, place, stand, { ...runUp, note: '{who} parte para a cobrança' }, kick]
+    const leave: Beat = { phase: 'chance', holder: taker.playerId, ball: ballFrom, moves: { ...clear, [taker.playerId]: { x: ballFrom.x - dir * 0.015, y: ballFrom.y } }, attSide: S, focusY: 0.5, marks: fouled ? [{ kind: 'foul', at: ballFrom }] : [], still: true, hold: SCENE_MS.penLeave, note: 'Pênalti! Os jogadores saem da área' }
+    const place: Beat = { phase: 'chance', holder: taker.playerId, ball: spot, moves: { ...clear, [taker.playerId]: setupTaker }, attSide: S, focusY: ballY, marks: [], still: true, hold: SCENE_MS.penBall, note: '{who} coloca a bola na marca do pênalti' }
+    const stand: Beat = { ...place, holder: keeper?.playerId ?? taker.playerId, moves: { ...setup.moves }, still: true, hold: SCENE_MS.penKeeper, note: '{who} se posiciona na linha do gol' }
+    const wait: Beat = { ...stand, holder: taker.playerId, hold: SCENE_MS.penWait, note: 'Todos esperam o apito para a cobrança' }
+    return [leave, place, stand, wait, { ...runUp, hold: SCENE_MS.penRun, note: '{who} parte para a cobrança' }, kick]
   }
   return [setup, runUp, kick]
 }
@@ -677,10 +681,11 @@ function kickoffBeats(scorer: Side, placed: readonly Placed[], minute: number): 
   moves[kicker.playerId] = kickerAt
   moves[partner.playerId] = partnerAt
   const centre: Pt = { x: 0.5, y: 0.5 }
-  return [
-    { phase: 'midfield', holder: kicker.playerId, ball: centre, moves, attSide: k, focusY: 0.5, marks: [], weight: 1.4, still: true, scene: true, note: 'A bola volta ao meio do campo e os times se reorganizam' },
-    { phase: 'progress', holder: partner.playerId, ball: partnerAt, arrow: { from: centre, to: partnerAt, curve: false }, moves, attSide: k, focusY: 0.5, marks: [], weight: 0.9, scene: true, note: '{from} dá a saída de bola para {who}' },
-  ]
+  // Depois da comemoração: os times voltam andando ao seu campo, ficam parados na formação por um instante, e só então sai a bola.
+  const walk: Beat = { phase: 'midfield', holder: kicker.playerId, ball: centre, moves, attSide: k, focusY: 0.5, marks: [], still: true, scene: true, hold: SCENE_MS.goalWalk, note: 'A bola volta ao meio do campo e os times voltam ao seu lado' }
+  const stand: Beat = { ...walk, hold: SCENE_MS.goalStand, note: 'Os times esperam a saída de bola' }
+  const pass: Beat = { phase: 'progress', holder: partner.playerId, ball: partnerAt, arrow: { from: centre, to: partnerAt, curve: false }, moves, attSide: k, focusY: 0.5, marks: [], scene: true, hold: SCENE_MS.kickoff, note: '{from} dá a saída de bola para {who}' }
+  return [walk, stand, pass]
 }
 
 function goalKickBeats(att: Side, placed: readonly Placed[], minute: number, keeperHint: Placed | undefined): Beat[] {
@@ -720,11 +725,18 @@ function goalKickBeats(att: Side, placed: readonly Placed[], minute: number, kee
   }
   if (!receiver) return []
   // O destinatário já vai ao ponto enquanto o goleiro ajeita a bola, então a bola não cruza o campo atrás dele.
-  const moves = { ...spread, [receiver.playerId]: target }
+  // Todos saem da área do goleiro (dos dois times) e os times se organizam no campo.
+  const clear: Record<string, Pt> = {}
+  for (const p of placed) {
+    if (p.slot === 'GK' || p.playerId === receiver.playerId || spread[p.playerId]) continue
+    const depth = Math.abs(p.base.x - gx)
+    if (depth < 0.24) clear[p.playerId] = { x: gx - adir * (0.24 + (p.side === D ? 0.02 : 0.07)), y: p.base.y }
+  }
+  const moves = { ...clear, ...spread, [receiver.playerId]: target }
   return [
-    { phase: 'progress', holder: keeper.playerId, ball: spot, moves: { [keeper.playerId]: behind, ...moves }, attSide: D, focusY: spot.y, marks: [], weight: 1.2, still: true, scene: true, note: 'Bola para fora: tiro de meta. {who} vai buscar a bola' },
-    { phase: 'progress', holder: keeper.playerId, ball: spot, moves: { [keeper.playerId]: behind, ...moves }, attSide: D, focusY: spot.y, marks: [], weight: 0.9, scene: true, note: '{who} pega a bola e ajeita para a cobrança' },
-    { phase: 'progress', holder: receiver.playerId, ball: nudge(target, -adir), arrow: { from: spot, to: target, curve }, moves, attSide: D, focusY: target.y, marks: [], weight: curve ? 1.4 : 1, scene: true, note: curve ? '{from} cobra o tiro de meta com bola longa para {who}' : '{from} cobra o tiro de meta e toca para {who}' },
+    { phase: 'progress', holder: keeper.playerId, ball: spot, moves: { [keeper.playerId]: behind, ...moves }, attSide: D, focusY: spot.y, marks: [], still: true, scene: true, hold: SCENE_MS.gkLeave, note: 'Bola para fora: tiro de meta. Os jogadores saem da área e os times se organizam' },
+    { phase: 'progress', holder: keeper.playerId, ball: spot, moves: { [keeper.playerId]: behind, ...moves }, attSide: D, focusY: spot.y, marks: [], scene: true, hold: SCENE_MS.gkBall, note: '{who} pega a bola e ajeita para a cobrança' },
+    { phase: 'progress', holder: receiver.playerId, ball: nudge(target, -adir), arrow: { from: spot, to: target, curve }, moves, attSide: D, focusY: target.y, marks: [], scene: true, hold: SCENE_MS.gkKick, note: curve ? '{from} cobra o tiro de meta com bola longa para {who}' : '{from} cobra o tiro de meta e toca para {who}' },
   ]
 }
 

@@ -467,6 +467,15 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const [showFouls, setShowFouls] = useState(false)
   // Quanto da partida a tela já viu: só o que chega depois pede câmera lenta ou aviso.
   const seen = useRef({ trace: snap.trace.length, events: snap.events.length })
+  // Gol (e pênalti perdido) só aparece quando a bola chega ao destino na animação: até lá, placar, linha do tempo e narração ficam como antes do lance.
+  const [held, setHeld] = useState<{ limit: number; home: number; away: number; before: MatchSnapshot } | null>(null)
+  const lastSnap = useRef(snap)
+  const heldTimer = useRef(0)
+  const reveal = () => {
+    window.clearTimeout(heldTimer.current)
+    setHeld(null)
+  }
+  useEffect(() => () => window.clearTimeout(heldTimer.current), [])
   // Números de camisa dos dois times: o campo e as Trocas usam os mesmos.
   const numbers = useRef(seedNumbers(seedNumbers(new Map<string, number>(), game.season, snap.home.teamId, 'home'), game.season, snap.away.teamId, 'away'))
   const [opponentOpen, setOpponentOpen] = useState(() => devFlag('oponente'))
@@ -478,7 +487,17 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const absorb = (next: MatchSnapshot): number => {
     const freshTrace = next.trace.slice(seen.current.trace)
     const freshEvents = next.events.slice(seen.current.events)
+    const hide = freshEvents.findIndex((e) => e.type === 'goal' || e.type === 'own-goal' || e.type === 'missed-penalty')
+    if (hide >= 0) {
+      const before = lastSnap.current
+      const limit = seen.current.events + hide
+      setHeld((h) => h ?? { limit, home: before.homeGoals, away: before.awayGoals, before })
+      // Plano B: se o campo não avisar, o resultado aparece depois do tempo da câmera lenta.
+      window.clearTimeout(heldTimer.current)
+      heldTimer.current = window.setTimeout(() => setHeld(null), holdFor(next.trace.slice(seen.current.trace), freshEvents, online ? online.effectiveSpeed() : speed) + 3500)
+    }
     seen.current = { trace: next.trace.length, events: next.events.length }
+    lastSnap.current = next
     setSnap(next)
     const hurt = freshEvents.find((e) => e.type === 'injury' && e.teamId === game.userTeamId)
     if (hurt) {
@@ -547,7 +566,9 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const beforeExtra = !online && !finished && !running && snap.minute === 90 && snap.extraTime === true
   const halfLeft = half ? Math.max(0, Math.ceil((half.deadline - Date.now()) / 1000)) : 0
   const label = finished ? 'Fim de jogo' : atHalftime ? (online ? `Intervalo · ${halfLeft} s` : 'Intervalo') : beforeExtra ? 'Fim do tempo normal' : snap.minute === 0 ? 'Antes do apito' : `${periodText(snap, false)}${online || running ? '' : ' · pausado'}`
-  const lines = useMemo(() => buildLog(snap, live.halftimeDone, showFouls), [snap, live.halftimeDone, showFouls])
+  // O que a tela mostra: a partida sem o gol que a bola ainda não fez.
+  const view = useMemo<MatchSnapshot>(() => (held ? { ...snap, events: snap.events.slice(0, held.limit), homeGoals: held.home, awayGoals: held.away } : snap), [snap, held])
+  const lines = useMemo(() => buildLog(view, live.halftimeDone, showFouls), [view, live.halftimeDone, showFouls])
   const mySide = live.side === 'home' ? snap.home : snap.away
   const opponentSide = live.side === 'home' ? snap.away : snap.home
   const canEdit = online ? !finished : !running && !finished
@@ -565,6 +586,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
     setRunning(false)
     live.match.playUntil(120)
     absorb(live.match.snapshot())
+    reveal()
   }
 
   const conclude = () => {
@@ -602,7 +624,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
         <MatchHeader
           home={homeTeam}
           away={awayTeam}
-          snap={snap}
+          snap={view}
           label={label}
           names={names}
           userTeamId={game.userTeamId}
@@ -661,7 +683,7 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
       {/* Em pé: o campo e, embaixo, os dois painéis lado a lado. Deitado e no computador: painel, campo e painel, como na referência. */}
       <div className="grid grid-cols-2 gap-3 min-[720px]:grid-cols-[190px_minmax(0,1fr)_190px] min-[720px]:items-start">
         <div className="col-span-2 min-w-0 min-[720px]:col-span-1 min-[720px]:col-start-2 min-[720px]:row-start-1">
-          <Pitch data={game.season} snap={snap} seed={live.matchId} speed={online ? online.effectiveSpeed() : speed} running={online ? !finished && !atHalftime && snap.minute > 0 : running} numbers={numbers.current} />
+          <Pitch data={game.season} snap={snap} {...(held ? { reveal: held.limit } : {})} onReveal={reveal} seed={live.matchId} speed={online ? online.effectiveSpeed() : speed} running={online ? !finished && !atHalftime && snap.minute > 0 : running} numbers={numbers.current} />
         </div>
         <div className="min-w-0 min-[720px]:col-start-1 min-[720px]:row-start-1">
           <TeamPanel team={homeTeam} stats={snap.homeStats} color={homeColor} side="home" />
@@ -673,10 +695,10 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
 
       <div className="grid gap-3 min-[720px]:grid-cols-3">
         <CardShell title="Jogos ao vivo" icon="calendar" testId="live-games-card">
-          <div className="px-3 py-1">{online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={snap.minute} compact />}</div>
+          <div className="px-3 py-1">{online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={held ? snap.minute - 1 : snap.minute} compact />}</div>
         </CardShell>
-        <TimelineCard snap={snap} teams={teamsById} names={names} />
-        <PerformanceCard snap={snap} home={homeTeam} away={awayTeam} homeColor={homeColor} awayColor={awayColor} />
+        <TimelineCard snap={view} teams={teamsById} names={names} />
+        <PerformanceCard snap={held ? held.before : view} home={homeTeam} away={awayTeam} homeColor={homeColor} awayColor={awayColor} />
       </div>
 
       <LiveTabs
@@ -689,9 +711,9 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
         onChange={setTab}
       />
 
-      {tab === 'games' && (online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={snap.minute} />)}
-      {tab === 'stats' && <StatsList game={game} snap={snap} />}
-      {tab === 'tactics' && <TacticPanel game={game} live={live} side={mySide} snap={snap} canEdit={canEdit} refresh={refresh} injuredId={pending ? snap.injuryPending?.playerId : undefined} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
+      {tab === 'games' && (online ? <OnlineOthers game={game} handle={online} /> : <OtherGames game={game} minute={held ? snap.minute - 1 : snap.minute} />)}
+      {tab === 'stats' && <StatsList game={game} snap={view} />}
+      {tab === 'tactics' && <TacticPanel game={game} live={live} side={mySide} snap={view} canEdit={canEdit} refresh={refresh} injuredId={pending ? snap.injuryPending?.playerId : undefined} kit={kits[live.side]} keeperKit={{ shirt: kits[live.side].keeper, trim: kits[live.side].shirt }} numbers={numbers.current} />}
 
       <div className="max-h-[28rem] overflow-y-auto">{logSection}</div>
 

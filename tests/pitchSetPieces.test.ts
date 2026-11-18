@@ -3,7 +3,7 @@ import { generateWorld } from '../src/data/generateWorld'
 import { formationOf } from '../src/engine/formations'
 import { startMatch } from '../src/engine/match'
 import type { MatchInput, MatchSnapshot } from '../src/engine/match'
-import { HOLD_MS, holdFor, sceneScale } from '../src/engine/match/timing'
+import { HOLD_MS, SCENE_MS, holdFor, sceneScale } from '../src/engine/match/timing'
 import type { PlayStyle, Player, Team } from '../src/engine/types'
 import { afterShotBeats, beatsFor, layoutFrom } from '../src/ui/screens/match/pitchModel'
 import type { Layout, Side } from '../src/ui/screens/match/pitchModel'
@@ -101,8 +101,8 @@ describe('saída de bola depois do gol', () => {
     for (const { trace, layout } of list.slice(0, 25)) {
       const scorer = layout.get(trace.shot!.shooterId)!.side
       const scene = afterShotBeats(trace, layout, new Set(layout.keys()))
-      expect(scene).toHaveLength(2)
-      const [reset, kickoff] = scene as [(typeof scene)[number], (typeof scene)[number]]
+      expect(scene).toHaveLength(3)
+      const [reset, , kickoff] = scene as [(typeof scene)[number], (typeof scene)[number], (typeof scene)[number]]
       expect(reset.ball).toEqual({ x: 0.5, y: 0.5 })
       expect(reset.still).toBe(true)
       expect(reset.attSide).not.toBe(scorer)
@@ -180,5 +180,31 @@ describe('as cenas tocam no campo sem a bola dar salto', () => {
     const [one] = find('off-target')
     const beats = beatsFor(one!.trace, one!.layout, one!.snap.events, new Set(one!.layout.keys()))
     expect(choosePlan(beats, one!.trace, 1, 2).tick).toBeLessThan(choosePlan(beats, one!.trace, 1, 1).tick)
+  })
+})
+
+describe('ritmo das jogadas paradas', () => {
+  it('as durações do 1x batem com o combinado e o 2x vale 75%', () => {
+    expect(SCENE_MS.goalWalk).toBe(3000)
+    expect(SCENE_MS.penLeave).toBe(2000)
+    expect(SCENE_MS.penWait).toBe(2000)
+    expect(SCENE_MS.gkLeave).toBe(2000)
+    expect(sceneScale(1)).toBe(1)
+    expect(sceneScale(2)).toBe(0.75)
+    expect(HOLD_MS.restart).toBe(SCENE_MS.goalWalk + SCENE_MS.goalStand + SCENE_MS.kickoff)
+  })
+  it('o relógio espera cada cena inteira: gol, pênalti e tiro de meta', () => {
+    const t = (result: string, type = 'insideBox') => ({ minute: 10, side: 'home', shot: { shooterId: 'x', type, result } }) as never
+    expect(holdFor([t('goal')], [])).toBe(HOLD_MS.goal + HOLD_MS.restart)
+    expect(holdFor([t('goal')], [], 2)).toBe(HOLD_MS.goal + HOLD_MS.restart * 0.75)
+    expect(holdFor([t('saved', 'penalty')], [])).toBe(HOLD_MS.shot + HOLD_MS.penalty)
+    expect(holdFor([t('off-target')], [], 2)).toBe(HOLD_MS.shot + HOLD_MS.goalKick * 0.75)
+  })
+})
+
+describe('velocidades antigas', () => {
+  it('4x e 8x contam como 2x nas jogadas paradas', () => {
+    expect(sceneScale(4)).toBe(sceneScale(2))
+    expect(sceneScale(8)).toBe(0.75)
   })
 })

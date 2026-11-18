@@ -181,7 +181,7 @@ export class OnlineMatchHandle {
         this.adapter.clearOverlay()
         this.adapter.reconcile(s.outcomes)
         const mine = g.speeds[this.playerId]
-        if (mine !== undefined) this.mySpeed = mine
+        if (mine !== undefined) this.mySpeed = mine >= 2 ? 2 : 1
         this.live.halftimeDone = g.snapshot.minute > 45
       }
       for (const l of this.listeners) l()
@@ -204,7 +204,8 @@ export class OnlineMatchHandle {
 
   /** A velocidade que vale (a mais lenta entre os técnicos do jogo) e se é diferente da que o técnico escolheu. */
   effectiveSpeed(): number {
-    return this.game?.speed ?? this.mySpeed
+    const v = this.game?.speed ?? this.mySpeed
+    return v >= 2 ? 2 : 1
   }
 
   setSpeed(value: number): void {

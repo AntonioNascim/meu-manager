@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { slotAt } from '../../../engine/grid'
-import type { MatchSnapshot } from '../../../engine/match'
+import type { MatchSnapshot, PlayTrace } from '../../../engine/match'
 import type { Player } from '../../../engine/types'
 import { playerName, shortPlayerName } from '../../format'
 import { Crest } from '../../theme'
@@ -81,7 +81,7 @@ export interface PitchData {
  * O movimento é contínuo (`PitchMotion`): a cada quadro os 22 jogadores e a bola andam, e só `transform` é escrito no DOM (nada passa pelo
  * React por quadro). Cada minuto simulado vira trechos da bola (passes de ligação + as batidas do lance), que partem de onde a bola está.
  */
-export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }: { data: PitchData; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number>; /** Identifica a partida: a semente do VAR narrativo (a mesma no solo e no online). */ seed?: string }) {
+export function Pitch({ data, snap, speed, running, numbers: shared, seed = '', reveal, onReveal }: { data: PitchData; snap: MatchSnapshot; speed: number; running: boolean; numbers?: Map<string, number>; /** Identifica a partida: a semente do VAR narrativo (a mesma no solo e no online). */ seed?: string; /** Quantos eventos já podem aparecer (gol, cartão): o resto espera a bola chegar ao destino na animação. Sem ele, todos. */ reveal?: number; /** O campo avisa quando a finalização termina (a bola chegou ao destino): a tela libera o placar e a narração. */ onReveal?: () => void }) {
   const teamOf = (id: string) => data.teams.find((t) => t.id === id) as PitchTeam
   const home = teamOf(snap.home.teamId)
   const away = teamOf(snap.away.teamId)
@@ -112,6 +112,11 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
   const arrowEl = useRef<SVGPathElement | null>(null)
   const lineEl = useRef<HTMLParagraphElement | null>(null)
   const fpsEl = useRef<HTMLSpanElement | null>(null)
+  const onRevealRef = useRef(onReveal)
+  onRevealRef.current = onReveal
+  const lastShot = useRef<PlayTrace['shot']>(undefined)
+  /** Os trechos do plano atual: o fim forçado de um trecho de plano antigo (abandonado) não é a bola entrando. */
+  const planLegs = useRef<ReadonlySet<unknown>>(new Set())
   const live = useRef({ speed, running, names, numbers: numbers.current })
   live.current = { speed, running, names, numbers: numbers.current }
 
@@ -155,20 +160,26 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
     // Finalizações e gols passam em câmera lenta em qualquer velocidade (o relógio da partida espera: ver `holdFor`).
     // Em desenvolvimento, &anim=1 mostra a sequência completa mesmo ao abrir a partida no meio.
     const choice = choosePlan(beats, last, fresh.length, speed, devFlag('anim'))
-    const { tick, connectors, quick, setPiece } = choice
+    const { tick, connectors, quick, setPiece, scale } = choice
     let seq = choice.seq
     // Em desenvolvimento, &passo=N mostra só a batida N da sequência (para conferir a cena parada).
     const only = devParam('passo')
     if (only !== null && seq[Number(only)]) seq = [seq[Number(only)] as Beat]
     setMarks([])
     const moment = vars.get(`t:${traces.indexOf(last)}`)
-    if (moment) showVar(moment)
-    motion.current?.plan(seq, { trace: last, names: nameOf, tickMs: tick, connectors, arrows: !quick, setPiece, floors: !quick })
+    // A checagem de um gol só aparece quando a bola entra (antes, ela entregaria o resultado).
+    if (moment && moment.kind !== 'goal-check') showVar(moment)
+    lastShot.current = last.shot
+    // Sem finalização na animação não há o que esperar: o que o lance trouxe aparece já.
+    if (!seq.some((b) => b.phase === 'shot')) onRevealRef.current?.()
+    const planned = motion.current?.plan(seq, { trace: last, names: nameOf, tickMs: tick, connectors, arrows: !quick, setPiece, floors: !quick, scale })
+    planLegs.current = new Set(planned ?? [])
   }, [snap.trace.length, snap.minute]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cartão: aparece na tela, com o nome de quem levou, por um instante.
   // (em desenvolvimento, &anim=1 mostra também os cartões do minuto em que a partida foi aberta)
-  const seenEvents = useRef(devFlag('anim') ? snap.events.findIndex((e) => e.minute >= snap.minute) >>> 0 : snap.events.length)
+  const shownCount = Math.min(reveal ?? snap.events.length, snap.events.length)
+  const seenEvents = useRef(devFlag('anim') ? snap.events.findIndex((e) => e.minute >= snap.minute) >>> 0 : shownCount)
   const cardTimer = useRef(0)
   useEffect(() => () => window.clearTimeout(cardTimer.current), [])
   const [card, setCard] = useState<{ kind: 'yellow' | 'red'; name: string; team: string; key: number } | null>(null)
@@ -176,12 +187,15 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
   const goalTimer = useRef(0)
   const goalDelay = useRef(0)
   useEffect(() => () => { window.clearTimeout(goalTimer.current); window.clearTimeout(goalDelay.current) }, [])
+  const callTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(callTimer.current), [])
+  const [call, setCall] = useState<{ key: number; text: string } | null>(null)
   const [goal, setGoal] = useState<{ key: number; scorer: string; assist: string; teamId: string; own: boolean } | null>(null)
   useEffect(() => {
-    if (snap.events.length < seenEvents.current) seenEvents.current = 0
+    if (shownCount < seenEvents.current) seenEvents.current = 0
     const base = seenEvents.current
-    const fresh = snap.events.slice(seenEvents.current)
-    seenEvents.current = snap.events.length
+    const fresh = snap.events.slice(seenEvents.current, shownCount)
+    seenEvents.current = shownCount
     // Vermelho que ganhou a cena do VAR.
     fresh.forEach((e, k) => {
       if (e.type !== 'red-card') return
@@ -194,8 +208,9 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
       const helper = scored.relatedPlayerId ? names.get(scored.relatedPlayerId) : undefined
       const ti = snap.trace.findIndex((t) => t.minute === scored.minute && t.shot?.result === 'goal' && t.shot.shooterId === scored.playerId)
       const check = ti >= 0 ? vars.get(`t:${ti}`) : undefined
-      // Com o VAR checando, a celebração espera a decisão final ("Gol confirmado").
-      const wait = check ? VAR.stepMs * (check.steps.length - 1) : 0
+      // A celebração sai no instante em que a bola entra; a checagem do VAR (se houver) vem depois, como no jogo de verdade. O VAR do pênalti já passou antes da cobrança.
+      const wait = 0
+      if (check?.kind === 'goal-check') showVar(check)
       window.clearTimeout(goalDelay.current)
       window.clearTimeout(goalTimer.current)
       goalDelay.current = window.setTimeout(() => {
@@ -206,10 +221,10 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
     const shown = [...fresh].reverse().find((e) => e.type === 'yellow-card' || e.type === 'red-card')
     if (!shown) return
     const who = names.get(shown.playerId)
-    setCard({ kind: shown.type === 'red-card' ? 'red' : 'yellow', name: who ? playerName(who) : '', team: teamOf(shown.teamId).abbreviation, key: snap.events.length })
+    setCard({ kind: shown.type === 'red-card' ? 'red' : 'yellow', name: who ? playerName(who) : '', team: teamOf(shown.teamId).abbreviation, key: shownCount })
     window.clearTimeout(cardTimer.current)
     cardTimer.current = window.setTimeout(() => setCard(null), HOLD_MS.card)
-  }, [snap.events.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shownCount]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tamanho do campo em pixels (as posições do movimento são proporções; o DOM recebe px por transform).
   useEffect(() => {
@@ -295,6 +310,16 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
           if (ev.leg.endText && lineEl.current) lineEl.current.textContent = ev.leg.endText
           if (ev.leg.marks.length > 0) setMarks(ev.leg.marks)
           if (arrowEl.current) arrowEl.current.setAttribute('d', '')
+          // A bola chegou ao destino da finalização: só agora o resultado aparece (placar, gol, narração). No pênalti, também "Defendeu!" ou "Para fora!".
+          if (ev.leg.kind === 'shot' && planLegs.current.has(ev.leg)) {
+            const shot = lastShot.current
+            if (shot?.type === 'penalty' && shot.result !== 'goal') {
+              setCall({ key: Date.now(), text: shot.result === 'saved' ? 'Defendeu!' : shot.result === 'off-target' ? 'Para fora!' : 'Bloqueado!' })
+              window.clearTimeout(callTimer.current)
+              callTimer.current = window.setTimeout(() => setCall(null), 1800)
+            }
+            onRevealRef.current?.()
+          }
         }
         const holder = ev.type === 'end' ? ev.holder : undefined
         if (holder && holder !== lastHolder) {
@@ -401,6 +426,12 @@ export function Pitch({ data, snap, speed, running, numbers: shared, seed = '' }
               <span className="text-base font-bold text-white">{goal.scorer}</span>
               {goal.assist && <span className="text-xs font-semibold text-slate-300">Assistência: {goal.assist}</span>}
             </div>
+          </div>
+        )}
+
+        {call && (
+          <div key={call.key} className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center" role="status" aria-label={call.text} data-testid="penalty-call">
+            <span className="goal-celebration title rounded-2xl border border-white/40 bg-bg/85 px-5 py-2 text-4xl leading-none text-white">{call.text}</span>
           </div>
         )}
 

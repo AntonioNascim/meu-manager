@@ -95,7 +95,7 @@ export function measureStyle(cfg: StyleConfig, seeds: readonly number[]): StyleM
         if (beats.length > 0) {
           const choice = choosePlan(beats, last, fresh.length, 1)
           tick = choice.tick
-          motion.plan(choice.seq, { trace: last, names: (id) => id, tickMs: choice.tick, connectors: choice.connectors, relays: choice.relays, arrows: !choice.quick, setPiece: choice.setPiece, floors: !choice.quick })
+          motion.plan(choice.seq, { trace: last, names: (id) => id, tickMs: choice.tick, connectors: choice.connectors, relays: choice.relays, arrows: !choice.quick, setPiece: choice.setPiece, floors: !choice.quick, scale: choice.scale })
         }
       }
       for (let f = 0; f < Math.round(tick / FRAME_MS); f++) {
@@ -123,6 +123,8 @@ export function measureStyle(cfg: StyleConfig, seeds: readonly number[]): StyleM
           }
         }
         poss = motion.ball.holder ? (motion.bodies.get(motion.ball.holder)?.placed.side ?? poss) : (motion.leg?.attSide ?? poss)
+        // As jogadas paradas (saída, pênalti, tiro de meta) são iguais para todos os estilos: não entram nas médias.
+        if (motion.leg?.beat?.hold) continue
         const ball = motion.ball.pos
         const mine = [...motion.bodies.values()].filter((body) => body.placed.side === 'home' && body.placed.slot !== 'GK')
         const depth = (x: number) => x * 105
