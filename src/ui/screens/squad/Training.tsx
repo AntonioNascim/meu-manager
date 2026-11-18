@@ -10,6 +10,7 @@ import { getGame } from '../../../store/gameStore'
 import { perform } from '../../../store/actions'
 import { PlayerDetail } from '../../components/PlayerDetail'
 import { TrainingWeek } from './TrainingWeek'
+import { PreseasonCard } from './Preseason'
 import { scoutLevelOf } from '../../../engine/scouting'
 import { formatDate, playerName } from '../../format'
 import {
@@ -218,6 +219,8 @@ export function Training({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
+      <PreseasonCard game={game} />
+
       <TrainingWeek game={game} />
 
       <Panel striped cut className="p-4">

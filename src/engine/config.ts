@@ -864,6 +864,26 @@ export const SCOUT = {
   errorScale: [1, 0.75, 0.5, 0.25] as readonly number[],
 } as const
 
+/**
+ * Pré-temporada do técnico (só humano). Custo do local = parcela da receita mensal esperada (6% a praça do país, 15% a excursão); a torcida cresce
+ * (3% e 6%); a bilheteria dos amistosos vale 1x (2x no exterior) de uma parcela do público e do ingresso; o cachê paga o adversário pela reputação
+ * dele; o acampamento no exterior pesa 15% a mais no risco de lesão dos dias em que acontece; cada amistoso vencido dá +1 de moral (até +3).
+ */
+export const PRESEASON = {
+  places: {
+    camp: { cost: 0, fan: 0, ticket: 1, injury: 1 },
+    country: { cost: 0.06, fan: 0.03, ticket: 1, injury: 1 },
+    abroad: { cost: 0.15, fan: 0.06, ticket: 2, injury: 1.15 },
+  },
+  minDays: 10,
+  maxFriendlies: 5,
+  attendanceShare: 0.45,
+  ticketShare: 0.6,
+  feeShare: 0.004,
+  moralePerWin: 1,
+  moraleCap: 3,
+} as const
+
 /** Categorias de base: elenco de jovens separado do profissional, que não joga partidas. */
 export const ACADEMY = {
   /** Idades na base: de 15 a 19 anos; quem faz 20 precisa ser promovido ou dispensado. */

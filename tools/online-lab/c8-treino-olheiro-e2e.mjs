@@ -1,4 +1,4 @@
-// Teste de ponta a ponta (estudo do concorrente, Partes 2 e 3): agenda de treino por dia e olheiro, na liga online, no navegador de verdade, contra o servidor LOCAL (sem custo).
+// Teste de ponta a ponta (estudo do concorrente, Partes 2 a 4): pré-temporada, agenda de treino por dia e olheiro, na liga online, no navegador de verdade, contra o servidor LOCAL (sem custo).
 //   cd server && ../tools/online-lab/node_modules/.bin/wrangler dev --local --port 8787
 //   VITE_API_BASE=http://127.0.0.1:8787 VITE_TURNSTILE_BYPASS=1 npx vite --port 5173 --strictPort
 //   cd tools/online-lab && node c8-treino-olheiro-e2e.mjs [http://localhost:5173] [prefixo-das-capturas]
@@ -34,7 +34,7 @@ const state = () =>
     if (!g) return null
     const t = g.season.teams.find((x) => x.id === g.userTeamId)
     const agenda = g.season.training.agenda?.[g.userTeamId] ?? {}
-    return { agenda, days: Object.keys(agenda).length, drills: Object.values(agenda).map((s) => s.drill), scouting: t.scouting ?? null, date: g.season.season.currentDate }
+    return { agenda, days: Object.keys(agenda).length, drills: Object.values(agenda).map((s) => s.drill), scouting: t.scouting ?? null, preseason: t.preseason ?? null, balance: t.finances.balance, date: g.season.season.currentDate }
   })
 const tab = async (name) => page.getByRole('button', { name, exact: true }).first().click()
 
@@ -66,6 +66,21 @@ check('o jogo online abre com o espelho do mundo', !!(await state()))
 // ------------------------------------------------------------------ agenda de treino
 await tab('Elenco')
 await page.getByRole('tab', { name: 'Treino', exact: true }).click()
+// ------------------------------------------------------------------ pré-temporada (o mundo da liga começa antes do primeiro jogo)
+await page.getByTestId('preseason-wizard').waitFor({ timeout: 30000 })
+check('o assistente de pré-temporada aparece com 3 locais', (await page.getByTestId('preseason-place').count()) === 3)
+const caixa0 = (await state()).balance
+await page.locator('[data-testid=preseason-place][data-place="country"]').click()
+await page.getByTestId('preseason-opponent').nth(0).click()
+await page.getByTestId('preseason-opponent').nth(1).click()
+await shoot('preseason-assistente')
+await page.getByTestId('preseason-confirm').click()
+await page.getByTestId('preseason-summary').waitFor({ timeout: 30000 })
+const p1 = await state()
+check('a pré-temporada valeu no espelho (praça do país, 2 amistosos)', p1.preseason?.place === 'country' && p1.preseason?.friendlies?.length === 2, JSON.stringify(p1.preseason?.place))
+check('o custo do local saiu do caixa', p1.balance < caixa0, `${caixa0} -> ${p1.balance}`)
+check('o resumo lista os 2 amistosos a jogar', (await page.getByTestId('friendly').count()) === 2)
+await shoot('preseason-resumo')
 await page.getByTestId('training-week').waitFor({ timeout: 30000 })
 const nDays = await page.getByTestId('training-day').count()
 check('a semana de treino mostra os dias até o primeiro jogo', nDays >= 1 && nDays <= 7, `${nDays} dias`)
@@ -136,6 +151,7 @@ await page.getByTestId('open-league-game').click()
 await page.getByTestId('league-card').waitFor({ timeout: 90000 })
 const s5 = await state()
 check('depois de sair e voltar, a agenda continua (o servidor guardou)', s5.days === nDays && s5.drills[0] === 'full-match', JSON.stringify(s5.drills))
+check('depois de sair e voltar, a pré-temporada continua (o servidor guardou)', s5.preseason?.friendlies?.length === 2, JSON.stringify(s5.preseason?.place))
 
 // ------------------------------------------------------------------ olheiro: contratar na tela de Finanças
 await page.getByRole('button', { name: 'Finanças' }).first().click()

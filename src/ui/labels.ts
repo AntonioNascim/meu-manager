@@ -283,6 +283,18 @@ export const REHEARSAL_LABELS: Record<0 | 1 | 2 | 3, string> = { 0: 'Sem trabalh
 
 export const REST_LABEL = 'Folga'
 
+/** Local da pré-temporada e o efeito de cada um em uma linha. */
+export const PRESEASON_PLACE_LABELS: Record<'camp' | 'country' | 'abroad', string> = {
+  camp: 'No CT',
+  country: 'Numa praça do país',
+  abroad: 'Excursão no exterior',
+}
+export const PRESEASON_PLACE_EFFECT_LABELS: Record<'camp' | 'country' | 'abroad', string> = {
+  camp: 'Sem custo e sem viagem: o time treina em casa.',
+  country: 'Custa 6% da receita mensal e a torcida cresce 3%.',
+  abroad: 'Custa 15% da receita mensal, a torcida cresce 6% e a bilheteria dos amistosos vale o dobro, com risco de lesão 15% maior no acampamento.',
+}
+
 /** O que cada nível de olheiro faz, em uma linha (a tela do clube e a leitura do adversário). */
 export const SCOUT_EFFECT_LABELS: Record<0 | 1 | 2 | 3, string> = {
   0: 'Sem olheiro: do adversário você vê só a força geral, e o potencial dos jogadores tem a margem de erro de sempre.',
@@ -367,6 +379,7 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   'not-found': 'Não encontrado: o jogador ou o jovem não é mais do seu clube',
   busy: 'A vaga de treino individual já está ocupada',
   'out-of-window': 'Esse dia não está na semana de treino',
+  'too-late': 'Já não dá tempo de montar a pré-temporada: faltam dias até o primeiro jogo',
   'squad-full': 'O elenco profissional já está cheio: venda, empreste ou libere alguém antes',
   'foreign-limit': 'Limite de estrangeiros da liga',
   invalid: 'Escolha inválida: confira a escalação e os valores',

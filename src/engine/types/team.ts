@@ -82,6 +82,31 @@ export interface ForeignLimit {
   lineup?: number
 }
 
+/** Onde o técnico faz a pré-temporada: no CT, numa praça do país ou numa excursão no exterior. */
+export const PRESEASON_PLACES = ['camp', 'country', 'abroad'] as const
+export type PreseasonPlace = (typeof PRESEASON_PLACES)[number]
+
+/** Um amistoso da pré-temporada (registro próprio: fora do calendário de partidas, da tabela e das copas). */
+export interface PreseasonFriendly {
+  opponentId: TeamId
+  date: IsoDate
+  /** Cachê pago ao adversário. */
+  fee: number
+  /** Preenchido quando o jogo acontece. */
+  result?: { goalsFor: number; goalsAgainst: number; attendance: number; revenue: number }
+}
+
+/** A pré-temporada do clube: uma por temporada, só de técnico humano. */
+export interface PreseasonPlan {
+  place: PreseasonPlace
+  /** Dias de acampamento, a partir de `start`. */
+  days: number
+  start: IsoDate
+  friendlies: PreseasonFriendly[]
+  /** Moral já dada ao elenco pelas vitórias (limitada). */
+  moraleGiven: number
+}
+
 /** Nível do olheiro do clube (0 a 3). */
 export type ScoutLevel = 0 | 1 | 2 | 3
 
@@ -128,4 +153,6 @@ export interface Team {
    * fechamento do mês seguinte (quando o custo também passa a ser cobrado).
    */
   scouting?: { level: ScoutLevel; next: ScoutLevel }
+  /** Pré-temporada do técnico humano (ausente = não montou). */
+  preseason?: PreseasonPlan
 }

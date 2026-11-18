@@ -21,6 +21,7 @@ import { cupScopeOf, knockoutRulesFor, progressCups } from '../cups'
 import type { ArchivedRow, IsoDate, MarketNotice, Match, OffseasonReport, Player, PlayerId, Tactic, Team, TeamId, TurnRecord } from '../types'
 import type { SeasonState } from './calendar'
 import { applyTraining, fitnessProfile } from '../training'
+import { applyPreseason } from '../preseason'
 import { settleDueContracts } from '../offseason/dueContracts'
 import { applyBirthdays } from './birthdays'
 import { applyMatchToPlayers, cupView, progressDays } from './condition'
@@ -153,6 +154,8 @@ function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, ma
   const squads = groupByTeam(players)
   const teams = settleMonths(state.teams, squads, state.season.currentDate, date, guarded)
   let current: SeasonState = applyTraining({ ...state, players, teams, season: { ...state.season, currentDate: date } }, state.season.currentDate, date, guarded)
+  // Amistosos da pré-temporada do técnico humano (registro próprio: nada entra no calendário nem na tabela).
+  current = applyPreseason(current, state.season.currentDate, date)
   // Contratos que terminam nestes dias (no meio da temporada) acabam na data deles.
   const due = settleDueContracts(current, state.season.currentDate, date, guarded)
   current = due.state

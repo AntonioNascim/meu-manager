@@ -36,6 +36,7 @@ import type {
 } from '../types'
 import { emptyTraining } from '../types'
 import { dayEffects, pruneAgenda, summarize } from './week'
+import { preseasonInjuryFactor } from '../preseason'
 
 const E = OFFSEASON.evolution
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
@@ -257,9 +258,9 @@ export function trainPlayer(rng: Rng, player: Player, input: TickInput): Player 
 }
 
 /** Lesão sofrida no treino durante os `days` dias: chance maior com intensidade alta e propensão a lesão. */
-function trainingInjury(rng: Rng, player: Player, intensity: TrainingPlan['intensity'], days: number): Player {
+function trainingInjury(rng: Rng, player: Player, intensity: TrainingPlan['intensity'], days: number, factor = 1): Player {
   if (player.condition.injuryDaysLeft > 0) return player
-  const perDay = TRAINING.injury.perDay * TRAINING.intensity[intensity].injury * (0.5 + (TRAINING.injury.pronenessWeight * player.hidden.injuryProneness) / 100)
+  const perDay = TRAINING.injury.perDay * TRAINING.intensity[intensity].injury * factor * (0.5 + (TRAINING.injury.pronenessWeight * player.hidden.injuryProneness) / 100)
   if (!rng.chance(1 - (1 - perDay) ** days)) return player
   // A lesão aconteceu num dia qualquer do intervalo: o que sobra dela é o que ainda falta no fim.
   const left = rng.int(TRAINING.injury.days[0], TRAINING.injury.days[1]) - Math.floor(rng.float(0, days))
@@ -315,6 +316,16 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
     agendaOf.set(teamId, value)
     return value
   }
+  // Acampamento no exterior: risco de lesão um pouco maior nos dias em que acontece (só times com pré-temporada montada; os demais ficam em 1).
+  const abroadFactors = new Map<TeamId, number>()
+  const preseasonFactorOf = (teamId: TeamId) => {
+    let f = abroadFactors.get(teamId)
+    if (f === undefined) {
+      const team = state.teams.find((t) => t.id === teamId)
+      abroadFactors.set(teamId, (f = team?.preseason ? preseasonInjuryFactor(team, from, to) : 1))
+    }
+    return f
+  }
   const meanWeights = new Map<string, Record<AttributeName, number>>()
   const agendaWeights = (focuses: readonly TrainingFocus[], goalkeeper: boolean) => {
     const key = `${focuses.join(',')}:${goalkeeper}`
@@ -364,7 +375,8 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
       weights: agenda ? agendaWeights(agenda.focuses, p.position === 'GK') : weightsFor(plan.focus, p.position === 'GK'),
       ...(e ? { extra: { attributes: e.attributes, points: e.points } } : {}),
     })
-    next = agenda ? trainingInjuryDays(rng, next, agenda.injuries) : trainingInjury(rng, next, plan.intensity, days)
+    const abroad = preseasonFactorOf(p.teamId)
+    next = agenda ? trainingInjuryDays(rng, next, abroad === 1 ? agenda.injuries : agenda.injuries.map((f) => f * abroad)) : trainingInjury(rng, next, plan.intensity, days, abroad)
     const learned = learning.get(p.id)
     if (learned && !next.secondaryPositions.includes(learned) && next.secondaryPositions.length < 2) next = { ...next, secondaryPositions: [...next.secondaryPositions, learned] }
     return next
