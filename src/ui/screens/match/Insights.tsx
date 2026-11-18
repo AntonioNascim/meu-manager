@@ -1,20 +1,33 @@
 import { useEffect, useRef } from 'react'
-import { PROJECTION_ZONE_LABELS } from '../../labels'
+import { CONTINENTAL_ENTRY_LABELS, GROUP_STATUS_LABELS, KNOCKOUT_STATUS_LABELS, PROJECTION_ZONE_LABELS } from '../../labels'
 import type { AnalystAction, AnalystRead } from './analyst'
-import type { Projection, Prognosis } from './projection'
+import type { AnyProjection, Prognosis } from './projection'
 
 const ordinal = (n: number) => `${n}º`
 
 const ZONE_TONE = { leader: 'text-win', promotion: 'text-win', relegation: 'text-loss' } as const
 
-/** "Se terminar assim": a posição na tabela se a partida acabasse agora (ao vivo) ou o prognóstico de vencer, empatar ou perder (antes do apito). */
-export function ProjectionLine({ projection, prognosis }: { projection: Projection | null; prognosis: Prognosis | null }) {
-  if (projection) {
+/** Texto curto da situação (para o prognóstico): posição na tabela ou o que acontece no mata-mata. */
+function shortOf(p: AnyProjection): string {
+  if (p.kind === 'knockout') return KNOCKOUT_STATUS_LABELS[p.status].split(':')[0] as string
+  return ordinal(p.position)
+}
+function toneOf(p: AnyProjection): string {
+  if (p.kind === 'league') return p.zone ? ZONE_TONE[p.zone] : 'text-white'
+  if (p.kind === 'knockout') return p.status === 'through' || p.status === 'ahead' ? 'text-win' : p.status === 'out' || p.status === 'behind' ? 'text-loss' : 'text-white'
+  return p.status === 'out' ? 'text-loss' : 'text-win'
+}
+
+const LINE = 'flex flex-wrap items-baseline justify-center gap-x-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-center'
+
+/** "Se terminar assim": a situação se a partida acabasse agora (ao vivo) ou o prognóstico de vencer, empatar ou perder (antes do apito). Liga, grupos e mata-mata de copa. */
+export function ProjectionLine({ projection, prognosis }: { projection: AnyProjection | null; prognosis: Prognosis | null }) {
+  const label = <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Se terminar assim</span>
+  if (projection?.kind === 'league') {
     const delta = projection.current - projection.position
-    const tone = projection.zone ? ZONE_TONE[projection.zone] : 'text-white'
     return (
-      <div className="flex flex-wrap items-baseline justify-center gap-x-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-center" data-testid="projection-line" role="status">
-        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Se terminar assim</span>
+      <div className={LINE} data-testid="projection-line" role="status">
+        {label}
         <span className="title text-2xl leading-none text-white">{ordinal(projection.position)}</span>
         <span className="text-xs text-muted">de {projection.size}</span>
         {delta !== 0 && (
@@ -23,21 +36,56 @@ export function ProjectionLine({ projection, prognosis }: { projection: Projecti
             {Math.abs(delta)}
           </span>
         )}
-        {projection.zone && <span className={`text-xs font-bold ${tone}`}>{PROJECTION_ZONE_LABELS[projection.zone]}</span>}
+        {projection.zone && <span className={`text-xs font-bold ${ZONE_TONE[projection.zone]}`}>{PROJECTION_ZONE_LABELS[projection.zone]}</span>}
+        {projection.continental && (
+          <span className="text-xs font-bold text-sky-300" data-testid="projection-continental">
+            {projection.zone === 'leader' ? '· ' : ''}
+            {projection.continental.cupName} ({CONTINENTAL_ENTRY_LABELS[projection.continental.entry]})
+          </span>
+        )}
+      </div>
+    )
+  }
+  if (projection?.kind === 'group' || projection?.kind === 'league-phase') {
+    return (
+      <div className={LINE} data-testid="projection-line" role="status">
+        {label}
+        <span className="text-xs font-semibold text-muted">{projection.group ? `Grupo ${projection.group}` : projection.cupName}</span>
+        <span className="title text-2xl leading-none text-white">{ordinal(projection.position)}</span>
+        <span className="text-xs text-muted">de {projection.size}</span>
+        <span className={`text-xs font-bold ${toneOf(projection)}`} data-testid="projection-status">
+          {GROUP_STATUS_LABELS[projection.status]}
+        </span>
+      </div>
+    )
+  }
+  if (projection?.kind === 'knockout') {
+    return (
+      <div className={LINE} data-testid="projection-line" role="status">
+        {label}
+        <span className="text-xs font-semibold text-muted">{projection.stageName}</span>
+        <span className="title text-2xl leading-none text-white">
+          {projection.goalsFor} x {projection.goalsAgainst}
+        </span>
+        <span className="text-xs text-muted">{projection.firstLeg ? 'na ida' : 'no confronto'}</span>
+        <span className={`text-xs font-bold ${toneOf(projection)}`} data-testid="projection-status">
+          {KNOCKOUT_STATUS_LABELS[projection.status]}
+        </span>
       </div>
     )
   }
   if (!prognosis) return null
-  const cell = (label: string, p: Projection) => (
-    <span className="flex flex-col items-center leading-tight">
-      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{label}</span>
-      <span className={`title text-2xl leading-none ${p.zone ? ZONE_TONE[p.zone] : 'text-white'}`}>{ordinal(p.position)}</span>
+  const knockout = prognosis.draw.kind === 'knockout'
+  const cell = (name: string, p: AnyProjection) => (
+    <span className="flex min-w-0 flex-col items-center text-center leading-tight">
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{name}</span>
+      <span className={`${p.kind === 'knockout' ? 'text-sm font-extrabold' : 'title text-2xl leading-none'} ${toneOf(p)}`}>{shortOf(p)}</span>
     </span>
   )
   return (
     <div className="rounded-xl border border-line bg-surface px-3 py-1.5" data-testid="prognosis-line" role="status">
-      <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Posição na tabela depois do jogo</p>
-      <div className="flex items-center justify-around">
+      <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{knockout ? 'O confronto depois do jogo' : prognosis.draw.kind === 'league' ? 'Posição na tabela depois do jogo' : 'Posição na copa depois do jogo'}</p>
+      <div className="flex items-start justify-around gap-2">
         {cell('Se vencer', prognosis.win)}
         {cell('Se empatar', prognosis.draw)}
         {cell('Se perder', prognosis.lose)}

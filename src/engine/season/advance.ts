@@ -149,7 +149,7 @@ function passDays(state: SeasonState, date: IsoDate, options: AdvanceOptions, ma
   const days = daysBetween(state.season.currentDate, date)
   const guarded = protectedOf(options)
   // Quem faz anos nesses dias envelhece um ano (idade, declínio e ruído dos atributos).
-  const players = applyBirthdays(progressDays(state.players, days, (teamId) => fitnessProfile(state.training, teamId, days)), state.season.currentDate, date, state.market.seed) as Player[]
+  const players = applyBirthdays(progressDays(state.players, days, (teamId) => fitnessProfile(state.training, teamId, days, state.season.currentDate)), state.season.currentDate, date, state.market.seed) as Player[]
   const squads = groupByTeam(players)
   const teams = settleMonths(state.teams, squads, state.season.currentDate, date, guarded)
   let current: SeasonState = applyTraining({ ...state, players, teams, season: { ...state.season, currentDate: date } }, state.season.currentDate, date, guarded)

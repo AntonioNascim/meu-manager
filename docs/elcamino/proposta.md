@@ -73,7 +73,7 @@ Tamanhos: P = poucos dias, M = uma a duas semanas, G = mais de duas semanas.
 - **Testes:** `pitchMotion`/`pitchModel` (a câmera é pura), `matchGolden` sem mudança, captura de 380 px em `.shots/`.
 - **Risco:** desempenho em celular simples (mais camadas). Medir com `?fps=1` e `fluidez-e2e` antes e depois; se cair do que temos hoje (60 fps a 1×), simplificar a arquibancada.
 
-### Parte 2 · Treino por dia, exercícios e campinho animado (G)
+### Parte 2 · Treino por dia, exercícios e campinho animado (G) — **FEITA localmente em 18/11/2026, aguardando aprovação para publicar** (ver `CLAUDE.md`, parágrafo "Treino por dia")
 - **Modelo:** `TrainingWeek` com até 5 sessões por semana (dia a dia até o jogo), cada uma: exercício (da biblioteca), intensidade, ou folga. `Game.trainingWeek` por time; no online, `LeagueCommand` `training-plan` por técnico. A comissão preenche sozinha (botão "Delegar"), o que mantém o ritmo rápido.
 - **Biblioteca:** os mesmos 7 grupos (jogos reduzidos, saída de bola, pressão e bloco, ataque, último passe, bola parada, corpo e mente), com **nomes e textos nossos**. Cada exercício tem zona do campo, ganho físico, risco de lesão e a que **grupo de atributos** serve (`GROUP_ATTRIBUTES`).
 - **Efeito, sem mudar nenhum resultado do motor:** o exercício só **redistribui, dentro da intensidade já escolhida**, o ganho de atributos (como o `focusWeights` faz hoje), muda a recuperação e o risco de lesão daquele dia (canais que `applyTraining` já usa). O total por temporada continua o de `OFFSEASON.evolution` e o equilíbrio `trainingIntensity.test.ts` segue valendo.
@@ -133,7 +133,11 @@ Tamanhos: P = poucos dias, M = uma a duas semanas, G = mais de duas semanas.
 6. **Parte 9** junto com a 3.
 7. **Parte 10**: pós-lançamento.
 
-## 5. Decisões que preciso de você antes de começar
+## 5. Decisões (respondidas em 18/11/2026)
+
+1) treino por dia só redistribui e "ensaiado" só informa; 2) olheiro antes do lançamento; 3) vestiário só informativo (ideia de efeito na moral anotada para depois); 4) partes 5 a 8 antes do lançamento, uma de cada vez; 5) câmera com arquibancada vira opção desligável abaixo de 60 fps em celular simples.
+
+### Perguntas originais
 
 1. **Treino**: aceitar que a **agenda por dia redistribui o ganho já calibrado** e que os medidores de "ensaiado" ficam só informativos (recomendado), ou aceitar nova calibragem do motor?
 2. **Olheiro**: antes do lançamento ou na fase 2?

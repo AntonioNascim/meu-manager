@@ -7,7 +7,7 @@ import type { PackageIssue } from '../data/package/types'
 import type { CsvIssue } from '../data/package/edit/csv'
 import type { NameIssue } from '../online/nameFilter'
 import type { RecoveryError } from '../online/recoveryCode'
-import type { CupEntrantSource, CupFormat, CupSpec, Region } from '../engine/types'
+import type { CupEntrantSource, CupFormat, CupSpec, Region, DrillGroup, DrillId, DrillTheme } from '../engine/types'
 import { COUNTRY_INFO } from './countries'
 import type {
   BoardStatus,
@@ -210,11 +210,112 @@ export const ZONE_LABELS: Record<Zone, string> = {
   relegation: 'Zona de rebaixamento',
 }
 
+/** Grupos da biblioteca de exercícios do treino por dia. */
+export const DRILL_GROUP_LABELS: Record<DrillGroup, string> = {
+  games: 'Jogos reduzidos',
+  'build-up': 'Construção',
+  'press-block': 'Pressão e bloco',
+  attack: 'Ataque',
+  'final-pass': 'Passe final',
+  'set-pieces': 'Bola parada',
+  'body-mind': 'Físico e mente',
+}
+
+/** Nome e descrição curta de cada exercício. */
+export const DRILL_LABELS: Record<DrillId, { name: string; description: string }> = {
+  'full-match': { name: 'Onze contra onze', description: 'Titulares contra reservas com o plano da semana: ensaia um pouco de tudo.' },
+  'eight-a-side': { name: 'Oito contra oito', description: 'Dois terços do campo: correr, apoiar e finalizar com espaço.' },
+  'six-a-side': { name: 'Seis contra seis', description: 'Meio-campo apertado: perdeu a bola, pressiona na hora.' },
+  'five-a-side': { name: 'Cinco contra cinco', description: 'Campo curto e gols pequenos: muito um contra um.' },
+  'joker-possession': { name: 'Posse com coringas', description: 'Quatro contra quatro mais dois coringas: sair jogando sem chutão.' },
+  'three-a-side': { name: 'Três contra três', description: 'Espaço mínimo e intensidade máxima: muitos toques e muito desgaste.' },
+  rondo: { name: 'Bobinho', description: 'Cinco contra dois: técnica sob pressão, com risco quase nulo.' },
+  'build-from-back': { name: 'Saída pelos zagueiros', description: 'Os zagueiros se abrem e o volante desce para receber.' },
+  'keeper-start': { name: 'Goleiro começa a jogada', description: 'O goleiro é o primeiro passe: sair curto sob pressão.' },
+  'midfield-pivot': { name: 'Pivô entre as linhas', description: 'Achar o homem livre entre a defesa e o meio-campo.' },
+  'wide-exit': { name: 'Saída pelos lados', description: 'Laterais e pontas levam a bola até o terço final.' },
+  'high-press-trigger': { name: 'Gatilho de pressão alta', description: 'Todos sobem juntos quando a bola vai para o lado.' },
+  'mid-block': { name: 'Bloco médio', description: 'Linhas curtas e juntas no meio do campo.' },
+  'low-block': { name: 'Bloco baixo', description: 'Fechar a área e proteger o gol.' },
+  'counter-press': { name: 'Contrapressão', description: 'Perdeu a bola, cercou na hora para recuperar.' },
+  'overlap-crosses': { name: 'Ultrapassagem e cruzamento', description: 'O lateral passa por fora e a bola vai para a área.' },
+  'one-two-wall': { name: 'Tabela', description: 'Tocar e ir para receber de volta (parede).' },
+  'finishing-box': { name: 'Finalização na área', description: 'Chutes em fila contra o goleiro, de dentro da área.' },
+  'counter-run': { name: 'Contra-ataque', description: 'Roubou, três toques e finalização: transição rápida.' },
+  'through-balls': { name: 'Passe em profundidade', description: 'Colocar o atacante na cara do gol.' },
+  cutback: { name: 'Passe para trás', description: 'Chegar à linha de fundo e rolar para a entrada da área.' },
+  'third-man': { name: 'Terceiro homem', description: 'Um toca, outro ajuda e o terceiro recebe livre.' },
+  'long-diagonal': { name: 'Bola longa na diagonal', description: 'Inverter o jogo para o lado oposto.' },
+  'corners-for': { name: 'Escanteios a favor', description: 'Os movimentos no primeiro pau, quase sem custo físico.' },
+  'corners-against': { name: 'Escanteios contra', description: 'Quem marca quem, e a saída rápida depois.' },
+  'free-kicks': { name: 'Faltas', description: 'Barreira, quem bate e quem fica no rebote.' },
+  'penalty-shootout': { name: 'Disputa de pênaltis', description: 'Cinco cobradores e a ordem para um mata-mata.' },
+  'conditioning-circuit': { name: 'Circuito de condicionamento', description: 'Corridas e deslocamentos entre cones para ganhar fôlego.' },
+  'speed-agility': { name: 'Velocidade e agilidade', description: 'Escadas, barreiras e arrancadas curtas.' },
+  'strength-circuit': { name: 'Circuito de força', description: 'Força e potência com poucos movimentos e carga alta.' },
+  'recovery-session': { name: 'Recuperação', description: 'Trote leve, alongamento e regenerativo.' },
+  'video-session': { name: 'Análise em vídeo', description: 'Rever lances e combinar o plano do jogo.' },
+}
+
+/** Onde o exercício acontece no campo. */
+export type DrillZone = 'whole' | 'midfield' | 'opponent-box' | 'own-box' | 'final-third' | 'own-half' | 'circuit'
+export const DRILL_ZONE_LABELS: Record<DrillZone, string> = {
+  whole: 'Campo todo',
+  midfield: 'Meio-campo',
+  'opponent-box': 'Área adversária',
+  'own-box': 'Nossa área',
+  'final-third': 'Terço final',
+  'own-half': 'Nosso campo',
+  circuit: 'Circuito',
+}
+
+export const DRILL_THEME_LABELS: Record<DrillTheme, string> = {
+  'build-up': 'Saída de bola',
+  press: 'Pressão',
+  block: 'Bloco',
+  attack: 'Ataque',
+  transitions: 'Transições',
+  'set-piece': 'Bola parada',
+}
+
+/** Quanto a semana ensaiou cada tema (0 a 3). Só informa. */
+export const REHEARSAL_LABELS: Record<0 | 1 | 2 | 3, string> = { 0: 'Sem trabalhar', 1: 'Só um pouco', 2: 'Bem ensaiado', 3: 'Dominado' }
+
+export const REST_LABEL = 'Folga'
+
 /** Onde a posição projetada coloca o time na tabela ("se terminar assim"). */
 export const PROJECTION_ZONE_LABELS: Record<'leader' | 'promotion' | 'relegation', string> = {
   leader: 'na liderança',
   promotion: 'na zona de acesso',
   relegation: 'na zona de rebaixamento',
+}
+
+/** Em que ponto da copa continental a posição da liga dá vaga. */
+export const CONTINENTAL_ENTRY_LABELS: Record<'qualifying' | 'groups' | 'league-phase' | 'knockout', string> = {
+  qualifying: 'fase prévia',
+  groups: 'fase de grupos',
+  'league-phase': 'fase de liga',
+  knockout: 'mata-mata',
+}
+
+/** Situação no grupo ou na fase de liga de uma copa ("se terminar assim"). */
+export const GROUP_STATUS_LABELS: Record<'direct' | 'playoff' | 'advance' | 'out', string> = {
+  direct: 'classificado direto',
+  playoff: 'na repescagem',
+  advance: 'classificado',
+  out: 'eliminado',
+}
+
+/** Situação no mata-mata de uma copa ("se terminar assim"). */
+export const KNOCKOUT_STATUS_LABELS: Record<'through' | 'out' | 'tied-extra-time' | 'tied-penalties' | 'tied' | 'ahead' | 'behind' | 'level', string> = {
+  through: 'classificado',
+  out: 'eliminado',
+  'tied-extra-time': 'empatado: vai à prorrogação',
+  'tied-penalties': 'empatado: vai aos pênaltis',
+  tied: 'empatado',
+  ahead: 'na frente para a volta',
+  behind: 'atrás para a volta',
+  level: 'empatado para a volta',
 }
 
 export const SET_PIECE_LABELS: Record<'penalty' | 'free-kick', string> = {
@@ -248,6 +349,7 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   ...OFFER_REASON_LABELS,
   'not-found': 'Não encontrado: o jogador ou o jovem não é mais do seu clube',
   busy: 'A vaga de treino individual já está ocupada',
+  'out-of-window': 'Esse dia não está na semana de treino',
   'squad-full': 'O elenco profissional já está cheio: venda, empreste ou libere alguém antes',
   'foreign-limit': 'Limite de estrangeiros da liga',
   invalid: 'Escolha inválida: confira a escalação e os valores',

@@ -9,6 +9,7 @@ import type { Game } from '../../../store/game'
 import { getGame } from '../../../store/gameStore'
 import { perform } from '../../../store/actions'
 import { PlayerDetail } from '../../components/PlayerDetail'
+import { TrainingWeek } from './TrainingWeek'
 import { formatDate, playerName } from '../../format'
 import {
   ATTRIBUTE_GROUP_LABELS,
@@ -216,9 +217,11 @@ export function Training({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
+      <TrainingWeek game={game} />
+
       <Panel striped cut className="p-4">
-        <Eyebrow>Treino da semana</Eyebrow>
-        <p className="mt-1 text-sm text-slate-300">A evolução chega aos poucos, a cada semana, e a virada de temporada cuida só do envelhecimento. A base treina junto, em ritmo menor.</p>
+        <Eyebrow>Plano da comissão</Eyebrow>
+        <p className="mt-1 text-sm text-slate-300">A intensidade e o foco valem para os dias em que você não montou um treino. A evolução chega aos poucos, a cada semana, e a virada de temporada cuida só do envelhecimento. A base treina junto, em ritmo menor.</p>
       </Panel>
 
       <div className="flex gap-2">

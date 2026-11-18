@@ -35,7 +35,7 @@ import { Pitch } from './match/Pitch'
 import { AnalystCard, Ceremony, ProjectionLine } from './match/Insights'
 import { analystRead } from './match/analyst'
 import type { AnalystAction } from './match/analyst'
-import { projectNow, prognosisOf } from './match/projection'
+import { onlineOthers, projectNow, prognosisOf, soloOthers } from './match/projection'
 import { CardShell, LiveTabs, MatchHeader, PerformanceCard, TeamPanel, TimelineCard } from './match/LiveParts'
 import { periodText, visibleColor } from './match/liveStats'
 import { seedNumbers } from '../shirt'
@@ -657,9 +657,21 @@ function LiveView({ game, live, onNavigate }: { game: Game; live: LiveSession; o
   const awayColor = visibleColor(kits.away.shirt, kits.away.trim)
   const context = match ? `${matchLabel(game.season, match).competition} · ${matchLabel(game.season, match).detail}` : undefined
   // "Se terminar assim" (ao vivo) e o prognóstico (antes do apito): só leitura, com os outros jogos do dia no minuto da partida.
+  // Liga ou copa, no solo e no online. Os outros jogos do dia entram só com o placar que a tela já viu: no solo, pelo relógio da partida;
+  // no online, pelos quadros ao vivo dos jogos dos outros técnicos (os jogos simulados pelo servidor ficam todos de fora).
   const revealedMinute = held ? snap.minute - 1 : snap.minute
-  const projection = useMemo(() => (snap.minute > 0 ? projectNow(game, match, game.userTeamId, { home: view.homeGoals, away: view.awayGoals }, revealedMinute) : null), [game, match, snap.minute, view.homeGoals, view.awayGoals, revealedMinute])
-  const prognosis = useMemo(() => (snap.minute === 0 ? prognosisOf(game, match, game.userTeamId) : null), [game, match, snap.minute])
+  const projMatch = match ?? (online ? game.season.matches.find((m) => m.id === live.matchId) : undefined)
+  const liveOthers = online ? online.state.games.filter((g) => g.matchId !== live.matchId).map((g) => ({ matchId: g.matchId, homeGoals: g.snapshot.homeGoals, awayGoals: g.snapshot.awayGoals })) : []
+  const othersKey = liveOthers.map((g) => `${g.matchId}:${g.homeGoals}-${g.awayGoals}`).join(',')
+  const othersAt = (minute: number) => (projMatch ? (online ? onlineOthers(game, projMatch, minute > 0 ? liveOthers : []) : soloOthers(game, projMatch, minute)) : undefined)
+  const projection = useMemo(() => {
+    const others = snap.minute > 0 ? othersAt(revealedMinute) : undefined
+    return others ? projectNow(game, projMatch, game.userTeamId, { home: view.homeGoals, away: view.awayGoals }, others) : null
+  }, [game, projMatch, snap.minute, view.homeGoals, view.awayGoals, revealedMinute, othersKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const prognosis = useMemo(() => {
+    const others = snap.minute === 0 ? othersAt(0) : undefined
+    return others ? prognosisOf(game, projMatch, game.userTeamId, others) : null
+  }, [game, projMatch, snap.minute]) // eslint-disable-line react-hooks/exhaustive-deps
   const analystNameOf = (id: string) => {
     const p = names.get(id)
     return p ? shortPlayerName(p) : 'Um jogador'

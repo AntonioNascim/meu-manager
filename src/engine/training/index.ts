@@ -34,6 +34,7 @@ import type {
   TrainingState,
 } from '../types'
 import { emptyTraining } from '../types'
+import { dayEffects, pruneAgenda, summarize } from './week'
 
 const E = OFFSEASON.evolution
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
@@ -263,6 +264,17 @@ function trainingInjury(rng: Rng, player: Player, intensity: TrainingPlan['inten
   return left > 0 ? { ...player, condition: { ...player.condition, injuryDaysLeft: left } } : player
 }
 
+/** Lesão no treino com um fator de risco por dia (agenda por dia): chance de pelo menos uma lesão nos dias, com a mesma duração de sempre. */
+function trainingInjuryDays(rng: Rng, player: Player, factors: readonly number[]): Player {
+  if (player.condition.injuryDaysLeft > 0) return player
+  const prone = 0.5 + (TRAINING.injury.pronenessWeight * player.hidden.injuryProneness) / 100
+  const survive = factors.reduce((acc, f) => acc * (1 - TRAINING.injury.perDay * f * prone), 1)
+  if (!rng.chance(1 - survive)) return player
+  const days = factors.length
+  const left = rng.int(TRAINING.injury.days[0], TRAINING.injury.days[1]) - Math.floor(rng.float(0, days))
+  return left > 0 ? { ...player, condition: { ...player.condition, injuryDaysLeft: left } } : player
+}
+
 /**
  * Treina de `from` a `to`: evolução do dia (coletivo e individual), lesões de treino, fim do treino individual e
  * histórico mensal da força do time do jogador (`userTeamId`).
@@ -292,6 +304,26 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
     if (!plan) plans.set(teamId, (plan = planFor(training, teamId, days)))
     return plan
   }
+  // Agenda por dia: o time que montou sessões neste intervalo usa a média dos dias (ganho e pesos) e a carga de cada dia (lesão); os demais, o plano.
+  const agendaOf = new Map<TeamId, { growth: number; focuses: TrainingFocus[]; injuries: number[] } | null>()
+  const agendaEffect = (teamId: TeamId) => {
+    if (agendaOf.has(teamId)) return agendaOf.get(teamId) ?? null
+    const days = dayEffects(training, teamId, from, to, planOf(teamId))
+    const value = days ? { growth: summarize(days).growth, focuses: days.map((d) => d.focus), injuries: days.map((d) => d.injury) } : null
+    agendaOf.set(teamId, value)
+    return value
+  }
+  const meanWeights = new Map<string, Record<AttributeName, number>>()
+  const agendaWeights = (focuses: readonly TrainingFocus[], goalkeeper: boolean) => {
+    const key = `${focuses.join(',')}:${goalkeeper}`
+    let w = meanWeights.get(key)
+    if (!w) {
+      w = {} as Record<AttributeName, number>
+      for (const name of ALL_ATTRIBUTES) w[name] = focuses.reduce((acc, f) => acc + weightsFor(f, goalkeeper)[name], 0) / focuses.length
+      meanWeights.set(key, w)
+    }
+    return w
+  }
   // Treino individual: quantos dias dele cabem neste avanço.
   const extras = new Map<PlayerId, { teamId: TeamId; attributes: readonly AttributeName[]; points: number }>()
   const learning = new Map<PlayerId, Position>()
@@ -320,16 +352,17 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
     const plan = planOf(p.teamId)
     const e = extras.get(p.id)
     const info = infoOf(p.teamId)
+    const agenda = agendaEffect(p.teamId)
     let next = trainPlayer(rng, p, {
       year: info.year,
       seasonStart: info.seasonStart,
       share: info.share,
       minutesShare: clamp(p.seasonStats.minutes / info.minutesBase, 0, 1),
-      growth: TRAINING.intensity[plan.intensity].growth,
-      weights: weightsFor(plan.focus, p.position === 'GK'),
+      growth: agenda ? agenda.growth : TRAINING.intensity[plan.intensity].growth,
+      weights: agenda ? agendaWeights(agenda.focuses, p.position === 'GK') : weightsFor(plan.focus, p.position === 'GK'),
       ...(e ? { extra: { attributes: e.attributes, points: e.points } } : {}),
     })
-    next = trainingInjury(rng, next, plan.intensity, days)
+    next = agenda ? trainingInjuryDays(rng, next, agenda.injuries) : trainingInjury(rng, next, plan.intensity, days)
     const learned = learning.get(p.id)
     if (learned && !next.secondaryPositions.includes(learned) && next.secondaryPositions.length < 2) next = { ...next, secondaryPositions: [...next.secondaryPositions, learned] }
     return next
@@ -357,16 +390,26 @@ export function applyTraining(state: SeasonState, from: IsoDate, to: IsoDate, us
     }
   }
 
-  return { ...state, players, academy, training: { ...training, individual, finished, history } }
+  return { ...state, players, academy, training: pruneAgenda({ ...training, individual, finished, history }, to) }
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10
 
 /** Recuperação diária e teto da condição do time para o intervalo (intensidade do treino). */
-export function fitnessProfile(training: Pick<TrainingState, 'plans'>, teamId: TeamId | null, days: number): { recovery: number; ceiling: number } {
+export function fitnessProfile(training: Pick<TrainingState, 'plans' | 'agenda'>, teamId: TeamId | null, days: number, from?: IsoDate): { recovery: number; ceiling: number } {
   if (teamId === null) return { recovery: 1, ceiling: 100 }
-  const level = TRAINING.intensity[planFor(training, teamId, days).intensity]
+  const plan = planFor(training, teamId, days)
+  // Com agenda por dia no intervalo, vale a média dos dias (carga de cada exercício); sem ela, o plano, como sempre.
+  const effects = from ? dayEffects(training, teamId, from, addDays(from, days), plan) : undefined
+  if (effects) {
+    const s = summarize(effects)
+    return { recovery: s.recovery, ceiling: s.ceiling }
+  }
+  const level = TRAINING.intensity[plan.intensity]
   return { recovery: level.recovery, ceiling: level.fitnessCeiling }
 }
 
 export { emptyTraining }
+export * from './week'
+export { DRILLS, REST_DAY, drillsOf } from './drills'
+export type { DrillSpec } from './drills'

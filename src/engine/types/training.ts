@@ -17,6 +17,57 @@ export interface TrainingPlan {
   focus: TrainingFocus
 }
 
+/** Grupos da biblioteca de exercícios do treino por dia. */
+export const DRILL_GROUPS = ['games', 'build-up', 'press-block', 'attack', 'final-pass', 'set-pieces', 'body-mind'] as const
+export type DrillGroup = (typeof DRILL_GROUPS)[number]
+
+/** Exercícios do treino por dia (o catálogo com os números fica em `engine/training/drills.ts`). */
+export const DRILL_IDS = [
+  'full-match',
+  'eight-a-side',
+  'six-a-side',
+  'five-a-side',
+  'joker-possession',
+  'three-a-side',
+  'rondo',
+  'build-from-back',
+  'keeper-start',
+  'midfield-pivot',
+  'wide-exit',
+  'high-press-trigger',
+  'mid-block',
+  'low-block',
+  'counter-press',
+  'overlap-crosses',
+  'one-two-wall',
+  'finishing-box',
+  'counter-run',
+  'through-balls',
+  'cutback',
+  'third-man',
+  'long-diagonal',
+  'corners-for',
+  'corners-against',
+  'free-kicks',
+  'penalty-shootout',
+  'conditioning-circuit',
+  'speed-agility',
+  'strength-circuit',
+  'recovery-session',
+  'video-session',
+] as const
+export type DrillId = (typeof DRILL_IDS)[number]
+
+/** Temas que a semana ensaia (os medidores "o que foi ensaiado": só informam, não entram em nenhuma conta do jogo). */
+export const DRILL_THEMES = ['build-up', 'press', 'block', 'attack', 'transitions', 'set-piece'] as const
+export type DrillTheme = (typeof DRILL_THEMES)[number]
+
+/** O que o time faz num dia de treino: um exercício (ou folga) com a intensidade escolhida. */
+export interface TrainingSession {
+  drill: DrillId | 'rest'
+  intensity: TrainingIntensity
+}
+
 /** O que o treino individual busca: acelerar um grupo de atributos ou aprender uma posição secundária. */
 export type IndividualGoal = { type: 'group'; group: TrainingGroup } | { type: 'position'; position: Position }
 
@@ -49,6 +100,11 @@ export interface TrainingState {
   finished: Record<TeamId, FinishedTraining>
   /** Histórico mensal da força dos jogadores do time do jogador. */
   history: Record<PlayerId, StrengthSnapshot[]>
+  /**
+   * Agenda do treino por dia (time → data → sessão). Só times com técnico escolhem; um dia sem sessão segue o plano do time. Redistribui o
+   * ganho já calibrado (nunca soma): sem agenda o treino é exatamente o de antes.
+   */
+  agenda?: Record<TeamId, Record<IsoDate, TrainingSession>>
 }
 
 export const emptyTraining = (): TrainingState => ({ plans: {}, individual: {}, finished: {}, history: {} })

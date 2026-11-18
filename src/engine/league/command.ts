@@ -5,7 +5,7 @@
  * Puro: sem relógio, rede nem sorteio fora da semente do estado.
  */
 import { AcademyError } from '../academy'
-import { cancelIndividualTraining, startIndividualTraining, setTrainingPlan, TrainingError } from '../training'
+import { AgendaError, cancelIndividualTraining, isSession, setAgenda, startIndividualTraining, setTrainingPlan, TrainingError } from '../training'
 import { lineupForeignCount } from '../foreign'
 import { monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../finance'
 import { boardEvaluation } from './career'
@@ -23,11 +23,13 @@ import type { SeasonState } from '../season'
 import { isGridPoint } from '../grid'
 import { applyClubAction, type ClubAction } from './club'
 import { PLAY_STYLES, POSITIONS, TRAINING_FOCUSES, TRAINING_GROUPS, TRAINING_INTENSITIES } from '../types'
-import type { GridPoint, IndividualGoal, Mentality, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan } from '../types'
+import type { GridPoint, IndividualGoal, Mentality, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan, TrainingSession } from '../types'
 
 export type LeagueCommand =
   | { type: 'tactic'; tactic: Tactic }
   | { type: 'training-plan'; plan: TrainingPlan }
+  /** Agenda do treino por dia: troca a semana inteira (data → sessão; `null` ou ausente = dia sem sessão, vale o plano). */
+  | { type: 'training-agenda'; sessions: Record<string, TrainingSession | null> }
   | { type: 'individual-training'; playerId: string; goal: IndividualGoal }
   | { type: 'cancel-individual-training' }
   | { type: 'ticket-price'; price: number }
@@ -116,6 +118,23 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
       if (!only(raw, ['type', 'plan']) || !isObj(p) || !only(p, ['intensity', 'focus']) || !TRAINING_INTENSITIES.includes(p.intensity as never) || !TRAINING_FOCUSES.includes(p.focus as never)) return undefined
       return { type: 'training-plan', plan: { intensity: p.intensity as TrainingPlan['intensity'], focus: p.focus as TrainingPlan['focus'] } }
     }
+    case 'training-agenda': {
+      const sessions = raw.sessions
+      if (!only(raw, ['type', 'sessions']) || !isObj(sessions)) return undefined
+      const entries = Object.entries(sessions)
+      if (entries.length > 14) return undefined
+      const out: Record<string, TrainingSession | null> = {}
+      for (const [date, value] of entries) {
+        if (!isDate(date)) return undefined
+        if (value === null) {
+          out[date] = null
+          continue
+        }
+        if (!isObj(value) || !only(value, ['drill', 'intensity']) || !isSession(value)) return undefined
+        out[date] = { drill: value.drill, intensity: value.intensity }
+      }
+      return { type: 'training-agenda', sessions: out }
+    }
     case 'individual-training': {
       const goal = only(raw, ['type', 'playerId', 'goal']) ? parseGoal(raw.goal) : undefined
       return goal && isId(raw.playerId) ? { type: 'individual-training', playerId: raw.playerId, goal } : undefined
@@ -174,6 +193,8 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
       }
       case 'training-plan':
         return { ok: true, world: setTrainingPlan(world, teamId, command.plan) }
+      case 'training-agenda':
+        return { ok: true, world: setAgenda(world, teamId, command.sessions) }
       case 'individual-training':
         return { ok: true, world: startIndividualTraining(world, teamId, command.playerId, command.goal) }
       case 'cancel-individual-training':
@@ -240,6 +261,7 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
     if (e instanceof OfferError) return { ok: false, error: e.code }
     if (e instanceof AcademyError) return { ok: false, error: e.code }
     if (e instanceof TrainingError) return { ok: false, error: e.code }
+    if (e instanceof AgendaError) return { ok: false, error: e.code }
     if (e instanceof ListingError) return { ok: false, error: e.code }
     // Escalação inválida e outras regras que o motor sinaliza com Error comum.
     if (e instanceof Error) return { ok: false, error: 'invalid' }
