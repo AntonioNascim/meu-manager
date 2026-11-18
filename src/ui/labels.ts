@@ -283,6 +283,14 @@ export const REHEARSAL_LABELS: Record<0 | 1 | 2 | 3, string> = { 0: 'Sem trabalh
 
 export const REST_LABEL = 'Folga'
 
+/** Setores do time na leitura do adversário. */
+export const SCOUT_SECTOR_LABELS: Record<'goalkeeper' | 'defence' | 'midfield' | 'attack', string> = {
+  goalkeeper: 'Goleiro',
+  defence: 'Defesa',
+  midfield: 'Meio-campo',
+  attack: 'Ataque',
+}
+
 /** Onde a posição projetada coloca o time na tabela ("se terminar assim"). */
 export const PROJECTION_ZONE_LABELS: Record<'leader' | 'promotion' | 'relegation', string> = {
   leader: 'na liderança',

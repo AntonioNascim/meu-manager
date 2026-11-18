@@ -10,6 +10,7 @@ import { shortName } from './parts'
 import { Avatar, Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../../theme'
 import { PlayerDetail } from '../../components/PlayerDetail'
 import { TacticSection } from './TacticSection'
+import { ScoutingSection } from './ScoutingSection'
 import { useOnlineDetail } from '../../useOnlineDetail'
 import type { LiveTactic } from './TacticSection'
 
@@ -63,6 +64,8 @@ export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; t
           </Panel>
         ))}
       </div>
+
+      {!mine && <ScoutingSection game={game} teamId={teamId} />}
 
       <TacticSection game={game} teamId={teamId} live={live && live.teamId === teamId ? live : undefined} />
 
