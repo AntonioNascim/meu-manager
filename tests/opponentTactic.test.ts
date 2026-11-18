@@ -65,9 +65,14 @@ describe('tática do adversário', () => {
   })
 
   it('a página do adversário traz formação, estilo, mentalidade e a escalação provável num campo', () => {
-    const g = toDay()
+    const base = toDay()
+    // a formação e a escalação provável de um adversário pedem olheiro de nível 2 ou mais (nível 0: só a força geral)
+    const g = { ...base, season: { ...base.season, teams: base.season.teams.map((t) => (t.id === base.userTeamId ? { ...t, scouting: { level: 2 as const, next: 2 as const } } : t)) } }
     const opp = teamById(g, g.pendingUserMatch!.homeTeamId === g.userTeamId ? g.pendingUserMatch!.awayTeamId : g.pendingUserMatch!.homeTeamId)
     const html = renderToStaticMarkup(createElement(TeamPage, { game: g, teamId: opp.id, onBack: () => {}, onTeam: () => {} }))
+    const locked = renderToStaticMarkup(createElement(TeamPage, { game: base, teamId: opp.id, onBack: () => {}, onTeam: () => {} }))
+    expect(locked).toContain('data-testid="tactic-locked"')
+    expect(locked).not.toContain('data-testid="field-lineup"')
     for (const t of ['Formação', 'Estilo', 'Mentalidade', 'escalação provável', 'data-testid="field-lineup"', 'Últimos resultados', 'Elenco']) expect(html).toContain(t)
     expect(html.match(/data-player=/g)).toHaveLength(11)
   })

@@ -45,7 +45,9 @@ describe('leitura do adversário', () => {
   })
 
   it('a seção mostra prognóstico, craque e setores do próximo adversário', () => {
-    const game = createGame(3, USER, { cups: false })
+    const base = createGame(3, USER, { cups: false })
+    // olheiro de nível 3: libera craque e setores (o nível 0 mostra só o prognóstico, pela força geral)
+    const game = { ...base, season: { ...base.season, teams: base.season.teams.map((t) => (t.id === USER ? { ...t, scouting: { level: 3 as const, next: 3 as const } } : t)) } }
     const rival = nextUserMatch(game)!
     const otherId = rival.homeTeamId === USER ? rival.awayTeamId : rival.homeTeamId
     const html = renderToStaticMarkup(createElement(ScoutingSection, { game, teamId: otherId }))

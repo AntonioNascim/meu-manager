@@ -854,6 +854,16 @@ export const TRAINING = {
   potentialRange: { sdYoung: 6, sdOld: 2, youngAge: 17, oldAge: 30 },
 } as const
 
+/**
+ * Olheiro do clube (níveis 0 a 3). O custo mensal é uma parcela da receita mensal esperada do clube, para pesar parecido em clubes grandes e
+ * pequenos; o efeito diminui o erro da estimativa do potencial dos outros jogadores (nas buscas do mercado) e libera mais informação na leitura do
+ * adversário (nível 1: o craque; 2: formação provável e estilo; 3: força por setor). A IA não contrata.
+ */
+export const SCOUT = {
+  costShare: [0, 0.004, 0.01, 0.02] as readonly number[],
+  errorScale: [1, 0.75, 0.5, 0.25] as readonly number[],
+} as const
+
 /** Categorias de base: elenco de jovens separado do profissional, que não joga partidas. */
 export const ACADEMY = {
   /** Idades na base: de 15 a 19 anos; quem faz 20 precisa ser promovido ou dispensado. */

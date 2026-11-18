@@ -7,6 +7,7 @@
 import { AcademyError } from '../academy'
 import { AgendaError, cancelIndividualTraining, isSession, setAgenda, startIndividualTraining, setTrainingPlan, TrainingError } from '../training'
 import { lineupForeignCount } from '../foreign'
+import { isScoutLevel, setScoutingLevel } from '../scouting'
 import { monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../finance'
 import { boardEvaluation } from './career'
 import { makeOffer, respondToOffer } from '../market/offers'
@@ -23,11 +24,13 @@ import type { SeasonState } from '../season'
 import { isGridPoint } from '../grid'
 import { applyClubAction, type ClubAction } from './club'
 import { PLAY_STYLES, POSITIONS, TRAINING_FOCUSES, TRAINING_GROUPS, TRAINING_INTENSITIES } from '../types'
-import type { GridPoint, IndividualGoal, Mentality, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan, TrainingSession } from '../types'
+import type { GridPoint, IndividualGoal, Mentality, ScoutLevel, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan, TrainingSession } from '../types'
 
 export type LeagueCommand =
   | { type: 'tactic'; tactic: Tactic }
   | { type: 'training-plan'; plan: TrainingPlan }
+  /** Nível do olheiro do clube (0 a 3): vale a partir do fechamento do mês seguinte. */
+  | { type: 'scouting'; level: ScoutLevel }
   /** Agenda do treino por dia: troca a semana inteira (data → sessão; `null` ou ausente = dia sem sessão, vale o plano). */
   | { type: 'training-agenda'; sessions: Record<string, TrainingSession | null> }
   | { type: 'individual-training'; playerId: string; goal: IndividualGoal }
@@ -118,6 +121,8 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
       if (!only(raw, ['type', 'plan']) || !isObj(p) || !only(p, ['intensity', 'focus']) || !TRAINING_INTENSITIES.includes(p.intensity as never) || !TRAINING_FOCUSES.includes(p.focus as never)) return undefined
       return { type: 'training-plan', plan: { intensity: p.intensity as TrainingPlan['intensity'], focus: p.focus as TrainingPlan['focus'] } }
     }
+    case 'scouting':
+      return only(raw, ['type', 'level']) && isScoutLevel(raw.level) ? { type: 'scouting', level: raw.level } : undefined
     case 'training-agenda': {
       const sessions = raw.sessions
       if (!only(raw, ['type', 'sessions']) || !isObj(sessions)) return undefined
@@ -193,6 +198,8 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
       }
       case 'training-plan':
         return { ok: true, world: setTrainingPlan(world, teamId, command.plan) }
+      case 'scouting':
+        return { ok: true, world: { ...world, teams: world.teams.map((t) => (t.id === teamId ? setScoutingLevel(t, command.level) : t)) } }
       case 'training-agenda':
         return { ok: true, world: setAgenda(world, teamId, command.sessions) }
       case 'individual-training':

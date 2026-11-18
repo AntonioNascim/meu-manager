@@ -5,6 +5,7 @@
  */
 import { FINANCE, LEAGUE } from '../config'
 import { leagueRevenue } from '../economy'
+import { applyScouting } from '../scouting'
 import { addDays, daysBetween } from '../season/dates'
 import type { FinanceCategory, FinanceEntry, Finances, IsoDate, Player, Team } from '../types'
 
@@ -78,6 +79,12 @@ export function settleMonth(team: Team, players: readonly Player[], date: IsoDat
   next = recordEntry(next, date, 'tv-rights', Math.round(annualTvRights(team) / 12), 'Cota de TV')
   next = recordEntry(next, date, 'salaries', -monthlyPayroll(players), 'Folha salarial')
   next = recordEntry(next, date, 'operations', -monthlyOperations(team), 'Operação do clube')
+  // Olheiro: o nível escolhido passa a valer e o mês é cobrado por ele (só técnicos humanos têm; a IA nunca).
+  if (next.scouting) {
+    const scout = applyScouting(next)
+    next = scout.team
+    if (scout.cost > 0) next = recordEntry(next, date, 'operations', -scout.cost, `Olheiros (nível ${scout.level})`)
+  }
   if (ai) {
     const ceiling = FINANCE.ceilingYears * expectedAnnualRevenue(team)
     const excess = next.finances.balance - ceiling

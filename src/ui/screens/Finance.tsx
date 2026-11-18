@@ -8,6 +8,7 @@ import { formatCompactMoney, formatDate, formatMoney } from '../format'
 import { Eyebrow, Icon, Panel } from '../theme'
 import type { IconName } from '../theme'
 import { BudgetBar, FundsButton } from './finance/Budget'
+import { ScoutingCard } from './finance/Scouting'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SeasonBalance, Statement, TicketSheet } from './finance/Sheets'
 
 const ICONS: Record<FinanceCategory, IconName> = {
@@ -108,6 +109,8 @@ export function Finance({ game }: { game: Game }) {
       </button>
 
       <BudgetBar game={game} />
+
+      <ScoutingCard game={game} />
 
       <section
         className={`flex items-start gap-3 rounded-[14px] border p-4 text-sm ${!outlook.coversSeason ? 'border-loss/50 bg-loss/10 text-loss' : tight ? 'border-amber/55 bg-amber/10 text-amber' : 'border-accent/45 bg-accent/[0.06] text-accent'}`}

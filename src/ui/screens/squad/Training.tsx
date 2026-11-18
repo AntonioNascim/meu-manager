@@ -10,6 +10,7 @@ import { getGame } from '../../../store/gameStore'
 import { perform } from '../../../store/actions'
 import { PlayerDetail } from '../../components/PlayerDetail'
 import { TrainingWeek } from './TrainingWeek'
+import { scoutLevelOf } from '../../../engine/scouting'
 import { formatDate, playerName } from '../../format'
 import {
   ATTRIBUTE_GROUP_LABELS,
@@ -204,7 +205,7 @@ export function Training({ game }: { game: Game }) {
   const rows = useMemo(
     () =>
       squad
-        .map((p) => ({ p, growth: projectedGrowth(p, plan, minutesShareSoFar(game.season, p, date)), range: potentialRange(p) }))
+        .map((p) => ({ p, growth: projectedGrowth(p, plan, minutesShareSoFar(game.season, p, date)), range: potentialRange(p, scoutLevelOf(team)) }))
         .sort((a, b) => b.growth - a.growth || playerOverall(b.p) - playerOverall(a.p))
         .slice(0, 12),
     [squad, plan, game.season, date],

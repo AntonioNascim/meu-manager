@@ -1,8 +1,9 @@
 import { playerOverall } from '../../../engine/overall'
-import { nextUserMatch } from '../../../store/game'
+import { scoutLevelOf } from '../../../engine/scouting'
+import { nextUserMatch, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { playerName } from '../../format'
-import { POSITION_LABELS, SCOUT_SECTOR_LABELS } from '../../labels'
+import { POSITION_LABELS, SCOUT_EFFECT_LABELS, SCOUT_SECTOR_LABELS } from '../../labels'
 import { Avatar, Eyebrow, Panel, ValueBadge } from '../../theme'
 import { outlookAgainst, sectorLevels, sectorVerdict, SCOUT_SECTORS, starOf } from './scouting'
 import { teamById } from '../../../store/game'
@@ -22,6 +23,8 @@ export function ScoutingSection({ game, teamId }: { game: Game; teamId: string }
   const levels = sectorLevels(game, teamId)
   const mine = sectorLevels(game, game.userTeamId)
   const verdict = sectorVerdict(game, teamId)
+  // O olheiro do clube libera a leitura: 0 só a força geral (e o prognóstico, que sai dela), 1 o craque, 2 formação e estilo (na seção de tática), 3 a força por setor.
+  const level = scoutLevelOf(userTeam(game))
   return (
     <Panel className="space-y-3 p-4" data-testid="scouting">
       <Eyebrow>Leitura do adversário</Eyebrow>
@@ -40,7 +43,7 @@ export function ScoutingSection({ game, teamId }: { game: Game; teamId: string }
           </div>
         </div>
       )}
-      {star && (
+      {level >= 1 && star && (
         <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-2.5" data-testid="star">
           <Avatar id={star.star.id} colors={team.colors} size={40} ring />
           <div className="min-w-0 flex-1">
@@ -53,6 +56,8 @@ export function ScoutingSection({ game, teamId }: { game: Game; teamId: string }
           <ValueBadge value={star.overall}>{Math.round(playerOverall(star.star))}</ValueBadge>
         </div>
       )}
+      {level >= 3 && (
+      <>
       <ul className="space-y-1.5" data-testid="sectors">
         {SCOUT_SECTORS.map((s) => {
           const d = verdict.diff[s]
@@ -71,6 +76,13 @@ export function ScoutingSection({ game, teamId }: { game: Game; teamId: string }
       <p className="text-xs text-muted">
         O ponto forte deles é o <b className="text-slate-200">{SCOUT_SECTOR_LABELS[verdict.strongest].toLowerCase()}</b>; o mais fraco, o <b className="text-slate-200">{SCOUT_SECTOR_LABELS[verdict.weakest].toLowerCase()}</b>. Os números ao lado comparam com o seu time.
       </p>
+      </>
+      )}
+      {level < 3 && (
+        <p className="rounded-lg border border-line bg-surface p-2 text-xs text-muted" data-testid="scout-locked">
+          Seu olheiro: <b className="text-slate-200">{level === 0 ? 'nenhum' : `nível ${level}`}</b>. {SCOUT_EFFECT_LABELS[(level + 1) as 1 | 2 | 3]} Contrate na tela de Finanças.
+        </p>
+      )}
     </Panel>
   )
 }

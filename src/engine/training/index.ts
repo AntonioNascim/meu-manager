@@ -8,7 +8,7 @@
  * - A base também treina, em ritmo menor (os jovens contam como quem jogou `ACADEMY.evolutionShare` dos minutos).
  * Funções puras: recebem o estado e devolvem outro.
  */
-import { ACADEMY, ATTRIBUTE_MAX, ATTRIBUTE_MIN, OFFSEASON, TRAINING } from '../config'
+import { ACADEMY, ATTRIBUTE_MAX, ATTRIBUTE_MIN, OFFSEASON, SCOUT, TRAINING } from '../config'
 import { isProtected, type TeamRef } from '../teamRef'
 import { playerOverall } from '../overall'
 import { developmentFactor, stochasticRound, yearlyGain } from '../offseason/evolution'
@@ -26,6 +26,7 @@ import type {
   Player,
   PlayerId,
   Position,
+  ScoutLevel,
   StrengthSnapshot,
   TeamId,
   TrainingFocus,
@@ -146,10 +147,11 @@ export function projectedGrowth(player: Player, plan: TrainingPlan, minutesShare
  * Faixa estimada do potencial (o valor de verdade é oculto): a estimativa soma um erro que diminui com a idade e
  * fica sempre igual para o mesmo jogador na mesma idade. Nunca fica abaixo da força de hoje.
  */
-export function potentialRange(player: Player): { low: number; high: number } {
+export function potentialRange(player: Player, scoutLevel: ScoutLevel = 0): { low: number; high: number } {
   const R = TRAINING.potentialRange
   const t = clamp((player.age - R.youngAge) / (R.oldAge - R.youngAge), 0, 1)
-  const sd = R.sdYoung + (R.sdOld - R.sdYoung) * t
+  // O olheiro do clube diminui o erro da estimativa (nível 0: o de sempre).
+  const sd = (R.sdYoung + (R.sdOld - R.sdYoung) * t) * (SCOUT.errorScale[scoutLevel] ?? 1)
   const estimate = player.hidden.potential + createRng(`${player.id}:${player.age}:range`).normal(0, sd * 0.6)
   const now = Math.ceil(playerOverall(player))
   const low = clamp(Math.max(now, Math.round(estimate - sd)), ATTRIBUTE_MIN, ATTRIBUTE_MAX)

@@ -82,6 +82,9 @@ export interface ForeignLimit {
   lineup?: number
 }
 
+/** Nível do olheiro do clube (0 a 3). */
+export type ScoutLevel = 0 | 1 | 2 | 3
+
 export interface Team {
   id: TeamId
   name: string
@@ -120,4 +123,9 @@ export interface Team {
   country?: Nationality
   /** Limite de estrangeiros da liga do clube; ausente = sem limite. Acompanha o clube como a economia. */
   foreignLimit?: ForeignLimit
+  /**
+   * Olheiro do clube (só técnicos humanos contratam; ausente = nível 0). `level` vale agora e `next` é o nível escolhido, que entra em vigor no
+   * fechamento do mês seguinte (quando o custo também passa a ser cobrado).
+   */
+  scouting?: { level: ScoutLevel; next: ScoutLevel }
 }

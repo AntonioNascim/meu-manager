@@ -5,7 +5,8 @@ import { playerOverall } from '../overall'
 import type { SeasonState } from '../season/calendar'
 import { cycleOfTeam } from '../season/cycles'
 import { potentialRange } from '../training'
-import type { IsoDate, Nationality, Player, Position, Team, TeamId } from '../types'
+import type { IsoDate, Nationality, Player, Position, ScoutLevel, Team, TeamId } from '../types'
+import { scoutLevelOf } from '../scouting'
 import { premiumPrice } from './decision'
 import { listingOf } from './listings'
 import { monthlyPayroll } from '../finance'
@@ -98,6 +99,8 @@ export interface SearchContext {
   /** Folga no orçamento de salários (orçamento menos a folha de hoje) e o salário que a proposta padrão oferece: quem não cabe nela é recusado por "orçamento de salários insuficiente". */
   salaryRoom?: number
   salary?: (p: Player) => number
+  /** Nível do olheiro do clube do técnico: diminui o erro da estimativa do potencial (atalho "jovens promessas"). */
+  scoutLevel?: ScoutLevel
 }
 
 /** Valor de mercado do jogador no clube em que está. */
@@ -138,6 +141,7 @@ export function searchContext(state: SeasonState, userTeamId: TeamId): SearchCon
     price,
     salaryRoom: team ? team.finances.salaryBudget - payroll : 0,
     salary: (p) => expectedSalary(p, team),
+    scoutLevel: scoutLevelOf(team),
   }
 }
 
@@ -151,7 +155,7 @@ export function matchesQuick(p: Player, quick: QuickFilter, ctx: SearchContext):
       return overall >= ctx.medianOverall && valueAt(p, ctx) <= strengthValue(overall) * valueScale(ctx.teams.get(p.teamId as TeamId) ?? {}) * MARKET.search.bargainShare
     }
     case 'prospect':
-      return p.age <= MARKET.search.prospectAge && potentialRange(p).high >= MARKET.search.prospectPotential
+      return p.age <= MARKET.search.prospectAge && potentialRange(p, ctx.scoutLevel ?? 0).high >= MARKET.search.prospectPotential
     case 'expiring':
       return p.teamId !== null && ctx.expiring(p)
   }

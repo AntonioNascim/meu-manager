@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { POSITIONS } from '../../../engine/types'
 import type { Match, StandingRow } from '../../../engine/types'
-import { competitionMatches, squadOf, standingsOf, teamById, teamStrength } from '../../../store/game'
+import { competitionMatches, squadOf, standingsOf, teamById, teamStrength, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { formatDate, playerName } from '../../format'
 import { POSITION_SHORT_LABELS } from '../../labels'
@@ -11,6 +11,7 @@ import { Avatar, Crest, Eyebrow, Flag, Panel, ResultDot, ValueBadge } from '../.
 import { PlayerDetail } from '../../components/PlayerDetail'
 import { TacticSection } from './TacticSection'
 import { ScoutingSection } from './ScoutingSection'
+import { scoutLevelOf } from '../../../engine/scouting'
 import { useOnlineDetail } from '../../useOnlineDetail'
 import type { LiveTactic } from './TacticSection'
 
@@ -67,7 +68,14 @@ export function TeamPage({ game, teamId, onBack, onTeam, live }: { game: Game; t
 
       {!mine && <ScoutingSection game={game} teamId={teamId} />}
 
-      <TacticSection game={game} teamId={teamId} live={live && live.teamId === teamId ? live : undefined} />
+      {mine || live || scoutLevelOf(userTeam(game)) >= 2 ? (
+        <TacticSection game={game} teamId={teamId} live={live && live.teamId === teamId ? live : undefined} />
+      ) : (
+        <Panel className="p-4" data-testid="tactic-locked">
+          <Eyebrow>Tática e escalação provável</Eyebrow>
+          <p className="mt-2 text-sm text-muted">Para ver a formação, o estilo e a escalação provável de um adversário, contrate um olheiro de nível 2 ou mais na tela de Finanças.</p>
+        </Panel>
+      )}
 
       <Panel className="p-4">
         <Eyebrow>Últimos resultados</Eyebrow>

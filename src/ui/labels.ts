@@ -283,6 +283,15 @@ export const REHEARSAL_LABELS: Record<0 | 1 | 2 | 3, string> = { 0: 'Sem trabalh
 
 export const REST_LABEL = 'Folga'
 
+/** O que cada nível de olheiro faz, em uma linha (a tela do clube e a leitura do adversário). */
+export const SCOUT_EFFECT_LABELS: Record<0 | 1 | 2 | 3, string> = {
+  0: 'Sem olheiro: do adversário você vê só a força geral, e o potencial dos jogadores tem a margem de erro de sempre.',
+  1: 'Mostra o craque do adversário e reduz 25% do erro do potencial nas buscas.',
+  2: 'Mostra também a formação provável e o estilo do adversário e reduz 50% do erro do potencial.',
+  3: 'Mostra também a força de cada setor do adversário e reduz 75% do erro do potencial.',
+}
+export const SCOUT_LEVEL_LABELS: Record<0 | 1 | 2 | 3, string> = { 0: 'Sem olheiro', 1: 'Nível 1', 2: 'Nível 2', 3: 'Nível 3' }
+
 /** Setores do time na leitura do adversário. */
 export const SCOUT_SECTOR_LABELS: Record<'goalkeeper' | 'defence' | 'midfield' | 'attack', string> = {
   goalkeeper: 'Goleiro',
