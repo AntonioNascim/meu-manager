@@ -11,6 +11,8 @@ import { isScoutLevel, setScoutingLevel } from '../scouting'
 import { PreseasonError, isPlace, planPreseason } from '../preseason'
 import { PromiseError, checkPromise, isPromiseKind, makePromise } from '../promise'
 import type { PromiseKind } from '../promise'
+import { PressError, answerPress, isPressTone } from '../press'
+import type { PressTone } from '../press'
 import { monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../finance'
 import { boardEvaluation } from './career'
 import { makeOffer, respondToOffer } from '../market/offers'
@@ -34,6 +36,8 @@ export type LeagueCommand =
   | { type: 'training-plan'; plan: TrainingPlan }
   /** Nível do olheiro do clube (0 a 3): vale a partir do fechamento do mês seguinte. */
   | { type: 'scouting'; level: ScoutLevel }
+  /** Resposta da coletiva de imprensa aberta (só registro, sem efeito no jogo). */
+  | { type: 'press'; tone: PressTone }
   /** Promessa na coletiva de apresentação (uma por temporada, nas primeiras rodadas): ±1 posição na margem da diretoria. */
   | { type: 'promise'; kind: PromiseKind }
   /** Pré-temporada: onde, quantos dias e contra quem (até 5 amistosos). Uma vez por temporada, antes do primeiro jogo. */
@@ -132,6 +136,8 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
       return only(raw, ['type', 'place', 'days', 'opponents']) && isPlace(raw.place) && Number.isInteger(raw.days) && (raw.days as number) >= 1 && (raw.days as number) <= 60 && isIds(raw.opponents, 0, 5) ? { type: 'preseason', place: raw.place, days: raw.days as number, opponents: raw.opponents } : undefined
     case 'promise':
       return only(raw, ['type', 'kind']) && isPromiseKind(raw.kind) ? { type: 'promise', kind: raw.kind } : undefined
+    case 'press':
+      return only(raw, ['type', 'tone']) && isPressTone(raw.tone) ? { type: 'press', tone: raw.tone } : undefined
     case 'scouting':
       return only(raw, ['type', 'level']) && isScoutLevel(raw.level) ? { type: 'scouting', level: raw.level } : undefined
     case 'training-agenda': {
@@ -216,6 +222,8 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
         checkPromise(team, command.kind, world.season.year, played)
         return { ok: true, world: { ...world, teams: world.teams.map((t) => (t.id === teamId ? makePromise(t, command.kind, world.season.year) : t)) } }
       }
+      case 'press':
+        return { ok: true, world: { ...world, teams: world.teams.map((t) => (t.id === teamId ? answerPress(world, t, command.tone) : t)) } }
       case 'scouting':
         return { ok: true, world: { ...world, teams: world.teams.map((t) => (t.id === teamId ? setScoutingLevel(t, command.level) : t)) } }
       case 'training-agenda':
@@ -289,6 +297,7 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
     if (e instanceof AgendaError) return { ok: false, error: e.code }
     if (e instanceof PreseasonError) return { ok: false, error: e.code }
     if (e instanceof PromiseError) return { ok: false, error: e.code }
+    if (e instanceof PressError) return { ok: false, error: e.code }
     if (e instanceof ListingError) return { ok: false, error: e.code }
     // Escalação inválida e outras regras que o motor sinaliza com Error comum.
     if (e instanceof Error) return { ok: false, error: 'invalid' }

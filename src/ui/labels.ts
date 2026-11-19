@@ -422,6 +422,8 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   'too-late': 'Já não dá tempo de montar a pré-temporada: faltam dias até o primeiro jogo',
   'preseason-done': 'A pré-temporada desta temporada já foi montada',
   'promise-done': 'Você já falou com a imprensa nesta temporada',
+  'press-closed': 'Não há coletiva aberta agora',
+  'press-done': 'Você já respondeu a esta coletiva',
   'promise-closed': 'A coletiva de apresentação já passou',
   'squad-full': 'O elenco profissional já está cheio: venda, empreste ou libere alguém antes',
   'foreign-limit': 'Limite de estrangeiros da liga',

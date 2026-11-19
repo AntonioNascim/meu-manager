@@ -107,6 +107,16 @@ export interface PreseasonPlan {
   moraleGiven: number
 }
 
+/** Uma resposta da coletiva de imprensa (só registro: sem efeito no jogo). */
+export interface PressAnswerRecord {
+  key: string
+  occasion: 'eve' | 'win' | 'draw' | 'loss'
+  question: number
+  tone: 'humble' | 'confident' | 'defend'
+  date: IsoDate
+  matchId: string
+}
+
 /** Nível do olheiro do clube (0 a 3). */
 export type ScoutLevel = 0 | 1 | 2 | 3
 
@@ -157,4 +167,6 @@ export interface Team {
   preseason?: PreseasonPlan
   /** Promessa da coletiva de apresentação (uma por temporada, só técnico humano): mexe uma posição na margem da diretoria. */
   promise?: { kind: 'title' | 'continental' | 'none'; year: number }
+  /** Respostas das coletivas de imprensa (as últimas 30; só registro). */
+  press?: PressAnswerRecord[]
 }

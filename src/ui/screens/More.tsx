@@ -35,6 +35,7 @@ export function More({ game, onNavigate, onMenu }: { game: Game; onNavigate: (to
   const main: Item[] = [
     { icon: 'dollar', title: 'Finanças', sub: 'Caixa, orçamento e ingresso', go: () => onNavigate('finance') },
     { icon: 'hist', title: 'Carreira', sub: 'Reputação e propostas', go: () => onNavigate('career') },
+    { icon: 'news', title: 'Imprensa', sub: 'Notícias e coletivas', go: () => onNavigate('press') },
     { icon: 'table', title: 'Histórico', sub: 'Temporadas encerradas', go: () => onNavigate('standings', 'history') },
     { icon: 'doc', title: 'Contratos', sub: 'Renovações', go: () => onNavigate('contracts') },
     { icon: 'sprout', title: 'Base', sub: 'Categorias de base', go: () => onNavigate('academy') },

@@ -20,6 +20,7 @@ import { Avatar, BottomNav } from './theme'
 import { coachFaceId, coachName } from './coachName'
 import type { NavItem } from './theme'
 import { Career } from './screens/Career'
+import { Press } from './screens/Press'
 import { Dismissed } from './screens/Dismissed'
 import { Market } from './screens/Market'
 import type { MarketTab } from './screens/Market'
@@ -174,6 +175,7 @@ export function App() {
         {current === 'league' && game.online && <LeagueScreen leagueId={game.online.leagueId} />}
         {current === 'admin' && game.online && <AdminPanel leagueId={game.online.leagueId} />}
         {current === 'career' && <Career game={game} onTaken={() => navigate('home')} />}
+        {current === 'press' && <Press game={game} />}
         {current === 'match' && <MatchScreen game={game} onNavigate={navigate} />}
         {(current === 'squad' || current === 'academy' || current === 'training' || current === 'tactics') && <Squad key={`${current}-${hint ?? ''}`} game={game} initialTab={current === 'academy' ? 'academy' : current === 'training' ? 'training' : current === 'tactics' ? 'tactics' : initialSquadTab(hint)} />}
         {current === 'standings' && <Standings key={hint ?? ''} game={game} initialSection={initialStandingsSection(hint)} />}
