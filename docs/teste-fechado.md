@@ -18,11 +18,15 @@ O `?online=1` é o que mostra o cartão "Online" no menu; ele fica lembrado no a
 >
 > 👉 Abra: **https://antonionascim.github.io/meu-manager/?online=1**
 >
+> Novidades que eu mais quero ver testadas: **partida com câmera que segue a bola e analista**, **treino dia a dia**, **olheiros**, **pré-temporada com amistosos**, **propostas de clubes e coletiva de imprensa no começo da carreira**, **vestiário**, **notícias**, **a tela "O clube"**, **patrocinador** e **aposta do ano**.
+>
 > Estamos numa fase de teste fechado, então **vai ter erro**, e é isso que eu quero descobrir! Se algo travar ou parecer estranho, use o botão **"Relatar problema"** (no menu e dentro do jogo). Leva 1 minuto.
+>
+> ⚠️ **O modo online do teste é só para maiores de 18 anos.**
 >
 > Obrigado por ajudar! 🙏
 
-*(Se o convidado for menor de 18 anos, veja a nota da seção 6.)*
+*(O convite vale só para maiores de 18 anos. Se o convidado for menor, veja a nota da seção 6.)*
 
 ---
 
@@ -32,6 +36,8 @@ O `?online=1` é o que mostra o cartão "Online" no menu; ele fica lembrado no a
 > 1. Abra o endereço no celular. Toque em **Novo jogo**, escolha o **mundo real** (ou fictício), um país, uma liga e um clube.
 > 2. No painel do clube, toque em **Avançar** até a primeira partida. Veja o jogo em campo, mude a tática e faça uma troca.
 > 3. Passe pelas abas **Elenco**, **Mercado** e **Finanças**.
+>
+> **Mais 20 minutos para as funções novas (carreira solo):** siga o roteiro da seção 2.3 abaixo, que está escrito para os convidados.
 >
 > **Para testar o online (30 minutos, com amigos):**
 > 1. No menu, **Online › Criar minha conta online**. Marque a faixa de idade (**18 anos ou mais**) e escolha um apelido. (O código de recuperação aparece depois; **guarde-o**.)
@@ -48,7 +54,8 @@ O `?online=1` é o que mostra o cartão "Online" no menu; ele fica lembrado no a
 2. **Uma temporada inteira** da carreira solo (tempo, travamentos, salvar e carregar).
 3. **Liga online de 4 a 20 pessoas**: criar, entrar por convite, Pronto/Avançar, partida ao vivo, lesão (o jogo para até escolher o reserva), mercado entre técnicos.
 3b. **O jogo do clube na liga online (Fase 6C)**, roteiro abaixo (seção 2.1).
-4. **Virada de temporada** numa liga online.
+3c. **Funções novas** (partida com câmera e analista, treino por dia, olheiro, pré-temporada, início de carreira, vestiário, imprensa, O clube, patrocinador e aposta), roteiro abaixo (seção 2.3).
+4. **Virada de temporada** numa liga online (e, no solo, o pagamento do bônus do patrocinador e da aposta do ano).
 5. **Trocar de aparelho** com o código de recuperação.
 6. **Denúncias** (apelido e liga) e o **painel** (nós).
 7. **Custo**: a conta do Cloudflare durante o teste (seção 4).
@@ -65,6 +72,62 @@ Para quem conduz o teste (nós), em duas pessoas ou mais, ligas de **Assistir ao
 6. **Outro aparelho:** entrar com o código de recuperação e abrir o jogo: favoritos e escalações guardadas vêm da conta.
 7. **Detalhe:** abrir a página do adversário e a ficha de um jogador de outro clube depois de uma rodada: a condição física tem de aparecer cansada (não 100%).
 8. **Carreira:** "Minha carreira" mostra o clube atual, as temporadas e a campanha de hoje.
+
+### 2.3 Roteiro das funções novas (para os convidados)
+
+> Faça com calma, de preferência numa carreira nova. Tudo funciona na carreira solo; o que também vale na liga online está marcado com **(online)**. Anote o que achou confuso, lento ou sem graça: **opinião vale tanto quanto erro**.
+>
+> **1. Começar a carreira (propostas, ficha, contrato, coletiva)**
+> - Em **Novo jogo**, veja as **4 propostas de clubes** (a contagem regressiva é só de tela). Toque em **Que outros liguem** para sortear outras.
+> - Toque em **Conhecer o clube**: meta e margem da diretoria, estádio, orçamento, elenco e melhor/pior setor. A ficha ajudou a decidir?
+> - Escolha um **desafio** (salvar um clube do rebaixamento, vaga continental, título em até 2 temporadas...) e confira as estrelas e o prazo.
+> - **Assine o contrato** (desenhe a assinatura ou use "Assinar por mim"). Depois escolha o espaço de salvamento.
+> - Logo depois de assinar abre a **coletiva de apresentação**: escolha uma das 3 respostas. **(online)** A promessa mexe uma posição na margem da diretoria: veja em **Mais › O clube** se ela aparece e se faz sentido.
+>
+> **2. Partida com câmera e analista**
+> - Comece uma partida. Veja a **entrada dos times** (use **Pular a entrada** e **Não mostrar mais**).
+> - A câmera segue a bola. Teste **Campo inteiro**, o **Torcida: sim/não** e as velocidades 1x, 2x, 4x e 8x. Em 4x e 8x a câmera volta ao campo inteiro, e se o celular estiver pesado o jogo avisa e faz isso sozinho. **Conte se travou.**
+> - Confira a linha **"Se terminar assim"** (posição e vaga que o placar de agora daria, com os outros jogos do dia) e se ela **não entrega resultados de jogos que ainda não aconteceram**.
+> - Quando o **analista** aparecer (pressão do rival, cansaço, reta final...), toque no botão sugerido. Ajudou ou atrapalhou?
+>
+> **3. Treino por dia**
+> - **Elenco › Treino**: monte a semana até o próximo jogo. Em cada dia escolha um exercício e a intensidade, ou **folga**. Teste **Delegar à comissão** e **Limpar**.
+> - Assista ao **campinho animado** dos exercícios (velocidades 1x, 2x, 4x e pausa). A bola salta ou some em algum momento?
+> - Os medidores "o que a semana ensaia" são só informação. Faz sentido para você? **(online)**
+>
+> **4. Olheiros**
+> - **Finanças › Olheiros**: troque de nível. O custo é mensal e **a troca só vale no fechamento do mês seguinte**: isso ficou claro?
+> - Com olheiro, veja a **faixa de potencial** dos jogadores no Mercado e a leitura do adversário (formação, estilo e escalação provável a partir do nível 2; força por setor no nível 3). O que aparece em cada nível confere com o que a tela prometia? **(online)**
+>
+> **5. Pré-temporada**
+> - Antes do primeiro jogo da temporada, **Elenco › Treino**, cartão da pré-temporada: escolha o **local** (CT, praça ou excursão), os **dias** e até 5 **amistosos**. Confira a estimativa de custo e renda, e depois o resultado, o público, a renda e a moral. **(online)**
+> - Só dá para montar uma vez por temporada e até o primeiro jogo de liga. Tente montar depois disso e veja a mensagem.
+>
+> **6. Vestiário**
+> - **Elenco › Vestiário**: referências, respeitados, queixas, entrosamento e moral do grupo. Use **Dar a braçadeira** a outro titular. **(online)** As queixas fazem sentido com o que você vê no elenco?
+>
+> **7. Imprensa**
+> - **Mais › Imprensa**: leia as **notícias** e responda uma **coletiva** (véspera do jogo ou até 2 dias depois) escolhendo um dos 3 tons. Veja o que você disse. **(online)** (Os veículos e jornalistas são inventados e nada aqui muda o jogo.)
+>
+> **8. O clube**
+> - **Mais › O clube**: como a diretoria, a torcida e o vestiário veem você, a arquibancada, a linha do tempo e como o mercado vê o técnico. Os números parecem coerentes com os últimos resultados?
+>
+> **9. Patrocinador e aposta do ano**
+> - **Finanças › Patrocinador**: escolha uma das **3 ofertas** (fixo 100%; fixo menor com bônus se bater a meta; fixo menor com bônus maior se passar 3 posições da meta) até o primeiro jogo de liga. **(online)**
+> - **Aposta do ano**: escolha uma das 3 metas nas 4 primeiras rodadas.
+> - Joguem **uma temporada inteira** e, na virada, confirmem que o **bônus do patrocinador** e o **prêmio da aposta** foram pagos (ou não) como a tela dizia e aparecem no extrato.
+>
+> **10. Mercado: "onde falta gente"**
+> - No **Resumo do mercado**, veja o cartão por setor (goleiros, defensores, meio, ataque) e toque em **Ver goleiros** para abrir a busca já filtrada.
+>
+> Quando terminar, conte pelo **Relatar problema** (categoria "sugestão" se não for erro): o que foi mais legal, o que foi mais chato e o que ficou sem entender.
+
+**Para nós, ao acompanhar os relatos desta parte:**
+- **Desempenho da câmera:** quantos relatos de travamento em celulares simples e se o aviso de volta ao campo inteiro aparece (`FpsGuard`). Se for frequente, baixar o zoom padrão ou desligar a câmera por padrão.
+- **Equilíbrio financeiro:** amistosos dão lucro líquido em clubes grandes (renda estimada acima do custo do local mais os cachês). Se virar rotina de ganho de caixa, reduzir `PRESEASON.attendanceShare` ou `ticketShare`. Comparar também as três ofertas de patrocinador: se uma for escolhida por quase todos, ajustar fixo ou bônus.
+- **Promessa da coletiva:** só mexe uma posição na margem da diretoria. Observar se alguém foi demitido ou salvo por causa dela.
+- **Online:** treino por agenda, olheiro, pré-temporada, promessa, braçadeira, resposta de coletiva, patrocinador e aposta foram testados ponta a ponta (`tools/online-lab/c8-treino-olheiro-e2e.mjs`); o que importa agora é ver cada técnico guardar o **seu** treino, olheiro, patrocinador e aposta, sem mexer no do outro, e o espelho voltando igual ao reabrir o jogo.
+- **Ideias que pediram para depois:** assistir a amistoso ao vivo, hierarquia do vestiário com efeito na moral, eleições da diretoria. Anotar o que os convidados pedirem.
 
 ### 2.2 Item a observar: demissão com troca de clube
 
@@ -133,4 +196,4 @@ Entrar em `dash.cloudflare.com` com a conta do projeto:
 
 ## 6. Nota sobre menores de idade no teste fechado
 
-O jogo já tem o **modo protegido** (12 a 15 anos) e pergunta a faixa de idade ao criar a conta online (`docs/lgpd-para-revisor.md`, seção 9.4), mas a idade de liberação total (16 ou 18) ainda **precisa ser confirmada pelo revisor de LGPD**. Por isso, **no teste fechado convide apenas maiores de 18 anos para o modo online**. A carreira solo (sem conta) pode ser testada por qualquer pessoa. Acrescente no convite, se quiser: *"O modo online do teste é só para maiores de 18 anos."*
+O jogo já tem o **modo protegido** (12 a 15 anos) e pergunta a faixa de idade ao criar a conta online (`docs/lgpd-para-revisor.md`, seção 9.4), mas a idade de liberação total (16 ou 18) ainda **precisa ser confirmada pelo revisor de LGPD**. Por isso, **no teste fechado convide apenas maiores de 18 anos para o modo online**. O texto do convite (seção 1) já traz a frase *"O modo online do teste é só para maiores de 18 anos."*; **mantenha-a** ao reenviar. A carreira solo (sem conta) é local e não coleta dados, mas o convite continua dirigido a maiores de 18.
