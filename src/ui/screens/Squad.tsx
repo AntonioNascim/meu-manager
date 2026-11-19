@@ -7,6 +7,7 @@ import { Icon, TopTabs } from '../theme'
 import { squadTagline } from './squad/Overview'
 import { Academy } from './squad/Academy'
 import { Lineup } from './squad/Lineup'
+import { Locker } from './squad/Locker'
 import { Numbers } from './squad/Numbers'
 import { Players } from './squad/Players'
 import { Training } from './squad/Training'
@@ -15,7 +16,7 @@ import { Tactics } from './Tactics'
 export { sortSquad }
 export type { SquadSortKey }
 
-export type SquadTab = 'players' | 'lineup' | 'numbers' | 'academy' | 'training' | 'tactics'
+export type SquadTab = 'players' | 'lineup' | 'numbers' | 'locker' | 'academy' | 'training' | 'tactics'
 
 /** Tela de Elenco: abas Jogadores, Time principal (escalação), Números, Base, Treino e Tática. */
 export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab?: SquadTab }) {
@@ -45,6 +46,7 @@ export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab
           { id: 'players', label: 'Jogadores' },
           { id: 'lineup', label: 'Time principal', alert: lineupAlert },
           { id: 'numbers', label: 'Números' },
+          { id: 'locker', label: 'Vestiário' },
           { id: 'academy', label: 'Base', alert: academy.pending > 0 || academy.arrivals > 0 },
           { id: 'training', label: 'Treino' },
           { id: 'tactics', label: 'Tática' },
@@ -53,6 +55,7 @@ export function Squad({ game, initialTab = 'players' }: { game: Game; initialTab
       {tab === 'players' && <Players game={game} />}
       {tab === 'lineup' && <Lineup game={game} />}
       {tab === 'numbers' && <Numbers game={game} />}
+      {tab === 'locker' && <Locker game={game} />}
       {tab === 'academy' && <Academy game={game} />}
       {tab === 'training' && <Training game={game} />}
       {tab === 'tactics' && <Tactics game={game} />}

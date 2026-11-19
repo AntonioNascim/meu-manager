@@ -209,9 +209,9 @@ describe('números da temporada', () => {
 describe('abas do Elenco', () => {
   const g = playDays(createGame(7, USER), 4)
 
-  it('existem Jogadores, Time principal, Números, Base, Treino e Tática', () => {
+  it('existem Jogadores, Time principal, Números, Vestiário, Base, Treino e Tática', () => {
     const html = renderToStaticMarkup(createElement(Squad, { game: g }))
-    expect(html.match(/role="tab"/g)).toHaveLength(6)
+    expect(html.match(/role="tab"/g)).toHaveLength(7)
     expect(html).toContain('Treino')
   })
 

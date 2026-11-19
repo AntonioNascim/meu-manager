@@ -292,6 +292,21 @@ export const CLUB_OFFER_LABELS: Record<'title-hopeful' | 'continental' | 'mid-ta
   'lower-division': 'Divisão de acesso',
 }
 
+/** Vestiário: o papel de cada jogador no grupo, as queixas e o entrosamento (só leitura). */
+export const ROOM_ROLE_LABELS: Record<'reference' | 'respected' | 'member' | 'trial', { title: string; text: string }> = {
+  reference: { title: 'Referências', text: 'Quem manda no grupo: força, idade e jogos pesam.' },
+  respected: { title: 'Respeitados', text: 'Têm voz, mas ainda atrás das referências.' },
+  member: { title: 'Do grupo', text: 'Fazem parte do elenco sem peso especial.' },
+  trial: { title: 'Em teste', text: 'Jovens ou quem ainda não jogou: estão ganhando espaço.' },
+}
+export const ROOM_COMPLAINT_LABELS: Record<'salary' | 'minutes', string> = { salary: 'pede salário', minutes: 'quer jogar mais' }
+export const ROOM_CHEMISTRY_LABELS: Record<'forming' | 'irregular' | 'building' | 'tight', string> = {
+  forming: 'Formando',
+  irregular: 'Irregular',
+  building: 'Em construção',
+  tight: 'Entrosado',
+}
+
 /** A meta da diretoria em palavras: "Ser campeão" ou "Terminar entre os N primeiros". */
 export const OBJECTIVE_TEXT = (position: number): string => (position <= 1 ? 'Ser campeão' : `Terminar entre os ${position} primeiros`)
 
