@@ -307,6 +307,14 @@ export const ROOM_CHEMISTRY_LABELS: Record<'forming' | 'irregular' | 'building' 
   tight: 'Entrosado',
 }
 
+/** Humor da torcida. */
+export const MOOD_BAND_LABELS: Record<'enthusiastic' | 'with-team' | 'uneasy' | 'angry', string> = {
+  enthusiastic: 'Empolgada',
+  'with-team': 'Com o time',
+  uneasy: 'Apreensiva',
+  angry: 'Revoltada',
+}
+
 /** A meta da diretoria em palavras: "Ser campeão" ou "Terminar entre os N primeiros". */
 export const OBJECTIVE_TEXT = (position: number): string => (position <= 1 ? 'Ser campeão' : `Terminar entre os ${position} primeiros`)
 
