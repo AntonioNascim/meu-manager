@@ -3,6 +3,7 @@
 //   VITE_API_BASE=http://127.0.0.1:8787 VITE_TURNSTILE_BYPASS=1 npx vite --port 5173 --strictPort
 //   cd tools/online-lab && node c5-e2e.mjs [http://localhost:5173] [prefixo-das-capturas]
 import { chromium } from 'playwright'
+import { readyWeek } from './week.mjs'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -65,6 +66,8 @@ for (let tries = 0; tries < 8 && !watching; tries++) {
   if (ready) {
     await page.getByTestId('league-ready-counter').waitFor({ timeout: 20000 })
     check('o cartão mostra "Jogo pronto · Agora" e o contador antes de a partida começar', (await page.getByTestId('league-status').innerText()).includes('Jogo pronto') && (await page.getByTestId('league-ready-counter').innerText()).includes('Pronto 0/'))
+    // Treino obrigatório: o Pronto só libera com a semana de treino montada ou delegada.
+    check('o Pronto libera depois de delegar a semana de treino', await readyWeek(page))
     await page.getByTestId('league-ready').click()
     watching = await page.getByTestId('speed').waitFor({ timeout: 40000 }).then(() => true, () => false)
   } else {

@@ -67,6 +67,7 @@ const g0 = await game()
 check('o jogo online abre com o espelho do mundo', !!g0?.online && g0.players > 1000, JSON.stringify(g0))
 check('o painel não tem o botão Avançar (a liga avança o tempo)', (await page.getByRole('button', { name: 'Avançar', exact: true }).count()) === 0)
 check('o cartão da liga mostra a próxima rodada', (await page.getByTestId('league-status').innerText()).toLowerCase().includes('rodada'))
+check('o painel pede a semana de treino antes do Pronto (treino obrigatório)', (await page.getByTestId('week-gate').count()) === 1)
 const shots1 = {}
 shots1.painel = await shoot(page, 'online-painel')
 await page.getByTestId('league-card').scrollIntoViewIfNeeded()

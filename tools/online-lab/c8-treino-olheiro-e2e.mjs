@@ -72,6 +72,15 @@ const pr = await state()
 check('a promessa da coletiva valeu no servidor (lutar pelo título)', pr.promise?.kind === 'title', JSON.stringify(pr.promise))
 check('depois de responder o cartão da coletiva some', (await page.getByTestId('press-card').count()) === 0)
 
+// ------------------------------------------------------------------ treino obrigatório: o Pronto fica bloqueado até a semana estar montada
+await page.getByTestId('week-gate').waitFor({ timeout: 30000 })
+await page.getByTestId('league-ready').waitFor({ timeout: 30000 })
+check('sem a semana montada o Pronto está bloqueado', await page.getByTestId('league-ready').isDisabled())
+check('o botão diz que está bloqueado', (await page.getByTestId('league-ready').innerText()).includes('bloqueado'))
+check('o aviso do painel fala em montar a semana antes do Pronto', (await page.getByTestId('week-gate').innerText()).includes('antes de dar Pronto'))
+check('o cartão da liga explica o motivo', (await page.getByTestId('league-week-pending').innerText()).includes('semana de treino'))
+await shoot('pronto-bloqueado')
+
 // ------------------------------------------------------------------ agenda de treino
 await tab('Elenco')
 await page.getByRole('tab', { name: 'Treino', exact: true }).click()
@@ -104,6 +113,20 @@ const s1 = await state()
 check('"Delegar à comissão" montou a semana no espelho (o servidor aceitou)', s1.days === nDays, JSON.stringify(s1.drills))
 check('a véspera do jogo é bola parada leve', s1.drills.at(-1) === 'corners-for')
 await shoot('treino-delegada')
+
+// com a semana delegada o Pronto libera (o aviso do painel some) e dá para dar e desfazer o Pronto
+await tab('Início')
+await page.getByTestId('league-ready').waitFor({ timeout: 30000 })
+const liberou = await page.waitForFunction(() => { const b = document.querySelector('[data-testid="league-ready"]'); return !!b && !b.disabled }, null, { timeout: 30000 }).then(() => true, () => false)
+check('com a semana delegada o Pronto libera', liberou)
+check('o aviso do painel some', (await page.getByTestId('week-gate').count()) === 0)
+await page.getByTestId('league-ready').click()
+await page.getByTestId('league-ready').filter({ hasText: 'Pronto!' }).waitFor({ timeout: 20000 }).then(() => check('o servidor aceitou o Pronto', true), () => check('o servidor aceitou o Pronto', false))
+await shoot('pronto-liberado')
+await page.getByTestId('league-ready').click()
+await tab('Elenco')
+await page.getByRole('tab', { name: 'Treino', exact: true }).click()
+await page.getByTestId('training-week').waitFor({ timeout: 30000 })
 
 // escolhe um jogo reduzido no primeiro dia e confere o campinho se mexendo
 await page.getByTestId('training-day').first().click()
