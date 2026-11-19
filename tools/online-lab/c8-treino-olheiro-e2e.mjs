@@ -34,7 +34,7 @@ const state = () =>
     if (!g) return null
     const t = g.season.teams.find((x) => x.id === g.userTeamId)
     const agenda = g.season.training.agenda?.[g.userTeamId] ?? {}
-    return { agenda, days: Object.keys(agenda).length, drills: Object.values(agenda).map((s) => s.drill), scouting: t.scouting ?? null, preseason: t.preseason ?? null, promise: t.promise ?? null, balance: t.finances.balance, date: g.season.season.currentDate }
+    return { agenda, days: Object.keys(agenda).length, drills: Object.values(agenda).map((s) => s.drill), scouting: t.scouting ?? null, preseason: t.preseason ?? null, promise: t.promise ?? null, sponsor: t.sponsor ?? 1, bet: t.bet ?? null, balance: t.finances.balance, date: g.season.season.currentDate }
   })
 const tab = async (name) => page.getByRole('button', { name, exact: true }).first().click()
 
@@ -175,6 +175,17 @@ check('escolher o nível 2 vale só no mês seguinte (o de hoje continua 0)', s6
 check('a tela avisa que a troca espera o fechamento do mês', (await page.getByTestId('scout-pending').count()) === 1)
 await shoot('olheiro')
 
+// patrocinador e aposta do ano (Finanças, antes do primeiro jogo)
+check('o cartão do patrocinador mostra as 3 ofertas', (await page.getByTestId('sponsor-offer').count()) === 3)
+await page.locator('[data-testid=sponsor-offer][data-offer="2"]').click()
+await sleep(1500)
+await page.locator('[data-testid=bet-option][data-kind="points"]').click()
+await sleep(1500)
+const sb = await state()
+check('o patrocinador (oferta 2) valeu no servidor', sb.sponsor === 2, String(sb.sponsor))
+check('a aposta do ano (pontos) valeu no servidor', sb.bet?.kind === 'points', JSON.stringify(sb.bet))
+await shoot('patrocinador-aposta')
+
 // o servidor guardou o olheiro também
 await tab('Início')
 await page.getByRole('button', { name: 'Mais', exact: true }).click()
@@ -186,6 +197,7 @@ await page.getByTestId('open-league-game').click()
 await page.getByTestId('league-card').waitFor({ timeout: 90000 })
 const s7 = await state()
 check('depois de sair e voltar, o olheiro escolhido continua', s7.scouting?.next === 2, JSON.stringify(s7.scouting))
+check('depois de sair e voltar, o patrocinador e a aposta continuam', s7.sponsor === 2 && s7.bet?.kind === 'points', `${s7.sponsor} ${JSON.stringify(s7.bet)}`)
 
 await browser.close()
 console.log(failed === 0 ? '\nTudo certo.' : `\n${failed} verificação(ões) falharam.`)

@@ -27,6 +27,7 @@ import { applyPreContracts } from '../market/precontract'
 import { expireContracts } from './contracts'
 import { CORE_COUNTS, desiredSquadSize, positionDeficits, payrollCuts } from './squad'
 import { retires, startNewSeason } from './evolution'
+import { settleSeasonRewards } from '../sponsor'
 import { dynastyRaids } from './dynasty'
 import { isProtected, type TeamRef } from '../teamRef'
 
@@ -154,6 +155,12 @@ function turnPyramid(state: SeasonState, pyramid: string, options: OffseasonOpti
       promoted.push(...up)
       for (const id of up) destination.set(id, above.id)
     }
+  }
+  // Patrocinador e aposta do ano dos técnicos humanos: o bônus e o prêmio são pagos pela posição final (quem não escolheu nada não muda).
+  {
+    const rowsById = new Map<TeamId, StandingRow>()
+    for (const competition of competitions) for (const r of computeStandings(competition.teamIds, state.matches.filter((m) => m.competitionId === competition.id))) rowsById.set(r.teamId, r)
+    state = settleSeasonRewards(state, finalPositions, rowsById, turnDate)
   }
   const competitionOf = new Map<TeamId, Competition>()
   for (const c of competitions) for (const id of c.teamIds) competitionOf.set(id, c)

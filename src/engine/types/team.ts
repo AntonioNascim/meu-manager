@@ -107,6 +107,30 @@ export interface PreseasonPlan {
   moraleGiven: number
 }
 
+/** Oferta de patrocínio (1 fixo, 2 bônus por posição, 3 bônus por superar a meta). */
+export type SponsorOffer = 1 | 2 | 3
+
+/** A aposta do ano: uma meta extra opcional (pontos, vitórias em casa ou gols sofridos). */
+export const BET_KINDS = ['points', 'home-wins', 'goals-against'] as const
+export type BetKind = (typeof BET_KINDS)[number]
+export interface BetPlan {
+  kind: BetKind
+  /** Meta: pontos e vitórias em casa são mínimos; gols sofridos é um máximo. */
+  target: number
+  year: number
+}
+
+/** O que o clube recebeu na virada da temporada por patrocínio e aposta (só registro). */
+export interface SeasonRewards {
+  year: number
+  position: number
+  offer?: SponsorOffer
+  bonus?: number
+  bet?: BetPlan
+  betWon?: boolean
+  prize?: number
+}
+
 /** Uma resposta da coletiva de imprensa (só registro: sem efeito no jogo). */
 export interface PressAnswerRecord {
   key: string
@@ -169,4 +193,10 @@ export interface Team {
   promise?: { kind: 'title' | 'continental' | 'none'; year: number }
   /** Respostas das coletivas de imprensa (as últimas 30; só registro). */
   press?: PressAnswerRecord[]
+  /** Contrato de patrocínio da temporada (só técnico humano; ausente = oferta 1, o patrocínio de sempre). */
+  sponsor?: SponsorOffer
+  /** Aposta do ano da temporada (opcional). */
+  bet?: BetPlan
+  /** O que a última virada pagou (bônus do patrocinador e aposta). */
+  rewards?: SeasonRewards
 }

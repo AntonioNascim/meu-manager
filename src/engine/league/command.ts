@@ -12,6 +12,7 @@ import { PreseasonError, isPlace, planPreseason } from '../preseason'
 import { PromiseError, checkPromise, isPromiseKind, makePromise } from '../promise'
 import type { PromiseKind } from '../promise'
 import { PressError, answerPress, isPressTone } from '../press'
+import { SponsorError, chooseSponsor, isBetKind, isOffer, placeBet } from '../sponsor'
 import type { PressTone } from '../press'
 import { monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../finance'
 import { boardEvaluation } from './career'
@@ -29,13 +30,17 @@ import type { SeasonState } from '../season'
 import { isGridPoint } from '../grid'
 import { applyClubAction, type ClubAction } from './club'
 import { PLAY_STYLES, POSITIONS, TRAINING_FOCUSES, TRAINING_GROUPS, TRAINING_INTENSITIES } from '../types'
-import type { GridPoint, IndividualGoal, Mentality, PreseasonPlace, ScoutLevel, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan, TrainingSession } from '../types'
+import type { BetKind, GridPoint, IndividualGoal, Mentality, SponsorOffer, PreseasonPlace, ScoutLevel, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan, TrainingSession } from '../types'
 
 export type LeagueCommand =
   | { type: 'tactic'; tactic: Tactic }
   | { type: 'training-plan'; plan: TrainingPlan }
   /** Nível do olheiro do clube (0 a 3): vale a partir do fechamento do mês seguinte. */
   | { type: 'scouting'; level: ScoutLevel }
+  /** Patrocinador da temporada (oferta 1, 2 ou 3), escolhido até o primeiro jogo. */
+  | { type: 'sponsor'; offer: SponsorOffer }
+  /** Aposta do ano (meta extra opcional), escolhida nas primeiras rodadas. */
+  | { type: 'bet'; kind: BetKind }
   /** Resposta da coletiva de imprensa aberta (só registro, sem efeito no jogo). */
   | { type: 'press'; tone: PressTone }
   /** Promessa na coletiva de apresentação (uma por temporada, nas primeiras rodadas): ±1 posição na margem da diretoria. */
@@ -138,6 +143,10 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
       return only(raw, ['type', 'kind']) && isPromiseKind(raw.kind) ? { type: 'promise', kind: raw.kind } : undefined
     case 'press':
       return only(raw, ['type', 'tone']) && isPressTone(raw.tone) ? { type: 'press', tone: raw.tone } : undefined
+    case 'sponsor':
+      return only(raw, ['type', 'offer']) && isOffer(raw.offer) ? { type: 'sponsor', offer: raw.offer } : undefined
+    case 'bet':
+      return only(raw, ['type', 'kind']) && isBetKind(raw.kind) ? { type: 'bet', kind: raw.kind } : undefined
     case 'scouting':
       return only(raw, ['type', 'level']) && isScoutLevel(raw.level) ? { type: 'scouting', level: raw.level } : undefined
     case 'training-agenda': {
@@ -224,6 +233,10 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
       }
       case 'press':
         return { ok: true, world: { ...world, teams: world.teams.map((t) => (t.id === teamId ? answerPress(world, t, command.tone) : t)) } }
+      case 'sponsor':
+        return { ok: true, world: chooseSponsor(world, teamId, command.offer) }
+      case 'bet':
+        return { ok: true, world: placeBet(world, teamId, command.kind) }
       case 'scouting':
         return { ok: true, world: { ...world, teams: world.teams.map((t) => (t.id === teamId ? setScoutingLevel(t, command.level) : t)) } }
       case 'training-agenda':
@@ -298,6 +311,7 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
     if (e instanceof PreseasonError) return { ok: false, error: e.code }
     if (e instanceof PromiseError) return { ok: false, error: e.code }
     if (e instanceof PressError) return { ok: false, error: e.code }
+    if (e instanceof SponsorError) return { ok: false, error: e.code }
     if (e instanceof ListingError) return { ok: false, error: e.code }
     // Escalação inválida e outras regras que o motor sinaliza com Error comum.
     if (e instanceof Error) return { ok: false, error: 'invalid' }

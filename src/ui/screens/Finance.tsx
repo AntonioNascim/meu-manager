@@ -9,6 +9,7 @@ import { Eyebrow, Icon, Panel } from '../theme'
 import type { IconName } from '../theme'
 import { BudgetBar, FundsButton } from './finance/Budget'
 import { ScoutingCard } from './finance/Scouting'
+import { BetCard, SponsorCard } from './finance/Sponsor'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SeasonBalance, Statement, TicketSheet } from './finance/Sheets'
 
 const ICONS: Record<FinanceCategory, IconName> = {
@@ -109,6 +110,10 @@ export function Finance({ game }: { game: Game }) {
       </button>
 
       <BudgetBar game={game} />
+
+      <SponsorCard game={game} />
+
+      <BetCard game={game} />
 
       <ScoutingCard game={game} />
 

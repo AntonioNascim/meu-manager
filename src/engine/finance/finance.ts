@@ -6,6 +6,7 @@
 import { FINANCE, LEAGUE } from '../config'
 import { leagueRevenue } from '../economy'
 import { applyScouting } from '../scouting'
+import { sponsorShare } from '../sponsor'
 import { addDays, daysBetween } from '../season/dates'
 import type { FinanceCategory, FinanceEntry, Finances, IsoDate, Player, Team } from '../types'
 
@@ -75,7 +76,7 @@ export function collectGate(home: Team, away: Pick<Team, 'reputation'>, date: Is
  * reinvestem o excesso em estrutura (`ai`). O orçamento de transferências é refeito a partir do saldo.
  */
 export function settleMonth(team: Team, players: readonly Player[], date: IsoDate, ai: boolean): Team {
-  let next = recordEntry(team, date, 'sponsorship', Math.round(annualSponsorship(team) / 12), 'Patrocínio')
+  let next = recordEntry(team, date, 'sponsorship', Math.round((annualSponsorship(team) * sponsorShare(team)) / 12), 'Patrocínio')
   next = recordEntry(next, date, 'tv-rights', Math.round(annualTvRights(team) / 12), 'Cota de TV')
   next = recordEntry(next, date, 'salaries', -monthlyPayroll(players), 'Folha salarial')
   next = recordEntry(next, date, 'operations', -monthlyOperations(team), 'Operação do clube')

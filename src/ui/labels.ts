@@ -312,6 +312,20 @@ export const NEED_GROUP_LABELS: Record<'GK' | 'DEF' | 'MID' | 'FWD', string> = {
 export const NEED_LABELS: Record<'covered' | 'thin' | 'missing', string> = { covered: 'Coberto', thin: 'No limite', missing: 'Em falta' }
 export const NEED_REASON_LABELS: Record<'few' | 'injured' | 'weak-bench', string> = { few: 'poucos jogadores', injured: 'lesionados ou suspensos', 'weak-bench': 'reserva abaixo dos titulares' }
 
+/** As três ofertas de patrocínio (título e a troca que cada uma faz). */
+export const SPONSOR_OFFER_LABELS: Record<1 | 2 | 3, { title: string; text: string }> = {
+  1: { title: 'Fixo, sem bônus', text: 'Todo o valor de hoje em parcelas mensais, sem depender de resultado.' },
+  2: { title: 'Fixo menor + bônus por posição', text: 'Parcela mensal menor e um bônus no fim da temporada se o time cumprir a meta da diretoria.' },
+  3: { title: 'Fixo médio + bônus por superar a meta', text: 'Parcela mensal média e um bônus maior no fim da temporada se o time superar a meta por 3 posições.' },
+}
+
+/** A aposta do ano em palavras (com a meta). */
+export const BET_LABELS: Record<'points' | 'home-wins' | 'goals-against', (n: number) => string> = {
+  points: (n) => `Fazer ${n} pontos`,
+  'home-wins': (n) => `Vencer ${n} jogos em casa`,
+  'goals-against': (n) => `Sofrer no máximo ${n} gols`,
+}
+
 /** Humor da torcida. */
 export const MOOD_BAND_LABELS: Record<'enthusiastic' | 'with-team' | 'uneasy' | 'angry', string> = {
   enthusiastic: 'Empolgada',
@@ -436,6 +450,9 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   'preseason-done': 'A pré-temporada desta temporada já foi montada',
   'promise-done': 'Você já falou com a imprensa nesta temporada',
   'press-closed': 'Não há coletiva aberta agora',
+  'sponsor-closed': 'O patrocinador se escolhe antes do primeiro jogo da temporada',
+  'bet-done': 'Você já fez a aposta desta temporada',
+  'bet-closed': 'O prazo da aposta do ano já passou',
   'press-done': 'Você já respondeu a esta coletiva',
   'promise-closed': 'A coletiva de apresentação já passou',
   'squad-full': 'O elenco profissional já está cheio: venda, empreste ou libere alguém antes',
