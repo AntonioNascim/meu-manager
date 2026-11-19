@@ -1,4 +1,4 @@
-// Teste de ponta a ponta (estudo do concorrente, Partes 2 a 4): pré-temporada, agenda de treino por dia e olheiro, na liga online, no navegador de verdade, contra o servidor LOCAL (sem custo).
+// Teste de ponta a ponta (estudo do concorrente, Partes 2 a 5): pré-temporada, agenda de treino por dia e olheiro, na liga online, no navegador de verdade, contra o servidor LOCAL (sem custo).
 //   cd server && ../tools/online-lab/node_modules/.bin/wrangler dev --local --port 8787
 //   VITE_API_BASE=http://127.0.0.1:8787 VITE_TURNSTILE_BYPASS=1 npx vite --port 5173 --strictPort
 //   cd tools/online-lab && node c8-treino-olheiro-e2e.mjs [http://localhost:5173] [prefixo-das-capturas]
@@ -34,7 +34,7 @@ const state = () =>
     if (!g) return null
     const t = g.season.teams.find((x) => x.id === g.userTeamId)
     const agenda = g.season.training.agenda?.[g.userTeamId] ?? {}
-    return { agenda, days: Object.keys(agenda).length, drills: Object.values(agenda).map((s) => s.drill), scouting: t.scouting ?? null, preseason: t.preseason ?? null, balance: t.finances.balance, date: g.season.season.currentDate }
+    return { agenda, days: Object.keys(agenda).length, drills: Object.values(agenda).map((s) => s.drill), scouting: t.scouting ?? null, preseason: t.preseason ?? null, promise: t.promise ?? null, balance: t.finances.balance, date: g.season.season.currentDate }
   })
 const tab = async (name) => page.getByRole('button', { name, exact: true }).first().click()
 
@@ -62,6 +62,15 @@ await page.getByTestId('status-next').waitFor({ timeout: 60000 })
 await page.getByTestId('open-league-game').click()
 await page.getByTestId('league-card').waitFor({ timeout: 90000 })
 check('o jogo online abre com o espelho do mundo', !!(await state()))
+
+// ------------------------------------------------------------------ coletiva de apresentação (promessa na diretoria)
+await page.getByTestId('press-card').waitFor({ timeout: 30000 })
+await page.getByTestId('press-open').click()
+await page.locator('[data-kind="title"]').click()
+await sleep(1500)
+const pr = await state()
+check('a promessa da coletiva valeu no servidor (lutar pelo título)', pr.promise?.kind === 'title', JSON.stringify(pr.promise))
+check('depois de responder o cartão da coletiva some', (await page.getByTestId('press-card').count()) === 0)
 
 // ------------------------------------------------------------------ agenda de treino
 await tab('Elenco')
@@ -151,6 +160,7 @@ await page.getByTestId('open-league-game').click()
 await page.getByTestId('league-card').waitFor({ timeout: 90000 })
 const s5 = await state()
 check('depois de sair e voltar, a agenda continua (o servidor guardou)', s5.days === nDays && s5.drills[0] === 'full-match', JSON.stringify(s5.drills))
+check('depois de sair e voltar, a promessa continua (o servidor guardou)', s5.promise?.kind === 'title', JSON.stringify(s5.promise))
 check('depois de sair e voltar, a pré-temporada continua (o servidor guardou)', s5.preseason?.friendlies?.length === 2, JSON.stringify(s5.preseason?.place))
 
 // ------------------------------------------------------------------ olheiro: contratar na tela de Finanças

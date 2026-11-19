@@ -8,6 +8,7 @@
  * - **Preferências por conta:** favoritos e escalações guardadas, conferidos antes de guardar (`parsePrefs`).
  */
 import { evaluateBoard } from '../board'
+import { adjustObjective, continentalLastPlace, promiseShift } from '../promise'
 import { monthlyOperations, monthlyPayroll } from '../finance'
 import { computeStandings } from '../season'
 import type { SeasonState } from '../season'
@@ -22,8 +23,10 @@ export function boardEvaluation(world: SeasonState, teamId: TeamId): BoardEvalua
   if (!team || !competition) return undefined
   const table = computeStandings(competition.teamIds, world.matches.filter((m) => m.competitionId === competition.id))
   const index = table.findIndex((r) => r.teamId === teamId)
+  const played = table[index]?.played ?? 0
+  const shift = promiseShift({ promise: team.promise, year: world.season.year, position: index + 1, teamCount: table.length, played, totalGames: (table.length - 1) * 2, continentalLast: continentalLastPlace(world.cupSpecs, competition.id) })
   return evaluateBoard({
-    objective: team.objective,
+    objective: adjustObjective(team.objective, shift, table.length),
     row: table[index],
     position: index + 1,
     teamCount: table.length,

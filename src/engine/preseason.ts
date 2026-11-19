@@ -18,7 +18,7 @@ import { PRESEASON_PLACES } from './types'
 
 export class PreseasonError extends Error {
   constructor(
-    readonly code: 'invalid' | 'busy' | 'too-late' | 'not-found',
+    readonly code: 'invalid' | 'preseason-done' | 'too-late' | 'not-found',
     message: string,
   ) {
     super(message)
@@ -116,7 +116,7 @@ export function planPreseason(state: SeasonState, teamId: TeamId, choice: Presea
   const team = teamOf(state, teamId)
   if (!team) throw new PreseasonError('not-found', 'Clube não encontrado.')
   const window = preseasonWindow(state, teamId)
-  if (!window.open) throw new PreseasonError(window.reason === 'planned' ? 'busy' : 'too-late', 'A pré-temporada não pode ser montada agora.')
+  if (!window.open) throw new PreseasonError(window.reason === 'planned' ? 'preseason-done' : 'too-late', 'A pré-temporada não pode ser montada agora.')
   if (!isPlace(choice.place) || !Number.isInteger(choice.days) || choice.days < window.minDays || choice.days > window.maxDays) throw new PreseasonError('invalid', 'Escolha inválida.')
   const unique = [...new Set(choice.opponents)]
   const allowed = new Set(friendlyCandidates(state, teamId, 40).map((t) => t.id))

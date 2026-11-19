@@ -45,7 +45,7 @@ describe('pré-temporada: janela e regras', () => {
     expect(preseasonWindow(first, USER)).toMatchObject({ open: false, reason: 'planned' })
     expect(() => planPreseason(first, USER, { place: 'camp', days: 12, opponents: [] })).toThrow()
     const applied = applyCommand(first, USER, { type: 'preseason', place: 'camp', days: 12, opponents: [] })
-    expect(applied).toMatchObject({ ok: false, error: 'busy' })
+    expect(applied).toMatchObject({ ok: false, error: 'preseason-done' })
   })
 
   it('depois do primeiro jogo da temporada a janela fecha', () => {

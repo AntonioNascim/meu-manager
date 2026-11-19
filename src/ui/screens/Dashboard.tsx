@@ -35,6 +35,7 @@ import { Highlights } from './dashboard/Highlights'
 import { CupCard } from './dashboard/CupCard'
 import { MiniTable } from './dashboard/MiniTable'
 import { NoticeCenter } from './dashboard/NoticeCenter'
+import { PressConference } from './dashboard/PressConference'
 import { dashboardNotices } from './dashboard/notices'
 import { isUnavailable } from '../squadSort'
 import { teamForm } from './standings/data'
@@ -316,6 +317,7 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
       <MiniTable game={game} competition={competition} onOpen={() => onNavigate('standings', 'table')} />
 
+      <PressConference game={game} />
       <NoticeCenter notices={notices} onOpen={onNavigate} />
 
       <div className="grid grid-cols-3 gap-2" data-testid="trio">

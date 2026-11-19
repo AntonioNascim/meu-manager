@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { Challenge } from '../../engine/challenges'
+import { ChallengesSection, OffersSection } from './start/Offers'
+import { ClubSheet } from './start/ClubSheet'
+import { ContractSheet } from './start/Contract'
 import type { ReactNode } from 'react'
 import type { World } from '../../data/generateWorld'
 import { loadWorld } from '../../data/package/defaultPackage'
@@ -157,6 +161,9 @@ interface PickerProps {
 }
 
 function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: PickerProps) {
+  const [known, setKnown] = useState<string | null>(null)
+  const [contract, setContract] = useState(false)
+  const [challenge, setChallenge] = useState<Challenge | undefined>(undefined)
   const countries = useMemo(() => worldChoices(world), [world])
   const [countryId, setCountryId] = useState(() => countries[0]?.country ?? 'Brazil')
   const country = countries.find((c) => c.country === countryId) ?? (countries[0] as (typeof countries)[number])
@@ -177,6 +184,16 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
   }, [world, division])
 
   const chosen = world.teams.find((t) => t.id === selected)
+  /** Escolhe um clube de qualquer país e liga (as propostas e os desafios vêm do mundo todo). */
+  const pickTeam = (id: string) => {
+    const c = countries.find((x) => x.divisions.some((d) => d.teams.some((t) => t.id === id)))
+    if (c) {
+      setCountryId(c.country)
+      setDivisionId(c.divisions.find((d) => d.teams.some((t) => t.id === id))?.id ?? '')
+    }
+    setSelected(id)
+    setChallenge((ch) => (ch && ch.teamId !== id ? undefined : ch))
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col text-slate-100">
@@ -214,6 +231,17 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
         </div>
       </Header>
 
+      <OffersSection world={world} seed={seed} onKnow={setKnown} onPick={pickTeam} />
+      <ChallengesSection
+        world={world}
+        seed={seed}
+        accepted={challenge?.id}
+        onAccept={(c) => {
+          setChallenge(c)
+          pickTeam(c.teamId)
+        }}
+      />
+
       <div className="px-4 pb-3">
         <label className="block text-[13px] font-semibold text-slate-300" htmlFor="coach-name-input">
           Seu nome de técnico
@@ -235,7 +263,7 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
           <li key={team.id}>
             <button
               type="button"
-              onClick={() => setSelected(team.id)}
+              onClick={() => pickTeam(team.id)}
               className={`flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition ${selected === team.id ? 'border-[1.5px] border-accent bg-accent/[0.08]' : 'border border-white/[0.13] card-bg'}`}
             >
               <TeamBadge team={team} />
@@ -269,18 +297,54 @@ function Picker({ slots, onBack, seed, world, dataPackage, subtitle, extra }: Pi
           ) : (
             <div className="flex-1 text-sm text-slate-400">Toque em um time para escolher.</div>
           )}
-          <Button disabled={!chosen} onClick={() => setChoosingSlot(true)}>
+          {chosen && (
+            <button type="button" onClick={() => setKnown(chosen.id)} className="min-h-12 rounded-xl border border-white/[0.13] px-3 text-sm font-bold text-slate-200 active:scale-95" data-testid="know-club">
+              Conhecer
+            </button>
+          )}
+          <Button disabled={!chosen} onClick={() => setContract(true)}>
             Começar
           </Button>
         </div>
       </footer>
 
+      {known && (
+        <ClubSheet
+          world={world}
+          teamId={known}
+          onClose={() => setKnown(null)}
+          onSign={() => {
+            pickTeam(known)
+            setKnown(null)
+            setContract(true)
+          }}
+        />
+      )}
+      {contract && chosen && (
+        <ContractSheet
+          world={world}
+          teamId={chosen.id}
+          coachName={coachInput.trim() || drawnCoachName(seed)}
+          onClose={() => setContract(false)}
+          onSigned={() => {
+            setContract(false)
+            setChoosingSlot(true)
+          }}
+        />
+      )}
       {choosingSlot && chosen && (
         <SlotPicker
           title={`Onde salvar o jogo com o ${chosen.name}?`}
           slots={slots}
           onCancel={() => setChoosingSlot(false)}
-          onPick={(slot) => openGame(createGame(seed, chosen.id, { world, coachName: coachInput.trim() || drawnCoachName(seed), ...(dataPackage ? { dataPackage: dataPackage.data, dataPackageId: dataPackage.id } : {}) }), slot)}
+          onPick={(slot) => {
+            try {
+              window.sessionStorage.setItem('mm-coletiva-novo', '1')
+            } catch {
+              /* sem a marca, só aparece o cartão */
+            }
+            openGame(createGame(seed, chosen.id, { world, coachName: coachInput.trim() || drawnCoachName(seed), ...(challenge && challenge.teamId === chosen.id ? { challenge } : {}), ...(dataPackage ? { dataPackage: dataPackage.data, dataPackageId: dataPackage.id } : {}) }), slot)
+          }}
         />
       )}
     </div>

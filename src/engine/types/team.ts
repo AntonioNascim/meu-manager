@@ -155,4 +155,6 @@ export interface Team {
   scouting?: { level: ScoutLevel; next: ScoutLevel }
   /** Pré-temporada do técnico humano (ausente = não montou). */
   preseason?: PreseasonPlan
+  /** Promessa da coletiva de apresentação (uma por temporada, só técnico humano): mexe uma posição na margem da diretoria. */
+  promise?: { kind: 'title' | 'continental' | 'none'; year: number }
 }

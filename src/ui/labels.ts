@@ -283,6 +283,31 @@ export const REHEARSAL_LABELS: Record<0 | 1 | 2 | 3, string> = { 0: 'Sem trabalh
 
 export const REST_LABEL = 'Folga'
 
+/** Propostas de clubes do início de carreira. */
+export const CLUB_OFFER_LABELS: Record<'title-hopeful' | 'continental' | 'mid-table' | 'avoid-relegation' | 'lower-division', string> = {
+  'title-hopeful': 'Candidato ao título',
+  continental: 'Briga por vaga continental',
+  'mid-table': 'Meio de tabela',
+  'avoid-relegation': 'Luta contra o rebaixamento',
+  'lower-division': 'Divisão de acesso',
+}
+
+/** A meta da diretoria em palavras: "Ser campeão" ou "Terminar entre os N primeiros". */
+export const OBJECTIVE_TEXT = (position: number): string => (position <= 1 ? 'Ser campeão' : `Terminar entre os ${position} primeiros`)
+
+/** Desafios do início de carreira: título e meta, com o nome do clube. */
+export const CHALLENGE_TITLE_TEXT = (kind: 'survive' | 'continental' | 'title' | 'humble', club: string): string =>
+  kind === 'survive' ? `Salve o ${club} do rebaixamento` : kind === 'continental' ? `Leve o ${club} a uma vaga continental` : kind === 'title' ? `Seja campeão com o ${club}` : `Humildes: o ${club} no meio da tabela`
+export const CHALLENGE_GOAL_TEXT = (c: { kind: string; targetPosition: number; seasons: number }): string =>
+  `Terminar em ${c.targetPosition}º ou melhor, ${c.seasons === 1 ? 'em 1 temporada' : 'em até 2 temporadas'}.`
+
+/** Promessa da coletiva de apresentação. */
+export const PROMISE_LABELS: Record<'title' | 'continental' | 'none', { title: string; text: string }> = {
+  title: { title: 'Lutar pelo título', text: 'Se o time estiver brigando lá em cima, a diretoria ganha 1 posição de paciência com você; se estiver longe, perde 1.' },
+  continental: { title: 'Brigar por vaga continental', text: 'Se o time estiver na faixa da vaga, a diretoria ganha 1 posição de paciência; se estiver longe dela, perde 1.' },
+  none: { title: 'Não prometer nada', text: 'Ninguém vai te cobrar além da meta de sempre.' },
+}
+
 /** Local da pré-temporada e o efeito de cada um em uma linha. */
 export const PRESEASON_PLACE_LABELS: Record<'camp' | 'country' | 'abroad', string> = {
   camp: 'No CT',
@@ -380,6 +405,9 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   busy: 'A vaga de treino individual já está ocupada',
   'out-of-window': 'Esse dia não está na semana de treino',
   'too-late': 'Já não dá tempo de montar a pré-temporada: faltam dias até o primeiro jogo',
+  'preseason-done': 'A pré-temporada desta temporada já foi montada',
+  'promise-done': 'Você já falou com a imprensa nesta temporada',
+  'promise-closed': 'A coletiva de apresentação já passou',
   'squad-full': 'O elenco profissional já está cheio: venda, empreste ou libere alguém antes',
   'foreign-limit': 'Limite de estrangeiros da liga',
   invalid: 'Escolha inválida: confira a escalação e os valores',

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       testes:
-        description: "Quais testes rodar (todos = c3, c4, c5, e3, c8 e c6, nessa ordem, um de cada vez)"
+        description: "Quais testes rodar (todos = c3, c4, c5, e3, c8, c9 e c6, nessa ordem, um de cada vez)"
         type: choice
         required: true
         default: todos
@@ -19,6 +19,7 @@ on:
           - c5
           - c6
           - c8
+          - c9
           - e3
 
 permissions:

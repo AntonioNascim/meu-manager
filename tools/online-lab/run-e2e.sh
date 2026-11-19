@@ -12,13 +12,13 @@ mkdir -p "$OUT" .shots
 API=http://127.0.0.1:8787
 SITE=http://localhost:5173
 
-declare -A SCRIPT=([c3]=c3-e2e.mjs [c4]=c4-e2e.mjs [c5]=c5-e2e.mjs [c6]=c6-e2e.mjs [e3]=e3-pular-conversar.mjs [c8]=c8-treino-olheiro-e2e.mjs)
-ORDER=(c3 c4 c5 e3 c8 c6)
+declare -A SCRIPT=([c3]=c3-e2e.mjs [c4]=c4-e2e.mjs [c5]=c5-e2e.mjs [c6]=c6-e2e.mjs [e3]=e3-pular-conversar.mjs [c8]=c8-treino-olheiro-e2e.mjs [c9]=c9-inicio-carreira-e2e.mjs)
+ORDER=(c3 c4 c5 e3 c8 c9 c6)
 
 want=("$@")
 if [ ${#want[@]} -eq 0 ] || [ "${want[0]}" = "todos" ]; then want=("${ORDER[@]}"); fi
 for t in "${want[@]}"; do
-  [ -n "${SCRIPT[$t]:-}" ] || { echo "teste desconhecido: $t (use c3, c4, c5, c6, c8, e3 ou todos)"; exit 2; }
+  [ -n "${SCRIPT[$t]:-}" ] || { echo "teste desconhecido: $t (use c3, c4, c5, c6, c8, c9, e3 ou todos)"; exit 2; }
 done
 selected() { for w in "${want[@]}"; do [ "$w" = "$1" ] && return 0; done; return 1; }
 
@@ -94,9 +94,9 @@ run_one() { # $1 = c3|c4|...
 start_site || exit 1
 
 # Servidor normal: c3, c4, c5, e3 e c8.
-if selected c3 || selected c4 || selected c5 || selected e3 || selected c8; then
+if selected c3 || selected c4 || selected c5 || selected e3 || selected c8 || selected c9; then
   start_api "" || exit 1
-  for t in c3 c4 c5 e3 c8; do selected "$t" && run_one "$t"; done
+  for t in c3 c4 c5 e3 c8 c9; do selected "$t" && run_one "$t"; done
 fi
 # Servidor com lesões frequentes: c6.
 if selected c6; then

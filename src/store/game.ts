@@ -10,6 +10,9 @@ import type { DataPackage } from '../data/package/types'
 import { advanceSeason, expiringContracts, renewUserContract } from '../engine/offseason'
 import type { RenewalResult } from '../engine/offseason'
 import { evaluateBoard } from '../engine/board'
+import { adjustObjective, continentalLastPlace, promiseShift } from '../engine/promise'
+import { evaluateChallenge, startChallenge } from '../engine/challenges'
+import type { ActiveChallenge, Challenge, Conquest } from '../engine/challenges'
 import { lineupForeignCount } from '../engine/foreign'
 import { dismissedReputation, jobOpenings, moveCoach, seasonReputation, startingCoach } from '../engine/career'
 import type { Coach, JobOpening } from '../engine/career'
@@ -96,6 +99,10 @@ export interface Game {
   online?: OnlineInfo
   /** Pacote de dados importado que deu origem ao mundo (guardado no navegador, tabela `packages`); sem ele, o mundo fictício padrão. */
   dataPackage?: { id: string; name: string }
+  /** Desafio aceito no início da carreira (sem prêmio): conferido no fim de cada temporada. */
+  challenge?: ActiveChallenge
+  /** Desafios cumpridos, com as estrelas (a aba Conquistas). */
+  conquests?: Conquest[]
 }
 
 export interface NewGameOptions {
@@ -109,6 +116,8 @@ export interface NewGameOptions {
   dataPackageId?: string
   /** Nome do técnico, como a pessoa digitou no Novo jogo. */
   coachName?: string
+  /** Desafio aceito na tela de Novo jogo. */
+  challenge?: Challenge
 }
 
 export function createGame(seed: number, userTeamId: TeamId, options: NewGameOptions = {}): Game {
@@ -145,6 +154,7 @@ export function createGame(seed: number, userTeamId: TeamId, options: NewGameOpt
     archive: [],
     coach: { ...startingCoach(world.teams.find((t) => t.id === userTeamId) as Team), ...(options.coachName?.trim() ? { name: options.coachName.trim() } : {}) },
     ...(options.dataPackage ? { dataPackage: { id: options.dataPackageId ?? 'sem-id', name: options.dataPackage.name } } : {}),
+    ...(options.challenge && options.challenge.teamId === userTeamId ? { challenge: startChallenge(options.challenge, world.startYear) } : {}),
   }
 }
 
@@ -201,7 +211,11 @@ export function startNextSeason(game: Game): Game {
   const summary: SeasonSummary = { year: report.year, ...(report.label ? { label: report.label } : {}), champions: report.champions, promoted: report.promoted, relegated: report.relegated, userTeamId: game.userTeamId, userTier: mine.tier, userPosition: mine.position }
   const size = userCompetition(game).teamIds.length
   const coach: Coach = { ...coachOf(game), reputation: seasonReputation(coachOf(game), { position: mine.position, targetPosition: userTeam(game).objective.targetPosition, teamCount: size }) }
-  return { ...game, season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], archive: [...game.archive, archiveSeason(game)], lastReport: report, coach }
+  // Desafio do início de carreira: cumprido vira conquista; prazo esgotado ou clube trocado, termina sem registro.
+  const verdict = evaluateChallenge(game.challenge, summary, userTeam(game).name)
+  const { challenge: _old, ...rest } = game
+  void _old
+  return { ...rest, ...(verdict.active ? { challenge: verdict.active } : {}), ...(verdict.conquest ? { conquests: [...(game.conquests ?? []), verdict.conquest] } : {}), season: state, lastDay: [], notices: [], seasonLog: [...game.seasonLog, summary], archive: [...game.archive, archiveSeason(game)], lastReport: report, coach }
 }
 
 /** Resume a temporada que acabou: classificação final das séries e os jogos do time do jogador. */
@@ -528,9 +542,11 @@ export function boardOf(game: Game): BoardEvaluation {
   const competition = userCompetition(game)
   const table = standingsOf(game, competition)
   const index = table.findIndex((r) => r.teamId === team.id)
+  const row = sinceArrival(game, table[index])
+  const shift = promiseShift({ promise: team.promise, year: game.season.season.year, position: index + 1, teamCount: table.length, played: row?.played ?? 0, totalGames: (table.length - 1) * 2, continentalLast: continentalLastPlace(game.season.cupSpecs, competition.id) })
   return evaluateBoard({
-    objective: team.objective,
-    row: sinceArrival(game, table[index]),
+    objective: adjustObjective(team.objective, shift, table.length),
+    row,
     position: index + 1,
     teamCount: table.length,
     totalGames: (table.length - 1) * 2,
