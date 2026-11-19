@@ -20,6 +20,8 @@ export type MarketTab = 'overview' | 'search' | 'favorites' | 'lists' | 'free' |
 /** Tela de Mercado: abas com rolagem horizontal e o aviso da janela de transferências no topo de todas. */
 export function Market({ game, initialTab = 'search' }: { game: Game; initialTab?: MarketTab }) {
   const [tab, setTab] = useState<MarketTab>(initialTab)
+  // "Onde falta gente" abre a busca já no setor (a busca é refeita com o filtro).
+  const [need, setNeed] = useState<{ group: 'GK' | 'DEF' | 'MID' | 'FWD'; n: number } | null>(null)
   const open = isWindowOpen(game.season)
   const incoming = pendingIncoming(game.season).length
   const favoriteIds = useMemo(() => new Set(favoritesOf(game)), [game])
@@ -50,8 +52,18 @@ export function Market({ game, initialTab = 'search' }: { game: Game; initialTab
           ...(game.online ? [{ id: 'coaches' as const, label: 'Técnicos' }] : []),
         ]}
       />
-      {tab === 'overview' && <Overview game={game} open={open} onTab={setTab} />}
-      {tab === 'search' && <Search key="search" game={game} open={open} />}
+      {tab === 'overview' && (
+        <Overview
+          game={game}
+          open={open}
+          onTab={setTab}
+          onNeed={(group) => {
+            setNeed((n) => ({ group, n: (n?.n ?? 0) + 1 }))
+            setTab('search')
+          }}
+        />
+      )}
+      {tab === 'search' && <Search key={`search-${need?.n ?? 0}`} game={game} open={open} {...(need ? { preset: { group: need.group } } : {})} />}
       {tab === 'favorites' && <Search key="favorites" game={game} open={open} restrict={onlyFavorites} showTier={false} empty="Toque na estrela de um jogador para acompanhá-lo aqui." />}
       {tab === 'lists' && <Lists game={game} open={open} />}
       {tab === 'free' && <Search key="free" game={game} open={open} preset={{ situation: 'free' }} situations={['free']} showTier={false} empty="Nenhum jogador livre com esses filtros." />}

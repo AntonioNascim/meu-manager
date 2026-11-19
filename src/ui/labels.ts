@@ -307,6 +307,11 @@ export const ROOM_CHEMISTRY_LABELS: Record<'forming' | 'irregular' | 'building' 
   tight: 'Entrosado',
 }
 
+/** Onde falta gente no elenco (mercado). */
+export const NEED_GROUP_LABELS: Record<'GK' | 'DEF' | 'MID' | 'FWD', string> = { GK: 'Goleiros', DEF: 'Defensores', MID: 'Meio-campistas', FWD: 'Atacantes' }
+export const NEED_LABELS: Record<'covered' | 'thin' | 'missing', string> = { covered: 'Coberto', thin: 'No limite', missing: 'Em falta' }
+export const NEED_REASON_LABELS: Record<'few' | 'injured' | 'weak-bench', string> = { few: 'poucos jogadores', injured: 'lesionados ou suspensos', 'weak-bench': 'reserva abaixo dos titulares' }
+
 /** Humor da torcida. */
 export const MOOD_BAND_LABELS: Record<'enthusiastic' | 'with-team' | 'uneasy' | 'angry', string> = {
   enthusiastic: 'Empolgada',

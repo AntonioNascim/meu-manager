@@ -3,11 +3,12 @@ import { expectedSalary, interestContext, interestIn, marketValue } from '../../
 import type { InterestLevel } from '../../../engine/market'
 import { playerOverall } from '../../../engine/overall'
 import type { Player, TransferOffer } from '../../../engine/types'
-import { favoritesOf, teamById } from '../../../store/game'
+import { squadNeeds } from '../../../engine/market/needs'
+import { favoritesOf, squadOf, teamById, userTeam } from '../../../store/game'
 import type { Game } from '../../../store/game'
 import { avatarColors } from '../../avatarColors'
 import { formatMoney, playerName } from '../../format'
-import { POSITION_SHORT_LABELS } from '../../labels'
+import { NEED_GROUP_LABELS, NEED_LABELS, NEED_REASON_LABELS, POSITION_SHORT_LABELS } from '../../labels'
 import { Avatar, Crest, Icon, ValueBadge } from '../../theme'
 import { InterestText, clubName, shortMoney } from './parts'
 import { PlayerDetail } from '../../components/PlayerDetail'
@@ -30,7 +31,7 @@ export function mainTarget(game: Game): { player: Player; offer?: TransferOffer 
 }
 
 /** Resumo do mercado: alvo principal, lista de alvos (favoritos) e atividade recente. Nada some: as abas de busca, listas e propostas seguem ao lado. */
-export function Overview({ game, onTab }: { game: Game; open: boolean; onTab: (tab: MarketTab) => void }) {
+export function Overview({ game, onTab, onNeed }: { game: Game; open: boolean; onTab: (tab: MarketTab) => void; onNeed?: (group: 'GK' | 'DEF' | 'MID' | 'FWD') => void }) {
   const [pickedId, setPickedId] = useState<string | null>(null)
   const state = game.season
   const date = state.season.currentDate
@@ -44,8 +45,34 @@ export function Overview({ game, onTab }: { game: Game; open: boolean; onTab: (t
   const recent = state.market.history.slice(-4).reverse()
   const picked = pickedId ? byId.get(pickedId) : undefined
 
+  const needs = squadNeeds(userTeam(game), squadOf(game, game.userTeamId))
   return (
     <div className="space-y-3" data-testid="market-overview">
+      <section className={CARD} data-testid="squad-needs">
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-3 py-2.5">
+          <span className="font-display text-[19px] font-bold leading-none">Onde falta gente</span>
+          <span className="text-[13px] text-muted">{squadOf(game, game.userTeamId).length} no elenco</span>
+        </div>
+        <ul className="divide-y divide-white/[0.07]">
+          {needs.map((n) => (
+            <li key={n.group} className="flex items-center gap-2 px-3 py-2.5 text-sm" data-testid="need" data-group={n.group}>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{NEED_GROUP_LABELS[n.group]}</span>
+                <span className="block text-[11px] text-muted">
+                  {n.available} disponíveis de {n.total}
+                  {n.reason ? ` · ${NEED_REASON_LABELS[n.reason]}` : ''}
+                </span>
+              </span>
+              <span className={`text-xs font-bold ${n.need === 'covered' ? 'text-win' : n.need === 'thin' ? 'text-amber' : 'text-loss'}`}>{NEED_LABELS[n.need]}</span>
+              {onNeed && (
+                <button type="button" onClick={() => onNeed(n.group)} className="min-h-10 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-bold active:scale-95" data-testid="need-search">
+                  Ver {NEED_GROUP_LABELS[n.group].toLowerCase()} ›
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
       <section className={CARD} data-testid="main-target">
         <div className="flex items-center justify-between border-b border-white/[0.07] bg-gradient-to-r from-accent/[0.10] to-transparent px-3 py-2.5">
           <span className="font-display text-[19px] font-bold leading-none">Alvo principal</span>
