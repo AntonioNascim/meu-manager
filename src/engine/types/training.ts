@@ -105,6 +105,8 @@ export interface TrainingState {
    * ganho já calibrado (nunca soma): sem agenda o treino é exatamente o de antes.
    */
   agenda?: Record<TeamId, Record<IsoDate, TrainingSession>>
+  /** Times cujo técnico pediu "Delegar sempre": a comissão monta a semana sozinha quando o técnico não montou. */
+  delegateAlways?: Record<TeamId, true>
 }
 
 export const emptyTraining = (): TrainingState => ({ plans: {}, individual: {}, finished: {}, history: {} })

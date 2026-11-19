@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { OpponentOverlay } from '../components/OpponentOverlay'
 import { devFlag } from './match/pitchModel'
 import type { DepartedPlayer, Match, OffseasonReport } from '../../engine/types'
@@ -41,6 +41,11 @@ import { isUnavailable } from '../squadSort'
 import { teamForm } from './standings/data'
 import { Avatar, Crest, Eyebrow, Icon, Panel, ProgressBar, ResultDot, SegmentedBar, ShortcutTile, StadiumArt, TrophyArt } from '../theme'
 import { MiniFormation } from './dashboard/MiniFormation'
+import { WeekGate, fullWeek } from './dashboard/WeekGate'
+import { TrainingDays, skipPref } from './dashboard/TrainingDays'
+import { weekStatus } from '../../engine/training'
+import type { IsoDate, TrainingSession } from '../../engine/types'
+import { perform } from '../../store/actions'
 import { playerOverall } from '../../engine/overall'
 
 const BOARD_CHIP = { safe: 'border-accent/50 bg-accent/10 text-accent', warning: 'border-amber/50 bg-amber/10 text-amber', danger: 'border-loss/40 bg-loss/10 text-loss' } as const
@@ -188,21 +193,41 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
   const salaryBudget = team.finances.salaryBudget
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
-  const advance = () => {
+  const week = weekStatus(game.season, game.userTeamId)
+  const weekGated = !game.online && !pending && !seasonOver && academy.pending === 0 && !week.ready
+  const [replay, setReplay] = useState<{ days: IsoDate[]; sessions: Record<IsoDate, TrainingSession>; goToMatch: boolean } | null>(null)
+  const endReplay = useCallback(() => {
+    setReplay((r) => {
+      if (r?.goToMatch) onNavigate('match')
+      return null
+    })
+  }, [onNavigate])
+  const advance = async () => {
     if (academy.pending > 0) return onNavigate('academy')
     if (seasonOver) {
       if (expiring.length > 0 && !window.confirm(`${expiring.length} contrato(s) vencem agora e esses jogadores vão embora. Encerrar a temporada mesmo assim?`)) return
       return void runHeavy('nextSeason')
     }
     if (pending) return onNavigate('match')
+    // Treino obrigatório: sem a semana montada o botão fica bloqueado; com "Delegar sempre" a comissão completa os dias que faltam.
+    if (!game.online && !week.ready && !week.delegateAlways) return
+    const sessions = fullWeek(game)
+    if (!game.online && !week.ready) await perform({ type: 'training-agenda', sessions })
+    const before = game.season.season.currentDate
     // A pré-temporada, a virada e os mundos grandes calculam num Web Worker, com a tela de progresso.
-    void runHeavy('advance').then((moved) => {
-      if (moved?.pendingUserMatch) onNavigate('match')
-    })
+    const moved = await runHeavy('advance')
+    if (!moved) return
+    const passed = week.window.filter((d) => d >= before && d < moved.season.season.currentDate)
+    if (passed.length === 0 || skipPref()) {
+      if (moved.pendingUserMatch) onNavigate('match')
+      return
+    }
+    setReplay({ days: passed, sessions, goToMatch: Boolean(moved.pendingUserMatch) })
   }
 
   return (
     <div className="space-y-3">
+      {replay && <TrainingDays game={game} days={replay.days} sessions={replay.sessions} onDone={endReplay} />}
       {game.lastReport && <SeasonReport game={game} report={game.lastReport} />}
 
       <section className="card-bg relative overflow-hidden rounded-[14px] border border-white/[0.13] p-3.5" data-testid="next-match">
@@ -285,10 +310,13 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
                   Preparar partida
                 </button>
               )}
+              {weekGated && <WeekGate game={game} onNavigate={onNavigate} />}
               <button
                 type="button"
-                onClick={advance}
-                className="btn-primary mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-[10px] font-display text-[21px] font-bold uppercase tracking-wide transition active:scale-[0.98]"
+                onClick={() => void advance()}
+                disabled={weekGated && !week.delegateAlways}
+                data-testid="advance"
+                className="btn-primary mt-3 disabled:cursor-not-allowed disabled:opacity-40 flex min-h-14 w-full items-center justify-center gap-2 rounded-[10px] font-display text-[21px] font-bold uppercase tracking-wide transition active:scale-[0.98]"
               >
                 <Icon name="ffwd" size={22} />
                 {academy.pending > 0 ? 'Decidir sobre a base' : seasonOver ? 'Encerrar a temporada' : pending ? 'Ir para a partida' : 'Avançar'}

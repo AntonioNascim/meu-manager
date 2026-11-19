@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { DRILLS, agendaOf, committeeAgenda, drillsOf, rehearsal, sessionEffect, trainingWindow } from '../../../engine/training'
+import { DRILLS, agendaOf, committeeAgenda, drillsOf, rehearsal, sessionEffect, trainingWindow, weekStatus } from '../../../engine/training'
 import { DRILL_GROUPS, DRILL_THEMES, TRAINING_INTENSITIES } from '../../../engine/types'
 import type { DrillGroup, DrillId, IsoDate, TrainingIntensity, TrainingSession } from '../../../engine/types'
 import { nextUserMatch, teamById, userTeam, userTrainingPlan } from '../../../store/game'
@@ -11,6 +11,7 @@ import { Eyebrow, Panel } from '../../theme'
 import { shortName } from '../standings/parts'
 import { inkFor } from '../match/pitchModel'
 import { TrainingField } from './TrainingField'
+import { DelegateAlways } from '../dashboard/WeekGate'
 import { SCENES } from './trainingScenes'
 import type { SceneId } from './trainingScenes'
 
@@ -41,6 +42,7 @@ export function TrainingWeek({ game }: { game: Game }) {
   const plan = userTrainingPlan(game)
   const window = useMemo(() => trainingWindow(game.season, team.id), [game.season, team.id])
   const agenda = agendaOf(game.season.training, team.id)
+  const status = weekStatus(game.season, team.id)
   const [picked, setPicked] = useState<IsoDate | null>(null)
   const [group, setGroup] = useState<DrillGroup>('games')
   const [message, setMessage] = useState<string | null>(null)
@@ -194,6 +196,10 @@ export function TrainingWeek({ game }: { game: Game }) {
           Limpar a semana
         </button>
       </div>
+      <p className={`text-sm font-semibold ${status.ready ? "text-win" : "text-draw"}`} data-testid="week-status">
+        {status.ready ? "Semana pronta: o tempo pode avançar." : `Faltam ${status.missing.length} dia(s) para a semana ficar pronta.`}
+      </p>
+      <DelegateAlways on={status.delegateAlways} onChange={(on) => void perform({ type: "training-delegate-always", on })} />
       {message && (
         <p className="rounded-xl border border-loss/50 bg-loss/10 p-2.5 text-sm font-semibold text-loss" role="alert">
           {message}

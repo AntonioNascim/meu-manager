@@ -5,7 +5,7 @@
  * Puro: sem relógio, rede nem sorteio fora da semente do estado.
  */
 import { AcademyError } from '../academy'
-import { AgendaError, cancelIndividualTraining, isSession, setAgenda, startIndividualTraining, setTrainingPlan, TrainingError } from '../training'
+import { AgendaError, cancelIndividualTraining, isSession, setAgenda, setDelegateAlways, startIndividualTraining, setTrainingPlan, TrainingError } from '../training'
 import { lineupForeignCount } from '../foreign'
 import { isScoutLevel, setScoutingLevel } from '../scouting'
 import { PreseasonError, isPlace, planPreseason } from '../preseason'
@@ -49,6 +49,8 @@ export type LeagueCommand =
   | { type: 'preseason'; place: PreseasonPlace; days: number; opponents: string[] }
   /** Agenda do treino por dia: troca a semana inteira (data → sessão; `null` ou ausente = dia sem sessão, vale o plano). */
   | { type: 'training-agenda'; sessions: Record<string, TrainingSession | null> }
+  /** "Delegar sempre": liga ou desliga a comissão montando sozinha as semanas que o técnico não montar. */
+  | { type: 'training-delegate-always'; on: boolean }
   | { type: 'individual-training'; playerId: string; goal: IndividualGoal }
   | { type: 'cancel-individual-training' }
   | { type: 'ticket-price'; price: number }
@@ -166,6 +168,8 @@ export function parseCommand(raw: unknown): LeagueCommand | undefined {
       }
       return { type: 'training-agenda', sessions: out }
     }
+    case 'training-delegate-always':
+      return only(raw, ['type', 'on']) && typeof raw.on === 'boolean' ? { type: 'training-delegate-always', on: raw.on } : undefined
     case 'individual-training': {
       const goal = only(raw, ['type', 'playerId', 'goal']) ? parseGoal(raw.goal) : undefined
       return goal && isId(raw.playerId) ? { type: 'individual-training', playerId: raw.playerId, goal } : undefined
@@ -241,6 +245,8 @@ export function applyCommand(world: SeasonState, teamId: TeamId, command: League
         return { ok: true, world: { ...world, teams: world.teams.map((t) => (t.id === teamId ? setScoutingLevel(t, command.level) : t)) } }
       case 'training-agenda':
         return { ok: true, world: setAgenda(world, teamId, command.sessions) }
+      case 'training-delegate-always':
+        return { ok: true, world: setDelegateAlways(world, teamId, command.on) }
       case 'individual-training':
         return { ok: true, world: startIndividualTraining(world, teamId, command.playerId, command.goal) }
       case 'cancel-individual-training':

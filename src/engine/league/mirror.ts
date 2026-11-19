@@ -266,7 +266,7 @@ export function ownPart(world: SeasonState, teamId: TeamId, humans?: readonly Te
     players: world.players.filter((p) => p.teamId === teamId).map(ownPlayer),
     academy: world.academy.filter((p) => p.teamId === teamId).map(ownPlayer),
     ...(world.talks ? { talks: talksOf(world.talks, teamId, mine) } : {}),
-    training: { plans: t.plans[teamId] ? { [teamId]: t.plans[teamId] } : {}, individual: t.individual[teamId] ? { [teamId]: t.individual[teamId] } : {}, finished: t.finished[teamId] ? { [teamId]: t.finished[teamId] } : {}, history, ...(t.agenda?.[teamId] ? { agenda: { [teamId]: t.agenda[teamId] } } : {}) },
+    training: { plans: t.plans[teamId] ? { [teamId]: t.plans[teamId] } : {}, individual: t.individual[teamId] ? { [teamId]: t.individual[teamId] } : {}, finished: t.finished[teamId] ? { [teamId]: t.finished[teamId] } : {}, history, ...(t.agenda?.[teamId] ? { agenda: { [teamId]: t.agenda[teamId] } } : {}), ...(t.delegateAlways?.[teamId] ? { delegateAlways: { [teamId]: true as const } } : {}) },
     offers: world.market.offers.filter((o) => o.buyerId === teamId || o.sellerId === teamId),
     preContracts: world.market.preContracts.filter((c) => c.fromTeamId === teamId || c.toTeamId === teamId),
   }

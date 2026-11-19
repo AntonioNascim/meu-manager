@@ -172,6 +172,46 @@ export function delegateAgenda(state: SeasonState, teamId: TeamId, plan: Trainin
   return withAgenda(state, teamId, committeeAgenda(plan, trainingWindow(state, teamId)))
 }
 
+/** Situação da semana de treino de um time: quais dias da janela ainda não têm sessão. Sem dias na janela (jogos em dias seguidos), está pronta. */
+export interface WeekStatus {
+  window: IsoDate[]
+  missing: IsoDate[]
+  ready: boolean
+  delegateAlways: boolean
+}
+
+export function weekStatus(state: Pick<SeasonState, 'matches' | 'season' | 'training'>, teamId: TeamId): WeekStatus {
+  const window = trainingWindow(state, teamId)
+  const agenda = agendaOf(state.training, teamId)
+  const missing = window.filter((d) => agenda[d] === undefined)
+  return { window, missing, ready: missing.length === 0, delegateAlways: state.training.delegateAlways?.[teamId] === true }
+}
+
+/** Liga ou desliga o "Delegar sempre" do time. */
+export function setDelegateAlways(state: SeasonState, teamId: TeamId, on: boolean): SeasonState {
+  const all = { ...(state.training.delegateAlways ?? {}) }
+  if (on) all[teamId] = true
+  else delete all[teamId]
+  const training = { ...state.training }
+  if (Object.keys(all).length === 0) delete training.delegateAlways
+  else training.delegateAlways = all
+  return { ...state, training }
+}
+
+/** Completa só os dias que faltam pelo plano da comissão (o que o técnico já montou fica). */
+export function delegateMissing(state: SeasonState, teamId: TeamId, plan: TrainingPlan): SeasonState {
+  const { window, missing } = weekStatus(state, teamId)
+  if (missing.length === 0) return state
+  const committee = committeeAgenda(plan, window)
+  return withAgenda(state, teamId, { ...committee, ...agendaOf(state.training, teamId) })
+}
+
+/** Antes de avançar: com "Delegar sempre" e semana incompleta, a comissão completa os dias que faltam. */
+export function ensureWeek(state: SeasonState, teamId: TeamId, plan: TrainingPlan): SeasonState {
+  const status = weekStatus(state, teamId)
+  return status.ready || !status.delegateAlways ? state : delegateMissing(state, teamId, plan)
+}
+
 /** Tira da agenda os dias que já passaram (antes de `date`). */
 export function pruneAgenda(training: TrainingState, date: IsoDate): TrainingState {
   if (!training.agenda) return training
