@@ -72,8 +72,10 @@ describe('telas (renderização)', () => {
     const html = renderToStaticMarkup(createElement(NewGame, { slots: null, onBack: () => {}, initialSource: 'fictional' }))
     expect(html).toContain('Série A')
     expect(html).toContain('Série B')
-    // 20 times da Série A + 4 propostas de clubes + 4 desafios (início de carreira).
-    expect(html.match(/<li/g)).toHaveLength(28)
+    // Tira da conta as propostas de clubes e os desafios do início de carreira (a quantidade de desafios varia com o sorteio).
+    const items = html.match(/<li/g)?.length ?? 0
+    const extras = (html.match(/data-testid="offer"/g)?.length ?? 0) + (html.match(/data-testid="challenge"/g)?.length ?? 0)
+    expect(items - extras).toBe(20)
   })
 
   it('o painel mostra próximo jogo, posição e o botão Avançar', () => {
