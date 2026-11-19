@@ -43,6 +43,11 @@ export interface Tactic {
    * ele (saves e táticas antigas) vale a grade da formação pronta.
    */
   grid?: GridPoint[]
+  /**
+   * Onde cada titular foi solto no campo (percentual, mesma ordem de `startingXI`), só para a tela: o motor lê sempre `grid`, o ponto da grade
+   * mais perto de cada um. Sem ele (ou se não bate com `grid`) vale o centro de cada ponto da grade.
+   */
+  spots?: { x: number; y: number }[]
   style: PlayStyle
   mentality: Mentality
   /** 11 titulares, na ordem das vagas da formação. */
@@ -62,4 +67,6 @@ export interface SavedLineup {
   startingXI: PlayerId[]
   /** Ponto da grade de cada titular (sem ele, a grade da formação pronta). */
   grid?: GridPoint[]
+  /** Onde cada titular foi solto no campo (só para a tela; ver `Tactic.spots`). */
+  spots?: { x: number; y: number }[]
 }

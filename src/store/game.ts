@@ -18,6 +18,7 @@ import { dismissedReputation, jobOpenings, moveCoach, seasonReputation, starting
 import type { Coach, JobOpening } from '../engine/career'
 import { AcademyError, academyOf, pendingDecisions, promoteYouth, releaseYouth } from '../engine/academy'
 import { applySavedLineup } from '../engine/tacticEdit'
+import { freeSpotsOf } from '../engine/spots'
 import { DEFAULT_PLAN, cancelIndividualTraining, setTrainingPlan, startIndividualTraining, strengthTrend } from '../engine/training'
 import { fundsDecision, monthlyOperations, monthlyPayroll, requestFunds, setSalaryBudget, setTicketPrice } from '../engine/finance'
 import type { FundsResult } from '../engine/finance'
@@ -373,7 +374,7 @@ export function saveUserLineup(game: Game, slot: number, name: string): Game {
   if (!Number.isInteger(slot) || slot < 0 || slot >= LINEUP_SLOTS) throw new Error('Espaço de escalação inválido')
   const tactic = userTeam(game).tactic
   const slots: (SavedLineup | null)[] = Array.from({ length: LINEUP_SLOTS }, (_, i) => game.savedLineups?.[i] ?? null)
-  slots[slot] = { name: name.trim() || `Escalação ${slot + 1}`, formationId: tactic.formationId, style: tactic.style, startingXI: [...tactic.startingXI], ...(tactic.grid ? { grid: tactic.grid.map((p) => ({ ...p })) } : {}) }
+  slots[slot] = { name: name.trim() || `Escalação ${slot + 1}`, formationId: tactic.formationId, style: tactic.style, startingXI: [...tactic.startingXI], ...(tactic.grid ? { grid: tactic.grid.map((p) => ({ ...p })) } : {}), ...(freeSpotsOf(tactic) ? { spots: (freeSpotsOf(tactic) as { x: number; y: number }[]).map((s) => ({ ...s })) } : {}) }
   return { ...game, savedLineups: slots }
 }
 

@@ -15,6 +15,7 @@ import type { SeasonState } from '../season'
 import { PLAY_STYLES } from '../types'
 import type { BoardEvaluation, Dismissal, IsoDate, PlayStyle, PlayerCondition, SavedLineup, SeasonRecord, Tactic, TeamId } from '../types'
 import { isGridPoint } from '../grid'
+import { parseSpots } from '../spots'
 
 /** A avaliação da diretoria hoje (a mesma conta de `boardOf` do jogo solo, sem a campanha de antes da chegada). */
 export function boardEvaluation(world: SeasonState, teamId: TeamId): BoardEvaluation | undefined {
@@ -158,7 +159,7 @@ export function parsePrefs(raw: unknown): Prefs | undefined {
       lineups.push(null)
       continue
     }
-    if (!isObj(l) || Object.keys(l).some((k) => !['name', 'formationId', 'style', 'startingXI', 'grid'].includes(k))) return undefined
+    if (!isObj(l) || Object.keys(l).some((k) => !['name', 'formationId', 'style', 'startingXI', 'grid', 'spots'].includes(k))) return undefined
     if (typeof l.name !== 'string' || l.name.length > 30 || typeof l.formationId !== 'string' || l.formationId.length > 16 || !STYLES.includes(l.style as PlayStyle)) return undefined
     if (!Array.isArray(l.startingXI) || l.startingXI.length !== 11 || !l.startingXI.every((x) => typeof x === 'string' && ID.test(x))) return undefined
     let grid: SavedLineup['grid']
@@ -170,7 +171,9 @@ export function parsePrefs(raw: unknown): Prefs | undefined {
         grid.push({ row: p.row, lane: p.lane })
       }
     }
-    lineups.push({ name: l.name, formationId: l.formationId, style: l.style as PlayStyle, startingXI: l.startingXI as string[], ...(grid ? { grid } : {}) })
+    const spots = l.spots === undefined ? undefined : parseSpots(l.spots)
+    if (l.spots !== undefined && !spots) return undefined
+    lineups.push({ name: l.name, formationId: l.formationId, style: l.style as PlayStyle, startingXI: l.startingXI as string[], ...(grid ? { grid } : {}), ...(spots ? { spots } : {}) })
   }
   return { favorites: [...new Set(raw.favorites as string[])], lineups }
 }

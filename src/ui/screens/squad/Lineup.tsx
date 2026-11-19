@@ -5,8 +5,9 @@ import { shapeOf } from '../../../engine/grid'
 import { overallAt, playerOverall } from '../../../engine/overall'
 import { lineupForeign } from '../../../engine/foreign'
 import { marketValue } from '../../../engine/market'
-import { applySavedLineup, changeFormation, movePlayerTo, suggestLineup, swapPlayers } from '../../../engine/tacticEdit'
+import { applySavedLineup, changeFormation, moveToSpot, suggestLineup, swapPlayers } from '../../../engine/tacticEdit'
 import type { GridPoint, Player, Position, Tactic } from '../../../engine/types'
+import type { PitchSpot } from '../../../engine/spots'
 import {
   LINEUP_SLOTS,
   deleteUserLineup,
@@ -59,7 +60,7 @@ function Token({ player, slot, captain, selected, colors }: { player: Player; sl
   )
 }
 
-function Pitch({ tactic, players, colors, selectedId, onTap, onMove }: { tactic: Tactic; players: Map<string, Player>; colors: [string, string]; selectedId: string | null; onTap: (id: string) => void; onMove: (id: string, point: GridPoint) => void }) {
+function Pitch({ tactic, players, colors, selectedId, onTap, onMove }: { tactic: Tactic; players: Map<string, Player>; colors: [string, string]; selectedId: string | null; onTap: (id: string) => void; onMove: (id: string, point: GridPoint, spot: PitchSpot) => void }) {
   return (
     <GridPitch
       tactic={tactic}
@@ -207,8 +208,8 @@ export function Lineup({ game }: { game: Game }) {
     }
   }
 
-  const move = (id: string, point: GridPoint) => {
-    apply((t) => movePlayerTo(t, id, point))
+  const move = (id: string, _point: GridPoint, spot: PitchSpot) => {
+    apply((t) => moveToSpot(t, id, spot))
     setSelectedId(null)
   }
 

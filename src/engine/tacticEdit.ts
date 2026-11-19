@@ -5,6 +5,8 @@
  */
 import { formationOf, getFormation, labelOfGrid } from './formations'
 import { GK_POINT, gridKey, gridProblem } from './grid'
+import { SWAP_RADIUS, SPOT_LIMITS, assignGrid, clampSpot, compactSpots, freeSpotsOf, keeperIndexOf, spotDistance, spotsOf } from './spots'
+import type { PitchSpot } from './spots'
 import { BENCH_SIZE } from './config'
 import { buildTactic, evaluateFormation } from './lineup'
 import type { LineupOptions } from './lineup'
@@ -68,7 +70,8 @@ export function changeFormation(tactic: Tactic, squad: readonly Player[], format
   // Todos os 11 entram, mesmo lesionados (o jogador decide); o encaixe só escolhe as vagas.
   const available = players.map((p) => ({ ...p, condition: { ...p.condition, injuryDaysLeft: 0, suspensionGames: 0 } }))
   const { startingXI } = evaluateFormation(available, formation)
-  return { ...tactic, formationId, grid: formation.grid.map((p) => ({ ...p })), startingXI }
+  const { spots: _dropped, ...rest } = tactic
+  return { ...rest, formationId, grid: formation.grid.map((p) => ({ ...p })), startingXI }
 }
 
 /**
@@ -91,8 +94,54 @@ export function movePlayerTo(tactic: Tactic, id: PlayerId, target: GridPoint): T
   }
   const problem = gridProblem(grid)
   if (problem) throw new Error(problem)
-  return { ...tactic, formationId: labelOfGrid(grid), grid }
+  // Mover para um ponto da grade deixa o time de volta na grade (sem posições livres).
+  const { spots: _dropped, ...rest } = tactic
+  return { ...rest, formationId: labelOfGrid(grid), grid }
 }
+
+/**
+ * Posicionamento livre de verdade: o titular fica exatamente onde foi solto (`spots`), e o motor lê o ponto da grade mais perto dele (sem repetir
+ * ponto: quem chega depois recebe o ponto livre mais perto). Solto em cima de outro jogador, os dois trocam de lugar. O goleiro não sai do gol
+ * (só troca com um jogador de linha). Devolve a tática nova; o ponto da grade de cada um vem de `assignGrid`.
+ */
+export function moveToSpot(tactic: Tactic, id: PlayerId, to: PitchSpot): Tactic {
+  const i = tactic.startingXI.indexOf(id)
+  if (i < 0) throw new Error('Só os titulares podem ser posicionados')
+  const grid0 = formationOf(tactic).grid
+  let keeper = keeperIndexOf(grid0)
+  const spots = spotsOf(tactic)
+  const drop = { x: Math.min(100, Math.max(0, to.x)), y: Math.min(100, Math.max(0, to.y)) }
+  let j = -1
+  let best = SWAP_RADIUS
+  spots.forEach((s, k) => {
+    if (k === i) return
+    const d = spotDistance(drop, s)
+    if (d < best) {
+      best = d
+      j = k
+    }
+  })
+  if (j >= 0) {
+    const a = spots[i] as PitchSpot
+    spots[i] = spots[j] as PitchSpot
+    spots[j] = a
+    // Quem vai para o lugar do goleiro vira o goleiro (e vice-versa), como na troca de pontos da grade.
+    if (keeper === i) keeper = j
+    else if (keeper === j) keeper = i
+  } else {
+    if (i === keeper) throw new Error('O gol não pode ficar sem goleiro')
+    spots[i] = clampSpot(drop)
+  }
+  const grid = assignGrid(spots, keeper)
+  const problem = gridProblem(grid)
+  if (problem) throw new Error(problem)
+  const { spots: _dropped, ...rest } = tactic
+  const kept = compactSpots(spots, grid)
+  return { ...rest, formationId: labelOfGrid(grid), grid, ...(kept ? { spots: kept } : {}) }
+}
+
+/** Limites onde um jogador de linha pode ser solto (para a tela). */
+export const FREE_SPOT_LIMITS = SPOT_LIMITS
 
 /** Define o capitão (precisa ser titular). */
 export function setCaptain(tactic: Tactic, id: PlayerId): Tactic {
@@ -142,10 +191,13 @@ export function applySavedLineup(tactic: Tactic, squad: readonly Player[], saved
   for (const p of filler) if (bench.length < Math.max(tactic.bench.length, BENCH_SIZE)) bench.push(p.id)
   const captainId = inXI.has(tactic.captainId) ? tactic.captainId : ((startingXI.find((id) => byId.get(id)?.position !== 'GK') ?? startingXI[0]) as PlayerId)
   const keepTakers = (ids: PlayerId[]) => (ids.filter((id) => inXI.has(id)).length > 0 ? ids.filter((id) => inXI.has(id)) : [captainId])
+  const { spots: _old, ...base } = tactic
+  const savedSpots = freeSpotsOf(saved)
   return {
-    ...tactic,
+    ...base,
     formationId: formation.id,
     grid: formation.grid.map((p) => ({ ...p })),
+    ...(savedSpots ? { spots: savedSpots.map((s) => ({ ...s })) } : {}),
     style: saved.style,
     startingXI,
     bench,
@@ -161,5 +213,9 @@ export function applySavedLineup(tactic: Tactic, squad: readonly Player[], saved
  * Troca os 11 titulares, o banco, o capitão e os cobradores; o limite de estrangeiros da escalação vale.
  */
 export function suggestLineup(tactic: Tactic, squad: readonly Player[], foreign?: LineupOptions['foreign']): Tactic {
-  return buildTactic(squad, { formationId: tactic.formationId, grid: tactic.formationId === 'custom' ? tactic.grid : undefined, style: tactic.style, mentality: tactic.mentality }, { rested: true, ...(foreign ? { foreign } : {}) })
+  const built = buildTactic(squad, { formationId: tactic.formationId, grid: tactic.formationId === 'custom' ? tactic.grid : undefined, style: tactic.style, mentality: tactic.mentality }, { rested: true, ...(foreign ? { foreign } : {}) })
+  // Os pontos livres ficam com as vagas: quem entra assume o lugar onde o técnico posicionou a vaga (só se a grade continua a mesma).
+  const spots = freeSpotsOf(tactic)
+  const sameGrid = built.grid !== undefined && tactic.grid !== undefined && built.grid.every((p, i) => gridKey(p) === gridKey(tactic.grid?.[i] as GridPoint))
+  return spots && sameGrid ? { ...built, spots: spots.map((s) => ({ ...s })) } : built
 }

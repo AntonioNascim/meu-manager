@@ -244,10 +244,12 @@ function TacticPanel({
     void perform({ type: 'tactic', tactic: { ...userTeam(g).tactic, ...change } })
   }
   const [movedNote, markMoved] = useMovedNote()
-  const move = (id: string, point: GridPoint) => {
+  const [spotHints, setSpotHints] = useState<Record<string, { x: number; y: number }>>({})
+  const move = (id: string, point: GridPoint, spot?: { x: number; y: number }) => {
     act(() => {
       live.match.setPosition(live.side, id, point)
       markMoved()
+      setSpotHints((h) => (spot ? { ...h, [id]: spot } : Object.fromEntries(Object.entries(h).filter(([k]) => k !== id))))
     })
     setPickedId(null)
   }
@@ -358,6 +360,7 @@ function TacticPanel({
               selectedId={pickedId}
               onTap={tapPlayer}
               onMove={move}
+              spotHints={spotHints}
             />
           ) : (
             <p className="text-xs text-amber-300">Não há jogadores em campo.</p>

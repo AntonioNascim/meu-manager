@@ -14,6 +14,19 @@ export type GridRow = (typeof GRID_ROWS)[number]
 export const GRID_LANES = 5
 
 export const GK_POINT: GridPoint = { row: 0, lane: 2 }
+
+/** Posição (percentual) de cada faixa e de cada linha da grade no campo desenhado (ataque para cima, goleiro embaixo). */
+export const LANE_X = [14, 32, 50, 68, 86] as const
+export const ROW_Y = [91, 75, 59, 46, 33, 16] as const
+
+/** Um ponto do campo desenhado, em percentual (x da esquerda para a direita, y de cima para baixo; ataque em cima). */
+export interface PitchSpot {
+  x: number
+  y: number
+}
+
+/** O centro de um ponto da grade no campo desenhado. */
+export const gridSpot = (p: GridPoint): PitchSpot => ({ x: LANE_X[p.lane] as number, y: ROW_Y[p.row] as number })
 export const ROW_COUNT = GRID_ROWS.length
 
 export const gridKey = (p: GridPoint): string => `${p.row}.${p.lane}`

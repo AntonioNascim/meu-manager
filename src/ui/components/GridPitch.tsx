@@ -2,6 +2,9 @@ import { useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import { formationOf } from '../../engine/formations'
 import { GRID_ROWS, allGridPoints, gridKey } from '../../engine/grid'
+import { readRoles, spotsOf } from '../../engine/spots'
+import type { PitchSpot } from '../../engine/spots'
+import { POSITION_LABELS, POSITION_SHORT_LABELS } from '../labels'
 import type { GridPoint, Player, Position, Tactic } from '../../engine/types'
 import { gridCoords, nearestGridPoint } from '../pitchLayout'
 
@@ -30,14 +33,18 @@ export function GridPitch({
   selectedId,
   onTap,
   onMove,
+  spotHints,
   renderToken,
   testId = 'grid-pitch',
 }: {
-  tactic: Pick<Tactic, 'formationId' | 'startingXI'> & { grid?: GridPoint[] | undefined }
+  tactic: Pick<Tactic, 'formationId' | 'startingXI'> & { grid?: GridPoint[] | undefined; spots?: PitchSpot[] | undefined }
   players: ReadonlyMap<string, Player>
   selectedId: string | null
   onTap: (playerId: string) => void
-  onMove: (playerId: string, point: GridPoint) => void
+  /** `point` é o ponto da grade mais perto (o que o motor lê); `spot` é exatamente onde o jogador foi solto. */
+  onMove: (playerId: string, point: GridPoint, spot: PitchSpot) => void
+  /** Onde cada jogador foi solto na partida ao vivo (só para desenhar): vale enquanto ainda cai no ponto da grade em que o motor o pôs. */
+  spotHints?: Readonly<Record<string, PitchSpot>>
   renderToken: (player: Player, slot: Position, selected: boolean, dragging: boolean) => ReactNode
   testId?: string
 }) {
@@ -47,6 +54,13 @@ export function GridPitch({
   const latest = useRef<Drag | null>(null)
   const justDragged = useRef(false)
   const [drag, setDrag] = useState<Drag | null>(null)
+  const [infoId, setInfoId] = useState<string | null>(null)
+  const spots = spotsOf(tactic).map((s, i) => {
+    const hint = spotHints?.[tactic.startingXI[i] as string]
+    const point = formation.grid[i]
+    return hint && point && gridKey(nearestGridPoint(hint.x, hint.y)) === gridKey(point) ? hint : s
+  })
+  const roles = readRoles(tactic, players)
   const points = useMemo(() => allGridPoints(), [])
   const occupied = new Set(formation.grid.map(gridKey))
 
@@ -85,7 +99,8 @@ export function GridPitch({
     setDrag(null)
     if (!s?.moved) return
     justDragged.current = true
-    if (!cancel && result) onMove(s.id, result.target)
+    setInfoId(s.id)
+    if (!cancel && result) onMove(s.id, result.target, { x: result.x, y: result.y })
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {
@@ -98,6 +113,7 @@ export function GridPitch({
       justDragged.current = false
       return
     }
+    setInfoId(id)
     onTap(id)
   }
   const key = (e: KeyboardEvent<HTMLDivElement>, id: string) => {
@@ -110,7 +126,8 @@ export function GridPitch({
   const dragging = drag !== null
   const target = drag ? gridKey(drag.target) : null
   return (
-    <div ref={field} className="relative mx-auto aspect-[3/5.1] w-full max-w-md select-none overflow-hidden rounded-2xl border border-emerald-950 bg-[#1d5a3a]" data-testid={testId}>
+    <div className="mx-auto w-full max-w-md">
+    <div ref={field} className="relative aspect-[3/5.1] w-full select-none overflow-hidden rounded-2xl border border-emerald-950 bg-[#1d5a3a]" data-testid={testId}>
       <div className="absolute inset-0 bg-[repeating-linear-gradient(180deg,rgb(255_255_255/0.045)_0_12.5%,transparent_12.5%_25%)]" />
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 170" preserveAspectRatio="none" aria-hidden="true">
         <g fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="0.55">
@@ -151,7 +168,8 @@ export function GridPitch({
         const point = formation.grid[i]
         const slot = formation.slots[i]
         if (!player || !point || !slot) return null
-        const c = gridCoords(point)
+        const c = spots[i] ?? gridCoords(point)
+        const read = roles[i]
         const isDragged = drag?.id === id
         const at = isDragged && drag ? { x: drag.x, y: drag.y } : c
         return (
@@ -172,9 +190,53 @@ export function GridPitch({
             style={{ left: `${at.x}%`, top: `${at.y}%`, touchAction: 'none' }}
           >
             {renderToken(player, slot.position, selectedId === id, isDragged)}
+            {read && read.penalty > 0 && (
+              <span className={`pointer-events-none absolute -left-2 -top-1 rounded-full px-1 text-[9px] font-extrabold leading-4 text-bg ${read.kind === 'out' ? 'bg-loss' : 'bg-draw'}`} data-testid="role-penalty" title="Penalidade por jogar fora da posição">
+                −{read.penalty}%
+              </span>
+            )}
           </div>
         )
       })}
+    </div>
+    <RoleCard tactic={tactic} players={players} roles={roles} infoId={infoId} />
+    </div>
+  )
+}
+
+/**
+ * O que o motor entendeu: o papel de cada jogador no ponto da grade mais perto de onde ele foi solto, a penalidade por jogar fora da
+ * posição e o aviso quando a zona estava cheia e o motor o pôs num ponto vizinho.
+ */
+function RoleCard({ tactic, players, roles, infoId }: { tactic: Pick<Tactic, 'startingXI'>; players: ReadonlyMap<string, Player>; roles: ReturnType<typeof readRoles>; infoId: string | null }) {
+  const i = infoId ? tactic.startingXI.indexOf(infoId) : -1
+  const player = i >= 0 ? players.get(infoId as string) : undefined
+  const read = i >= 0 ? roles[i] : undefined
+  const moved = tactic.startingXI.flatMap((id, k) => (roles[k]?.moved ? [{ id, role: roles[k]?.role }] : []))
+  return (
+    <div className="mt-2 space-y-1.5 text-sm" data-testid="role-card">
+      {player && read ? (
+        <div className="rounded-xl border border-line bg-surface p-2.5">
+          <p className="font-bold">{player.nickname ?? player.name}</p>
+          <p className="text-muted">
+            Posição dele: {POSITION_LABELS[player.position]}
+            {player.secondaryPositions.length > 0 ? ` · secundárias: ${player.secondaryPositions.map((p) => POSITION_SHORT_LABELS[p]).join(', ')}` : ''}
+          </p>
+          <p className="mt-1">
+            O motor entende: <b>{POSITION_LABELS[read.role]} ({POSITION_SHORT_LABELS[read.role]})</b>
+          </p>
+          <p className={read.penalty === 0 ? 'text-win' : read.kind === 'secondary' ? 'text-draw' : 'text-loss'} data-testid="role-penalty-text">
+            {read.penalty === 0 ? 'Sem penalidade: é a posição principal dele.' : read.kind === 'secondary' ? `Penalidade de ${read.penalty}% na força: posição secundária.` : `Penalidade de ${read.penalty}% na força: fora da posição dele.`}
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-muted">Toque ou arraste um jogador para ver o papel que o motor entende e a penalidade de posição.</p>
+      )}
+      {moved.length > 0 && (
+        <p className="rounded-xl border border-draw/50 bg-draw/10 p-2 text-xs text-draw" data-testid="role-crowded">
+          Zona cheia: o motor colocou {moved.map(({ id, role }) => `${players.get(id)?.nickname ?? players.get(id)?.name ?? id} em ${role ? POSITION_SHORT_LABELS[role] : ''}`).join(', ')} no ponto livre mais perto. Na tela cada um fica onde você soltou.
+        </p>
+      )}
     </div>
   )
 }

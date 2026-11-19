@@ -5,9 +5,10 @@ import { FORMATION_IDS, formationOf } from '../../engine/formations'
 import { shapeOf } from '../../engine/grid'
 import { buildTactic } from '../../engine/lineup'
 import { overallAt, playerOverall } from '../../engine/overall'
-import { MAX_TAKERS, changeFormation, movePlayerTo, setCaptain, setTaker, swapPlayers } from '../../engine/tacticEdit'
+import { MAX_TAKERS, changeFormation, moveToSpot, setCaptain, setTaker, swapPlayers } from '../../engine/tacticEdit'
 import type { SetPieceKind } from '../../engine/tacticEdit'
 import type { GridPoint, Player, Tactic } from '../../engine/types'
+import type { PitchSpot } from '../../engine/spots'
 import { squadOf, userTeam } from '../../store/game'
 import type { Game } from '../../store/game'
 import { getGame } from '../../store/gameStore'
@@ -66,7 +67,7 @@ function Token({ player, slot, tactic, selected }: { player: Player; slot: Playe
   )
 }
 
-function Pitch({ tactic, players, selectedId, onTap, onMove }: { tactic: Tactic; players: Map<string, Player>; selectedId: string | null; onTap: (id: string) => void; onMove: (id: string, point: GridPoint) => void }) {
+function Pitch({ tactic, players, selectedId, onTap, onMove }: { tactic: Tactic; players: Map<string, Player>; selectedId: string | null; onTap: (id: string) => void; onMove: (id: string, point: GridPoint, spot: PitchSpot) => void }) {
   return <GridPitch tactic={tactic} players={players} selectedId={selectedId} onTap={onTap} onMove={onMove} renderToken={(player, slot, selected) => <Token player={player} slot={slot} tactic={tactic} selected={selected} />} />
 }
 
@@ -142,8 +143,8 @@ export function Tactics({ game }: { game: Game }) {
     }
   }
 
-  const move = (id: string, point: GridPoint) => {
-    apply((t) => movePlayerTo(t, id, point))
+  const move = (id: string, _point: GridPoint, spot: PitchSpot) => {
+    apply((t) => moveToSpot(t, id, spot))
     setSelectedId(null)
   }
 

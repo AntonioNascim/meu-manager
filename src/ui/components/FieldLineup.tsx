@@ -86,6 +86,7 @@ export function FieldLineup({
   selectedId,
   onTap,
   onMove,
+  spotHints,
 }: {
   formationId: string
   lineup: readonly FieldSlot[]
@@ -98,7 +99,9 @@ export function FieldLineup({
   selectedId?: string | null
   onTap?: (playerId: string) => void
   /** Com ele o campo vira a grade de posicionamento: arrastar leva o jogador ao ponto mais perto (ponto ocupado = troca). */
-  onMove?: (playerId: string, point: GridPoint) => void
+  onMove?: (playerId: string, point: GridPoint, spot: { x: number; y: number }) => void
+  /** Onde cada jogador foi solto (só para desenhar). */
+  spotHints?: Readonly<Record<string, { x: number; y: number }>>
 }) {
   const placed = useMemo(() => placeLineup(formationId, lineup), [formationId, lineup])
   if (onMove && lineup.length > 0 && lineup.every((e) => e.point)) {
@@ -110,6 +113,7 @@ export function FieldLineup({
         selectedId={selectedId ?? null}
         onTap={(id) => onTap?.(id)}
         onMove={onMove}
+        {...(spotHints ? { spotHints } : {})}
         renderToken={(player, slot, selected) => (
           <Token player={player} number={numberOf(player.id, slot)} fitness={fitnessOf(player.id)} yellow={yellowOf?.(player.id) ?? false} kit={slot === 'GK' && keeperKit ? keeperKit : kit} selected={selected} />
         )}

@@ -28,6 +28,7 @@ import type { TalkKind } from '../talk'
 import { setTeamTactic } from '../season/advance'
 import type { SeasonState } from '../season'
 import { isGridPoint } from '../grid'
+import { parseSpots } from '../spots'
 import { applyClubAction, type ClubAction } from './club'
 import { PLAY_STYLES, POSITIONS, TRAINING_FOCUSES, TRAINING_GROUPS, TRAINING_INTENSITIES } from '../types'
 import type { BetKind, GridPoint, IndividualGoal, Mentality, SponsorOffer, PreseasonPlace, ScoutLevel, OfferKind, PlayStyle, Tactic, TeamId, TrainingGroup, TrainingPlan, TrainingSession } from '../types'
@@ -94,7 +95,7 @@ const only = (o: Record<string, unknown>, keys: readonly string[]): boolean => O
 const money = (v: unknown, max = 5_000_000_000): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max
 
 function parseTactic(v: unknown): Tactic | undefined {
-  if (!isObj(v) || !only(v, ['formationId', 'grid', 'style', 'mentality', 'startingXI', 'bench', 'captainId', 'penaltyTakerIds', 'freeKickTakerIds'])) return undefined
+  if (!isObj(v) || !only(v, ['formationId', 'grid', 'spots', 'style', 'mentality', 'startingXI', 'bench', 'captainId', 'penaltyTakerIds', 'freeKickTakerIds'])) return undefined
   if (typeof v.formationId !== 'string' || v.formationId.length > 16 || !STYLES.includes(v.style as PlayStyle) || !MENTALITIES.includes(v.mentality as Mentality)) return undefined
   if (!isIds(v.startingXI, 11, 11) || !isIds(v.bench, 0, 12) || !isId(v.captainId) || !isIds(v.penaltyTakerIds, 0, 11) || !isIds(v.freeKickTakerIds, 0, 11)) return undefined
   let grid: GridPoint[] | undefined
@@ -108,7 +109,9 @@ function parseTactic(v: unknown): Tactic | undefined {
       grid.push(point)
     }
   }
-  return { formationId: v.formationId, ...(grid ? { grid } : {}), style: v.style as PlayStyle, mentality: v.mentality as Mentality, startingXI: v.startingXI, bench: v.bench, captainId: v.captainId, penaltyTakerIds: v.penaltyTakerIds, freeKickTakerIds: v.freeKickTakerIds }
+  const spots = v.spots === undefined ? undefined : parseSpots(v.spots)
+  if (v.spots !== undefined && !spots) return undefined
+  return { formationId: v.formationId, ...(grid ? { grid } : {}), ...(spots ? { spots } : {}), style: v.style as PlayStyle, mentality: v.mentality as Mentality, startingXI: v.startingXI, bench: v.bench, captainId: v.captainId, penaltyTakerIds: v.penaltyTakerIds, freeKickTakerIds: v.freeKickTakerIds }
 }
 
 function parseGoal(v: unknown): IndividualGoal | undefined {

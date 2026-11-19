@@ -15,6 +15,7 @@ import { expireOffers, nextMarketEvent, refreshListings, resolveDueOffers, runMa
 import type { MarketEvent } from '../market'
 import { formationOf } from '../formations'
 import { gridProblem } from '../grid'
+import { freeSpotsOf } from '../spots'
 import { simulateMatch } from '../match'
 import type { KnockoutRules, MatchInput } from '../match'
 import { cupScopeOf, knockoutRulesFor, progressCups } from '../cups'
@@ -471,5 +472,8 @@ export function setTeamTactic(state: SeasonState, teamId: TeamId, tactic: Tactic
     throw new Error('Escalação inválida')
   }
   if (tactic.bench.some((id) => !ids.has(id) || tactic.startingXI.includes(id))) throw new Error('Banco inválido')
-  return { ...state, teams: state.teams.map((t) => (t.id === teamId ? { ...t, tactic } : t)) }
+  // Pontos livres que não batem com a grade que o motor lê são descartados (a grade manda).
+  const { spots: _spots, ...plain } = tactic
+  const clean = tactic.spots && freeSpotsOf(tactic) ? tactic : plain
+  return { ...state, teams: state.teams.map((t) => (t.id === teamId ? { ...t, tactic: clean } : t)) }
 }
