@@ -97,7 +97,7 @@ export interface LeagueStore {
   countMemberships(playerId: string): Promise<number>
 }
 
-export type RoomFailure = SeatError | 'team-reserved' | 'bad-vacancy' | 'not-found' | 'bad-world' | 'bad-state' | 'unavailable'
+export type RoomFailure = SeatError | 'week-pending' | 'team-reserved' | 'bad-vacancy' | 'not-found' | 'bad-world' | 'bad-state' | 'unavailable'
 
 /** A sala da liga (Durable Object): dona das vagas e do mundo. */
 export interface RoomPort {
@@ -191,6 +191,7 @@ export type LeagueError =
   | { error: 'forbidden' }
   /** Modo protegido (menor de idade): só ligas de amigos, por convite. */
   | { error: 'protected-account' }
+  | { error: 'week-pending' }
   /** Modo protegido: o nome da liga tem de ser um da lista. */
   | { error: 'protected-name' }
   | { error: 'too-many-created'; limit: number }
@@ -378,7 +379,7 @@ function parseCreate(body: ApiRequest['body']): CreateBody | undefined {
 // ---------------------------------------------------------------- operações
 
 const roomFailure = <T>(error: RoomFailure): LeagueResult<T> =>
-  error === 'bad-state' ? fail(409, { error: 'bad-state' }) : error === 'not-seated' ? fail(409, { error: 'not-seated' }) : error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'team-reserved' ? fail(409, { error: 'team-reserved' }) : error === 'bad-vacancy' ? fail(409, { error: 'bad-vacancy' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
+  error === 'week-pending' ? fail(409, { error: 'week-pending' }) : error === 'bad-state' ? fail(409, { error: 'bad-state' }) : error === 'not-seated' ? fail(409, { error: 'not-seated' }) : error === 'team-taken' ? fail(409, { error: 'team-taken' }) : error === 'team-reserved' ? fail(409, { error: 'team-reserved' }) : error === 'bad-vacancy' ? fail(409, { error: 'bad-vacancy' }) : error === 'unknown-team' ? fail(400, { error: 'unknown-team' }) : error === 'already-seated' ? fail(409, { error: 'already-member' }) : fail(502, { error: 'room-failed', detail: error })
 
 /** Cria a liga. Ligas abertas só usam o ritmo Normal; quem cria é o ADM e já pode escolher o clube. */
 export async function createLeague(req: ApiRequest, deps: LeagueDeps): Promise<LeagueResult<LeagueDetail>> {

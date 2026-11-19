@@ -41,6 +41,11 @@ export const READY_WAIT_MS: Record<PaceId, number> = {
   fast: 15 * MS_MINUTE,
   'very-fast': 10 * MS_MINUTE,
 }
+/**
+ * Folga mínima para montar a semana de treino depois que um evento termina: a passagem diária espera esse tempo antes de levar o mundo aos dias
+ * de treino da semana. Passado o prazo, a comissão monta sozinha a semana de quem não montou (ninguém trava a liga).
+ */
+export const WEEK_GRACE_MS = 6 * MS_HOUR
 /** A pausa do ADM dura no máximo isto (depois a liga volta sozinha e avisa). */
 export const MAX_PAUSE_MS = 30 * MS_DAY
 /** Quanto do calendário futuro fica agendado e visível. */

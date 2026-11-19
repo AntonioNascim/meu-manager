@@ -355,6 +355,11 @@ describe('sala: Pronto antes da partida e códigos de vaga', () => {
     expect(waiting.view.progress.played).toBe(0)
     // Avançar de novo com a sala esperando é recusado.
     expect(await room.post('advance', { by: 'ana' })).toMatchObject({ ok: false, error: 'bad-state' })
+    // Sem a semana de treino montada ou delegada o Pronto não libera.
+    expect(waiting.view.week.ready).toBe(false)
+    expect(await room.post('ready', { playerId: 'ana', ready: true })).toMatchObject({ ok: false, error: 'week-pending' })
+    const sessions = Object.fromEntries((waiting.view.week.missing as string[]).map((d) => [d, { drill: 'rondo', intensity: 'normal' }]))
+    expect(await room.post('command', { playerId: 'ana', command: { type: 'training-agenda', sessions }, since: 0 })).toMatchObject({ ok: true })
     // O Pronto de quem joga começa a partida (resultado direto: o evento termina na hora).
     expect(await room.post('ready', { playerId: 'ana', ready: true })).toMatchObject({ ok: true })
     const after = (await room.post('state', { playerId: 'ana' })) as Reply

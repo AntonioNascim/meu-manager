@@ -858,6 +858,7 @@ export const LEAGUE_ERROR_LABELS: Record<import('../online/leagueApi').LeagueErr
   'unknown-team': 'Esse clube não existe neste mundo.',
   'room-failed': 'A sala da liga não respondeu. Tente de novo daqui a pouco.',
   'bad-state': 'Isso não é possível agora.',
+  'week-pending': 'Monte a semana de treino ou delegue à comissão antes de dar Pronto.',
   offline: 'Sem conexão com o servidor. Confira a internet e tente de novo.',
   server: 'O servidor está com problema agora. Tente de novo daqui a pouco.',
 }

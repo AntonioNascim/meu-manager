@@ -32,7 +32,8 @@ import {
   type ClockState,
   type ScheduledEvent,
 } from './clock'
-import { DEFAULT_TICK_HOUR, MAX_PAUSE_MS, READY_WAIT_MS, ROOM_OPENS_BEFORE_MS, SCHEDULE_HORIZON_MS, type PaceId } from './pace'
+import { DEFAULT_TICK_HOUR, MAX_PAUSE_MS, READY_WAIT_MS, ROOM_OPENS_BEFORE_MS, SCHEDULE_HORIZON_MS, WEEK_GRACE_MS, type PaceId } from './pace'
+import { DEFAULT_PLAN, delegateMissing, weekStatus } from '../training'
 
 export type SeatStatus = 'active' | 'absent' | 'autopilot'
 
@@ -97,6 +98,8 @@ export interface LeagueState {
   waiting?: Waiting
   /** Próxima passagem diária. */
   nextTick: number
+  /** Até aqui (relógio dos prazos, congela na pausa) o técnico pode montar a semana de treino antes de a passagem diária levar o mundo aos dias dela. */
+  weekDeadline?: number
   log: LogEntry[]
   /** Mercado entre técnicos humanos (B8.6, `trade.ts`); ausente nas ligas de antes dela. */
   trades?: import('./trade').TradeBook
@@ -121,12 +124,25 @@ export interface Stepped {
   actions: LeagueAction[]
 }
 
+/** Quando um evento termina abre-se a folga para montar a semana de treino. */
+const withWeekGrace = (league: LeagueState, now: number): LeagueState => ({ ...league, weekDeadline: deadlineIn(league, now, WEEK_GRACE_MS) })
+
 const LOG_MAX = 200
 const log = (league: LeagueState, entry: LogEntry): LeagueState => ({ ...league, log: [...league.log, entry].slice(-LOG_MAX) })
 const humanIds = (league: LeagueState): TeamId[] => league.seats.map((s) => s.teamId)
 /** Na virada de temporada só os técnicos ativos decidem contratos e base; os ausentes e em piloto automático ficam com a IA (B8.7). */
 const activeIds = (league: LeagueState): TeamId[] => league.seats.filter((s) => s.status === 'active').map((s) => s.teamId)
 const optionsOf = (league: LeagueState, deps: LeagueDeps) => ({ humanTeamIds: humanIds(league), turnHumanTeamIds: activeIds(league), market: deps.market ?? true, turn: deps.turn })
+
+/** Times humanos cuja semana de treino ainda não está montada (sem dias de treino até o jogo, a semana está pronta). */
+export const weekPending = (league: LeagueState, world: SeasonState): TeamId[] => humanIds(league).filter((id) => !weekStatus(world, id).ready)
+
+/** Semana de treino automática: a comissão completa só os dias que faltam de cada time humano (o que o técnico montou fica). */
+export function delegateWeeks(league: LeagueState, world: SeasonState): SeasonState {
+  let current = world
+  for (const id of humanIds(league)) current = delegateMissing(current, id, current.training.plans[id] ?? DEFAULT_PLAN)
+  return current
+}
 
 /** Dias (do relógio) de todos os eventos que o mundo ainda tem: datas com partida de humano e âncoras (último dia da temporada de cada país). */
 export function eventDaysOf(world: SeasonState, seats: readonly Seat[]): { day: number; kind: ScheduledEvent['kind'] }[] {
@@ -269,18 +285,19 @@ function beginEvent(league: LeagueState, world: SeasonState, now: number, deps: 
   const ev = nextEvent(league.clock) as ScheduledEvent
   const date = dateOfDay(ev.day)
   const started = startEvent(league.clock, now)
-  let current = world
+  // Os dias de treino que faltam passam agora: quem não montou a semana fica com a da comissão.
+  let current = date > world.season.currentDate ? delegateWeeks(league, world) : world
   const actions: LeagueAction[] = []
-  const step = date > world.season.currentDate ? advanceUntil(world, date, optionsOf(league, deps)) : undefined
+  const step = date > world.season.currentDate ? advanceUntil(current, date, optionsOf(league, deps)) : undefined
   if (step) current = step.state
   const pending = (step?.pendingHumanMatches ?? []).map((m) => m.id)
   const locked = ev.kind === 'match' ? notReady(league, world).map((s) => s.playerId) : []
   const seats = league.seats.map((s) => ({ ...s, ready: false }))
-  let next: LeagueState = { ...league, clock: started.clock, seats, waiting: undefined }
+  let next: LeagueState = { ...league, clock: started.clock, seats, waiting: undefined, weekDeadline: undefined }
   next = log(next, { at: now, type: reason === 'advance' ? 'advance' : 'event-started', date, detail: reason, ...(by !== undefined ? { by } : {}) })
   if (pending.length === 0) {
     actions.push({ type: 'event-ended', date })
-    return { league: refreshEvents(log(next, { at: now, type: 'event-ended', date }), current), world: current, actions }
+    return { league: refreshEvents(log(withWeekGrace(next, now), { at: now, type: 'event-ended', date }), current), world: current, actions }
   }
   next = { ...next, current: { date, startedAt: now, pending, all: pending, reason: ev.kind === 'anchor' ? 'anchor' : reason, ...(locked.length > 0 ? { locked } : {}) } }
   actions.push({ type: 'event-started', date, matchIds: pending, reason })
@@ -315,7 +332,7 @@ export function submitResult(from: Stepped, matchId: string, result: MatchResult
   const moved = completeMatch(world, { ...match, status: 'finished', result })
   const pending = cur.pending.filter((id) => id !== matchId)
   if (pending.length > 0) return { league: { ...league, current: { ...cur, pending } }, world: moved, actions: from.actions }
-  const ended: LeagueState = log({ ...league, current: undefined }, { at: now, type: 'event-ended', date: cur.date })
+  const ended: LeagueState = log(withWeekGrace({ ...league, current: undefined }, now), { at: now, type: 'event-ended', date: cur.date })
   return { league: refreshEvents(ended, moved), world: moved, actions: [...from.actions, { type: 'event-ended', date: cur.date }] }
 }
 
@@ -353,11 +370,16 @@ function tick(league: LeagueState, world: SeasonState, now: number, deps: League
   const target = ev && due >= dateOfDay(ev.day) ? addDays(dateOfDay(ev.day), -1) : due
   let current = world
   const actions: LeagueAction[] = []
-  if (target > world.season.currentDate) {
-    current = advanceUntil(world, target, optionsOf(league, deps)).state
+  // Folga para montar a semana: enquanto dura, a passagem diária não leva o mundo aos dias de treino de quem ainda não montou; depois, a comissão completa.
+  const hold = target > world.season.currentDate && league.weekDeadline !== undefined && !deadlineExpired(league, now, league.weekDeadline) && weekPending(league, world).length > 0
+  let weekDeadline = league.weekDeadline
+  if (target > world.season.currentDate && !hold) {
+    current = advanceUntil(delegateWeeks(league, world), target, optionsOf(league, deps)).state
     actions.push({ type: 'tick', date: target })
+    weekDeadline = undefined
   }
-  const next = refreshEvents({ ...league, nextTick: nextTickAt(now, league.config.clock, league.config.tickHour) }, current)
+  const nextTick = hold ? Math.max(now + 1, (league.weekDeadline as number) + league.clock.pausedTotalMs) : nextTickAt(now, league.config.clock, league.config.tickHour)
+  const next = refreshEvents({ ...league, nextTick, weekDeadline }, current)
   return { league: next, world: current, actions }
 }
 

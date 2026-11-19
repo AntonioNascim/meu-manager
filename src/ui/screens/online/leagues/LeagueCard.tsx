@@ -4,6 +4,9 @@ import { leagueApi } from '../../../../store/leagues'
 import { LEAGUE_ERROR_LABELS } from '../../../labels'
 import { Eyebrow, Panel } from '../../../theme'
 import { hourLabel, inLabel, readyCount, whenLabel } from './LeagueRunning'
+import { perform } from '../../../../store/actions'
+import { getGame } from '../../../../store/gameStore'
+import { fullWeek } from '../../dashboard/WeekGate'
 
 const POLL_MS = 5000
 /** Partidas que já levaram o técnico à tela sozinhas (o cartão é remontado ao trocar de tela, então a memória fica fora dele). */
@@ -41,9 +44,13 @@ export function LeagueCard({ leagueId, teamId, onOpen, onWatch, onCareer }: { le
     if (view.now - view.current.startedAt < 90_000) onWatch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startKey, playingNow])
+  const weekBlocked = !!view?.week && !view.week.ready && !view.week.delegateAlways
   const ready = async () => {
     if (!me) return
     setBusy(true)
+    // "Delegar sempre": a comissão completa os dias que faltam antes do Pronto.
+    const game = getGame()
+    if (!me.ready && view?.week && !view.week.ready && view.week.delegateAlways && game) await perform({ type: 'training-agenda', sessions: fullWeek(game) })
     const r = await leagueApi.ready(leagueId, !me.ready)
     if (!r.ok) setError(LEAGUE_ERROR_LABELS[r.error])
     await load()
@@ -85,13 +92,19 @@ export function LeagueCard({ leagueId, teamId, onOpen, onWatch, onCareer }: { le
         {me && view && !view.current && !view.paused && me.required && (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || (weekBlocked && !me.ready)}
             onClick={() => void ready()}
             data-testid="league-ready"
             className={`mt-3 flex min-h-14 w-full items-center justify-center rounded-xl font-display text-2xl font-extrabold uppercase tracking-wide transition active:scale-[0.98] ${me.ready ? 'border border-accent text-accent' : 'bg-accent text-accent-ink'}`}
           >
-            {me.ready ? 'Pronto! Toque para desfazer' : 'Estou pronto'}
+            {me.ready ? 'Pronto! Toque para desfazer' : weekBlocked ? 'Pronto · bloqueado' : 'Estou pronto'}
           </button>
+        )}
+        {me && view?.week && !view.week.ready && !view.current && !view.paused && (
+          <p className="mt-2 text-xs font-semibold text-amber" data-testid="league-week-pending">
+            {view.week.delegateAlways ? 'A comissão completa a semana de treino ao dar Pronto.' : 'Falta montar a semana de treino: sem ela o Pronto não libera.'}
+            {view.week.deadlineAt && !view.week.delegateAlways ? ` Se você não fizer nada até ${whenLabel(view.week.deadlineAt)}, a comissão monta por você.` : ''}
+          </p>
         )}
         {me && view && !view.current && !view.paused && !me.required && view.next && <p className="mt-2 text-xs text-muted">Seu clube não joga na próxima rodada. Não precisa dar Pronto.</p>}
         <button type="button" onClick={onCareer} data-testid="league-career" className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-line text-sm font-bold">

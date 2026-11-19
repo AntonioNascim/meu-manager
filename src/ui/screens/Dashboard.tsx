@@ -194,7 +194,8 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
   // Avança até o próximo dia de jogos; se o time do jogador joga nele, vai para a tela da partida.
   const week = weekStatus(game.season, game.userTeamId)
-  const weekGated = !game.online && !pending && !seasonOver && academy.pending === 0 && !week.ready
+  const weekShown = !pending && !seasonOver && academy.pending === 0 && !week.ready
+  const weekGated = !game.online && weekShown
   const [replay, setReplay] = useState<{ days: IsoDate[]; sessions: Record<IsoDate, TrainingSession>; goToMatch: boolean } | null>(null)
   const endReplay = useCallback(() => {
     setReplay((r) => {
@@ -301,7 +302,10 @@ export function Dashboard({ game, onNavigate }: { game: Game; onNavigate: (scree
 
           {game.online ? (
             // Na liga online quem avança o tempo é a liga: no lugar do botão Avançar entra o cartão da liga (Pronto e sala).
-            <LeagueCard leagueId={game.online.leagueId} teamId={game.userTeamId} onOpen={() => onNavigate('league')} onWatch={() => onNavigate('match')} onCareer={() => onNavigate('career')} />
+            <>
+              {weekShown && <WeekGate game={game} online onNavigate={onNavigate} />}
+              <LeagueCard leagueId={game.online.leagueId} teamId={game.userTeamId} onOpen={() => onNavigate('league')} onWatch={() => onNavigate('match')} onCareer={() => onNavigate('career')} />
+            </>
           ) : (
             <>
               {pending && (

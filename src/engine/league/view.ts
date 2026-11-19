@@ -8,6 +8,7 @@ import { dateOfDay, type ScheduledEvent } from './clock'
 import { markPresent, suggestionsFor, type AbsenceSuggestion } from './absence'
 import { bookOf, type TradeRecord, type TradeReport } from './trade'
 import { LEAGUE_TRADE } from '../config'
+import { weekStatus } from '../training'
 import { fixturesOn, type LeagueFixture } from './cupsView'
 import { MAX_PAUSE_MS, ROOM_OPENS_BEFORE_MS, type PaceId } from './pace'
 import { notReady, requiredSeats, upcoming, waitingDeadlineAt, type LeagueState, type LogType, type SeatStatus } from './runner'
@@ -57,6 +58,8 @@ export interface LeagueView {
   autoResumeAt?: number
   /** O próximo evento de partidas (as âncoras não aparecem). */
   next?: ViewEvent & { roomOpensAt: number; required: string[]; notReady: string[]; /** O jogo já chegou na hora e a partida espera o Pronto; `deadlineAt` é quando começa sozinha. */ waiting?: { openedAt: number; deadlineAt?: number } }
+  /** A semana de treino de quem consulta: sem ela montada ou delegada o "Pronto" não libera. `deadlineAt`: até quando dá para montar (depois a comissão monta). */
+  week?: { ready: boolean; missing: IsoDate[]; delegateAlways: boolean; deadlineAt?: number }
   /** Calendário das próximas semanas (só eventos com partidas). */
   events: ViewEvent[]
   /** `playing`: técnicos cujo clube tem partida neste evento (quem não joga não tem o que ver ao vivo). */
@@ -117,6 +120,7 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
     ...(firstMatch
       ? { next: { date: dateOfDay(firstMatch.day), startAt: firstMatch.startAt, kind: 'match' as const, fixtures: fixtures.get(dateOfDay(firstMatch.day)) ?? [], roomOpensAt: firstMatch.startAt - ROOM_OPENS_BEFORE_MS, required: [...required], notReady: notReady(league, world).map((s) => s.playerId), ...(league.waiting ? { waiting: { openedAt: league.waiting.openedAt, ...(waitingDeadlineAt(league) !== undefined ? { deadlineAt: waitingDeadlineAt(league) as number } : {}) } } : {}) } }
       : {}),
+    ...(viewerTeamId ? { week: weekOf(league, world, viewerTeamId) } : {}),
     events: shown.map((e) => ({ ...e, fixtures: fixtures.get(e.date) ?? [] })),
     ...(league.current ? { current: { date: league.current.date, startedAt: league.current.startedAt, pending: league.current.pending.length, all: league.current.all.length, playing: playingIn(league, world), locked: league.current.locked ?? [], fixtures: fixtures.get(league.current.date) ?? [] } } : {}),
     seats: league.seats.map((s) => ({ playerId: s.playerId, teamId: s.teamId, status: s.status, ready: s.ready, required: required.has(s.playerId), missed: s.missed ?? 0, leaving: s.leaving === true, lastActiveAt: s.lastActiveAt ?? joinedAt(s.playerId) })),
@@ -125,6 +129,13 @@ export function leagueView(league: LeagueState, world: SeasonState, now: number,
     transfers: [...bookOf(league).history].reverse().slice(0, LEAGUE_TRADE.historyShown),
     reports: bookOf(league).reports,
   }
+}
+
+/** A semana de treino do clube de quem consulta e o prazo (relógio real, descontada a pausa) em que a comissão a monta sozinha. */
+export function weekOf(league: LeagueState, world: SeasonState, teamId: string): NonNullable<LeagueView['week']> {
+  const status = weekStatus(world, teamId)
+  const deadlineAt = !status.ready && league.weekDeadline !== undefined && league.clock.pausedAt === undefined ? league.weekDeadline + league.clock.pausedTotalMs : undefined
+  return { ready: status.ready, missing: status.missing, delegateAlways: status.delegateAlways, ...(deadlineAt !== undefined ? { deadlineAt } : {}) }
 }
 
 /** O técnico deu (ou tirou) o "Pronto". Dar "Pronto" também conta como presença: volta de ausente para ativo. */

@@ -96,6 +96,7 @@ import type { DataPackage } from '../src/data/package/types'
 import { SqliteWorldStore, type WorldSql } from '../src/store/worldStore'
 import { frameSince, makeStoredReplay, parseClientMessage, replayKey, type Cursor, type Roster, type ServerMessage } from '../src/online/liveProtocol'
 import { playerOverall } from '../src/engine/overall'
+import { weekStatus } from '../src/engine/training'
 import { matchLabel } from '../src/engine/cups'
 import { fingerprintResult } from '../src/online/liveProtocol'
 
@@ -951,6 +952,11 @@ export class LeagueRoom {
       if (!this.league) return no('bad-state')
       if (!this.league.seats.some((x) => x.playerId === playerId)) return no('not-seated')
       if (this.league.current) return no('bad-state')
+      if (body.ready === true) {
+        // O Pronto só libera com a semana de treino montada ou delegada (quem tem "Delegar sempre" completa a semana pelo comando antes).
+        const teamId = this.league.seats.find((x) => x.playerId === playerId)!.teamId
+        if (!weekStatus(world, teamId).ready) return no('week-pending')
+      }
       this.league = setPlayerReady(this.league, playerId, body.ready === true, now)
       this.persist()
       await this.run()

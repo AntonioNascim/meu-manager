@@ -26,7 +26,7 @@ export function fullWeek(game: Game): Record<IsoDate, TrainingSession> {
  * Treino obrigatório antes do jogo: enquanto a semana não está montada, o Avançar fica bloqueado. O técnico monta a semana, delega à
  * comissão (só esta semana) ou liga "Delegar sempre". Sem dias de treino até o jogo, nada é pedido.
  */
-export function WeekGate({ game, onNavigate }: { game: Game; onNavigate: (screen: ScreenId, tab?: string) => void }) {
+export function WeekGate({ game, onNavigate, online = false }: { game: Game; onNavigate: (screen: ScreenId, tab?: string) => void; online?: boolean }) {
   const team = userTeam(game)
   const status = weekStatus(game.season, team.id)
   const [message, setMessage] = useState<string | null>(null)
@@ -48,7 +48,7 @@ export function WeekGate({ game, onNavigate }: { game: Game; onNavigate: (screen
   if (status.delegateAlways) {
     return (
       <div className="mt-3 rounded-[10px] border border-line bg-surface-2/60 p-3 text-sm" data-testid="week-gate-auto">
-        <b>A comissão monta a semana ao avançar.</b>
+        <b>{online ? 'A comissão monta a semana ao dar Pronto.' : 'A comissão monta a semana ao avançar.'}</b>
         <p className="mt-1 text-slate-300">Faltam {missingText(status.missing)}. Você ainda pode montar os dias antes.</p>
         <DelegateAlways on onChange={always} />
       </div>
@@ -56,7 +56,7 @@ export function WeekGate({ game, onNavigate }: { game: Game; onNavigate: (screen
   }
   return (
     <div className="mt-3 rounded-[10px] border border-draw/50 bg-draw/10 p-3 text-sm" data-testid="week-gate">
-      <b className="text-draw">Monte a semana de treino antes de avançar.</b>
+      <b className="text-draw">{online ? 'Monte a semana de treino antes de dar Pronto.' : 'Monte a semana de treino antes de avançar.'}</b>
       <p className="mt-1 text-slate-200">
         {status.missing.length === 1 ? 'Falta 1 dia' : `Faltam ${status.missing.length} dias`} ({missingText(status.missing)}). Monte você mesmo ou deixe com a comissão.
       </p>
