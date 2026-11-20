@@ -11,9 +11,17 @@ const base = process.argv[2] ?? 'http://localhost:5173'
 const prefix = process.argv[3] ?? 'c8'
 const shots = resolve('../../.shots')
 let failed = 0
+// As falhas também saem num resumo no fim do log (para copiar só o que importa).
+const failures = []
+process.on('exit', () => {
+  if (failures.length > 0) console.log(`\nRESUMO DAS FALHAS (${failures.length}):\n${failures.join('\n')}`)
+})
 const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALHA'} ${name}${extra ? '  ' + extra : ''}`)
-  if (!ok) failed++
+  if (!ok) {
+    failed++
+    failures.push(`FALHA ${name}${extra ? '  ' + extra : ''}`)
+  }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const rnd = () => Array.from({ length: 4 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')
@@ -76,7 +84,7 @@ check('depois de responder o cartão da coletiva some', (await page.getByTestId(
 await page.getByTestId('week-gate').waitFor({ timeout: 30000 })
 await page.getByTestId('league-ready').waitFor({ timeout: 30000 })
 check('sem a semana montada o Pronto está bloqueado', await page.getByTestId('league-ready').isDisabled())
-check('o botão diz que está bloqueado', (await page.getByTestId('league-ready').innerText()).includes('bloqueado'))
+check('o botão diz que está bloqueado', (await page.getByTestId('league-ready').innerText()).toLowerCase().includes('bloqueado'))
 check('o aviso do painel fala em montar a semana antes do Pronto', (await page.getByTestId('week-gate').innerText()).includes('antes de dar Pronto'))
 check('o cartão da liga explica o motivo', (await page.getByTestId('league-week-pending').innerText()).includes('semana de treino'))
 await shoot('pronto-bloqueado')

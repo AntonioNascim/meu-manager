@@ -11,9 +11,17 @@ const base = process.argv[2] ?? 'http://localhost:5173'
 const prefix = process.argv[3] ?? 'c6'
 const shots = resolve('../../.shots')
 let failed = 0
+// As falhas também saem num resumo no fim do log (para copiar só o que importa).
+const failures = []
+process.on('exit', () => {
+  if (failures.length > 0) console.log(`\nRESUMO DAS FALHAS (${failures.length}):\n${failures.join('\n')}`)
+})
 const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALHA'} ${name}${extra ? '  ' + extra : ''}`)
-  if (!ok) failed++
+  if (!ok) {
+    failed++
+    failures.push(`FALHA ${name}${extra ? '  ' + extra : ''}`)
+  }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const rnd = () => Array.from({ length: 4 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')
@@ -95,7 +103,21 @@ const sellOne = async (skip, exclude) => {
     for (const pick of picks) {
       await select.selectOption({ index: pick })
       const before = await squadSize()
-      await page.getByRole('button', { name: 'Vender', exact: true }).last().click()
+      // O botão de vender da folha "Negociar jogador" (a outra "Vender" é o seletor de venda ou empréstimo). Se não der para clicar (desabilitado, coberto
+      // por outra coisa...), o motivo vai para o log e o teste segue para o próximo comprador em vez de travar 30 s.
+      const sellButton = page.getByRole('button', { name: 'Vender', exact: true }).last()
+      const clicked = await sellButton.click({ timeout: 8000 }).then(() => true, () => false)
+      if (!clicked) {
+        const diag = await page.evaluate(() => {
+          const b = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === 'Vender').pop()
+          if (!b) return 'nenhum botão Vender na tela; diálogos: ' + [...document.querySelectorAll('[role=dialog]')].map((d) => d.innerText.replace(/\s+/g, ' ').slice(0, 120)).join(' | ')
+          const r = b.getBoundingClientRect()
+          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+          return JSON.stringify({ desabilitado: b.disabled, retangulo: [r.x, r.y, r.width, r.height].map(Math.round), alturaDaTela: innerHeight, porCima: top ? top.tagName + '.' + String(top.className).slice(0, 50) + ' ' + (top.innerText || '').slice(0, 30) : null, janela: document.body.innerText.includes('Janela fechada') })
+        })
+        saleErrors.set('não deu para tocar em Vender: ' + diag, (saleErrors.get('não deu para tocar em Vender: ' + diag) ?? 0) + 1)
+        continue
+      }
       await sleep(2000)
       if ((await squadSize()) < before) {
         await closeOverlays()

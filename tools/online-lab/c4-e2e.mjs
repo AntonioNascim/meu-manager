@@ -10,9 +10,17 @@ const base = process.argv[2] ?? 'http://localhost:5173'
 const prefix = process.argv[3] ?? 'c4'
 const shots = resolve('../../.shots')
 let failed = 0
+// As falhas também saem num resumo no fim do log (para copiar só o que importa).
+const failures = []
+process.on('exit', () => {
+  if (failures.length > 0) console.log(`\nRESUMO DAS FALHAS (${failures.length}):\n${failures.join('\n')}`)
+})
 const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALHA'} ${name}${extra ? '  ' + extra : ''}`)
-  if (!ok) failed++
+  if (!ok) {
+    failed++
+    failures.push(`FALHA ${name}${extra ? '  ' + extra : ''}`)
+  }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const rnd = () => Array.from({ length: 4 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('')

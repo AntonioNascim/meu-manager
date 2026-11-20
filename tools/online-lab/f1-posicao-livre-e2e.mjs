@@ -10,9 +10,17 @@ const base = process.argv[2] ?? 'http://localhost:5173'
 const prefix = process.argv[3] ?? 'f1'
 const shots = resolve('../../.shots')
 let failed = 0
+// As falhas também saem num resumo no fim do log (para copiar só o que importa).
+const failures = []
+process.on('exit', () => {
+  if (failures.length > 0) console.log(`\nRESUMO DAS FALHAS (${failures.length}):\n${failures.join('\n')}`)
+})
 const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALHA'} ${name}${extra ? '  ' + extra : ''}`)
-  if (!ok) failed++
+  if (!ok) {
+    failed++
+    failures.push(`FALHA ${name}${extra ? '  ' + extra : ''}`)
+  }
 }
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 380, height: 844 }, deviceScaleFactor: 2, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR' })
