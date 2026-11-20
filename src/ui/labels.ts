@@ -467,6 +467,14 @@ export const COMMAND_ERROR_LABELS: Record<string, string> = {
   'has-promise': 'Ele já tem uma promessa de vaga em andamento',
   'no-mirror': 'A liga ainda não carregou: tente de novo em instantes',
   server: 'O servidor não respondeu: tente de novo',
+  'bad-body': 'O servidor não entendeu o pedido: o jogo pode estar desatualizado. Recarregue a página e tente de novo',
+  'rate-limited': 'Muitas ações seguidas: espere alguns segundos e tente de novo',
+  'week-pending': 'Monte a semana de treino ou delegue à comissão antes de dar Pronto',
+  'bad-state': 'Isso não é possível agora',
+  forbidden: 'O servidor não deixou fazer isso',
+  'not-seated': 'Você não tem mais um clube nesta liga',
+  unauthorized: 'O servidor recusou o pedido. Confira a data e a hora do aparelho',
+  'unknown-identity': 'Esta conta ainda não existe no servidor',
 }
 export const TALK_KIND_LABELS: Record<TalkKind, string> = {
   praise: 'Elogiar',

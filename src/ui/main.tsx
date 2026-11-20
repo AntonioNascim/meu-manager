@@ -12,6 +12,7 @@ import { initPwa } from '../pwa/pwa'
 import { installErrorLog } from './techInfo'
 import { startAutosave } from '../store/autosave'
 import { flushCloud, loadAccount } from '../store/onlineAccount'
+import { activeMirror } from '../store/leagueSession'
 import { getGame, setGame } from '../store/gameStore'
 import { perform } from '../store/actions'
 import { beginLive } from '../store/liveMatch'
@@ -39,8 +40,12 @@ function startOnline() {
   void loadAccount()
   window.addEventListener('online', flushCloud)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushCloud()
+    if (document.visibilityState === 'hidden') {
+      activeMirror()?.flush() // a tática que espera a junção dos arrastos sai agora
+      flushCloud()
+    }
   })
+  window.addEventListener('pagehide', () => activeMirror()?.flush())
 }
 
 if (import.meta.env.DEV) {

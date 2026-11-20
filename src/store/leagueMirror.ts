@@ -20,9 +20,32 @@ export interface MirrorTransport {
 export type Connection = 'online' | 'offline'
 export type Outcome = { ok: true; info?: CommandInfo } | { ok: false; error: CommandError | 'offline' | 'no-mirror' | 'server'; minimumSalary?: number }
 
+/** Respostas do servidor que a tela sabe explicar (qualquer outra vira "o servidor não respondeu"). */
+const KNOWN_SERVER_ERRORS = new Set(['bad-body', 'rate-limited', 'week-pending', 'bad-state', 'forbidden', 'not-seated', 'unauthorized', 'unknown-identity'])
+
+/** Um comando à espera de ir ao servidor (ou a caminho dele). */
+interface Job {
+  command: LeagueCommand
+  started: boolean
+  info?: CommandInfo
+  waiters: ((outcome: Outcome) => void)[]
+}
+
+/**
+ * Espera antes de mandar uma tática: arrastos seguidos nesse tempo viram um comando só (vale o último). A espera recomeça a cada arrasto novo, até
+ * `TACTIC_DEBOUNCE_MAX_MS` desde o primeiro. A tela já mostra tudo na hora, então a espera não aparece para o técnico.
+ */
+export const TACTIC_DEBOUNCE_MS = 600
+export const TACTIC_DEBOUNCE_MAX_MS = 3000
+
 export class LeagueMirror {
   private state: MirrorState = emptyMirror()
   private optimistic?: SeasonState
+  /** Comandos aceitos aqui e ainda não confirmados pelo servidor, na ordem. A tela mostra o resultado de todos eles na hora. */
+  private jobs: Job[] = []
+  private debounceTimer?: ReturnType<typeof setTimeout>
+  private debounceResolve?: () => void
+  private debounceStart = 0
   private built?: { source: MirrorState; season: SeasonState | undefined }
   private chain: Promise<unknown> = Promise.resolve()
   connection: Connection = 'online'
@@ -40,6 +63,7 @@ export class LeagueMirror {
   constructor(
     private readonly transport: MirrorTransport,
     private readonly onChange: () => void = () => {},
+    private readonly tacticDebounceMs: number = TACTIC_DEBOUNCE_MS,
   ) {}
 
   get rev(): number {
@@ -54,7 +78,11 @@ export class LeagueMirror {
 
   /** O mundo que as telas leem: o da resposta mais recente do servidor ou, enquanto um comando espera, o que o comando já mudou. */
   season(): SeasonState | undefined {
-    if (this.optimistic) return this.optimistic
+    return this.optimistic ?? this.confirmedSeason()
+  }
+
+  /** O mundo como o servidor confirmou (mais o detalhe dos clubes abertos), sem os comandos que ainda esperam. */
+  private confirmedSeason(): SeasonState | undefined {
     if (this.built?.source !== this.state) this.built = { source: this.state, season: toSeasonState(this.state) }
     const base = this.built.season
     if (!base || this.details.size === 0) return base
@@ -125,7 +153,7 @@ export class LeagueMirror {
       const p = first.payload
       if (!p.full) {
         this.state = applyPayload(this.state, p)
-        this.optimistic = undefined
+        this.refreshOptimistic()
         this.onChange()
         this.persist?.(this.state)
         return true
@@ -142,7 +170,7 @@ export class LeagueMirror {
       }
       this.fullLoads++
       this.state = { ...staging, rev: p.rev }
-      this.optimistic = undefined
+      this.refreshOptimistic()
       this.onChange()
       // O mundo pode ter andado enquanto as páginas vinham: uma atualização curta fecha a diferença.
       const again = await this.transport.fetch(this.state.rev, 0)
@@ -154,37 +182,105 @@ export class LeagueMirror {
     return false
   }
 
-  /** Aplica um comando do técnico: mostra o resultado na hora e confirma no servidor (o oficial corrige o local, se diferirem). */
+  /** Refaz o que a tela mostra: o mundo confirmado com todos os comandos que ainda esperam o servidor aplicados por cima, na ordem. */
+  private refreshOptimistic(): void {
+    if (this.jobs.length === 0) {
+      this.optimistic = undefined
+      return
+    }
+    let world = this.confirmedSeason()
+    const teamId = this.teamId
+    if (!world || !teamId) {
+      this.optimistic = undefined
+      return
+    }
+    for (const job of this.jobs) {
+      const r = applyCommand(world, teamId, job.command, { humans: this.state.own?.humans ?? [] })
+      if (r.ok) world = r.world
+    }
+    this.optimistic = world
+  }
+
+  /**
+   * Aplica um comando do técnico: a tela mostra o resultado na hora (também dos que esperam a vez) e o servidor confirma depois (o oficial corrige o
+   * local, se diferirem). Várias mudanças de tática seguidas, antes de a anterior sair, viram um comando só: vale a última. Só devolve erro se o
+   * servidor realmente recusar, com o motivo.
+   */
   perform(command: LeagueCommand): Promise<Outcome> {
-    return this.serial(async () => {
+    return new Promise<Outcome>((resolve) => {
       const teamId = this.teamId
       const season = this.season()
-      if (!teamId || !season) return { ok: false, error: 'no-mirror' }
-      if (this.connection === 'offline') return { ok: false, error: 'offline' }
+      if (!teamId || !season) return resolve({ ok: false, error: 'no-mirror' })
+      if (this.connection === 'offline') return resolve({ ok: false, error: 'offline' })
       const local = applyCommand(season, teamId, command, { humans: this.state.own?.humans ?? [] })
       // Recusado aqui, nem chega ao servidor (a regra é a mesma).
-      if (!local.ok) return { ok: false, error: local.error, ...(local.minimumSalary !== undefined ? { minimumSalary: local.minimumSalary } : {}) }
-      this.optimistic = local.world
-      this.onChange()
-      const r = await this.transport.command(command, this.state.rev)
-      if (!r.ok) {
-        this.optimistic = undefined
-        if (r.error === 'offline') this.setConnection('offline')
-        this.onChange()
-        if (r.error === 'offline') return { ok: false, error: 'offline' }
-        if (r.reason) return { ok: false, error: r.reason, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) }
-        return { ok: false, error: 'server' }
+      if (!local.ok) return resolve({ ok: false, error: local.error, ...(local.minimumSalary !== undefined ? { minimumSalary: local.minimumSalary } : {}) })
+      const last = this.jobs[this.jobs.length - 1]
+      if (command.type === 'tactic' && last && !last.started && last.command.type === 'tactic') {
+        last.command = command
+        if (local.info) last.info = local.info
+        last.waiters.push(resolve)
+        this.bumpDebounce()
+      } else {
+        this.jobs.push({ command, started: false, ...(local.info ? { info: local.info } : {}), waiters: [resolve] })
       }
-      const info = r.info ?? local.info
-      if (r.payload.full) {
-        this.optimistic = undefined
-        await this.syncNow()
-        return { ok: true, ...(info ? { info } : {}) }
-      }
-      this.state = applyPayload(this.state, r.payload)
-      this.optimistic = undefined
+      this.refreshOptimistic()
       this.onChange()
-      return { ok: true, ...(info ? { info } : {}) }
+      void this.serial(() => this.runNext())
     })
+  }
+
+  /** Manda ao servidor o próximo comando que ainda não saiu (quando o anterior terminou). */
+  private async runNext(): Promise<void> {
+    const job = this.jobs.find((j) => !j.started)
+    if (!job) return
+    // Tática: espera um instante para juntar os arrastos que vierem logo em seguida (eles trocam o comando, que ainda não saiu).
+    if (job.command.type === 'tactic' && this.tacticDebounceMs > 0) await this.waitTactic()
+    job.started = true
+    const outcome = await this.send(job)
+    this.jobs = this.jobs.filter((j) => j !== job)
+    this.refreshOptimistic()
+    this.onChange()
+    for (const waiter of job.waiters) waiter(outcome)
+  }
+
+  private waitTactic(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.debounceStart = Date.now()
+      this.debounceResolve = resolve
+      this.debounceTimer = setTimeout(() => this.flush(), this.tacticDebounceMs)
+    })
+  }
+
+  /** Um arrasto novo chegou antes de o anterior sair: a espera recomeça (até o limite). */
+  private bumpDebounce(): void {
+    if (!this.debounceResolve || Date.now() - this.debounceStart >= TACTIC_DEBOUNCE_MAX_MS) return
+    if (this.debounceTimer) clearTimeout(this.debounceTimer)
+    this.debounceTimer = setTimeout(() => this.flush(), this.tacticDebounceMs)
+  }
+
+  /** Manda já o que espera a junção (a tela foi escondida ou fechada: não dá para esperar). */
+  flush(): void {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer)
+    this.debounceTimer = undefined
+    const resolve = this.debounceResolve
+    this.debounceResolve = undefined
+    resolve?.()
+  }
+
+  private async send(job: Job): Promise<Outcome> {
+    const r = await this.transport.command(job.command, this.state.rev)
+    if (!r.ok) {
+      if (r.error === 'offline') {
+        this.setConnection('offline')
+        return { ok: false, error: 'offline' }
+      }
+      if (r.reason) return { ok: false, error: r.reason, ...(r.minimumSalary !== undefined ? { minimumSalary: r.minimumSalary } : {}) }
+      return { ok: false, error: KNOWN_SERVER_ERRORS.has(r.error) ? r.error : 'server' }
+    }
+    const info = r.info ?? job.info
+    if (r.payload.full) await this.syncNow()
+    else this.state = applyPayload(this.state, r.payload)
+    return { ok: true, ...(info ? { info } : {}) }
   }
 }

@@ -100,12 +100,63 @@ check('o jogador fica onde foi solto (y)', Math.abs(after.y + after.height / 2 -
 check('o cartão mostra o papel que o motor entendeu', (await page.locator('[data-testid="role-card"]').innerText()).includes('O motor entende'))
 await shoot('solto')
 
-const t1 = await tacticNow()
+let t1 = await tacticNow()
 const i = t1.startingXI.indexOf(id)
 check('o servidor aceitou: o espelho tem os pontos livres do clube', Array.isArray(t1.spots) && t1.spots.length === 11, JSON.stringify(t1.spots?.[i]))
 check('o ponto guardado é onde o jogador foi solto (41% da largura, 38,5% da altura)', !!t1.spots?.[i] && Math.abs(t1.spots[i].x - 41) < 3 && Math.abs(t1.spots[i].y - 38.5) < 3, JSON.stringify(t1.spots?.[i]))
 check('a grade que o motor lê continua com 11 pontos diferentes', t1.grid && new Set(t1.grid.map((p) => `${p.row}.${p.lane}`)).size === 11)
 check('os mesmos 11 titulares', JSON.stringify(t1.startingXI) === JSON.stringify(t0.startingXI))
+
+// ------------------------------------------------------------------ vários jogadores mexidos em seguida: sem erro, comandos juntados, tudo guardado
+const commands = []
+page.on('request', (req) => {
+  if (req.method() === 'POST' && /\/command$/.test(new URL(req.url()).pathname)) commands.push(Date.now())
+})
+const dist = (a, b) => Math.hypot(((a.x - b.x) / 100) * 3, ((a.y - b.y) / 100) * 5.1)
+const LANES = [14, 32, 50, 68, 86]
+const ROWS = [91, 75, 59, 46, 33, 16]
+const current = (t) => t.startingXI.map((_, k) => t.spots?.[k] ?? { x: LANES[t.grid[k].lane], y: ROWS[t.grid[k].row] })
+const occupied = current(t1)
+const targets = []
+for (const y of [28, 40, 52, 66, 22, 58]) {
+  for (const x of [22, 42, 62, 80, 30, 70]) {
+    const c = { x, y }
+    if (targets.length < 4 && occupied.every((o) => dist(o, c) > 0.5) && targets.every((o) => dist(o, c) > 0.5)) targets.push(c)
+  }
+}
+check('achou 4 pontos livres no campo para mexer', targets.length === 4, JSON.stringify(targets))
+const movedIds = []
+const before = commands.length
+await field.evaluate((el) => el.scrollIntoView({ block: 'start' }))
+await page.evaluate(() => window.scrollBy(0, -70))
+await sleep(300)
+const box3 = await field.boundingBox()
+for (let n = 0; n < 4; n++) {
+  const tk = tokens.nth(6 + n)
+  movedIds.push(await tk.getAttribute('data-player'))
+  const fb = await tk.boundingBox()
+  await page.mouse.move(fb.x + fb.width / 2, fb.y + fb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box3.x + (box3.width * targets[n].x) / 100, box3.y + (box3.height * targets[n].y) / 100, { steps: 6 })
+  await page.mouse.up()
+}
+await sleep(3500)
+const sent = commands.length - before
+const errorTexts = await page.getByText(/O servidor não respondeu|não entendeu o pedido|Muitas ações seguidas/).count()
+check('nenhum erro vermelho apareceu ao mexer vários jogadores', errorTexts === 0, String(errorTexts))
+check('os arrastos seguidos foram juntados em menos comandos que arrastos', sent >= 1 && sent < 4, `${sent} comando(s) para 4 arrastos`)
+const t1b = await tacticNow()
+let allThere = true
+movedIds.forEach((pid, n) => {
+  const k = t1b.startingXI.indexOf(pid)
+  const s = t1b.spots?.[k]
+  if (!s || Math.abs(s.x - targets[n].x) > 3 || Math.abs(s.y - targets[n].y) > 3) allThere = false
+})
+check('o espelho tem os 4 jogadores onde foram soltos (o servidor aceitou tudo)', allThere, JSON.stringify(movedIds.map((pid) => t1b.spots?.[t1b.startingXI.indexOf(pid)])))
+check('o primeiro jogador mexido continua onde estava', Math.abs((t1b.spots?.[i]?.x ?? 0) - 41) < 3 && Math.abs((t1b.spots?.[i]?.y ?? 0) - 38.5) < 3)
+check('os mesmos 11 titulares e 11 pontos diferentes na grade', JSON.stringify(t1b.startingXI) === JSON.stringify(t0.startingXI) && new Set(t1b.grid.map((p) => `${p.row}.${p.lane}`)).size === 11)
+await shoot('varios-jogadores')
+t1 = t1b
 
 // ------------------------------------------------------------------ o servidor guardou: sair e voltar
 await tab('Início')
